@@ -1,0 +1,101 @@
+Mark,
+
+Here is another version of the assembly code, following Morrisett's
+"TALx86," a typed assembly language targeting x86. As far as I can
+tell that was their most recent, and last, work on typed asssembly
+language. I took the syntax from "TALx86: A Realistic Typed Assembly
+Language."
+
+Their TAL uses type annotations to specify preconditions on labels,
+types on labeled locations, and type coercions on instructions. They
+have an interesting array type for regions of memory. An array
+consists of a count of elements and an element size. The type system
+includes singleton natural numbers so array counts do not have to be
+explicitly given. Instead, an array can be parameterized by a natural
+and any operations which index into the array have to use by typed by
+singleton naturals that are less than or equal to the operation given.
+
+Labels have preconditions, which specify the types which must be in
+registers. Instructions also have type annotations but they seem to be
+only used for coercing the type of a register.
+
+TALx86 relies on a "macro" for memory allocation which puts the
+location of allocated memory into eax. So instead of using a fixed
+memory address for the array, we allocate it and put its address into
+edi. The original code fragment:
+
+   movl $a, edi
+
+becomes 
+
+    malloc $n, W
+    movl eax, edi
+
+where "W" means "word-sized" elements. After the above, edi contains a
+pointer to an array of n word-sized elements.
+
+The original code, with the new malloc instruction is then:
+
+    malloc $n, W 
+    movl eax, edi
+    movl $n, ecx
+  loop:
+    movl $0, %(edi)
+    addl $4, edi
+    decl ecx
+    jnz loop
+    return
+
+Now we can annotate the type of registers after each instruction. Each
+annotation is a post-condition - the type of registers after it is
+executed. Pre-conditions would also need to be specified, but I ignore
+them for now.
+
+    malloc $n, W ; eax :: array({x}, W)
+
+That is, eax points to an array of {x} count W-sized elements. Note
+that array is parametric in {x} here -- though it is a natural
+number. Since $n is statically known, {x} could be instantiated to the
+actual size of the array, but I am not doing that in this case.
+
+    movl eax, edi ; edi :: array({x}, W), eax :: ...
+    movl $n, ecx  ; ecx :: {x}, edi :: ..., eax :: ...
+
+Since ecx and edi are parameterized over the same {x}, I know
+they have the same value.
+
+  loop:     ; edi :: array({y}, W), ecx :: {y}
+
+To enter the loop, edi must point to an array and ecx must hold a
+value of the same type as the count, i.e., it must be equal to the
+count of values in the array. I use {y} above to make it clear that
+the type variable is distinct from {x}, though it would be unified
+with {x} during type-checking.
+
+    movl $0, %(edi) ; edi :: array({y}, W)
+
+This doesn't change the type of anything but you would want to check
+that $0 is a word value, since only word values can be stored in the
+array.
+
+    addl $4, edi   ; edi :: array({y - 1}, W)
+
+Incrementing edi means it now points to an array with one less
+element. Here you would also check that $4 equals the element size in
+the array.
+
+    decl ecx ; ecx :: {y - 1}
+
+Now the type of ecx is also one less, matching the type of the array
+count in edi.
+
+    jnz loop
+
+I'm not sure on the post-condition here. However, you would check that
+the current type environment matches the preconditinos for loop.
+
+    return
+
+I suppose the post-condition here is the type environment so far.
+
+

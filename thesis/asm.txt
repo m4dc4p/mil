@@ -1,0 +1,48 @@
+Idea: use Habit types to describe Habit programs AND assembly
+programs.
+
+Hope: Generate assembly source from Habit types
+
+Good Enough: Verify assembly source using *inferred* Habit types. If
+Habit types are sound, source is sound.
+
+Consider the function setVal, which sets a value in an array:
+
+  setVal :: Ref (Array 256 Int) -> Ix 256 -> Int -> m ()
+  setVal arr idx val = do
+    r <- readRef (arr @@ idx)
+    writeRef r val
+
+Almost no polymorphis is present to simplify the argument. The monadic
+result is a little hard to deal with but ignore it for now.
+
+Now consider possible assembler source for each function in setVal. We
+put all arguments in global locations for simplicity. Details such as
+stack management, prologue, epilogue, etc. are also left out.
+
+First, consider (@@):
+
+  movl $idx, %eax      -- $idx is index of element in the array, zero-based.
+  multl $width, %eax   -- $width is size of elements in the array.
+  addl $arr, %eax      -- $arr is address of array in memory.
+                       -- Result in eax. 
+
+Now, readRef:
+
+  movl $arr, %eax      -- result (address of reference) in eax
+
+writeRef:
+
+  movl $arr, %eax      -- address of reference in eax
+  movl $val, %(eax)    -- write value at address
+
+What would the types of these functions be in a typed assembly
+language? We take the concrete types from setVal above:
+
+  (@@) :: { $arr :: ARef 1 (Array 256 Int), 
+            $idx :: Ix 256, $width :: 1, %eax :: Ref Int }
+  readRef :: { $arr :: ARef 1 (Array ?? Int) , %eax :: Ref Int }
+  writeRef :: { $arr :: ARef 1 (Array ?? Int), $val :: Int }
+
+Problem: how does these types "sum" to become Ref (Array 256 Int) ->
+Ix 256 -> Int -> m ()?

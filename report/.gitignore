@@ -1,0 +1,6 @@
+*.eps
+*.log
+*.dvi
+*.ptb
+*.tmp.tex
+*.aux

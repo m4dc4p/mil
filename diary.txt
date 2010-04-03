@@ -1,0 +1,39 @@
+Week of 4/6/09
+-------------
+
+ * Working on converting to a register machine.
+
+ * How does compileMAbs work with ECase/EAbs? In ECase, there is an
+   expression to consider. In EAbs, there are just arguments but we
+   don't know what the register is for those. Do I pass in the well
+   known argsLoc?
+
+   * compileMAbs needs to work as before. Each "parameter" to the
+     match consumes an argument. Arguments are always found in argLoc/cloLoc.
+     As parameters are consumed, they are copied into an ever-growing closure.
+     The final parameter of the match is not consumed - it is left alone and
+     added to the list of locations which compileMatch should look in for its
+     arguments. 
+
+     This does seem to imply a stack of argument/closure registers that are
+     being popped as arguments are consumed.
+
+ * Are closures necessary with a register machine (infinite registers)?
+
+   Should they be implemented because they are obviously necessary
+   in a real machine w/ limited registers.
+
+ * compileGuard wants to return an environment or a register, but not
+   both. Should the register be undefined or should I use Either? Is
+   the scheme correct?
+
+ * compile MAlt - almost want the result register before I've compiled the
+   code. Exactly as discussed last week?
+
+Week of 4/13/09
+---------------
+
+  * EAbs - what is the "initial argument" to compileMAbs, if any? Simple
+    for ECase but EAbs not so obvious.
+
+  * What do I do with the register result from compileMAbs in compileDecl?

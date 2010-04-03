@@ -1,0 +1,15 @@
+Interpretation and Compilation of Habit Programs (ICHB)  
+
+  * Audience: Familiarity with Habit; Unfamiliar with AST/Parser.
+  * Goals
+    * Describe data structures generated in assembler
+    * Describe semantics of intermediate language
+    * Detail interesting techiques in register & assembly compilers.
+    * Detail translation from Habit to IL to ASM (reference/appendix)
+  * Translation to Register Machine
+    * Instruction Set
+    * Data/Closure values
+  * Remaining Work
+    * Primitives
+    * Bit data
+    * Classes/instances

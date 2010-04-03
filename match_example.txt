@@ -1,0 +1,176 @@
+Hi Justin,
+
+I started writing the following email this morning, thinking it
+wouldn't take too long ... but then I struggled to figure out
+how to explain things clearly, and ended up having to go off to
+a series of meetings before I was done.  Sorry for the delay,
+and sorry that the result has ended up being this long!
+
+My first reaction is that I think compileMatch needs some extra
+extra arguments: to track the number of elements on the stack,
+to describe the behavior that is required when a match fails,
+and to describe the behavior that is required when a match
+succeeds.  In the context of the code that you sent, I don't
+know what you mean by "should I increase the stack height by 1",
+but with the first extra parameter that I mentioned above, this
+would correspond to using the value of that parameter plus one.
+
+But let's back up a bit before we get into code.
+
+Suppose that we want to generate code for MAlt alt1 alt2 at a
+point in the program where there are n values on the top of the
+stack.  We're going to start by producing code that looks
+something like the following (with a fresh label, l1, at the
+end, whose purpose will become clear below):
+
+      ... code that attempts to
+      run alt1 to conclusion,
+      starting with n items on
+      the stack ...
+ l1:
+
+Of course, the code for a Match can Fail, so we need to be
+prepared for that.  I'll take this in three steps:
+
+ 1) code for alt2;
+ 2) handling failures in the code for alt1;
+ 3) handling failures in the code for alt2.
+
+Step 1: First, I'll generate a chunk of code for alt2 that looks
+something like the following:
+
+  l2:
+      ... code that attempts to
+      run alt2 to conclusion,
+      starting with n items on
+      the stack ...
+      goto l1
+
+This code has another new label, l2, which marks the beginning of
+the code for alt2.  Note that we have also added a "goto l1" at
+the end of the code for alt2 so that, regardless of whether we
+execute alt1 or alt2, a successful match will always continue by
+executing the code at l1.  That part was easy ... :-)
+
+Step 2: What do we do at points where the code for alt1 fails?
+The answer, of course, is to jump to l2 so that we can try the
+second alternative.  But this might not be enough ... it is
+possible that that the code for alt1 will have added things to the
+stack before we reach the point at which the failure occurs.  If
+there are m items on the stack at that failure point, then we will
+need to pop (m - n) items off the stack before continuing with the
+code at l2.  And note that there might be multiple failure points
+in the code for alt1, and that the appropriate value of m might be
+different in each case.  There are two ways to deal with this.
+One option is to insert an instruction at the beginning of the
+code for alt2 (i.e., immediately after the label l2), with a
+instruction of the form "ResetStack n", whose purpose is to reset
+the stack size to the value n, immediately discarding any new
+elements that were pushed. before the failure point.  This is
+simple to do because it only requires one new instruction, and
+because failures in alt1 can then be translated into simple jump
+instructions "goto l2".  However, if a failure occurs at a point
+where m = n, then it is not necesary to do a ResetStack.  To
+handle this case, we could use two labels at the top of the code
+for alt2:
+
+  l2: ResetStack n
+  l3: ... code that attempts to
+      run alt2 to conclusion,
+      starting with n items on
+      the stack ...
+      goto l1
+
+Now we arrange for failure points in the code for alt1 to be
+translated as either "goto l3" (at points where m=n), or as
+"goto l2" (at points where m>n).  If it turns out that the
+only failure points in alt1 occur when m=n, then the ResetStack
+instruction at l2 will be dead code.  If there are no failure
+points at all in alt1, then the code at l2 and l3 will be dead
+code.  A simple dead code elimination pass can be used to remove
+blocks of code like this after the process is complete.  (In
+fact, if we're really carefull about the way we implement this,
+the dead code will be eliminated automatically as a result of
+Haskell's garbage collection.)
+
+Step 3: Now we just need to figure out what to do with the
+points in alt2 where that code could fail.  In this case, the
+required behavior will be determined by whatever failure
+behavior was required for the full match, MAlt alt1 alt2.
+If that was a top level match, then the whole thing wll fail.
+This could be represented by inserting a "goto topFailure"
+instruction, where "topFailure" is some fixed label where we
+have inserted some code to report an error and stop execution.
+But because we're defining our own machine, it's better to
+make up our own new instruction, MatchFails, for this.
+The other possibility is that we might have another alt to
+try if alt2 fails, in which case we'll use essentially the
+same scheme as above in Step 2.
+
+-----
+
+Ok, so now let's start looking at code.  First of all, I
+think we'll need to have a way to describe what the compiled
+code for a match should do when a failure occurs.  This might
+be represented as a value of the following type:
+
+ data OnFail = Abort
+             | OtherAlt Label Int Label
+
+The "Abort" case corresponds to the MatchFails case.  The
+"OtherAlt" case corresponds to the case where we have another
+alternative to try.  The situation in the example above, for
+example, would be described by the value OtherAlt l2 n l3.
+
+In a similar way, I think we'll also want a way to describe
+what the code should do after a successful match.  This time
+we could use a value of the following type:
+
+ type OnSucc = [Instr]
+
+which represents the set of instructions that we want to
+run after the code is done.  This could be [] if we just
+want to run on to the next instruction (as in the case for
+alt1 above), or [Goto l1] (as in the case for alt2 above),
+or something else if we want ...
+
+So now we can write out a type signature for compileMatch:
+
+ compileMatch :: Match     -- the match that we're compiling
+              -> Env       -- the environment
+              -> Int       -- # elements on stack at this point
+              -> OnSucc    -- code to execute when done
+              -> OnFail    -- what to do on failure
+              -> [Arg]     -- args for MPats
+              -> M [Instr] -- generated instructions
+
+And then we can start to write code like the following:
+
+ compileMatch m env n s f args
+  = case m of
+      MExp e     -> do is <- compileExpr e env n
+                       return (is ++ s)
+      MFail      -> return [ handleFail n f ]
+      MAlt m1 m2 -> do l1 <- newLabel
+                       l2 <- newLabel
+                       l3 <- newLabel
+                       let f1 = OtherAlt l2 n l3
+                       is1 <- compileMatch m1 env n [] f1
+                       is2 <- compileMatch m2 env n [Goto l1] f
+                       tell ([Label l2,
+                              ResetStack n,
+                              Label l3] ++ is2)
+                       return (is1 ++ [Label l1] ++ s)
+      ...
+
+ handleFail        :: Int -> OnFail -> Instr
+ handleFail m Abort = MatchFails
+ handleFail m (OtherAlt l2 n l3)
+                    = Goto (if m>n then l2 else l3)
+
+I hasten to point out that this code is completely untested, and
+doesn't cover all cases.  I'm sure it can be improved, but I hope
+it will give you some reasonable idea of what I have in mind.
+
+All the best,
+Mark

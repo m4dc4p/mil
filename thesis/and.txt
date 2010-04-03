@@ -1,0 +1,113 @@
+Consider and:
+
+  and :: [Bool] -> Bool
+
+We desugar the list to a reference type:
+
+  and :: Ref (List Bool) -> Bool
+
+Then the booleans are desugared to types containing tags only (and
+they are not references):
+
+  and :: Ref (List (Ix 1)) -> Ix 1
+
+Finally, we desugar the List constructor to a struct which contains 
+a tag distinguishing Cons and Nil, a field containing the Bool element
+of the list, and a field referring to tail of the list:
+
+  and :: Ref (struct (Ix 1) (Ix 1) (Ref (List Bool))) -> Ix 1
+
+Notice how heap objects are explicit here -- Ref
+means heap. Not all heap objects are explicit of course - if we
+allowed partial application and this function took more than 1 argument
+we would not see the closure object in the type.
+
+***
+Aside - a union type would make this more efficient:
+
+  List Bool == struct Tag (union Unit (struct Bool (List Bool)))
+
+The Tag field distinguishes Nil and Cons. The second field contains Unit (i.e, nothing
+usefl) or two cells, the first contaiing the value in the list and the second containing
+a reference to the end of the list.
+
+Ideally you would want *no* data in the second cell if the Tag was "Nil", but I'm
+not sure how to express that. Maybe invent a Void type which has no runtime representation:
+
+  List Bool == struct Tag (union Void (struct Bool (List Bool)))
+***
+
+In Habit we could implement and as:
+
+  and [] = True
+  and (False:_) = False
+  and (_:bs) = and bs
+
+In assembler, we assume %esi contains a pointer to our argument in the heap. %eax will
+contain our result:
+
+  and:
+    cmp     Nil, %(esi)         -- Compare tag in argument to empty list.
+    je      EmptyList                 
+    movl    %(esi + 4), %eax    -- Look at value in Cons node
+    cmp     False, %eax         
+    je      Done                -- Short-circuit on false value
+    ... prologue elided ...
+    movl %(esi + 8), %esi       -- Load tail of list into argument register
+    call $and                   -- call ourselves
+    ... epilogue elided ...     
+    jmp Done                    -- Result in %eax already
+
+ EmptyList:
+    movl True, %eax
+    jmp Done
+ 
+ Done:
+    return                      -- %eax contains result    
+
+
+Now we annotate each instruction with pre and post conditions. Boring or 
+unchanged conditions aren't shown:
+
+  esi :: Ref (struct (Ix 1) (Ix 1) (Ref (List Bool)))
+    and: 
+
+  esi :: Ref (struct (Ix 1) ...)/Ref (List ...)
+      cmp     Nil, %(esi)         -- Compare tag in argument to empty list.
+      je      EmptyList                 
+
+  esi :: Ref (struct (Ix 1) (Ix 1) ...)
+      movl    %(esi + 4), %eax    -- Look at value in Cons node
+  eax :: Bool
+
+      cmp     False, %eax         
+      je      Done                -- Short-circuit on false value
+      ... prologue elided ...
+
+  esi :: Ref (struct (Ix 1) (Ix 1) (Ref (List Bool)))
+      movl %(esi + 8), %esi       -- Load tail of list into argument register
+  esi :: Ref (List Bool)
+
+      call $add                   -- call ourselves
+  eax :: Ix 1
+      ... epilogue elided ...     
+      jmp Done                    -- Result in %eax already
+
+    EmptyList:
+      movl True, %eax
+  eax :: Ix 1/Bool
+
+      jmp Done
+
+  eax :: Ix 1/Bool 
+   Done:
+      return                      -- %eax contains result    
+  eax :: Ix 1/Bool 
+
+
+
+
+
+
+
+

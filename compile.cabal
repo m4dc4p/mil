@@ -1,0 +1,52 @@
+name: caffeine
+version: 0.1
+cabal-version: >= 1.2
+build-type: Simple
+
+flag debug
+  description: Include annotations in generated code.
+  default: False
+
+library
+  build-depends: base, value-supply, mtl, containers, filepath, habit-front,
+                 GraphSCC
+  ghc-options: -O
+  hs-source-dirs: .
+                                
+  if flag(debug)
+    cpp-options:-DDEBUG
+        
+  exposed-modules: Habit.Compiler.Stack.Machine
+                   Habit.Compiler.Stack.Compiler
+                   Habit.Compiler.Stack.Eval
+                   Habit.Compiler.Register.Machine
+                   Habit.Compiler.Register.Compiler
+                   Habit.Compiler.Register.Eval
+                   Habit.Compiler.X86.Compiler
+        
+executable register-compiler
+  main-is: Habit/Compiler/Register/RunCompiler.hs
+  build-depends: base, value-supply, mtl, containers, filepath, habit-front
+  
+  ghc-options: -O
+  hs-source-dirs: .
+                                
+  if flag(debug)
+    cpp-options:-DDEBUG
+
+executable register-interpreter
+  main-is: InterpR.hs
+  build-depends: base
+  ghc-options: -O
+  hs-source-dirs: .
+
+executable x86-compiler
+  main-is: Habit/Compiler/X86/RunCompiler.hs
+  build-depends: base, value-supply, mtl, containers, filepath, habit-front, process
+  
+  ghc-options: -O
+  hs-source-dirs: .
+                                
+  if flag(debug)
+    cpp-options:-DDEBUG
+
