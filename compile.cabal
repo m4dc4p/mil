@@ -9,7 +9,7 @@ flag debug
 
 library
   build-depends: base, value-supply, mtl, containers, filepath, habit-front,
-                 GraphSCC
+                 GraphSCC, fgl >= 5.4 && < 6
   ghc-options: -O
   hs-source-dirs: .
                                 

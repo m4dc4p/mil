@@ -7,13 +7,11 @@ import Data.Map (Map)
 import Data.List (intercalate)
 import Data.Maybe (fromJust)
 
-
-
--- ^ A register is just a unique name for
+-- | A register is just a unique name for
 -- a location. 
 type Reg = String
 
--- ^ A field is referred to by an offset within
+-- | A field is referred to by an offset within
 -- a particular register. Fields are indexed from 0.
 type Field = (Reg, Int)
 
@@ -22,8 +20,6 @@ argReg, cloReg, resultReg :: Reg
 cloReg = "clo"
 argReg = "arg"
 resultReg = "result"
-
-
 
 -- | Instructions available to the machine.
 data Instr = Enter Reg Reg Reg -- ^ Enter the closure at the first location, with the argument at the second location.
@@ -58,7 +54,6 @@ type Tag = String
 -- additionally means the location is the entry point
 -- for a function. 
 type Label = String
-
 
 -- | Values the machine can represent.
 data Val = Num Int -- ^ An integer value.
@@ -230,8 +225,6 @@ step (Jmp l) machine@(Machine { program = p })
 step (Error _) machine = machine 
 step (Note _) machine = next machine
 
-
-
 -- | Advance to next instruction. 
 next :: Machine -> Machine
 next machine@(Machine { program = pc}) = machine { program = nextInstr pc} 
@@ -287,8 +280,6 @@ allocate reg str amt machine@(Machine { registers = rs })
     = let v = (Data str . replicate amt $ Num 0)
       in next $ machine { registers = setRegister reg v rs }
 
-
-
 -- | Get the value of a register, if the register exists.
 getRegister :: Registers -> Reg -> Maybe Val
 getRegister registers r = Map.lookup r registers
@@ -315,8 +306,6 @@ getField (Data l fields) o =
     case drop o fields of
       (v:_) -> Just v
       _ -> Nothing
-
-
 
 showMachine :: Machine -> String
 showMachine (Machine { program = p

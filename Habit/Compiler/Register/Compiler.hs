@@ -29,6 +29,11 @@ type Code = (Label, [Instr])
 -- | Specify how to label lists of instructions. 
 type Label = String 
 
+-- | A group represents a function body, more or less.  First element
+--  is the Label of the code element which is the entry point for the
+--  group.  Second element is the number of arguments expected in the
+--  closure when the entry point code element is executed. Third
+--  element is the code making up the group.
 type Group = (Label, Int, [Code])
 
 -- | State we need during compilation. nextID gives us
@@ -149,8 +154,6 @@ getInstrs groups = concatMap snd . concatMap third . map addLabels $ groups
       addLabels (entry, size, blocks) = 
           let blocks' = map (\(l, b) -> (l, H.Label l : b)) blocks
           in (entry, size, blocks')
-
-
 
 -- | An environment is a list of name & location pairs.
 type Env = [(Name, Reg)]
