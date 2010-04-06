@@ -21,8 +21,6 @@ import Habit.Syntax.Utils (DeclSCC(..), decl_deps)
 import Habit.Compiler.Register.Machine (Instr, Reg, Field)
 import qualified Habit.Compiler.Register.Machine as H -- H for hardware
 
-
-
 -- | Code is a labeled list of instructions.
 type Code = (Label, [Instr])
 

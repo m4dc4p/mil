@@ -45,7 +45,10 @@ act Check params =
     _  -> mapM_ (save_typed_mod_dump optimizer) =<< load_files params
 act a _ = crash $ OtherError $ "Unsupported action " ++ show a
 
-optimizer gs = return gs
+optimizer gs = io $ do
+  let gr = makeCFG gs 
+  writeViz gr
+  return gs
 
 --------------------------------------------------------------------------------
 
