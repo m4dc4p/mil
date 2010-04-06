@@ -45,23 +45,23 @@ act Check params =
     _  -> mapM_ (save_typed_mod_dump optimizer) =<< load_files params
 act a _ = crash $ OtherError $ "Unsupported action " ++ show a
 
-optimizer gs = io $ do
+optimizer file gs = io $ do
   let gr = makeCFG gs 
-  writeViz gr
+  writeViz file gr
   return gs
 
 --------------------------------------------------------------------------------
 
-save_typed_mod_dump :: ([Group] -> SessionM [Group]) -> SCC TypedModule -> SessionM ()
+save_typed_mod_dump :: (String -> [Group] -> SessionM [Group]) -> SCC TypedModule -> SessionM ()
 save_typed_mod_dump _ (CyclicSCC {}) = crash $ OtherError
                                            $ "Cyclic SCC"
 save_typed_mod_dump optimizer (AcyclicSCC mo) =
   do let m = the_ast (get_pass mo)
      opts <- get_cmd_opts
-     supply <- io newNumSupply
-     funcs <- optimizer (compile supply m)
      let env = default_pp_env { pp_opts = opt_pp opts }
          file_name = mod_name_to_file (mod_name m)
+     supply <- io newNumSupply
+     funcs <- optimizer file_name (compile supply m)
      save_file (file_name <.> "dump")
                    $ show $ run_pp_with env $ dump_typed_mod m
 #ifdef DEBUG
