@@ -2,37 +2,65 @@ module Habit.Compiler.Register.ControlFlowGraph (makeCFG, writeViz)
 
 where
 
-import Data.Graph.Inductive.Graph
-import Data.Graph.Inductive.Tree
-import Data.Graph.Inductive.Graphviz
 import System.IO
+import Data.Graph.Inductive.Graph ((&), Node)
+import qualified Data.Graph.Inductive.Graph as G (empty)
+import Data.Graph.Inductive.Tree (Gr)
+import Data.Graph.Inductive.Graphviz (graphviz')
+import Data.Map (Map, (!))
+import qualified Data.Map as Map
 
-import Habit.Compiler.Register.Compiler
-import Habit.Compiler.Register.Machine
+import Habit.Compiler.Register.Compiler (Group, Code, Label)
+import Habit.Compiler.Register.Machine (Instr(..))
 
 makeCFG :: [Group] -> Gr String ()
 makeCFG groups = 
     let emptyAdj = [] :: [((), Node)] -- empty adjacency list
         adj p = [((), p)] -- single adjacent node
-        addInstr :: (Gr String (), (Int, Int)) -> Instr -> (Gr String (), (Int, Int))
-        addInstr s (Note _) = s
-        addInstr (g, (prev, next)) instr = ((adj prev
-                                     , next
-                                     , showInstr instr
-                                     , emptyAdj) & g, (next, next + 1))
-        addLabel :: (Gr String (), Int) -> Code -> (Gr String (), Int)
-        addLabel (g, m) (label, instrs) = 
+        -- add a node with a forward link
+        forward node prevNode succNode instr = (adj prevNode
+                                               , node
+                                               , showInstr instr
+                                               , adj succNode)
+        -- Add control links between instructions and labels
+        linkInstr :: Map Label Node -> (Gr String (), (Node, Int)) -> Instr -> (Gr String (), (Node, Int))
+        linkInstr labelMap (g, (prev, next)) instr@(Jmp label) =
+          (forward next prev (labelMap ! label) instr & g, (next, next + 1))
+        linkInstr labelMap (g, (prev, next)) instr@(FailT _ _ label) =
+          (forward next prev (labelMap ! label) instr & g, (next, next + 1))
+        linkInstr labelMap s (Note _) = s
+        linkInstr labelMap (g, (prev, next)) instr = ((adj prev
+                                                 , next
+                                                 , showInstr instr
+                                                 , emptyAdj) & g, (next, next + 1))
+        -- Add control links between instructions
+        linkCode :: Map Label Node -> (Gr String (), Int) -> Code -> (Gr String (), Int)
+        linkCode labelMap (g, next) (label, instrs) = 
+          let predNode = labelMap ! label
+              (g', (_, next')) = foldl (linkInstr labelMap) (g, (predNode, next)) instrs
+          in (g', next')
+        -- Adds all labels to the graph and creates a map from
+        -- labels to nodes.
+        mkLabelGraph :: (Gr String (), (Map Label Node, Int)) -> Code -> (Gr String (), (Map Label Node, Int))
+        mkLabelGraph (g, (labelMap, next)) (label, instrs) = 
           let labNode = (emptyAdj
-                        , m
+                        , next
                         , label
                         , emptyAdj)
-              (instrGraph, (_, m')) = foldl addInstr (labNode & g, (m, m + 1)) instrs
-          in (instrGraph, m')
-        mkSubGraph :: (Gr String (), (Maybe Int, Int)) -> Group -> (Gr String (), (Maybe Int, Int))
-        mkSubGraph (g, (prev, n)) (_, _, blocks) = 
-          let (subgraph, n') = foldl addLabel (g, n) blocks
-          in (subgraph, (Just n', n' + 1))
-    in fst $ foldl mkSubGraph (empty, (Nothing, 0)) groups
+              addInstrLabels :: (Gr String (), (Map Label Node, Int)) -> Instr -> (Gr String (), (Map Label Node, Int))
+              addInstrLabels (g, (labelMap, next)) (Label l) = 
+                let labNode = (emptyAdj
+                              , next
+                              , l
+                              , emptyAdj)
+                in (labNode & g, (Map.insert l next labelMap, next + 1))
+              addInstrLabels s _ = s
+          in foldl addInstrLabels (labNode & g, (Map.insert label next labelMap, next + 1)) instrs
+        -- Gets all code blocks from all groups
+        blocks = concatMap (\(_, _, code) -> code) groups
+        x :: (Gr String (), (Map Label Node, Int))
+        x@(labGraph, (labMap, nextNode)) = foldl mkLabelGraph (G.empty, (Map.empty, 0)) blocks
+    in fst $ foldl (linkCode labMap) (labGraph, nextNode) blocks
 
 showInstr :: Instr -> String
 showInstr (Enter _ _ _) = "Enter"
