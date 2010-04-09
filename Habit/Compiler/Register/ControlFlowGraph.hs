@@ -28,6 +28,10 @@ makeCFG groups =
           (forward next prev (labelMap ! label) instr & g, (next, next + 1))
         linkInstr labelMap (g, (prev, next)) instr@(FailT _ _ label) =
           (forward next prev (labelMap ! label) instr & g, (next, next + 1))
+        linkInstr labelMap (g, (prev, next)) instr@(AllocC _ lab _) = ((adj prev
+                                                 , next
+                                                 , showInstr instr ++ " " ++ lab
+                                                 , emptyAdj) & g, (next, next + 1))
         linkInstr labelMap s (Note _) = s
         linkInstr labelMap (g, (prev, next)) instr = ((adj prev
                                                  , next

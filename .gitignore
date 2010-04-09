@@ -19,3 +19,6 @@
 Parsing/
 ifaces/
 dist
+*.dot
+*.pdf
+*.png

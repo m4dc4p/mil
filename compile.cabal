@@ -8,8 +8,9 @@ flag debug
   default: False
 
 library
-  build-depends: base, value-supply, mtl, containers, filepath, habit-front,
-                 GraphSCC, fgl >= 5.4 && < 6
+  build-depends: base > 4 && < 5, value-supply >= 0.5 && < 1, mtl >= 1.1 && < 2, containers >= 0.3 && < 1, 
+                 filepath >= 1.1 && < 2, habit-front,
+                 GraphSCC >= 1 && < 2, fgl >= 5.4 && < 6
   ghc-options: -O
   hs-source-dirs: .
                                 
