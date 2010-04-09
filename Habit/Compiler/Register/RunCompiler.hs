@@ -21,6 +21,7 @@ import Habit.Compiler.Register.Compiler (compile, getInstrs, Group)
 import Habit.Compiler.Register.Machine (Instr(Note))
 import Habit.Compiler.Register.PrintModule (dump_typed_mod)
 import Habit.Compiler.Register.ControlFlowGraph
+import Habit.Compiler.Register.Dataflow ()
 
 main :: IO ()
 main = parse_opts `fmap` getArgs >>= \res ->
