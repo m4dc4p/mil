@@ -38,10 +38,26 @@ type ConstFact = Map.Map M.Reg HasConst
 -- into Hoopl lables.
 makeBody :: C.Group -> FuelMonad (Body InstrNode)
 makeBody (_, _, blocks) = do
+      -- Turn a list of blocks into a body.
   let toBody :: [Block InstrNode O C] -> Body InstrNode
       toBody = undefined
+
+      -- Turn a list of instructions into a block.
       toBlock :: (C.Label, [M.Instr]) -> FuelMonad (Block InstrNode O C)
-      toBlock = undefined
+      toBlock (lab, instrs) = do
+        let firstInstr = LabelNode (M.Label lab) (hash l)
+        return . foldl BCat firstInstr . map (BUnit . mkBlock) $ instrs
+
+      -- Turn a (string) label into a numeric label
+      hash :: String -> Label
+      hash = undefined
+
+      -- Turn a machine instruction into a InstrNode
+      mkNode instr@(M.Label l) = LabelNode instr (hash l)
+      mkNode instr@(M.Enter _ _ _) = Enter instr
+      mkNode instr@(M.Copy _ _) = Copy instr
+      mkNode instr@(M.Ret _) = Ret instr
+      mkNode instr = Rest instr
   mapM toBlock blocks >>= return . toBody
 
 -- | Apply constant propogation to a body.
