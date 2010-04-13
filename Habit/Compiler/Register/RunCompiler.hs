@@ -6,6 +6,7 @@ import System.FilePath
 import Control.Monad(forM_)
 import Data.Graph(SCC(..))
 import Data.Supply
+import Compiler.Hoopl (runWithFuel)
 
 import Habit.Options
 import Habit.Passes
@@ -21,7 +22,7 @@ import Habit.Compiler.Register.Compiler (compile, getInstrs, Group)
 import Habit.Compiler.Register.Machine (Instr(Note))
 import Habit.Compiler.Register.PrintModule (dump_typed_mod)
 import Habit.Compiler.Register.ControlFlowGraph
-import Habit.Compiler.Register.Dataflow ()
+import Habit.Compiler.Register.Dataflow 
 
 main :: IO ()
 main = parse_opts `fmap` getArgs >>= \res ->
@@ -43,13 +44,14 @@ act Check params =
     -- XXX: This check probably should not be here...
     [] -> io $ do hPutStrLn stderr "Please specify which files to check."
                   exitFailure
-    _  -> mapM_ (save_typed_mod_dump optimizer) =<< load_files params
+    _  -> mapM_ (save_typed_mod_dump visualizer) =<< load_files params
 act a _ = crash $ OtherError $ "Unsupported action " ++ show a
 
-optimizer file gs = io $ do
-  let gr = makeCFG gs 
-  writeViz file gr
-  return gs
+visualizer :: (String -> [Group] -> SessionM [Group])
+visualizer file gs = io $ do
+  writeViz file (makeCFG gs)
+  return $ runWithFuel 1000 (makeGraph gs)
+        
 
 --------------------------------------------------------------------------------
 

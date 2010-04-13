@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs #-}
-module Habit.Compiler.Register.Dataflow
+module Habit.Compiler.Register.Dataflow (makeGraph)
 
 where
 
@@ -8,17 +8,69 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 
 import qualified Habit.Compiler.Register.Machine as M (Instr(..), Reg, Label)
+import qualified Habit.Compiler.Register.Compiler as C
 
 data InstrNode e x where
-  Label :: M.Instr -> InstrNode C O
-  Enter :: M.Instr -> M.Instr -> InstrNode O C
-  Copy :: M.Instr -> InstrNode O O
-  Rest :: M.Instr -> InstrNode O O
+  LabelNode :: M.Instr -- ^ Original instruction
+            -> Label -- ^ Numeric label
+            -> InstrNode C O
+  Enter :: M.Instr -- ^ Original instruction
+        -> InstrNode O O
+  Copy :: M.Instr -- ^ Original instruction
+       -> InstrNode O O
+  Ret :: M.Instr -- ^ Original instruction
+         -> InstrNode O C
+  Rest :: M.Instr -- ^ Original instruction
+       -> InstrNode O O
+
+instance Edges InstrNode where
+  entryLabel (LabelNode _ l) = l
+  successors (Ret _) = []
 
 data HasConst = Top | R M.Label
   deriving Eq 
 
 type ConstFact = Map.Map M.Reg HasConst
+
+-- | Turn a group into a body.  Probably need
+-- to maintain map of Machine labels to Hoopl labels,
+-- or use a hash function to turn Machine labels
+-- into Hoopl lables.
+makeBody :: C.Group -> FuelMonad (Body InstrNode)
+makeBody (_, _, blocks) = do
+  let toBody :: [Block InstrNode O C] -> Body InstrNode
+      toBody = undefined
+      toBlock :: (C.Label, [M.Instr]) -> FuelMonad (Block InstrNode O C)
+      toBlock = undefined
+  mapM toBlock blocks >>= return . toBody
+
+-- | Apply constant propogation to a body.
+optBody :: Body InstrNode -> FuelMonad (Body InstrNode)
+optBody body = do
+  let fwd  = FwdPass { fp_lattice = constLattice
+                     , fp_transfer = varHasConst
+                     , fp_rewrite = constProp }
+      -- Initial map of registers to values in
+      -- the body
+      initFact = undefined
+      -- The entry point for the body
+      entry :: Label 
+      entry = undefined
+  (body', _) <- analyzeAndRewriteFwd fwd body (mkFactBase [(entry, initFact body)])
+  return body'
+
+-- | Turn a body back into a Group of Machine instructions. How
+-- to recover labels?  
+bodyToGroup :: Body InstrNode -> C.Group
+bodyToGroup = undefined
+
+-- | Take a list of Machine groups, optimize them all,
+-- and return a new list.
+makeGraph :: [C.Group] -> FuelMonad [C.Group]
+makeGraph groups = 
+  mapM makeBody groups >>= 
+       mapM optBody >>=  
+            return . map bodyToGroup
 
 constLattice :: DataflowLattice ConstFact
 constLattice = DataflowLattice { fact_bot = Map.empty
@@ -60,11 +112,11 @@ constLattice = DataflowLattice { fact_bot = Map.empty
          else (NoChange, new)
 
 varHasConst :: FwdTransfer InstrNode ConstFact
-varHasConst (Label instr) = undefined
-varHasConst (Enter instrS instrD) = undefined
+varHasConst (LabelNode i instr) = undefined
+varHasConst (Enter instrS) = undefined
 varHasConst (Copy instr) = undefined
 varHasConst (Rest instr) = undefined
 
-
+constProp = undefined
 
   
