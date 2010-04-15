@@ -50,9 +50,7 @@ act a _ = crash $ OtherError $ "Unsupported action " ++ show a
 visualizer :: (String -> [Group] -> SessionM [Group])
 visualizer file gs = do
   io (writeViz file (makeCFG gs))
-  let (b1, b2, ir) = makeGraph gs
-  io (putStrLn $ "body 1 " ++ show b1 ++ ", body 2 " ++ show b2)
-  save_file (file <.> "opt.r.hs") (showIR ir)
+  save_file (file <.> "opt.r.hs") (showIR $ optGroups noOpOpt gs)
   return gs
 
 --------------------------------------------------------------------------------

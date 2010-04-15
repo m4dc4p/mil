@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
-module Habit.Compiler.Register.Hoopl
-
+module Habit.Compiler.Register.Hoopl 
+  (groupsToBody, InstrNode(..) , bodyToGroups)
+   
 where
 
 import Compiler.Hoopl
@@ -8,6 +9,7 @@ import Compiler.Hoopl
 import qualified Habit.Compiler.Register.Machine as M (Instr(..), Reg, Label)
 import qualified Habit.Compiler.Register.Compiler as C
 
+-- | Maps machine IR to Hoopl's node types.
 data InstrNode e x where
   LabelNode :: M.Instr -- ^ Original instruction
             -> Label -- ^ Numeric label
@@ -27,12 +29,13 @@ instance Edges InstrNode where
   entryLabel (LabelNode _ l) = l
   successors (Ret _) = []
 
--- | Turn a group into a body.  Probably need
+-- | Turn a list of groups into a body.  The first entry is
+-- the "top" group, where execution begins.
 -- to maintain map of Machine labels to Hoopl labels,
 -- or use a hash function to turn Machine labels
 -- into Hoopl lables.
-makeBody :: C.Group -> FuelMonad (Label, Body InstrNode)
-makeBody _ = do
+groupsToBody :: [C.Group] -> FuelMonad (Label, Body InstrNode)
+groupsToBody _ = do
   (l, g) <- prog 
   return $ (l, bodyOf g)
 {-makeBody (_, _, blocks) = do
@@ -66,6 +69,25 @@ makeBody _ = do
       mkNode instr@(M.Copy _ _) = Copy instr
       mkNode instr = Rest instr
   mapM toBlock blocks >>= return . toBody-}
+
+-- | Turn a body back into a Group of Machine instructions. 
+bodyToGroups :: Body InstrNode -> [C.Group]
+bodyToGroups = map toGroup . reverse . bodyList
+  where
+    toGroup :: (Label, Block InstrNode e x) -> C.Group
+    toGroup (_, block) = 
+      let instrs = toCode block
+      in ("", 0, [("", instrs)])
+    toCode :: Block InstrNode e x -> [M.Instr]
+    toCode (BUnit i) = [toInstr i]
+    toCode (b1 `BCat` b2) = toCode b1 ++ toCode b2
+    toInstr :: InstrNode e x -> M.Instr
+    toInstr (LabelNode i l) = i
+    toInstr (Enter i) = i
+    toInstr (Copy i) = i
+    toInstr (Ret i) = i
+    toInstr (Halt i) = i 
+    toInstr (Rest i) = i
 
 bodyOf :: Graph InstrNode C C -> Body InstrNode
 bodyOf (GMany NothingO b NothingO) = b
