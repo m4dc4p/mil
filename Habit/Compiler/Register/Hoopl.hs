@@ -35,9 +35,30 @@ instance Edges InstrNode where
 -- or use a hash function to turn Machine labels
 -- into Hoopl lables.
 groupsToBody :: [C.Group] -> FuelMonad (Label, Body InstrNode)
-groupsToBody _ = do
-  (l, g) <- prog 
-  return $ (l, bodyOf g)
+groupsToBody groups 
+    | null groups = error "TODO: empty groups."
+    | otherwise = do
+        body <- mapM groupToBody groups >>= return . bodyOf . foldl1 unionBlocks 
+        return $ (fst . head . bodyList $ body, bodyOf g)
+
+groupToBody :: C.Group -> FuelMonad (Body InstrNode)
+groupToBody (_, _, codes) 
+  | null codes = error "TODO: empty code blocks"
+  | otherwise = codesToBody codes
+
+codesToBody :: [C.Code] -> Body InstrNode
+codesToBody ((_, instrs):rest@(next:rest)) 
+    | null rest = error "TODO: Final code block"
+    | null instrs = error "TODO: empty code block"
+    | otherwise = mkFirst (start (head instrs)) <*>
+                  catAGraphs (map middle (drop 1 . init $ instrs)) <*>
+                  mkLast (end (last instrs))
+  where
+    start = undefined
+    middle = undefined
+    end = undefined
+  
+
 {-makeBody (_, _, blocks) = do
   -- Turn a list of blocks into a body.
   let toBody :: Block InstrNode O C -> Block InstrNode e x -> Body InstrNode
