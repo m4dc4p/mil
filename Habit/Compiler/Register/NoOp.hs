@@ -45,6 +45,9 @@ noOpTransfer (Copy _) f = f
 noOpTransfer (Rest _) f = f
 noOpTransfer (Ret _) f = mkFactBase []
 noOpTransfer (Halt _) f = mkFactBase []
+noOpTransfer (FailT _) f = mkFactBase []
+noOpTransfer (Jmp _) f = mkFactBase []
+noOpTransfer (Error _) f = mkFactBase []
 
 noOpProp :: FwdRewrite InstrNode NoOpFact
 noOpProp = noFwdRewrite

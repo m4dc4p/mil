@@ -5,6 +5,7 @@ module Habit.Compiler.Register.Hoopl
 where
 
 import Compiler.Hoopl
+import Data.Map (Map)
 
 import qualified Habit.Compiler.Register.Machine as M (Instr(..), Reg, Label)
 import qualified Habit.Compiler.Register.Compiler as C
@@ -20,7 +21,13 @@ data InstrNode e x where
        -> InstrNode O O
   Ret :: M.Instr -- ^ Original instruction
          -> InstrNode O C
+  FailT :: M.Instr -- ^ Original instruction.
+        -> InstrNode O C
   Halt :: M.Instr -- ^ Original instruction
+         -> InstrNode O C
+  Jmp :: M.Instr -- ^ Original instruction
+         -> InstrNode O C
+  Error :: M.Instr -- ^ Original instruction
          -> InstrNode O C
   Rest :: M.Instr -- ^ Original instruction
        -> InstrNode O O
@@ -28,6 +35,8 @@ data InstrNode e x where
 instance Edges InstrNode where
   entryLabel (LabelNode _ l) = l
   successors (Ret _) = []
+
+type LabelMap = Map Label M.Label
 
 -- | Turn a list of groups into a body.  The first entry is
 -- the "top" group, where execution begins.
@@ -38,58 +47,50 @@ groupsToBody :: [C.Group] -> FuelMonad (Label, Body InstrNode)
 groupsToBody groups 
     | null groups = error "TODO: empty groups."
     | otherwise = do
-        body <- mapM groupToBody groups >>= return . bodyOf . foldl1 unionBlocks 
-        return $ (fst . head . bodyList $ body, bodyOf g)
+        body <- foldl1 unionBlocks . map groupToBody $ groups
+        return $ (fst . head . bodyList $ bodyOf body, bodyOf body)
 
-groupToBody :: C.Group -> FuelMonad (Body InstrNode)
+groupToBody :: C.Group -> AGraph InstrNode C C
 groupToBody (_, _, codes) 
   | null codes = error "TODO: empty code blocks"
-  | otherwise = codesToBody codes
+  | otherwise = let notNote (M.Note _) = False
+                    notNote _ = True
+                in codesToBody . map (\(l, instrs) -> (l, filter notNote instrs)) $ codes
 
-codesToBody :: [C.Code] -> Body InstrNode
-codesToBody ((_, instrs):rest@(next:rest)) 
-    | null rest = error "TODO: Final code block"
+-- | TODO: Convert codes in a group to basic blocks, so 
+-- all transfers show up correctly. Will need to rewrite
+-- labels.
+toBasicBlocks :: C.Group -> C.Group
+toBasicBlocks = undefined
+
+codesToBody :: [C.Code] -> AGraph InstrNode C C
+codesToBody ((entry, instrs):rest) 
     | null instrs = error "TODO: empty code block"
-    | otherwise = mkFirst (start (head instrs)) <*>
-                  catAGraphs (map middle (drop 1 . init $ instrs)) <*>
+    | otherwise = do
+        l <- freshLabel
+        let g = mkFirst (LabelNode (M.Label entry) l) <*>
+                  catAGraphs (map middle instrs) <*>
                   mkLast (end (last instrs))
+        if null rest
+         then g
+         else g `unionBlocks` codesToBody rest
   where
-    start = undefined
-    middle = undefined
-    end = undefined
-  
-
-{-makeBody (_, _, blocks) = do
-  -- Turn a list of blocks into a body.
-  let toBody :: Block InstrNode O C -> Block InstrNode e x -> Body InstrNode
-      toBody fst blks 
-        | null blks = BodyEmpty
-        | null (drop 1 blks) = BodyUnit (head blks)
-        | otherwise = foldl1 BodyCat . map BodyUnit $ blks
-
-      -- Turn a list of instructions into a block.
-      toBlock :: (C.Label, [M.Instr]) -> FuelMonad (Block InstrNode C C)
-      toBlock (lab, instrs) 
-              | null instrs = return $ start `BCat` BUnit (Halt M.Halt)
-              | otherwise = do
-                  let body = foldl1 (BCat) . map (BUnit . mkNode) . init $ instrs
-                      end = BUnit $ case last instrs of
-                                       i@(M.Ret _) -> Ret i
-                                       i@M.Halt -> Halt i
-                                       i -> error $ "Block ended with " ++ show i ++ " unexpectedly. " ++ show instrs
-                  return $ start `BCat` body `BCat` end
-              where
-                start = BUnit . LabelNode (M.Label lab) $ hash lab
-
-      -- Turn a (string) label into a numeric label
-      hash :: String -> Label
-      hash = Label . sum . map ord
-
-      -- Turn a machine instruction into a InstrNode
-      mkNode instr@(M.Enter _ _ _) = Enter instr
-      mkNode instr@(M.Copy _ _) = Copy instr
-      mkNode instr = Rest instr
-  mapM toBlock blocks >>= return . toBody-}
+    middle i = case i of 
+                 (M.Enter _ _ _) -> mkMiddle $ Enter i
+                 (M.Copy _ _) -> mkMiddle $ Copy i
+                 M.Halt -> emptyAGraph
+                 (M.Ret _) -> emptyAGraph
+                 (M.Jmp _) -> emptyAGraph
+                 (M.Error _) -> emptyAGraph
+                 _ -> mkMiddle $ Rest i
+    end i = case i of
+              (M.Ret _) -> Ret i
+              M.Halt -> Halt i
+              (M.FailT _ _ _) -> FailT i
+              (M.Jmp _) -> Jmp i
+              (M.Error _) -> Error i
+              _ -> codeError "Illegal instruction at end of code block."
+    codeError msg = error (msg ++ " " ++ show instrs ++ " " ++ show rest)
 
 -- | Turn a body back into a Group of Machine instructions. 
 bodyToGroups :: Body InstrNode -> [C.Group]
@@ -97,8 +98,8 @@ bodyToGroups = map toGroup . reverse . bodyList
   where
     toGroup :: (Label, Block InstrNode e x) -> C.Group
     toGroup (_, block) = 
-      let instrs = toCode block
-      in ("", 0, [("", instrs)])
+      let ((M.Label l):instrs) = toCode block
+      in (l, 0, [(l, instrs)]) -- Ugly: assume first instruction always a label.
     toCode :: Block InstrNode e x -> [M.Instr]
     toCode (BUnit i) = [toInstr i]
     toCode (b1 `BCat` b2) = toCode b1 ++ toCode b2
@@ -107,7 +108,10 @@ bodyToGroups = map toGroup . reverse . bodyList
     toInstr (Enter i) = i
     toInstr (Copy i) = i
     toInstr (Ret i) = i
+    toInstr (FailT i) = i
     toInstr (Halt i) = i 
+    toInstr (Jmp i) = i 
+    toInstr (Error i) = i 
     toInstr (Rest i) = i
 
 bodyOf :: Graph InstrNode C C -> Body InstrNode
