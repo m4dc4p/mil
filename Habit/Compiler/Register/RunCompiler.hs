@@ -48,10 +48,12 @@ act Check params =
 act a _ = crash $ OtherError $ "Unsupported action " ++ show a
 
 visualizer :: (String -> [Group] -> SessionM [Group])
-visualizer file gs = io $ do
-  writeViz file (makeCFG gs)
-  return $ runWithFuel 1000 (makeGraph gs)
-        
+visualizer file gs = do
+  io (writeViz file (makeCFG gs))
+  let (b1, b2, ir) = makeGraph gs
+  io (putStrLn $ "body 1 " ++ show b1 ++ ", body 2 " ++ show b2)
+  save_file (file <.> "opt.r.hs") (showIR ir)
+  return gs
 
 --------------------------------------------------------------------------------
 
@@ -67,17 +69,23 @@ save_typed_mod_dump optimizer (AcyclicSCC mo) =
      funcs <- optimizer file_name (compile supply m)
      save_file (file_name <.> "dump")
                    $ show $ run_pp_with env $ dump_typed_mod m
-#ifdef DEBUG
-     let showCode instrs = map (\i -> show i) instrs
-#else 
-     let showCode instrs = map (\i -> show i) . filter notNote $ instrs
-         notNote (Note _) = False
-         notNote _ = True
-#endif
      let showFuncs (l, size, codes) = "Group " ++ l ++ " (" ++ show size ++ ") \n" ++ 
                                 (unlines . map ("  " ++) . 
                                  concatMap (\(l, cs) -> (l ++ ":") : showCode cs) $ codes)
-     save_file (file_name <.> ".r.hs") (unlines . showCode . getInstrs $ funcs)
+     save_file (file_name <.> ".r.hs") (showIR funcs)
      save_file (file_name <.> ".f.hs") $ concatMap showFuncs funcs
 
+showCode :: [Instr] -> [String]
+#ifdef DEBUG
+showCode instrs = map show instrs
+#else 
+showCode instrs = map show . filter notNote $ instrs
+  where
+    notNote (Note _) = False
+    notNote _ = True
+#endif
+
+showIR :: [Group] -> String
+showIR = unlines . showCode . getInstrs 
+      
 
