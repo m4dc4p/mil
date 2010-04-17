@@ -294,6 +294,8 @@ compileMatch env (MD failure success) result (MAlt alt1 alt2) args = do
   (l1:l2:_) <- mapM (const newLabel) [0..1]
   alt1C <- compileMatch env (MD (OnFail l2) []) result alt1 args
   alt2C <- compileMatch env (MD failure [H.Jmp l1]) result alt2 args
+  -- This inserts a label which does NOT start a code block. 
+  -- BAD.
   record l2 alt2C
   return $ alt1C ++ H.Label l1 : success
 

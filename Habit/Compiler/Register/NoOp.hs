@@ -10,7 +10,6 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 
 import qualified Habit.Compiler.Register.Machine as M (Reg)
--- import qualified Habit.Compiler.Register.Compiler as C
 import Habit.Compiler.Register.Hoopl
 
 -- | Apply constant propogation to a body.
@@ -39,14 +38,13 @@ noOpLattice = DataflowLattice { fact_bot = Map.empty
 -- type FwdTransfer n f 
 -- forall e x. n e x -> Fact e f -> Fact x f 
 noOpTransfer :: FwdTransfer InstrNode NoOpFact
-noOpTransfer (LabelNode _ l) f = fromMaybe Map.empty $ lookupFact f l
-noOpTransfer (Enter _) f = f
-noOpTransfer (Copy _) f = f
+noOpTransfer (LabelNode _ l) f = Map.empty
 noOpTransfer (Rest _) f = f
+noOpTransfer (Enter _ _) f = mkFactBase []
 noOpTransfer (Ret _) f = mkFactBase []
 noOpTransfer (Halt _) f = mkFactBase []
-noOpTransfer (FailT _) f = mkFactBase []
-noOpTransfer (Jmp _) f = mkFactBase []
+noOpTransfer (FailT _ _ _) f = mkFactBase []
+noOpTransfer (Jmp _ _) f = mkFactBase []
 noOpTransfer (Error _) f = mkFactBase []
 
 noOpProp :: FwdRewrite InstrNode NoOpFact

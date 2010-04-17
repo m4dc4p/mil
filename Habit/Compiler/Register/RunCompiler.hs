@@ -18,8 +18,8 @@ import Habit.Utils.Misc(breaks)
 import Habit.Utils.PP
 
 import Habit.Session
-import Habit.Compiler.Register.Compiler (compile, getInstrs, Group)
-import Habit.Compiler.Register.Machine (Instr(Note))
+import Habit.Compiler.Register.Compiler (compile, getInstrs, Group, Code)
+import Habit.Compiler.Register.Machine (Instr(..))
 import Habit.Compiler.Register.PrintModule (dump_typed_mod)
 import Habit.Compiler.Register.ControlFlowGraph
 import Habit.Compiler.Register.Dataflow 
@@ -47,11 +47,27 @@ act Check params =
     _  -> mapM_ (save_typed_mod_dump visualizer) =<< load_files params
 act a _ = crash $ OtherError $ "Unsupported action " ++ show a
 
-visualizer :: (String -> [Group] -> SessionM [Group])
+removeEmptyLabels :: Group -> Group
+removeEmptyLabels (l, c, (cs:css)) = (l, c, foldl remove1 [cs] css)
+  where
+    remove1 :: [Code] -> Code -> [Code]
+    remove1 codes ("", code) = 
+      let sew :: Code -> [Instr] -> Code
+          sew (l, is1) is2 = (l, is1 ++ is2)
+      in case codes of 
+           [] -> error $ "Blank label at head of group " ++ show (cs:css)
+           [code'] -> [sew code' code]
+           _ -> init codes ++ [sew (last codes) code]
+    remove1 codes code = codes ++ [code]
+
+visualizer :: String -> [Group] -> SessionM [Group]
 visualizer file gs = do
   io (writeViz file (makeCFG gs))
-  save_file (file <.> "opt.r.hs") (showIR $ optGroups noOpOpt gs)
-  return gs
+  let gs' = optGroups noOpOpt . 
+            optGroups constPropOpt $ gs
+  io (writeViz file (makeCFG gs'))
+  return gs'
+
 
 --------------------------------------------------------------------------------
 
@@ -64,14 +80,16 @@ save_typed_mod_dump optimizer (AcyclicSCC mo) =
      let env = default_pp_env { pp_opts = opt_pp opts }
          file_name = mod_name_to_file (mod_name m)
      supply <- io newNumSupply
-     funcs <- optimizer file_name (compile supply m)
+     let unOptGroups = compile supply m
+     optGroups <- optimizer file_name (removeNotes unOptGroups)
      save_file (file_name <.> "dump")
                    $ show $ run_pp_with env $ dump_typed_mod m
      let showFuncs (l, size, codes) = "Group " ++ l ++ " (" ++ show size ++ ") \n" ++ 
                                 (unlines . map ("  " ++) . 
                                  concatMap (\(l, cs) -> (l ++ ":") : showCode cs) $ codes)
-     save_file (file_name <.> ".r.hs") (showIR funcs)
-     save_file (file_name <.> ".f.hs") $ concatMap showFuncs funcs
+     save_file (file_name <.> ".r.hs") (showIR unOptGroups)
+     save_file (file_name <.> ".opt.r.hs") (showIR optGroups)
+     save_file (file_name <.> ".f.hs") $ concatMap showFuncs unOptGroups
 
 showCode :: [Instr] -> [String]
 #ifdef DEBUG
@@ -85,5 +103,13 @@ showCode instrs = map show . filter notNote $ instrs
 
 showIR :: [Group] -> String
 showIR = unlines . showCode . getInstrs 
+
+removeNotes :: [Group] -> [Group]
+removeNotes = 
+  let removeNote (l, cs) = (l, filter notNote cs)
+  in map (\(l, c, css) -> (l, c, map removeNote css))
+    
+notNote (Note _) = False
+notNote _ = True
       
 

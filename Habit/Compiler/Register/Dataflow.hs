@@ -1,5 +1,5 @@
 module Habit.Compiler.Register.Dataflow 
-  (optGroups, Optimizer, noOpOpt)
+  (optGroups, Optimizer, N.noOpOpt, C.constPropOpt)
 
 where
 
@@ -9,6 +9,7 @@ import qualified Habit.Compiler.Register.Machine as M (Instr(..), Reg, Label)
 import qualified Habit.Compiler.Register.Compiler as C (Group)
 import Habit.Compiler.Register.Hoopl (InstrNode, groupsToBody, bodyToGroups)
 import qualified Habit.Compiler.Register.NoOp as N (noOpOpt)
+import qualified Habit.Compiler.Register.ConstProp as C (constPropOpt)
 
 type Optimizer = Label -> Body InstrNode -> FuelMonad (Body InstrNode)
 
@@ -20,4 +21,3 @@ optGroups optimizer groups  = runWithFuel 100 $ do
     body' <- optimizer entry body
     return $ bodyToGroups body'
 
-noOpOpt = N.noOpOpt

@@ -1,60 +1,89 @@
-module Habit.Compiler.Register.ConstProp
+{-# LANGUAGE GADTs #-}
+module Habit.Compiler.Register.ConstProp (constPropOpt)
 
 where
 
 import Compiler.Hoopl
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
 
-data HasConst = Top | R M.Label
+import qualified Habit.Compiler.Register.Machine as M (Reg, Label, Instr(..))
+import Habit.Compiler.Register.Hoopl
+
+data HasConst = Top | R M.Reg
   deriving Eq 
 
-type ConstFact = Map.Map M.Reg HasConst
+-- Indicates if a register holds a constant value or if it
+-- gets overwritten. The key for the map is the *destination*
+-- register. 
+type ConstFact = Map M.Reg HasConst
+
+constPropOpt :: Label -> Body InstrNode -> FuelMonad (Body InstrNode)
+constPropOpt entry body = do
+  let fwd  = FwdPass { fp_lattice = constLattice
+                     , fp_transfer = varHasConst
+                     , fp_rewrite = constProp }
+      -- Initial map of labels to initial facts.
+      initFacts = zip (map fst (bodyList body)) (repeat Map.empty)
+  (body', _) <- analyzeAndRewriteFwd fwd body (mkFactBase initFacts)
+  return body'
+
 
 constLattice :: DataflowLattice ConstFact
 constLattice = DataflowLattice { fact_bot = Map.empty
                                , fact_name = "Constant propagation"
-                               , fact_extend = extendFacts
+                               , fact_extend = stdMapJoin extendFact
                                , fact_do_logging = False }
   where
-    extendFacts :: (OldFact ConstFact) -> (NewFact ConstFact) -> (ChangeFlag, ConstFact)
-    -- Determine if new constants change old facts. A couple of cases 
-    -- to consider. 
-    --   * New entries are present. Return (SomeChange, updated map)
-    --   * Some entries are not equal. Return (SomeChange, updated map)
-    --   * Facts have been taken away. Return (SomeChange, updated map)
-    --   * All entries are equal. Return (NoChange, updated map)
-    extendFacts (OldFact old) (NewFact new) = 
-      let updateCommon :: M.Reg -> HasConst -> HasConst -> (Bool, HasConst)
-          updateCommon _ o n 
-            | o == n = (False, n)
-            | otherwise = (True, Top)
-          -- common elements with change attached
-          commonB :: Map M.Reg (Bool, HasConst)
-          commonB = Map.intersectionWithKey updateCommon new old
-          -- common elements with HasConst only
-          common :: Map M.Reg HasConst
-          common = Map.map snd commonB
-
-          onlyOld :: Map M.Reg HasConst
-          onlyOld = Map.difference old common
-          onlyNew :: Map M.Reg HasConst
-          onlyNew = Map.difference new common
-
-          commonChanged = or . map fst . Map.elems $ commonB
-          elemAdded = not (Map.null onlyNew)
-          elemRemoved = not (Map.null onlyOld)
-
-          newMap' = Map.union onlyNew common
-      in if elemAdded || elemRemoved || commonChanged
-         then (SomeChange, newMap')
-         else (NoChange, new)
-
+    extendFact :: OldFact HasConst -> NewFact HasConst -> (ChangeFlag, HasConst)
+    extendFact (OldFact old) (NewFact new) = (flag, fact)
+      where
+        fact = if old == new then new else Top
+        flag = if fact == old then NoChange else SomeChange
+        
 varHasConst :: FwdTransfer InstrNode ConstFact
-varHasConst (LabelNode i instr) = undefined
-varHasConst (Enter instrS) = undefined
-varHasConst (Copy instr) = undefined
-varHasConst (Rest instr) = undefined
+varHasConst (LabelNode _ l) f = fromMaybe Map.empty $ lookupFact f l
+varHasConst (Rest (M.Copy src dst)) fact = Map.insert dst (R src) fact
+varHasConst (Rest (M.Load _ dst)) fact = Map.insert dst Top fact
+varHasConst (Rest (M.Set dst _)) fact = Map.insert dst Top fact
+varHasConst (Rest _) fact = fact
+varHasConst (Enter _ next) fact = mkFactBase [(next, fact)]
+varHasConst (FailT _ true false) fact = mkFactBase [(true, fact)
+                                                   ,(false, fact)]
+varHasConst (Ret _) fact = mkFactBase []
+varHasConst (Jmp _ dest) fact = mkFactBase [(dest, fact)]
+varHasConst (Halt _) fact = mkFactBase []
+varHasConst (Error _) fact = mkFactBase []
 
-constProp :: FwdTransfer InstrNode ConstFact
-constProp = undefined
+-- Takes a node and facts. Returns a Maybe Graph
+-- forall e x. n e x -> Fact e f -> Fact x f 
+-- forall e x. InstrNode e x -> Fact e ConstFact -> Fact x f ConstFact
+constProp :: FwdRewrite InstrNode ConstFact
+constProp = shallowFwdRw rewrite
+  where
+    rewrite :: InstrNode e x -> Fact e ConstFact -> Maybe (AGraph InstrNode e x)
+    rewrite (Ret (M.Ret r)) facts = case findConst r facts of
+                                      Just s -> Just $ mkLast (Ret (M.Ret s))
+                                      Nothing -> Nothing
+    rewrite n facts = Nothing
+    findConst r facts = case Map.lookup r facts of
+                          Just (R s) -> Just s
+                          _ -> Nothing
+
+
+-- It's common to represent dataflow facts as a map from locations
+-- to some fact about the locations. For these maps, the join
+-- operation on the map can be expressed in terms of the join
+-- on each element:
+
+-- Stolen shamelessly from Hoopl source ...
+stdMapJoin :: Ord k => JoinFun v -> JoinFun (Map k v)
+stdMapJoin eltJoin (OldFact old) (NewFact new) = Map.foldWithKey add (NoChange, old) new
+  where 
+    add k new_v (ch, joinmap) =
+      case Map.lookup k joinmap of
+        Nothing    -> (SomeChange, Map.insert k new_v joinmap)
+        Just old_v -> case eltJoin (OldFact old_v) (NewFact new_v) of
+                        (SomeChange, v') -> (SomeChange, Map.insert k v' joinmap)
+                        (NoChange,   _)  -> (ch, joinmap)
