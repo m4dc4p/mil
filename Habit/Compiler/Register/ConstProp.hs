@@ -43,16 +43,16 @@ constLattice = DataflowLattice { fact_bot = Map.empty
         flag = if fact == old then NoChange else SomeChange
         
 varHasConst :: FwdTransfer InstrNode ConstFact
-varHasConst (LabelNode _ l) f = fromMaybe Map.empty $ lookupFact f l
-varHasConst (Rest (M.Copy src dst)) fact = Map.insert dst (R src) fact
-varHasConst (Rest (M.Load _ dst)) fact = Map.insert dst Top fact
-varHasConst (Rest (M.Set dst _)) fact = Map.insert dst Top fact
-varHasConst (Rest _) fact = fact
-varHasConst (Enter _ next) fact = mkFactBase [(next, fact)]
+varHasConst (EntryLabel _ _ l) f = fromMaybe Map.empty $ lookupFact f l
+varHasConst (LabelNode _ _ l) f = fromMaybe Map.empty $ lookupFact f l
+varHasConst (Open (M.Copy src dst)) fact = Map.insert dst (R src) fact
+varHasConst (Open (M.Load _ dst)) fact = Map.insert dst Top fact
+varHasConst (Open (M.Set dst _)) fact = Map.insert dst Top fact
+varHasConst (Open _) fact = fact
+varHasConst (Closed1 _ next) fact = mkFactBase [(next, fact)]
 varHasConst (FailT _ true false) fact = mkFactBase [(true, fact)
                                                    ,(false, fact)]
 varHasConst (Ret _) fact = mkFactBase []
-varHasConst (Jmp _ dest) fact = mkFactBase [(dest, fact)]
 varHasConst (Halt _) fact = mkFactBase []
 varHasConst (Error _) fact = mkFactBase []
 
