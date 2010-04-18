@@ -170,12 +170,22 @@ codesToBody lbls (curr:ls) ((entry, instrs):rest)
 
 -- | Turn a body back into a Group of Machine instructions. 
 bodyToGroups :: Body InstrNode -> [C.Group]
-bodyToGroups = map toGroup . reverse . bodyList
+bodyToGroups = foldl1 combine . map toGroup . reverse . bodyList
   where
-    toGroup :: (Label, Block InstrNode e x) -> C.Group
+    -- Lots of empty groups get created - fold them back
+    -- into "real" groups. toGroup creates a list of singleton
+    -- lists so we can use foldl1.
+    combine :: [C.Group] -> [C.Group] -> [C.Group]
+    combine groups [("", c, curr)] =
+      let (pl, pn, prev) = last groups
+          codes = foldl removeEmptyLabels prev curr
+      -- drop initial label from each empty group.
+      in init groups ++ [(pl, pn, codes)]
+    combine groups group = groups ++ group
+    toGroup :: (Label, Block InstrNode e x) -> [C.Group]
     toGroup (_, block) = 
       let ((M.Label l):instrs) = toCode block
-      in (l, 0, [(l, instrs)]) -- Ugly: assume first instruction always a label.
+      in [(l, 0, [(l, instrs)])] -- Ugly: assume first instruction always a label.
     toCode :: Block InstrNode e x -> [M.Instr]
     toCode (BUnit i) = [toInstr i]
     toCode (b1 `BCat` b2) = toCode b1 ++ toCode b2
@@ -188,6 +198,16 @@ bodyToGroups = map toGroup . reverse . bodyList
     toInstr (Jmp i _) = i 
     toInstr (Error i) = i 
     toInstr (Rest i) = i
+
+removeEmptyLabels :: [C.Code] -> C.Code -> [C.Code]
+removeEmptyLabels codes ("", code) = 
+      let sew :: C.Code -> [M.Instr] -> C.Code
+          sew (l, is1) is2 = (l, is1 ++ is2)
+      in case codes of 
+           [] -> error $ "Blank label at head of group."
+           [code'] -> [sew code' code]
+           _ -> init codes ++ [sew (last codes) code]
+removeEmptyLabels codes code = codes ++ [code]
 
 bodyOf :: Graph InstrNode C C -> Body InstrNode
 bodyOf (GMany NothingO b NothingO) = b

@@ -37,7 +37,6 @@ main = parse_opts `fmap` getArgs >>= \res ->
                 exitFailure
     _ -> hPutStrLn stderr (usage "") >> exitFailure
 
-
 act :: Action -> [String] -> SessionM ()
 act Check params = 
   case params of
@@ -47,25 +46,12 @@ act Check params =
     _  -> mapM_ (save_typed_mod_dump visualizer) =<< load_files params
 act a _ = crash $ OtherError $ "Unsupported action " ++ show a
 
-removeEmptyLabels :: Group -> Group
-removeEmptyLabels (l, c, (cs:css)) = (l, c, foldl remove1 [cs] css)
-  where
-    remove1 :: [Code] -> Code -> [Code]
-    remove1 codes ("", code) = 
-      let sew :: Code -> [Instr] -> Code
-          sew (l, is1) is2 = (l, is1 ++ is2)
-      in case codes of 
-           [] -> error $ "Blank label at head of group " ++ show (cs:css)
-           [code'] -> [sew code' code]
-           _ -> init codes ++ [sew (last codes) code]
-    remove1 codes code = codes ++ [code]
-
 visualizer :: String -> [Group] -> SessionM [Group]
 visualizer file gs = do
   io (writeViz file (makeCFG gs))
   let gs' = optGroups noOpOpt . 
             optGroups constPropOpt $ gs
-  io (writeViz file (makeCFG gs'))
+  io (writeViz (file ++ ".opt") (makeCFG gs'))
   return gs'
 
 
@@ -87,8 +73,9 @@ save_typed_mod_dump optimizer (AcyclicSCC mo) =
      let showFuncs (l, size, codes) = "Group " ++ l ++ " (" ++ show size ++ ") \n" ++ 
                                 (unlines . map ("  " ++) . 
                                  concatMap (\(l, cs) -> (l ++ ":") : showCode cs) $ codes)
-     save_file (file_name <.> ".r.hs") (showIR unOptGroups)
-     save_file (file_name <.> ".opt.r.hs") (showIR optGroups)
+     save_file (file_name <.> ".r.hs") $ showIR unOptGroups
+     save_file (file_name <.> ".opt.r.hs") $ showIR optGroups
+     save_file (file_name <.> ".opt.f.hs") $ concatMap showFuncs optGroups
      save_file (file_name <.> ".f.hs") $ concatMap showFuncs unOptGroups
 
 showCode :: [Instr] -> [String]
