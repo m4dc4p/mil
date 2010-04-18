@@ -122,8 +122,6 @@ record l instrs = do
     addCode s@(S { inProgress = (l, i, cs) : css }) 
         = s { inProgress = (l, i, code : cs) : css }
 
-
-
 -- | Compile a module to a list of "group" blocks. 
 compile :: Supply Int -> Module -> [Group]
 compile supply m 
@@ -292,12 +290,10 @@ compileMatch env m@(MD failure success) result (MGrd guard body) args = do
 -- the result will be in the register returned.
 compileMatch env (MD failure success) result (MAlt alt1 alt2) args = do
   (l1:l2:_) <- mapM (const newLabel) [0..1]
-  alt1C <- compileMatch env (MD (OnFail l2) []) result alt1 args
-  alt2C <- compileMatch env (MD failure [H.Jmp l1]) result alt2 args
-  -- This inserts a label which does NOT start a code block. 
-  -- BAD.
-  record l2 alt2C
-  return $ alt1C ++ H.Label l1 : success
+  alt1C <- compileMatch env (MD (OnFail l2) success) result alt1 args
+  alt2C <- compileMatch env (MD failure success) result alt2 args
+  record l2 (mkN "compileMatch: MAlt2" : alt2C)
+  return $ mkN "compileMatch: MAlt1" : alt1C 
 
 -- A "pure" match expression. Always succeeds and
 -- puts its result in the register returned.
@@ -362,8 +358,6 @@ compilePat env f (PSig pat typ) arg = compilePat env f pat arg
 -- matches everyting. That is, it has no
 -- effect.
 compilePat env _ PWild _ = return (env, [mkN "compilePat: PWild"])
-
-
 
 -- | A guard checks an expression against a pattern and 
 -- can also create new bindings. A guard always returns
@@ -437,10 +431,11 @@ compileExpr _ (ELit literal) = do
 -- may compile a series of closures to get all arguments to the
 -- match. We return a location for the result of the match, allocation
 -- instructions (if any) and instructions necessary to evaluate the
--- match. 
+-- match.
 --
--- Allocation instructions are returned to support mutually recursive, locally
--- defined functins. We must allocate all storage before loading any free variables.
+-- Allocation instructions are returned to support mutually recursive,
+-- locally defined functins. We must allocate all storage before
+-- loading any free variables.
 compileMAbs :: Env -> Maybe Reg -> Maybe Name -> OnFail -> Match -> C (Reg, Maybe Instr, [Instr])
 compileMAbs env dest name f m = do
   result <- case (dest, name) of
@@ -486,9 +481,10 @@ compileAbs env f nparams fvs m = newGroup nfvs $ compileAbs' 1
               env' = zip fvs fvRegs ++ env
               args' = argRegs ++ [H.argReg]
           r <- newReg
-          matchC <- compileMatch env' (MD f []) r m args'
-          return $ mkN "compileAbs 1" 
-                     : matchC ++ [H.Ret r]
+          l <- newLabel
+          record l [H.Ret r]
+          matchC <- compileMatch env' (MD f [H.Jmp l]) r m args'
+          return $ mkN "compileAbs 1" : matchC
       | otherwise = do
           entry <- newGroup (length regs + 1) $ compileAbs' (n + 1)
           r <- newReg
