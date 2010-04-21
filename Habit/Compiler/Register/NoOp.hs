@@ -41,7 +41,7 @@ noOpTransfer :: FwdTransfer InstrNode NoOpFact
 noOpTransfer (LabelNode _ _ _) f = Map.empty
 noOpTransfer (EntryLabel _ _ _) f = Map.empty
 noOpTransfer (Open _) f = f
-noOpTransfer (Closed1 _ _) f = mkFactBase []
+noOpTransfer (Closed _ _) f = mkFactBase []
 noOpTransfer (Ret _) f = mkFactBase []
 noOpTransfer (Halt _) f = mkFactBase []
 noOpTransfer (FailT _ _ _) f = mkFactBase []
@@ -50,4 +50,4 @@ noOpTransfer (Error _) f = mkFactBase []
 noOpProp :: FwdRewrite InstrNode NoOpFact
 noOpProp = noFwdRewrite
 
-noOpExtend (OldFact f) _ = (NoChange, f)
+noOpExtend _ (OldFact f) _ = (NoChange, f)

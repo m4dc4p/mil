@@ -36,8 +36,8 @@ constLattice = DataflowLattice { fact_bot = Map.empty
                                , fact_extend = stdMapJoin extendFact
                                , fact_do_logging = False }
   where
-    extendFact :: OldFact HasConst -> NewFact HasConst -> (ChangeFlag, HasConst)
-    extendFact (OldFact old) (NewFact new) = (flag, fact)
+    extendFact :: Label -> OldFact HasConst -> NewFact HasConst -> (ChangeFlag, HasConst)
+    extendFact _ (OldFact old) (NewFact new) = (flag, fact)
       where
         fact = if old == new then new else Top
         flag = if fact == old then NoChange else SomeChange
@@ -49,7 +49,7 @@ varHasConst (Open (M.Copy src dst)) fact = Map.insert dst (R src) fact
 varHasConst (Open (M.Load _ dst)) fact = Map.insert dst Top fact
 varHasConst (Open (M.Set dst _)) fact = Map.insert dst Top fact
 varHasConst (Open _) fact = fact
-varHasConst (Closed1 _ next) fact = mkFactBase [(next, fact)]
+varHasConst (Closed _ next) fact = mkFactBase [(next, fact)]
 varHasConst (FailT _ true false) fact = mkFactBase [(true, fact)
                                                    ,(false, fact)]
 varHasConst (Ret _) fact = mkFactBase []
@@ -79,11 +79,11 @@ constProp = shallowFwdRw rewrite
 
 -- Stolen shamelessly from Hoopl source ...
 stdMapJoin :: Ord k => JoinFun v -> JoinFun (Map k v)
-stdMapJoin eltJoin (OldFact old) (NewFact new) = Map.foldWithKey add (NoChange, old) new
+stdMapJoin eltJoin l (OldFact old) (NewFact new) = Map.foldWithKey add (NoChange, old) new
   where 
     add k new_v (ch, joinmap) =
       case Map.lookup k joinmap of
         Nothing    -> (SomeChange, Map.insert k new_v joinmap)
-        Just old_v -> case eltJoin (OldFact old_v) (NewFact new_v) of
+        Just old_v -> case eltJoin l (OldFact old_v) (NewFact new_v) of
                         (SomeChange, v') -> (SomeChange, Map.insert k v' joinmap)
                         (NoChange,   _)  -> (ch, joinmap)
