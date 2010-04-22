@@ -13,8 +13,8 @@ import qualified Habit.Compiler.Register.Machine as M (Reg)
 import Habit.Compiler.Register.Hoopl
 
 -- | Apply constant propogation to a body.
-noOpOpt :: Label -> Body InstrNode -> FuelMonad (Body InstrNode)
-noOpOpt entry body = do
+noOpOpt :: Body InstrNode -> FuelMonad (Body InstrNode)
+noOpOpt body = do
   let fwd  = FwdPass { fp_lattice = noOpLattice -- constLattice
                      , fp_transfer = noOpTransfer -- varHasConst
                      , fp_rewrite = noOpProp {- constProp  -} }

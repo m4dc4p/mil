@@ -19,8 +19,8 @@ data HasConst = Top | R M.Reg
 -- register. 
 type ConstFact = Map M.Reg HasConst
 
-constPropOpt :: Label -> Body InstrNode -> FuelMonad (Body InstrNode)
-constPropOpt entry body = do
+constPropOpt :: Body InstrNode -> FuelMonad (Body InstrNode)
+constPropOpt body = do
   let fwd  = FwdPass { fp_lattice = constLattice
                      , fp_transfer = varHasConst
                      , fp_rewrite = constProp }
@@ -72,18 +72,3 @@ constProp = shallowFwdRw rewrite
                           _ -> Nothing
 
 
--- It's common to represent dataflow facts as a map from locations
--- to some fact about the locations. For these maps, the join
--- operation on the map can be expressed in terms of the join
--- on each element:
-
--- Stolen shamelessly from Hoopl source ...
-stdMapJoin :: Ord k => JoinFun v -> JoinFun (Map k v)
-stdMapJoin eltJoin l (OldFact old) (NewFact new) = Map.foldWithKey add (NoChange, old) new
-  where 
-    add k new_v (ch, joinmap) =
-      case Map.lookup k joinmap of
-        Nothing    -> (SomeChange, Map.insert k new_v joinmap)
-        Just old_v -> case eltJoin l (OldFact old_v) (NewFact new_v) of
-                        (SomeChange, v') -> (SomeChange, Map.insert k v' joinmap)
-                        (NoChange,   _)  -> (ch, joinmap)
