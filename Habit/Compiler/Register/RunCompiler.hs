@@ -50,6 +50,7 @@ visualizer :: String -> [Group] -> SessionM [Group]
 visualizer file gs = do
   io (writeViz file (makeCFG gs))
   let gs' = optGroups noOpOpt . 
+            optGroups liveOpt .
             optGroups constPropOpt $ gs
   io (writeViz (file ++ ".opt") (makeCFG gs'))
   return gs'

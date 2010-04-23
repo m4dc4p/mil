@@ -6,7 +6,7 @@ where
 
 import Compiler.Hoopl
 import Data.Maybe (fromMaybe)
-import Data.Set (Set)
+import Data.Set (Set, (\\))
 import qualified Data.Set as Set
 
 import qualified Habit.Compiler.Register.Machine as M (Reg, Instr(..))
@@ -19,16 +19,21 @@ liveOpt body = do
   let bwd = BwdPass { bp_lattice = liveLattice
                        , bp_transfer = liveTransfer 
                        , bp_rewrite = liveRewrite }
-      initFacts = zip (map fst (bodyList body)) (repeat Set.empty)
-  (body', _) <- analyzeAndRewriteBwd bwd body (mkFactBase initFacts)
+  (body', _) <- analyzeAndRewriteBwd bwd body (mkFactBase [])
   return body'
 
 liveLattice :: DataflowLattice LiveFact
 liveLattice = DataflowLattice { fact_name = "Liveness"
                               , fact_bot = Set.empty
-                              , fact_extend = undefined -- stdMapJoin extendLive
+                              , fact_extend = extend
                               , fact_do_logging = True }
-
+  where
+    extend _ (OldFact old) (NewFact new) = 
+      let c = if Set.null(old \\ new) && Set.null (new \\ old)
+              then NoChange
+              else SomeChange
+      in (c, old `Set.union` new)
+                                         
 {- | liveTransfer adds facts based on the type of node:
 
     Open/Closed: Transfer all live registers from target labels.
@@ -56,5 +61,11 @@ liveTransfer (Halt _) _ = Set.empty
 -- type BwdRewrite n f = forall e x. n e x -> Fact x f -> Maybe (BwdRes n f e x)
 -- data BwdRes n f e x = BwdRes (AGraph n e x) (BwdRewrite n f)
 liveRewrite :: BwdRewrite InstrNode LiveFact
-liveRewrite = undefined
+liveRewrite = shallowBwdRw f
+  where
+    f :: SimpleBwdRewrite InstrNode LiveFact
+{-    f (Open (M.Copy _ dest)) live 
+            | dest `Set.member` live = Nothing
+            | otherwise = Just emptyAGraph-}
+    f _ _ = Nothing
                                                
