@@ -67,7 +67,7 @@ instance Edges InstrNode where
   successors (Ret _) = []
   successors (Error _) = []
   successors (Halt _) = []
-  successors (FailT _ true false) = [true, false]
+  successors (FailT _ false true ) = [true, false]
   successors (Closed _ next) = [next]
 
 -- | Turn a list of groups into a body.  The first entry is
