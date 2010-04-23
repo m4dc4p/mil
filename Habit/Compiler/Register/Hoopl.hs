@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs, ScopedTypeVariables #-}
+{-# OPTIONS_GHC -Wall 	-fno-warn-name-shadowing #-}
 module Habit.Compiler.Register.Hoopl 
   (groupsToBody, InstrNode(..) , bodyToGroups
   , stdMapJoin)
@@ -9,6 +10,8 @@ import Compiler.Hoopl
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Control.Monad (foldM)
+import Data.List (deleteFirstsBy, find)
+import Data.Maybe (fromMaybe, catMaybes, isNothing)
 
 import qualified Habit.Compiler.Register.Machine as M (Instr(..), Label)
 import qualified Habit.Compiler.Register.Compiler as C
@@ -67,7 +70,7 @@ instance Edges InstrNode where
   successors (Ret _) = []
   successors (Error _) = []
   successors (Halt _) = []
-  successors (FailT _ false true ) = [true, false]
+  successors (FailT _ false true) = [true, false]
   successors (Closed _ next) = [next]
 
 -- | Turn a list of groups into a body.  The first entry is
@@ -88,8 +91,71 @@ groupsToBody groups
           (lbls', graph) <- codesToBody group lbls 
           return (lbls', prevGraph <#> graph)
 
--- | Converts a body back to a list of groups.
+type GroupMap = Map C.Label C.Group
+
 bodyToGroups :: Body InstrNode -> [C.Group]
+bodyToGroups = map clean . Map.elems . go Map.empty . bodyList
+  where
+    -- Test the entryLabel of each block and ensure
+    -- it does NOT appear later in the list ...
+    go :: GroupMap -> [(Label, Block InstrNode C C)] -> GroupMap
+    go groups [] = groups
+    go groups ((l, block):rest) 
+       | null predecessors = 
+           let instrs = toCode block
+               groups' :: GroupMap
+               groups' = case blockLabel block of
+                           LabelNode group lab _ -> addCode groups group 0 (\cs -> cs ++ [(lab, instrs)])
+                           EntryLabel group cnt _ -> addCode groups group cnt (\cs -> [(group, instrs)] ++ cs)
+           in case findBlocks (successors block) rest of
+                [] -> go groups' rest
+                next -> go groups' (next ++ deleteFirstsBy blockEq next rest)
+       | otherwise = go groups (predecessors ++ (l, block) : deleteFirstsBy blockEq predecessors rest)
+      where
+        predecessors :: [(Label, Block InstrNode C C)]
+        predecessors = filter (elem l . successors . snd) rest
+    blockLabel :: Block InstrNode e x -> InstrNode C O
+    blockLabel (b1 `BCat` _) = blockLabel b1
+    blockLabel (BUnit i@(LabelNode _ _ _)) = i    
+    blockLabel (BUnit i@(EntryLabel _ _ _)) = i    
+    blockLabel _ = error $ "Block did not start with label."
+    toCode :: Block InstrNode e x -> [M.Instr]
+    toCode (b1 `BCat` b2) = toCode b1 ++ toCode b2
+    toCode (BUnit instr) = 
+      case instr of
+        LabelNode _ _ _ -> []
+        EntryLabel _ _ _ -> []
+        Closed i _ -> [i]
+        Ret i -> [i]
+        FailT i _ _ -> [i]
+        Halt i -> [i] 
+        Error i -> [i] 
+        Open i -> [i]
+    addCode :: GroupMap -> C.Label -> Int -> ([C.Code] -> [C.Code]) -> GroupMap
+    addCode groups groupLabel cnt addToCode = 
+      let (l, c, cs) = fromMaybe (groupLabel, cnt, []) $ Map.lookup groupLabel groups
+      in Map.insert groupLabel (l, c, addToCode cs) groups
+    blockEq :: (Label, Block InstrNode C C) -> (Label, Block InstrNode C C) -> Bool
+    blockEq (l1, _) (l2, _) = l1 == l2
+    findBlocks :: [Label] -> [(Label, Block InstrNode C C)] -> [(Label, Block InstrNode C C)]
+    findBlocks ls blocks = catMaybes . map (\l -> findByLabel l blocks) $ ls
+    findByLabel l blocks = find (\(l', _) -> l' == l) blocks
+    removeEmptyLabels :: [C.Code] -> C.Code -> [C.Code]
+    removeEmptyLabels codes ("", code) = 
+      let sew :: C.Code -> [M.Instr] -> C.Code
+          sew (l, is1) is2 = (l, is1 ++ is2)
+      in case codes of 
+           [] -> error $ "Blank label at head of group."
+           [code'] -> [sew code' code]
+           _ -> init codes ++ [sew (last codes) code]
+    removeEmptyLabels codes code = codes ++ [code]
+    clean :: C.Group -> C.Group 
+    clean (l, c, cs) = 
+      let (first, rest) = (head cs, tail cs)
+      in (l, c, foldl removeEmptyLabels [first] $ rest)
+
+-- | Converts a body back to a list of groups.
+{-bodyToGroups :: Body InstrNode -> [C.Group]
 bodyToGroups = map clean . Map.elems . foldr toGroups Map.empty . map snd . bodyList 
   where
     clean :: C.Group -> C.Group 
@@ -111,11 +177,6 @@ bodyToGroups = map clean . Map.elems . foldr toGroups Map.empty . map snd . body
              case info of
                Left lab -> Map.insert groupLabel (groupLabel, 0, [(lab, toCode block)]) groups
                Right cnt -> Map.insert groupLabel (groupLabel, cnt, [(groupLabel, toCode block)]) groups
-    blockLabel :: Block InstrNode e x -> InstrNode C O
-    blockLabel (b1 `BCat` b2) = blockLabel b1
-    blockLabel (BUnit i@(LabelNode _ _ _)) = i    
-    blockLabel (BUnit i@(EntryLabel _ _ _)) = i    
-    blockLabel _ = error $ "Block did not start with label."
     toCode :: Block InstrNode e x -> [M.Instr]
     toCode (b1 `BCat` b2) = toCode b1 ++ toCode b2
     toCode (BUnit i) = 
@@ -136,7 +197,7 @@ bodyToGroups = map clean . Map.elems . foldr toGroups Map.empty . map snd . body
            [] -> error $ "Blank label at head of group."
            [code'] -> [sew code' code]
            _ -> init codes ++ [sew (last codes) code]
-    removeEmptyLabels codes code = codes ++ [code]
+    removeEmptyLabels codes code = codes ++ [code]-}
 
 -- | Convert codes in a group to basic blocks, so 
 -- all transfers show up correctly. An empty
@@ -149,8 +210,8 @@ bodyToGroups = map clean . Map.elems . foldr toGroups Map.empty . map snd . body
 -- the data structure. For now I use the ugly hack
 -- of having empty labels
 toBasicBlocks :: C.Group -> C.Group
-toBasicBlocks (l, c, codes) = (l, c, basicBlocks)
-  where basicBlocks = concatMap toBB $ codes
+toBasicBlocks (gl, c, codes) = (gl, c, basicBlocks codes)
+  where basicBlocks = concatMap toBB 
         -- The code list is reconstructed by keeping the
         -- first label with the first code block and
         -- adding blank labels everywhere else.
@@ -190,7 +251,7 @@ codesToBody (groupLabel, groupCount, codes) lbls = do
       codesToBody' lbls entryL ((entry, instrs):rest) 
           | null instrs = error "TODO: empty code block"
           | null rest = do
-              mkGraph (error "Graph should not end with FailT!") 
+              mkGraph (error $ "Graph should not end with FailT!" ++ show codes) 
           | otherwise = do
               nextL <- freshLabel
               (lbls', graph) <- mkGraph nextL
@@ -233,6 +294,7 @@ codesToBody (groupLabel, groupCount, codes) lbls = do
           findLabel lbls l fresh = case Map.lookup l lbls of
                                      Just lbl -> (lbls, lbl)
                                      Nothing -> (Map.insert l fresh lbls, fresh)
+      codesToBody' _ _ [] = error $ "Empty code block!"
 
 -- | Retrieve the body of a graph.
 bodyOf :: AGraph InstrNode C C -> FuelMonad (Body InstrNode)
