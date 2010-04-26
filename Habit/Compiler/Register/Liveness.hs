@@ -39,11 +39,13 @@ liveLattice = DataflowLattice { fact_name = "Liveness"
     Open/Closed: Transfer all live registers from target labels.
     Open/Open: Transfer all register that are live, remove any that are killed.
     Closed/Open: Return all registers that are known to be live now.
+
+    Does this work for global registers allocated in TOP but only used elsewhere?
 -}
 liveTransfer :: BwdTransfer InstrNode LiveFact
 liveTransfer (EntryLabel _ _ l) f = mkFactBase [(l, f)]
 liveTransfer (LabelNode _ _ l) f = mkFactBase [(l, f)]
-liveTransfer (Open (M.Enter _ _ dest)) f = Set.delete dest f
+liveTransfer (Open (M.Enter src arg dest)) f = Set.insert src . Set.insert arg . Set.delete dest $ f
 liveTransfer (Open (M.AllocC dest _ _)) f = Set.delete dest f
 liveTransfer (Open (M.AllocD dest _ _)) f = Set.delete dest f
 liveTransfer (Open (M.Copy _ dest)) f = Set.delete dest f
@@ -52,9 +54,10 @@ liveTransfer (Open (M.Load (dest,_) src)) f = Set.insert src (Set.delete dest f)
 liveTransfer (Open (M.Set dest _)) f = Set.delete dest f
 liveTransfer (Open _) f = f
 liveTransfer (Closed _ l) f = fromMaybe Set.empty $ lookupFact f l
-liveTransfer (FailT _ tl fl) f = fromMaybe Set.empty (lookupFact f tl) `Set.union`
+liveTransfer (FailT _ (F fl) (T tl)) f = fromMaybe Set.empty (lookupFact f tl) `Set.union`
                                                fromMaybe Set.empty (lookupFact f fl)
-liveTransfer (Ret _) _ = Set.empty
+liveTransfer (Ret (M.Ret r)) _ = Set.singleton r
+liveTransfer (Ret i) _ = error $ "Hoopl Ret instruciton associated with incorrect machine instruction: " ++ show i
 liveTransfer (Error _) _ = Set.empty
 liveTransfer (Halt _) _ = Set.empty
 
@@ -64,8 +67,8 @@ liveRewrite :: BwdRewrite InstrNode LiveFact
 liveRewrite = shallowBwdRw f
   where
     f :: SimpleBwdRewrite InstrNode LiveFact
-{-    f (Open (M.Copy _ dest)) live 
+    f (Open (M.Copy _ dest)) live 
             | dest `Set.member` live = Nothing
-            | otherwise = Just emptyAGraph-}
+            | otherwise = Just emptyGraph
     f _ _ = Nothing
                                                

@@ -3,7 +3,7 @@ module Habit.Compiler.Register.ConstProp (constPropOpt)
 
 where
 
-import Compiler.Hoopl
+import Compiler.Hoopl hiding (Top)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
@@ -50,7 +50,7 @@ varHasConst (Open (M.Load _ dst)) fact = Map.insert dst Top fact
 varHasConst (Open (M.Set dst _)) fact = Map.insert dst Top fact
 varHasConst (Open _) fact = fact
 varHasConst (Closed _ next) fact = mkFactBase [(next, fact)]
-varHasConst (FailT _ true false) fact = mkFactBase [(true, fact)
+varHasConst (FailT _ (F false) (T true)) fact = mkFactBase [(true, fact)
                                                    ,(false, fact)]
 varHasConst (Ret _) fact = mkFactBase []
 varHasConst (Halt _) fact = mkFactBase []

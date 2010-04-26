@@ -49,6 +49,7 @@ act a _ = crash $ OtherError $ "Unsupported action " ++ show a
 visualizer :: String -> [Group] -> SessionM [Group]
 visualizer file gs = do
   io (writeViz file (makeCFG gs))
+
   let gs' = optGroups noOpOpt . 
             optGroups liveOpt .
             optGroups constPropOpt $ gs
