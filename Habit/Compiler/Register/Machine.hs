@@ -21,6 +21,12 @@ cloReg = "clo"
 argReg = "arg"
 resultReg = "result"
 
+newtype Failure = F Label
+  deriving (Eq, Read, Show)
+
+newtype Success = S Label
+  deriving (Eq, Read, Show)
+
 -- | Instructions available to the machine.
 data Instr = Enter Reg Reg Reg -- ^ Enter the closure at the first location, with the argument at the second location.
                                -- The result of the Enter will be in the register in the third location.
@@ -37,7 +43,7 @@ data Instr = Enter Reg Reg Reg -- ^ Enter the closure at the first location, wit
                               -- first argument is the source register, with an offset indexed from 0. The 
                               -- second argument is the destination register.
           | Set Reg Val -- ^ Set a register to a value.
-          | FailT Reg Tag Label -- ^ Jump to the given label if the value in the
+          | FailT Reg Tag Failure Success -- ^ Jump to the given label if the value in the
                                  -- location specified does NOT match the tag given. Otherwise
                                  -- continue executing.
           | Label Label -- ^ Label the next instruction with the name given.
@@ -193,26 +199,26 @@ step (Load (src, i) dst) machine@(Machine { registers = rs })
 step (Set dst v) machine@(Machine { registers = rs })
     = next $ machine { registers = setRegister dst v rs }
 
--- FailT reg t1 l | program | registers | callStack 
+-- FailT reg t1 f s | program | registers | callStack 
 -------------------------------------------------
 -- In   | [*i_k*]   | (Data t1 _) == reg | cs 
--- Out  | [*i_k+1*] | ...                 | cs
+-- Out  | [*Label s*] | ...                 | cs
 
 -- FailT reg t1 l | program | registers | callStack 
 -------------------------------------------------
 -- In   | [*i_k*]     | (Data t2 _) == reg | cs 
--- Out  | [*Label l*] | ...                | cs
+-- Out  | [*Label f*] | ...                | cs
 
-step (FailT reg t1 l) machine@(Machine { program = p
+step (FailT reg t1 (F f) (S s)) machine@(Machine { program = p
                                        , registers = rs })
     = case getRegister rs reg of
         (Just (Data t2 _)) 
-           | t2 == t1 -> next machine -- Tag matches, continue
-           | otherwise -> maybe err1 jump (findLabel p l)
+           | t2 == t1 -> maybe (err1 s) jump (findLabel p s) -- Tag matches, continue
+           | otherwise -> maybe (err1 f) jump (findLabel p f)
         _ -> err machine $ "Illegal state for FailT."
   where
     jump p' = machine { program = p' }
-    err1 = err machine $ "Can't find label " ++ l ++ " for FailT in machine."
+    err1 l = err machine $ "Can't find label " ++ l ++ " for FailT in machine."
 
 step (Label _) machine = next machine 
 step Halt machine = machine 

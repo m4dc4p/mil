@@ -11,7 +11,7 @@ import Data.Map (Map, (!))
 import qualified Data.Map as Map
 
 import Habit.Compiler.Register.Compiler (Group, Code, Label)
-import Habit.Compiler.Register.Machine (Instr(..))
+import Habit.Compiler.Register.Machine (Instr(..), Failure(..), Success(..))
 
 makeCFG :: [Group] -> Gr String ()
 makeCFG groups = 
@@ -26,7 +26,7 @@ makeCFG groups =
         linkInstr :: Map Label Node -> (Gr String (), (Node, Int)) -> Instr -> (Gr String (), (Node, Int))
         linkInstr labelMap (g, (prev, next)) instr@(Jmp label) =
           (forward next prev (labelMap ! label) instr & g, (next, next + 1))
-        linkInstr labelMap (g, (prev, next)) instr@(FailT _ _ label) =
+        linkInstr labelMap (g, (prev, next)) instr@(FailT _ _ (F label) (S success)) =
           (forward next prev (labelMap ! label) instr & g, (next, next + 1))
         linkInstr labelMap (g, (prev, next)) instr@(AllocC _ lab _) = ((adj prev
                                                  , next
@@ -75,7 +75,7 @@ showInstr (Copy _ _) = "Copy"
 showInstr (Store _ _) = "Store"
 showInstr (Load _ _) = "Load"
 showInstr (Set _ _) = "Set"
-showInstr (FailT _ _ _) = "FailT"
+showInstr (FailT _ _ _ _) = "FailT"
 showInstr (Label _) = "Label"
 showInstr (Halt) = "Halt"
 showInstr (Jmp _) = "Jmp"

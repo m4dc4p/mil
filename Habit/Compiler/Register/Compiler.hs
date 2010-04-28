@@ -238,7 +238,7 @@ compileDatas dataDefs env = do
 -- | What to do when a match fails: abort or jump
 -- to a label.
 data OnFail = Abort 
-   | OnFail String
+   | OnFail Label
  deriving (Show)
 
 -- | Code to execute after a match has succeeded
@@ -336,9 +336,11 @@ compilePat env f (PCon name _ pats) arg = do
         return (next l, e', is ++ H.Load l tmp : is')
   (_, env', patC) <- foldM bindArgs ((arg, 0), env, []) pats
   l1 <- newLabel
+  l2 <- newLabel
   record l1 (handleFailure f)
+  record l2 patC
   let note = mkN "compilePat: PCon" 
-  return (env', note : H.FailT arg (showName name) l1 : patC)
+  return (env', note : [H.FailT arg (showName name) (H.F l1) (H.S l2)])
 
 -- A pattern guard evaulates the guard and, if
 -- it succeeds, matches against the pattern given. 

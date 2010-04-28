@@ -14,7 +14,7 @@ import Control.Monad (foldM)
 import Data.List (foldl')
 import Data.Maybe (fromMaybe)
 
-import qualified Habit.Compiler.Register.Machine as M (Instr(..), Label)
+import qualified Habit.Compiler.Register.Machine as H
 import qualified Habit.Compiler.Register.Compiler as C
 
 -- | Maps machine IR to Hoopl's node types.
@@ -34,38 +34,38 @@ data InstrNode e x where
     -> InstrNode C O
   -- | Generic open/open instruction.
   Open 
-    :: M.Instr -- ^ Original instruction
+    :: H.Instr -- ^ Original instruction
     -> InstrNode O O
   -- | An instruction which can branch to the label given. 
   Closed 
-    :: M.Instr -- ^ Original instruction
+    :: H.Instr -- ^ Original instruction
     -> Label -- ^ Next node
     -> InstrNode O C
   -- | QED
   FailT 
-    :: M.Instr -- ^ Original instruction.
+    :: H.Instr -- ^ Original instruction.
     -> False -- ^ Destination if test fails.
     -> True -- ^ Destination if test succeeds.
     -> InstrNode O C
   -- | QED.
   Ret 
-    :: M.Instr -- ^ Original instruction
+    :: H.Instr -- ^ Original instruction
     -> InstrNode O C
   -- | QED.
   Halt 
-    :: M.Instr -- ^ Original instruction
+    :: H.Instr -- ^ Original instruction
     -> InstrNode O C
   -- | QED.
   Error 
-    :: M.Instr -- ^ Original instruction
+    :: H.Instr -- ^ Original instruction
     -> InstrNode O C
 
 -- | Label which heads up a group.
-newtype Group = G M.Label
+newtype Group = G H.Label
   deriving (Eq, Show)
 
 -- | Non-group label.
-newtype Norm = N M.Label
+newtype Norm = N H.Label
   deriving (Eq, Show)
 
 -- | Label when FailT succeeds.
@@ -127,7 +127,7 @@ toBasicBlocks (gl, c, codes) = (gl, c, basicBlocks codes)
           let labels = l : zipWith (++) (repeat (gl ++ "-" ++ l ++ "-hoop")) (map show [(1::Int)..])
               -- Have to create new labels here which will not collide. Ugly ....
           in zip labels . uncurry (:) . foldr mkBB ([last instrs], []) $ (init instrs)
-        mkBB :: M.Instr -> ([M.Instr],[[M.Instr]]) -> ([M.Instr],[[M.Instr]])
+        mkBB :: H.Instr -> ([H.Instr],[[H.Instr]]) -> ([H.Instr],[[H.Instr]])
         mkBB instr (basic, list) = 
           -- Split blocks when we see "closed" instructions (conditional,
           -- jump, error, halt or return). Accumulate
@@ -136,68 +136,60 @@ toBasicBlocks (gl, c, codes) = (gl, c, basicBlocks codes)
           -- to list and start accumlating a new basic. Remember
           -- we are going backwards through each block. 
           case instr of
-            M.FailT _ _ _ -> ([instr], basic : list)
-            M.Jmp _ -> ([instr], basic : list)
-            M.Halt -> ([instr], basic : list)
-            M.Ret _ -> ([instr], basic : list)
-            M.Error _ -> ([instr], basic : list)
+            H.FailT _ _ _ _ -> ([instr], basic : list)
+            H.Jmp _ -> ([instr], basic : list)
+            H.Halt -> ([instr], basic : list)
+            H.Ret _ -> ([instr], basic : list)
+            H.Error _ -> ([instr], basic : list)
             _ -> (instr : basic, list)
 
-type MLabelMap = Map M.Label Label
+type MLabelMap = Map H.Label Label
 
 -- | Converts a group to a graph. Maintains a dictionary which maps
 -- machine labels to Hoopl labels. 
 groupToBody :: C.Group -> FuelMonad (AGraph InstrNode C C)
-groupToBody (groupLabel, groupCount, codes) = do
-    entry <- freshLabel
-    (_, g) <- codesToBody' Map.empty entry codes
-    return g
+groupToBody (groupLabel, groupCount, codes) = codesToBody' Map.empty codes >>= return . snd
   where
       -- The contortions here result from FailT's
       -- definition -- it only specifies the "false" branch. Hoopl needs a branch following
       -- all closed definitions. Have to ensure we have a Hoopl label for the "true" branch
       -- on FailT.      
-      codesToBody' :: MLabelMap -> Label -> [C.Code] -> FuelMonad (MLabelMap, AGraph InstrNode C C)
-      codesToBody' lbls entryL ((entry, instrs):rest) 
+      codesToBody' :: MLabelMap -> [C.Code] -> FuelMonad (MLabelMap, AGraph InstrNode C C)
+      codesToBody' prevLbls ((entry, instrs):rest) 
           | null instrs = error "TODO: empty code block"
-          | null rest = do
-              mkGraph (error $ "Graph should not end with FailT!" ++ show codes) 
-          | otherwise = do
-              nextL <- freshLabel
-              (lbls', graph) <- mkGraph nextL
-              (lbls'', graph') <- codesToBody' lbls' nextL rest
+          | null rest = mkGraph 
+          | otherwise = do 
+              (lbls', graph) <- mkGraph 
+              (lbls'', graph') <- codesToBody' lbls' rest
               return $ (lbls'', graph |*><*| graph')
         where
-          mkGraph nextL = do
-            let (lbls', first) = mkLabel entryL entry groupLabel lbls
-                middles = map middle (init instrs)
-            (lbls'', last) <- end (Map.insert entry entryL lbls') nextL (last instrs)
-            return $ (lbls'', mkFirst first <*> catGraphs middles <*> mkLast last)
-          mkLabel entryL entry groupLabel lbls
-              | entry == groupLabel = (lbls', EntryLabel (G entry) groupCount foundL)
-              | otherwise = (lbls', LabelNode (G groupLabel) (N entry) foundL)
-            where
-              (lbls', foundL) = findLabel lbls entry entryL
+          (newLbls, entryLabel) = findLabel prevLbls entry entryL
+          mkGraph = do
+            (lbls'', last) <- end (last instrs)
+            return $ (lbls'', mkFirst first <*> catGraphs (map middle (init instrs)) <*> mkLast last)
+          first 
+              | entry == groupLabel = EntryLabel (G entry) groupCount entryLabel
+              | otherwise = LabelNode (G groupLabel) (N entry) entryLabel
           middle i = case i of 
-                       M.Halt -> err "Illegal instruction in middle of block."
-                       M.Ret _ -> err "Illegal instruction in middle of block."
-                       M.Jmp _ -> err "Illegal instruction in middle of block."
-                       M.Error _ -> err "Illegal instruction in middle of block."
+                       H.Halt -> err "Illegal instruction in middle of block."
+                       H.Ret _ -> err "Illegal instruction in middle of block."
+                       H.Jmp _ -> err "Illegal instruction in middle of block."
+                       H.Error _ -> err "Illegal instruction in middle of block."
                        _ -> mkMiddle $ Open i
-          end :: MLabelMap -> Label -> M.Instr -> FuelMonad (MLabelMap, InstrNode O C)
-          end lbls nextLabel i = do
+          end :: H.Instr -> FuelMonad (MLabelMap, InstrNode O C)
+          end i = do
             case i of
-              M.Ret _ -> return (lbls, Ret i)
-              M.Jmp l -> do
+              H.Ret _ -> return (newLbls, Ret i)
+              H.Jmp l -> do
                      fresh <- freshLabel
-                     let (lbls', foundL) = findLabel lbls l fresh
+                     let (lbls', foundL) = findLabel newLbls l fresh
                      return (lbls', Closed i foundL)
-              M.Halt -> return (lbls, Halt i)
-              M.FailT _ _ l -> do
-                     fresh <- freshLabel
-                     let (lbls', falseL) = findLabel lbls l fresh
-                     return (lbls', FailT i (F falseL) (T nextLabel))
-              M.Error _ -> return (lbls, Error i)
+              H.Halt -> return (newLbls, Halt i)
+              H.FailT _ _ (H.F f) (H.S s)_ -> withFreshLabels $ \(t, f) -> do
+                     let (lbls', falseL) = findLabel newLbls f fresh
+                         (lbls'', trueL) = findLabel lbls' t fresh
+                     return (lbls'', FailT i (F falseL) (T trueL))
+              H.Error _ -> return (newLbls, Error i)
               _ -> err "Illegal instruction at end of code block."
           err msg = codeError (msg ++ " " ++ show instrs ++ " " ++ show rest)
           -- Find label associated with l, or associate label l
@@ -266,7 +258,7 @@ bodyToGroups body = Map.elems . snd .
         label = case blockLabel block of
                   LabelNode _ (N l) _ -> l 
                   EntryLabel (G l) _ _ -> l
-        code :: Block InstrNode e x -> [M.Instr]
+        code :: Block InstrNode e x -> [H.Instr]
         code (b1 `BCat` b2) = code b1 ++ code b2
         code (BUnit instr) = 
           case instr of

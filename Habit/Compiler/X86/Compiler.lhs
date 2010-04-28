@@ -260,7 +260,7 @@ to refer to the value.
 > asmInstr env (Set reg (H.Num val)) = error $ "Can't assemble a numeric value."
 > asmInstr env (Set reg (H.Data _ _)) = error $ "Can't assemble a data value."
 
-> asmInstr env i@(FailT reg tag label) = _text $ do
+> asmInstr env i@(FailT reg tag (H.F label) (H.S success)) = _text $ do
 >     let sourceL = findL reg env
 >     note $ show i
 >     case sourceL of
@@ -274,6 +274,7 @@ to refer to the value.
 >     emit $ movl (Ref ecx) ecx
 >     emit $ cmpl (hash tag) ecx 
 >     emit $ jnz (A.Label label)
+>     emit $ jmp (A.Label success)
 >     return env
 
 > asmInstr env i@(Label l) = _text $ do
@@ -448,7 +449,7 @@ the second holds local (temporary) registers.
 >     getReg (H.Store _ _) = []
 >     getReg (H.Load (_, _) r2 ) = [r2]
 >     getReg (H.Set r1 _) = [r1]
->     getReg (H.FailT _ _ _) = []
+>     getReg (H.FailT _ _ _ _) = []
 >     getReg _ = []
 
 > -- | Create a unique label.
