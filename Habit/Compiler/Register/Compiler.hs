@@ -122,6 +122,14 @@ record l instrs = do
     addCode s@(S { inProgress = (l, i, cs) : css }) 
         = s { inProgress = (l, i, code : cs) : css }
 
+-- | Record a block of code under a new label and return 
+-- the label used.
+recordBlock :: [Instr] -> C Label
+recordBlock instrs = do
+  label <- newLabel
+  record label instrs
+  return label
+
 -- | Compile a module to a list of "group" blocks. 
 compile :: Supply Int -> Module -> [Group]
 compile supply m 
@@ -168,7 +176,6 @@ compileDecls decls env = do
               r <- if isGlobal name 
                     then newGlobalReg name 
                     else newNamedReg name
-              l <- newNamedLabel "makeEnv"
               return (decl_name d, r)
             f env (dst, decl) = compileDecl env dst decl
             decl_bodies = (impl_decls recDecls ++ map decl (expl_decls recDecls))
@@ -238,7 +245,7 @@ compileDatas dataDefs env = do
 -- | What to do when a match fails: abort or jump
 -- to a label.
 data OnFail = Abort 
-   | OnFail Label
+   | AltLabel Label
  deriving (Show)
 
 -- | Code to execute after a match has succeeded
@@ -254,7 +261,8 @@ data MatchDone = MD OnFail Success
 -- failure mode.
 handleFailure :: OnFail -> [Instr]
 handleFailure Abort = [H.Error "Match failure!"]
-handleFailure (OnFail l2) = [H.Jmp l2]
+handleFailure (AltLabel l2) = [mkN "handleFailure"
+                            , H.Jmp l2]
 
 -- | A match takes an environment, a description of what to do when
 -- the match succeeds or what to do when it fails and a list of
@@ -262,35 +270,44 @@ handleFailure (OnFail l2) = [H.Jmp l2]
 -- values it is matching against. They will be consumed in the order
 -- given. 
 --
--- compileMatch returns a register where the result of the match
--- is stored and the instructions necessary for starting the match.
+-- compileMatch returns the instructions necessary for starting the match.
 compileMatch :: Env -> MatchDone -> Reg -> Match -> [Reg] -> C [Instr]
 
 -- A match pattern binds variables and evaluates its body
 -- in the new environment. One argument is consumed when 
 -- binding.
 compileMatch env m@(MD failure _) result (MPat pat body) (arg:args) = do
-  (env', patC) <- compilePat env failure pat arg
+  (env', sL, patC) <- compilePat env failure pat arg
   bodyC <- compileMatch env' m result body args
   let note = mkN "compileMatch: MPat"
-  return $ note : patC ++ bodyC
+  case sL of
+    Just l -> do
+            record l bodyC
+            return $ note : patC
+    Nothing -> return $ note : patC ++ bodyC
+  
 
 -- A match guard evaluates the guard and creates
 -- a new environment, if the guard succeeds. The body
 -- is then evaluated in the new environment.
 compileMatch env m@(MD failure success) result (MGrd guard body) args = do
-  (env', guardC) <- compileGuard env failure guard 
+  (env', sL, guardC) <- compileGuard env failure guard 
   bodyC <- compileMatch env' m result body args
   let note = mkN "compileMatch: MGrd"
-  return $ note : guardC ++ bodyC ++ success
+  case sL of
+    Just l -> do
+            record l bodyC
+            return $ note : guardC ++ success
+    Nothing -> return $ note : guardC ++ bodyC ++ success
 
+  
 -- MAlt evaluates the first match and, if it fails,
 -- evaulates the second match. If the second match
 -- fails, the match fails. If either match succeeds
 -- the result will be in the register returned.
 compileMatch env (MD failure success) result (MAlt alt1 alt2) args = do
-  (l1:l2:_) <- mapM (const newLabel) [0..1]
-  alt1C <- compileMatch env (MD (OnFail l2) success) result alt1 args
+  l2 <- newLabel
+  alt1C <- compileMatch env (MD (AltLabel l2) success) result alt1 args
   alt2C <- compileMatch env (MD failure success) result alt2 args
   record l2 (mkN "compileMatch: MAlt2" : alt2C)
   return $ mkN "compileMatch: MAlt1" : alt1C 
@@ -315,14 +332,14 @@ compileMatch e md r expr args = error $ "Pattern match failure\n e: " ++ show e 
 -- pattern-match against is also given. A pattern
 -- returns a new environment and instructions necessary
 -- to evaluate the pattern.
-compilePat :: Env -> OnFail -> Pat -> Reg -> C (Env, [Instr])
+compilePat :: Env -> OnFail -> Pat -> Reg -> C (Env, Maybe Label, [Instr])
 
 -- PVar pattern simply binds a name to the 
 -- location given.
 compilePat env _ (PVar name) arg = do
   let note = [mkN ("compilePat: PVar (" ++ showName name ++ 
                     " : " ++ show arg ++ ")")]
-  return ((name, arg) : env, note)
+  return ((name, arg) : env, Nothing,  note)
 
 -- PCon determines if the location given 
 -- matches the constructor given. The arguments
@@ -332,24 +349,25 @@ compilePat env f (PCon name _ pats) arg = do
   let next (l, o) = (l, (o + 1))
       bindArgs (l, e, is) p = do
         tmp <- newReg
-        (e', is') <- compilePat e f p tmp
+        (e', _, is') <- compilePat e f p tmp
         return (next l, e', is ++ H.Load l tmp : is')
   (_, env', patC) <- foldM bindArgs ((arg, 0), env, []) pats
-  l1 <- newLabel
+  l1 <- recordBlock (handleFailure f)
   l2 <- newLabel
-  record l1 (handleFailure f)
-  record l2 patC
-  let note = mkN "compilePat: PCon" 
-  return (env', note : [H.FailT arg (showName name) (H.F l1) (H.S l2)])
+  l3 <- recordBlock $ patC ++ [H.Jmp l2]
+  return (env'
+         , Just l2
+         , [mkN "compilePat: Failt"
+           , H.FailT arg (showName name) (H.F l1) (H.S l3)])
 
 -- A pattern guard evaulates the guard and, if
 -- it succeeds, matches against the pattern given. 
 compilePat env f (PGrd p g) arg = do
-  (env', guardC) <- compileGuard env f g 
-  (env'', patC) <- compilePat env' f p arg
+  (env', _, guardC) <- compileGuard env f g 
+  (env'', sL, patC) <- compilePat env' f p arg
   let note = mkN "compilePat: PGrd" 
   return (env''
-         , note : guardC ++ patC)
+         , sL, note : guardC ++ patC)
 
 -- A pattern signature has no runtime effect
 -- and just evaluates to the underlying
@@ -359,26 +377,26 @@ compilePat env f (PSig pat typ) arg = compilePat env f pat arg
 -- A pattern wildcard always succeeds and
 -- matches everyting. That is, it has no
 -- effect.
-compilePat env _ PWild _ = return (env, [mkN "compilePat: PWild"])
+compilePat env _ PWild _ = return (env, Nothing, [mkN "compilePat: PWild"])
 
 -- | A guard checks an expression against a pattern and 
 -- can also create new bindings. A guard always returns
 -- a new environment and instructions for executing
 -- the guard.
-compileGuard :: Env -> OnFail -> Guard -> C (Env, [Instr])
+compileGuard :: Env -> OnFail -> Guard -> C (Env, Maybe Label, [Instr])
 
 -- A GMatch checks an expression against a pattern 
 -- and fails if the pattern does not match. Otherwise,
 -- execution continues.
 compileGuard env f (GMatch pat expr) = do
   (regE, exprC) <- compileExpr env expr
-  (env', testC) <- compilePat env f pat regE
-  return (env', mkN "compileGMatch" : exprC ++ testC)
+  (env', sL, testC) <- compilePat env f pat regE
+  return (env', sL, mkN "compileGMatch" : exprC ++ testC)
 
 -- GLet binds new values in the environment.
 compileGuard env failure (GLet decls) = do
   (env', initC) <- compileDecls (decl_deps decls) env
-  return (env', mkN "compileGLet" : initC)
+  return (env', Nothing, mkN "compileGLet" : initC)
 
 -- | Compile a pure expression. Compiling an expression in an
 -- environment always results in a register holding the final value
@@ -483,16 +501,15 @@ compileAbs env f nparams fvs m = newGroup nfvs $ compileAbs' 1
               env' = zip fvs fvRegs ++ env
               args' = argRegs ++ [H.argReg]
           r <- newReg
-          l <- newLabel
-          record l [H.Ret r]
+          l <- recordBlock [H.Ret r]
           matchC <- compileMatch env' (MD f [H.Jmp l]) r m args'
-          return $ mkN "compileAbs 1" : matchC
+          return $ mkN "compileAbs 1" : matchC ++ [mkN "compileAbs 1 end"]
       | otherwise = do
           entry <- newGroup (length regs + 1) $ compileAbs' (n + 1)
           r <- newReg
           closureC <- mkClosure r entry regs
           return $ mkN "compileAbs n" 
-                     : closureC ++ [H.Ret r]
+                     : closureC ++ [H.Ret r] ++ [mkN "compileAbs n end"]
 
 -- | Create a closure in the register given, for the
 -- label specified. The list of registers passed will be
