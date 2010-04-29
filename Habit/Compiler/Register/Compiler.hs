@@ -57,14 +57,14 @@ newLabel = do
   return $ "lab" ++ show (supplyValue s1)
 
 -- | Create a unique label with the given name embedded.
-newNamedLabel :: String -> C String
+newNamedLabel :: Name -> C String
 newNamedLabel name = do
   m <- get
   let (s1, s2) = split2 . nextID $ m
   put m { nextID = s2 }
   -- As long as this prefix is unique, labels
   -- produced here won't collide with assembler.
-  return $ "lab" ++ (replace '.' '_' name) ++ show (supplyValue s1)
+  return $ "lab" ++ (replace '.' '_' (showName name)) ++ show (supplyValue s1)
 
 -- | Create a unique register.
 newReg :: C Reg
@@ -92,24 +92,29 @@ newGlobalReg name = do
   return $ "glob" ++ (replace '.' '_' (showName name)) ++ show (supplyValue s1)
 
 
--- | Begins tracking instructions for a new code group.
-newGroup :: Int -> ([Reg] -> C [Instr]) -> C Label
-newGroup size action = do
-    label <- newLabel
-    let prologue = 
-          let mkReg i = do 
-                t <- newReg
-                return (t, H.Load (H.cloReg, i) t)
-          in mapM mkReg [0 .. size - 1] >>= return . unzip
-    (regs, init) <- prologue
-    modify (\s -> s { inProgress = (label, size, []) : (inProgress s) })
-    body <- action regs
-    let addEntry s@(S { inProgress = (l, i, c) : rest
-                      , completed = comp }) 
-            = s { inProgress = rest
-                , completed = (l, i, (label, init ++ body) : c) : comp }
-    modify addEntry
-    return label
+-- | Begins tracking instructions for a new group. 
+newGroup :: Maybe Name -- ^ Name to embed in the label, if any
+         -> Int -- ^ Number of slots expected in the closure register.
+         -> ([Reg] -> C [Instr])  -- ^ Compilation action. Will be passed the registers which
+                                  -- will contain values from the closure. The first slot in
+                                  -- the closure is first in the list, and so on.
+         -> C Label
+newGroup name size action = do
+  label <- maybe newLabel newNamedLabel name
+  let prologue = 
+        let mkReg i = do 
+              t <- newReg
+              return (t, H.Load (H.cloReg, i) t)
+        in mapM mkReg [0 .. size - 1] >>= return . unzip
+  (regs, init) <- prologue
+  modify (\s -> s { inProgress = (label, size, []) : (inProgress s) })
+  body <- action regs
+  let addEntry s@(S { inProgress = (l, i, c) : rest
+                    , completed = comp }) = s { inProgress = rest
+                                              , completed = (l, i, (label, init ++ body) : c) 
+                                                            : comp }
+  modify addEntry
+  return label
 
 -- | Record a labeled block of code.    
 record :: String -> [Instr] -> C ()
@@ -121,6 +126,12 @@ record l instrs = do
         = error $ "Not able to record right now!"
     addCode s@(S { inProgress = (l, i, cs) : css }) 
         = s { inProgress = (l, i, code : cs) : css }
+
+maybeRecord :: Maybe Label -> [Instr] -> [Instr] -> C [Instr]
+maybeRecord Nothing block rest = return $ block ++ rest 
+maybeRecord (Just l) block rest = do
+  record l block
+  return rest
 
 -- | Record a block of code under a new label and return 
 -- the label used.
@@ -217,7 +228,7 @@ compileDatas dataDefs env = do
                             , H.Ret result]
         mkData remain def@(name, _) regs = do
           r <- newNamedReg name
-          entry <- newGroup (length regs + 1) $ mkData (remain - 1) def
+          entry <- newGroup (Just name) (length regs + 1) $ mkData (remain - 1) def
           closureC <- mkClosure r entry regs
           return $ mkN "mkData n" : closureC ++ [H.Ret r]
         compileData (e, inits) (name, 0) = do
@@ -230,7 +241,7 @@ compileDatas dataDefs env = do
                    : H.AllocD r (showName name) 0 : inits)
         compileData (e, inits) (name, count) = do
           r <- newGlobalReg name
-          entry <- newGroup 0 $ mkData count (name, count)
+          entry <- newGroup (Just name) 0 $ mkData count (name, count)
           return ((name, r) : e
                  , mkN ("compileData n: " ++ showBinding (name, r))
                    : H.AllocC r entry 0 : inits)
@@ -280,12 +291,7 @@ compileMatch env m@(MD failure _) result (MPat pat body) (arg:args) = do
   (env', sL, patC) <- compilePat env failure pat arg
   bodyC <- compileMatch env' m result body args
   let note = mkN "compileMatch: MPat"
-  case sL of
-    Just l -> do
-            record l bodyC
-            return $ note : patC
-    Nothing -> return $ note : patC ++ bodyC
-  
+  maybeRecord sL bodyC (note : patC)
 
 -- A match guard evaluates the guard and creates
 -- a new environment, if the guard succeeds. The body
@@ -476,7 +482,7 @@ compileMAbs env dest name f m = do
                                          -- considered free.
           fvRegs  = [r | Just r <- map (flip lookup env) fvs]
           fvLoads = map (\(r, i) -> H.Store r (result, i)) . zip fvRegs $ [0..]
-      l <- compileAbs env f nparams fvs m 
+      l <- compileAbs name env f nparams fvs m 
       return (result, Just $ H.AllocC result l (length fvRegs)
              , mkN ("free: " ++ showNames fvs ++ ", env: " ++ showEnv env) 
                : mkN ("dest is: " ++ show dest) 
@@ -492,7 +498,7 @@ compileMAbs env dest name f m = do
 -- | Compiles intermediate instructions for consuming arguments
 -- and copying them between closures, until all arguments have
 -- been consumed and the function can do real work.   
-compileAbs env f nparams fvs m = newGroup nfvs $ compileAbs' 1
+compileAbs name env f nparams fvs m = newGroup name nfvs $ compileAbs' 1
   where
     nfvs = length fvs
     compileAbs' n regs 
@@ -505,7 +511,7 @@ compileAbs env f nparams fvs m = newGroup nfvs $ compileAbs' 1
           matchC <- compileMatch env' (MD f [H.Jmp l]) r m args'
           return $ mkN "compileAbs 1" : matchC ++ [mkN "compileAbs 1 end"]
       | otherwise = do
-          entry <- newGroup (length regs + 1) $ compileAbs' (n + 1)
+          entry <- newGroup name (length regs + 1) . compileAbs' $ (n + 1)
           r <- newReg
           closureC <- mkClosure r entry regs
           return $ mkN "compileAbs n" 
