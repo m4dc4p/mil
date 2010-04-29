@@ -11,7 +11,7 @@ import Compiler.Hoopl
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Control.Monad (foldM)
-import Data.List (foldl')
+import Data.List (foldl', nubBy)
 import Data.Maybe (fromMaybe)
 
 import qualified Habit.Compiler.Register.Machine as H
@@ -145,60 +145,62 @@ toBasicBlocks (gl, c, codes) = (gl, c, basicBlocks codes)
 
 type MLabelMap = Map H.Label Label
 
--- | Converts a group to a graph. Maintains a dictionary which maps
--- machine labels to Hoopl labels. 
+-- | Converts a group to a graph.  
 groupToBody :: C.Group -> FuelMonad (AGraph InstrNode C C)
 groupToBody (groupLabel, groupCount, codes) = codesToBody' Map.empty codes >>= return . snd
   where
-      -- The contortions here result from FailT's
-      -- definition -- it only specifies the "false" branch. Hoopl needs a branch following
-      -- all closed definitions. Have to ensure we have a Hoopl label for the "true" branch
-      -- on FailT.      
       codesToBody' :: MLabelMap -> [C.Code] -> FuelMonad (MLabelMap, AGraph InstrNode C C)
-      codesToBody' prevLbls ((entry, instrs):rest) 
+      codesToBody' _ [] = error $ "Empty code block!"
+      codesToBody' labels ((entry, instrs):rest) 
           | null instrs = error "TODO: empty code block"
-          | null rest = mkGraph 
+          | null rest = mkGraph labels instrs entry 
           | otherwise = do 
-              (lbls', graph) <- mkGraph 
-              (lbls'', graph') <- codesToBody' lbls' rest
-              return $ (lbls'', graph |*><*| graph')
-        where
-          (newLbls, entryLabel) = findLabel prevLbls entry entryL
-          mkGraph = do
-            (lbls'', last) <- end (last instrs)
-            return $ (lbls'', mkFirst first <*> catGraphs (map middle (init instrs)) <*> mkLast last)
-          first 
-              | entry == groupLabel = EntryLabel (G entry) groupCount entryLabel
-              | otherwise = LabelNode (G groupLabel) (N entry) entryLabel
-          middle i = case i of 
-                       H.Halt -> err "Illegal instruction in middle of block."
-                       H.Ret _ -> err "Illegal instruction in middle of block."
-                       H.Jmp _ -> err "Illegal instruction in middle of block."
-                       H.Error _ -> err "Illegal instruction in middle of block."
-                       _ -> mkMiddle $ Open i
-          end :: H.Instr -> FuelMonad (MLabelMap, InstrNode O C)
-          end i = do
-            case i of
-              H.Ret _ -> return (newLbls, Ret i)
-              H.Jmp l -> do
-                     fresh <- freshLabel
-                     let (lbls', foundL) = findLabel newLbls l fresh
-                     return (lbls', Closed i foundL)
-              H.Halt -> return (newLbls, Halt i)
-              H.FailT _ _ (H.F f) (H.S s)_ -> withFreshLabels $ \(t, f) -> do
-                     let (lbls', falseL) = findLabel newLbls f fresh
-                         (lbls'', trueL) = findLabel lbls' t fresh
-                     return (lbls'', FailT i (F falseL) (T trueL))
-              H.Error _ -> return (newLbls, Error i)
-              _ -> err "Illegal instruction at end of code block."
-          err msg = codeError (msg ++ " " ++ show instrs ++ " " ++ show rest)
-          -- Find label associated with l, or associate label l
-          -- with the fresh label given.
-          findLabel :: MLabelMap -> C.Label -> Label -> (MLabelMap, Label)
-          findLabel lbls l fresh = case Map.lookup l lbls of
-                                     Just lbl -> (lbls, lbl)
-                                     Nothing -> (Map.insert l fresh lbls, fresh)
-      codesToBody' _ _ [] = error $ "Empty code block!"
+              (lbls'', graph) <- mkGraph labels instrs entry 
+              (lbls''', graph') <- codesToBody' lbls'' rest
+              return $ (lbls''', graph |*><*| graph')
+      mkGraph labels instrs entry = do
+          (labels', start) <- first labels entry 
+          (labels'', last) <- end labels' (last instrs)
+          return $ (labels''
+                   , mkFirst start
+                    <*> catGraphs (map middle (init instrs)) 
+                    <*> mkLast last)
+      first labels entry = do
+          (labels', label) <- newLabel labels entry
+          return (labels'
+                 , if entry == groupLabel 
+                   then EntryLabel (G entry) groupCount label
+                   else LabelNode (G groupLabel) (N entry) label)
+      middle i = case i of 
+                   H.Halt -> error $ "Illegal instruction in middle of block: " ++ show i
+                   H.Ret _ -> error $ "Illegal instruction in middle of block: " ++ show i
+                   H.Jmp _ -> error $ "Illegal instruction in middle of block: " ++ show i
+                   H.Error _ -> error $ "Illegal instruction in middle of block: " ++ show i
+                   H.FailT { } -> error $ "Illegal instruction in middle of block: " ++ show i
+                   _ -> mkMiddle $ Open i
+      end :: MLabelMap -> H.Instr -> FuelMonad (MLabelMap, InstrNode O C)
+      end labels i = do
+          case i of
+            H.Ret _ -> return (labels, Ret i)
+            H.Jmp l -> do
+                       (labels', foundL) <- newLabel labels l 
+                       return (labels', Closed i foundL)
+            H.Halt -> return (labels, Halt i)
+            H.FailT _ _ (H.F f) (H.S t) -> do
+                       (labels', falseL) <- newLabel labels f
+                       (labels'', trueL) <- newLabel labels' t
+                       return (labels'', FailT i (F falseL) (T trueL))
+            H.Error _ -> return (labels, Error i)
+            _ -> error $ "Illegal instruction at end of code block: " ++ show i
+      -- Find label associated with l, or associate label l
+      -- with the fresh label given.
+      newLabel :: MLabelMap -> H.Label -> FuelMonad (MLabelMap, Label)
+      newLabel lbls e = 
+        case Map.lookup e lbls of
+          Just lbl -> return (lbls, lbl)
+          Nothing -> do
+            fresh <- freshLabel
+            return (Map.insert e fresh lbls, fresh)
 
 -- | Retrieve the body of a graph.
 bodyOf :: AGraph InstrNode C C -> FuelMonad (Body InstrNode)
@@ -209,8 +211,7 @@ bodyOf aGraph = do
 type GroupMap = Map C.Label C.Group
 type BlockL = (Label, Block InstrNode C C)
 
--- | Recreate program instructions from Body. Still need to 
--- remove generated labels by sewing code back together.
+-- | Recreate program instructions from Body. 
 bodyToGroups :: Body InstrNode -> [C.Group]
 bodyToGroups body = Map.elems . snd . 
                     foldl' mkGroups (emptyLabelSet, Map.empty) .
@@ -222,20 +223,27 @@ bodyToGroups body = Map.elems . snd .
                              LabelNode _ _ _ -> False
                              EntryLabel _ _ _ -> True
     mkGroups :: (LabelSet, GroupMap) -> BlockL -> (LabelSet, GroupMap)
-    mkGroups (lbls, groups) (label, block) 
-      | usedBlock lbls (label, block) = (lbls, groups)
+    mkGroups (lbls, groups) blockL
+      | usedBlock lbls blockL = (lbls, groups)
       | otherwise = 
-          let succBlocks = filter (not . usedBlock lbls) . allSucc $ (label, block)
-              lbls' = foldl extendLabelSet lbls (label : map fst succBlocks)
-          in (lbls', addToGroup groups (label, block) succBlocks)
+          let succBlocks = newSuccessors lbls blockL
+              lbls' = foldl extendLabelSet lbls (fst blockL : map fst succBlocks)
+          in (lbls', addToGroup groups blockL succBlocks)
     addToGroup :: GroupMap -> BlockL -> [BlockL] -> GroupMap
     addToGroup groups (l, entryB) rest =
       let (grp, cnt) :: (C.Label, Int) = case blockLabel entryB of
                                            EntryLabel (G l) cnt _ -> (l, cnt)
                                            LabelNode _ (N l) _ -> (l, 0)
       in Map.insert grp (grp, cnt, toCode (l, entryB) : map toCode rest) groups 
+    -- | Return all unique, unused successors to the given block. The filter
+    -- ensures only blocks that are new are returned. A new, duplicate block
+    -- can appear, though, so we use nubBy to get distinct blocks.
+    newSuccessors :: LabelSet -> BlockL -> [BlockL]
+    newSuccessors lbls = nubBy blockEq . filter (not . usedBlock lbls) . allSucc 
     usedBlock :: LabelSet -> BlockL -> Bool
     usedBlock lbls (label, _) = elemLabelSet label lbls 
+    blockEq :: BlockL -> BlockL -> Bool
+    blockEq (l1, _) (l2, _) = l1 == l2
     -- Return all the successors of the given block, including all 
     -- of their successors, and so on, in the order in which they appear
     -- when successors is called.
@@ -248,7 +256,7 @@ bodyToGroups body = Map.elems . snd .
     getSuccessors (_, block) = map getBlock (successors block)
     -- All blocks should be found here, so we don't return Maybe type.
     getBlock :: Label -> (Label, Block InstrNode C C)
-    getBlock l = (l, fromMaybe (codeError $ "Block " ++ show l ++ " not found in bodyMap.") 
+    getBlock l = (l, fromMaybe (error $ "Block " ++ show l ++ " not found in bodyMap.") 
                            (lookupLabel bodyM l))
     -- | Convert a hoopl basic block to a machine basic block.
     toCode :: BlockL -> C.Code
@@ -292,7 +300,3 @@ stdMapJoin eltJoin l (OldFact old) (NewFact new) = Map.foldWithKey add (NoChange
         Just old_v -> case eltJoin l (OldFact old_v) (NewFact new_v) of
                         (SomeChange, v') -> (SomeChange, Map.insert k v' joinmap)
                         (NoChange,   _)  -> (ch, joinmap)
-
-codeError :: String -> a
-codeError msg = error msg
-                          

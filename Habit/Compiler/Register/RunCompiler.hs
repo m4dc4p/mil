@@ -22,7 +22,7 @@ import Habit.Compiler.Register.Compiler (compile, getInstrs, Group, Code)
 import Habit.Compiler.Register.Machine (Instr(..))
 import Habit.Compiler.Register.PrintModule (dump_typed_mod)
 import Habit.Compiler.Register.ControlFlowGraph
---import Habit.Compiler.Register.Dataflow 
+import Habit.Compiler.Register.Dataflow 
 
 main :: IO ()
 main = parse_opts `fmap` getArgs >>= \res ->
@@ -49,12 +49,11 @@ act a _ = crash $ OtherError $ "Unsupported action " ++ show a
 visualizer :: String -> [Group] -> SessionM [Group]
 visualizer file gs = do
   io (writeViz file (makeCFG gs))
-  return gs {-
   let gs' = optGroups noOpOpt . 
             optGroups liveOpt .
             optGroups constPropOpt $ gs
   io (writeViz (file ++ ".opt") (makeCFG gs'))
-  return gs'-}
+  return gs'
 
 noOp _ gs = return gs
 
