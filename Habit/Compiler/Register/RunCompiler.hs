@@ -21,7 +21,7 @@ import Habit.Session
 import Habit.Compiler.Register.Compiler (compile, getInstrs, Group, Code)
 import Habit.Compiler.Register.Machine (Instr(..))
 import Habit.Compiler.Register.PrintModule (dump_typed_mod)
---import Habit.Compiler.Register.ControlFlowGraph
+import Habit.Compiler.Register.ControlFlowGraph
 --import Habit.Compiler.Register.Dataflow 
 
 main :: IO ()
@@ -43,12 +43,13 @@ act Check params =
     -- XXX: This check probably should not be here...
     [] -> io $ do hPutStrLn stderr "Please specify which files to check."
                   exitFailure
-    _  -> mapM_ (save_typed_mod_dump noOp) =<< load_files params
+    _  -> mapM_ (save_typed_mod_dump visualizer) =<< load_files params
 act a _ = crash $ OtherError $ "Unsupported action " ++ show a
 
-{-visualizer :: String -> [Group] -> SessionM [Group]
+visualizer :: String -> [Group] -> SessionM [Group]
 visualizer file gs = do
   io (writeViz file (makeCFG gs))
+  return gs {-
   let gs' = optGroups noOpOpt . 
             optGroups liveOpt .
             optGroups constPropOpt $ gs

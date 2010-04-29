@@ -16,27 +16,40 @@ import Habit.Compiler.Register.Machine (Instr(..), Failure(..), Success(..))
 makeCFG :: [Group] -> Gr String ()
 makeCFG groups = 
     let emptyAdj = [] :: [((), Node)] -- empty adjacency list
-        adj p = [((), p)] -- single adjacent node
-        -- add a node with a forward link
-        forward node prevNode succNode instr = (adj prevNode
+        adj :: Node -> [((), Node)]
+        adj p = adjs [p] -- single adjacent node
+        adjs ps = map (\p -> ((), p)) ps -- many adjacent nodes
+        -- add a node with forward links
+        forward node prevNode succNodes instr = (adj prevNode
                                                , node
                                                , showInstr instr
-                                               , adj succNode)
+                                               , adjs succNodes)
         -- Add control links between instructions and labels
         linkInstr :: Map Label Node -> (Gr String (), (Node, Int)) -> Instr -> (Gr String (), (Node, Int))
-        linkInstr labelMap (g, (prev, next)) instr@(Jmp label) =
-          (forward next prev (labelMap ! label) instr & g, (next, next + 1))
-        linkInstr labelMap (g, (prev, next)) instr@(FailT _ _ (F label) (S success)) =
-          (forward next prev (labelMap ! label) instr & g, (next, next + 1))
-        linkInstr labelMap (g, (prev, next)) instr@(AllocC _ lab _) = ((adj prev
-                                                 , next
-                                                 , showInstr instr ++ " " ++ lab
-                                                 , emptyAdj) & g, (next, next + 1))
+        linkInstr labelMap (g, (prev, next)) instr@(Jmp label) 
+          = (forward next prev [(labelMap ! label)] instr & g, (next, next + 1))
+        linkInstr labelMap (g, (prev, next)) instr@(FailT _ tag (F fail) (S success)) 
+          = ((adj prev
+             , next
+             , showInstr instr ++ " " ++ tag
+             , adjs [(labelMap ! fail)
+                    , (labelMap ! success)]) & g, (next, next + 1))
+        linkInstr labelMap (g, (prev, next)) instr@(AllocC _ lab _) 
+          = ((adj prev
+             , next
+             , showInstr instr ++ " " ++ lab
+             , emptyAdj) & g, (next, next + 1))
+        linkInstr labelMap (g, (prev, next)) instr@(AllocD _ tag _) 
+          = ((adj prev
+             , next
+             , showInstr instr ++ " " ++ tag
+             , emptyAdj) & g, (next, next + 1))
         linkInstr labelMap s (Note _) = s
-        linkInstr labelMap (g, (prev, next)) instr = ((adj prev
-                                                 , next
-                                                 , showInstr instr
-                                                 , emptyAdj) & g, (next, next + 1))
+        linkInstr labelMap (g, (prev, next)) instr 
+          = ((adj prev
+             , next
+             , showInstr instr
+             , emptyAdj) & g, (next, next + 1))
         -- Add control links between instructions
         linkCode :: Map Label Node -> (Gr String (), Int) -> Code -> (Gr String (), Int)
         linkCode labelMap (g, next) (label, instrs) = 
