@@ -47,6 +47,7 @@ liveTransfer (EntryLabel _ _ l) f = mkFactBase [(l, f)]
 liveTransfer (LabelNode _ _ l) f = mkFactBase [(l, f)]
 liveTransfer (Open (M.Enter src arg dest)) f = Set.insert src . Set.insert arg . Set.delete dest $ f
 liveTransfer (Open (M.AllocC dest _ _)) f = Set.delete dest f
+liveTransfer (Open (M.MkClo dest _ _)) f = Set.delete dest f
 liveTransfer (Open (M.AllocD dest _ _)) f = Set.delete dest f
 liveTransfer (Open (M.Copy _ dest)) f = Set.delete dest f
 liveTransfer (Open (M.Store src (dest, _))) f = Set.insert src (Set.delete dest f)
@@ -68,6 +69,9 @@ liveRewrite = shallowBwdRw f
   where
     f :: SimpleBwdRewrite InstrNode LiveFact
     f (Open (M.Copy _ dest)) live 
+            | dest `Set.member` live = Nothing
+            | otherwise = Just emptyGraph
+    f (Open (M.Load _ dest)) live 
             | dest `Set.member` live = Nothing
             | otherwise = Just emptyGraph
     f _ _ = Nothing

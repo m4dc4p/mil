@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -Wall -fno-warn-name-shadowing #-}
 module Habit.Compiler.Register.ControlFlowGraph (makeCFG, writeViz)
 
 where
@@ -28,24 +30,14 @@ makeCFG groups =
         linkInstr :: Map Label Node -> (Gr String (), (Node, Int)) -> Instr -> (Gr String (), (Node, Int))
         linkInstr labelMap (g, (prev, next)) instr@(Jmp label) 
           = (forward next prev [(labelMap ! label)] instr & g, (next, next + 1))
-        linkInstr labelMap (g, (prev, next)) instr@(FailT _ tag (F fail) (S success)) 
+        linkInstr labelMap (g, (prev, next)) instr@(FailT _ _ (F fail) (S success)) 
           = ((adj prev
              , next
-             , showInstr instr ++ " " ++ tag
+             , showInstr instr
              , adjs [(labelMap ! fail)
                     , (labelMap ! success)]) & g, (next, next + 1))
-        linkInstr labelMap (g, (prev, next)) instr@(AllocC _ lab _) 
-          = ((adj prev
-             , next
-             , showInstr instr ++ " " ++ lab
-             , emptyAdj) & g, (next, next + 1))
-        linkInstr labelMap (g, (prev, next)) instr@(AllocD _ tag _) 
-          = ((adj prev
-             , next
-             , showInstr instr ++ " " ++ tag
-             , emptyAdj) & g, (next, next + 1))
-        linkInstr labelMap s (Note _) = s
-        linkInstr labelMap (g, (prev, next)) instr 
+        linkInstr _ s (Note _) = s
+        linkInstr _ (g, (prev, next)) instr 
           = ((adj prev
              , next
              , showInstr instr
@@ -75,26 +67,27 @@ makeCFG groups =
           in foldl addInstrLabels (labNode & g, (Map.insert label next labelMap, next + 1)) instrs
         -- Gets all code blocks from all groups
         blocks = concatMap (\(_, _, code) -> code) groups
-        x :: (Gr String (), (Map Label Node, Int))
-        x@(labGraph, (labMap, nextNode)) = foldl mkLabelGraph (G.empty, (Map.empty, 0)) blocks
+        (labGraph, (labMap, nextNode)) :: (Gr String (), (Map Label Node, Int)) = foldl mkLabelGraph (G.empty, (Map.empty, 0)) blocks
     in fst $ foldl (linkCode labMap) (labGraph, nextNode) blocks
 
 showInstr :: Instr -> String
 showInstr (Enter _ _ _) = "Enter"
 showInstr (Ret _) = "Ret"
-showInstr (AllocC _ _ _) = "AllocC"
-showInstr (AllocD _ _ _) = "AllocD"
+showInstr (AllocC _ lab _) = "AllocC " ++ lab
+showInstr (AllocD _ tag _) = "AllocD " ++ tag
 showInstr (Copy _ _) = "Copy"
 showInstr (Store _ _) = "Store"
 showInstr (Load _ _) = "Load"
 showInstr (Set _ _) = "Set"
-showInstr (FailT _ _ _ _) = "FailT"
+showInstr (FailT _ tag _ _) = "FailT " ++ tag
 showInstr (Label _) = "Label"
 showInstr (Halt) = "Halt"
 showInstr (Jmp _) = "Jmp"
 showInstr (Error _) = "Error"
 showInstr (Note _) = "Note"
+showInstr (MkClo _ _ _) = "MkClo"
 
+writeViz :: String -> Gr String () -> IO () 
 writeViz file gr = do
   let viz = graphviz' gr
   withFile (file ++ ".dot") WriteMode (\h -> hPutStr h viz)

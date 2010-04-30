@@ -1,24 +1,20 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -Wall -fno-warn-name-shadowing #-}
 module Habit.Compiler.Register.Compiler
 
 where
 
-import Data.List (lookup, intercalate, (\\), nub, elemIndex)
+import Data.List (intercalate)
 import Control.Monad.Writer
 import Control.Monad.State
 import Data.Maybe (fromJust, isJust, catMaybes, maybeToList)
 import Data.Supply
-import Data.Graph.SCC(stronglyConnComp)
-import Data.Graph(SCC(..))
-import Data.Map (Map)
-import qualified Data.Map as Map
 
 import Habit.Syntax.AST hiding (Label)
-import Habit.Syntax.Names (Name(..), qual)
 import qualified Habit.Syntax.Utils as U
 import Habit.Syntax.Utils (DeclSCC(..), decl_deps)
 
-import Habit.Compiler.Register.Machine (Instr, Reg, Field)
+import Habit.Compiler.Register.Machine (Instr, Reg)
 import qualified Habit.Compiler.Register.Machine as H -- H for hardware
 
 -- | Code is a labeled list of instructions.
@@ -113,6 +109,7 @@ newGroup name size action = do
                     , completed = comp }) = s { inProgress = rest
                                               , completed = (l, i, (label, init ++ body) : c) 
                                                             : comp }
+      addEntry _ = error $ "Can't add a new group!"
   modify addEntry
   return label
 
@@ -122,7 +119,7 @@ record l instrs = do
     modify addCode
   where
     code = (l, instrs)
-    addCode s@(S { inProgress = [] }) 
+    addCode (S { inProgress = [] }) 
         = error $ "Not able to record right now!"
     addCode s@(S { inProgress = (l, i, cs) : css }) 
         = s { inProgress = (l, i, code : cs) : css }
@@ -164,7 +161,7 @@ compile supply m
 getInstrs :: [Group] -> [Instr]
 getInstrs groups = concatMap snd . concatMap third . map addLabels $ groups
     where
-      third (a,b,c) = c
+      third (_, _,c) = c
       addLabels :: Group -> Group
       addLabels (entry, size, blocks) = 
           let blocks' = map (\(l, b) -> (l, H.Label l : b)) blocks
@@ -200,6 +197,7 @@ compileDecls decls env = do
         let d = case dscc of
                   NonRecImpl impl -> impl
                   NonRecExpl expl -> (decl expl)
+                  _ -> error $ "Rec constructor not expected."
             name = decl_name d
         dst <- if isGlobal name 
                 then newGlobalReg name 
@@ -244,7 +242,7 @@ compileDatas dataDefs env = do
           entry <- newGroup (Just name) 0 $ mkData count (name, count)
           return ((name, r) : e
                  , mkN ("compileData n: " ++ showBinding (name, r))
-                   : H.AllocC r entry 0 : inits)
+                   : H.MkClo r entry 0 : inits)
     foldM compileData (env, []) constructors
   where
     constructors = map mkPair . concatMap data_cons $ dataDefs
@@ -325,7 +323,7 @@ compileMatch env (MD _ success) result (MExp expr) _ = do
   let note = mkN "compileMatch: MExp" 
   return $ note : exprC ++ H.Copy resultE result : success
 
-compileMatch _ (MD failure _) _ (MFail arity) _ = 
+compileMatch _ (MD failure _) _ (MFail _) _ = 
   return $ handleFailure failure
 
 compileMatch e md r expr args = error $ "Pattern match failure\n e: " ++ show e ++
@@ -378,7 +376,7 @@ compilePat env f (PGrd p g) arg = do
 -- A pattern signature has no runtime effect
 -- and just evaluates to the underlying
 -- pattern given.
-compilePat env f (PSig pat typ) arg = compilePat env f pat arg
+compilePat env f (PSig pat _) arg = compilePat env f pat arg
 
 -- A pattern wildcard always succeeds and
 -- matches everyting. That is, it has no
@@ -400,9 +398,12 @@ compileGuard env f (GMatch pat expr) = do
   return (env', sL, mkN "compileGMatch" : exprC ++ testC)
 
 -- GLet binds new values in the environment.
-compileGuard env failure (GLet decls) = do
+compileGuard env _ (GLet decls) = do
   (env', initC) <- compileDecls (decl_deps decls) env
   return (env', Nothing, mkN "compileGLet" : initC)
+
+-- GLet binds new values in the environment.
+compileGuard _ _ GOtherwise = error $ "GOtherwise not implemented."
 
 -- | Compile a pure expression. Compiling an expression in an
 -- environment always results in a register holding the final value
@@ -432,8 +433,11 @@ compileExpr env (EAbs match) = do
 compileExpr env (ECase expr match) = 
   compileExpr env (EApp (EAbs match) expr)
 
-compileExpr env (EInfix expr1 name expr2) = error "EInfix"
-compileExpr env (EParens expr) = error "EParens" 
+compileExpr _ (EInfix _ _ _) = error "EInfix"
+
+compileExpr _ (EParens _) = error "EParens" 
+
+compileExpr _ (ESel _ _) = error "ESel not implemented."
 
 compileExpr env (EVar (EV name _ _)) = 
   return $ case lookup name env of
@@ -445,6 +449,7 @@ compileExpr _ (ELit literal) = do
       showLit (LFrac r) = show r
       showLit (LChar c) = [c]
       showLit (LString s) = s 
+      showLit (LLabel l) = show l
   result <- newReg
   return (result
          , [H.Set result (H.Str . showLit $ literal)])
@@ -481,12 +486,9 @@ compileMAbs env dest name f m = do
                                          -- level declarations are not 
                                          -- considered free.
           fvRegs  = [r | Just r <- map (flip lookup env) fvs]
-          fvLoads = map (\(r, i) -> H.Store r (result, i)) . zip fvRegs $ [0..]
       l <- compileAbs name env f nparams fvs m 
-      return (result, Just $ H.AllocC result l (length fvRegs)
-             , mkN ("free: " ++ showNames fvs ++ ", env: " ++ showEnv env) 
-               : mkN ("dest is: " ++ show dest) 
-               : fvLoads)
+      return (result, Just $ H.MkClo result l (length fvRegs)
+             , [])
   where
     -- Calculate maximum parameters required by a match.
     countParams :: Match -> Int
@@ -498,6 +500,7 @@ compileMAbs env dest name f m = do
 -- | Compiles intermediate instructions for consuming arguments
 -- and copying them between closures, until all arguments have
 -- been consumed and the function can do real work.   
+compileAbs :: Maybe Name -> Env -> OnFail -> Int -> [Name] -> Match -> C Label
 compileAbs name env f nparams fvs m = newGroup name nfvs $ compileAbs' 1
   where
     nfvs = length fvs
@@ -524,13 +527,14 @@ compileAbs name env f nparams fvs m = newGroup name nfvs $ compileAbs' 1
 mkClosure :: Reg -> String -> [Reg] -> C [Instr]
 mkClosure dst label argRegs = do
   let loads = map (\(r, i) -> H.Store r (dst, i)) . zip (argRegs ++ [H.argReg]) $ [0..]
-  return $ H.AllocC dst label (length loads) : loads 
+  return [H.MkClo dst label (length loads)]
 
 -- | Show a list of names nicely.
 showNames :: [Name] -> String
 showNames = intercalate "," . map showName
 
 -- | Readably print a name.
+showName :: Name -> String
 showName (Name (Just m) name _) = mkPrefix m ++ "." ++ name
   where
     mkPrefix (ModName [] last) = last
@@ -556,6 +560,7 @@ mkN = H.Note
 
 -- | Replace the first argument with the second in 
 -- the list of items given.
+replace :: Eq a => a -> a -> [a] -> [a]
 replace a b ls = 
     let rep x
             | x == a = b

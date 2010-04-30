@@ -1,3 +1,5 @@
+{-# LANGUAGE NamedFieldPuns #-}
+{-# OPTIONS_GHC -Wall -fno-warn-name-shadowing #-}
 module Habit.Compiler.Register.Machine
 
 where
@@ -5,7 +7,7 @@ where
 import qualified Data.Map as Map
 import Data.Map (Map)
 import Data.List (intercalate)
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, fromMaybe)
 
 -- | A register is just a unique name for
 -- a location. 
@@ -28,29 +30,44 @@ newtype Success = S Label
   deriving (Eq, Read, Show)
 
 -- | Instructions available to the machine.
-data Instr = Enter Reg Reg Reg -- ^ Enter the closure at the first location, with the argument at the second location.
-                               -- The result of the Enter will be in the register in the third location.
-          | Ret Reg -- ^ Return from procedure call. 
-          | AllocC Reg Label Int -- ^ Allocate N values with a label. 
-          | AllocD Reg Tag Int -- ^ Allocate data with the tag given and space for the number of arguments. 
-          | Copy Reg Reg -- ^ Copy a value from one location to another. The first argument
-                         -- is the source and the second the destination. The value in the destination
-                         -- will be replaced.
-          | Store Reg Field -- ^ Store the value in a register into the field given. The first
-                            -- argument is the register to store. The second is the destination
-                            -- register, with anoffset indexed from 0.
-          | Load Field Reg  -- ^ Load a value from a register and offset into a particular register. The
-                              -- first argument is the source register, with an offset indexed from 0. The 
-                              -- second argument is the destination register.
-          | Set Reg Val -- ^ Set a register to a value.
-          | FailT Reg Tag Failure Success -- ^ Jump to the given label if the value in the
-                                 -- location specified does NOT match the tag given. Otherwise
-                                 -- continue executing.
-          | Label Label -- ^ Label the next instruction with the name given.
-          | Halt -- ^ End execution
-          | Jmp Label -- ^ Jump to the label specified.
-          | Error String -- ^ Halt and print error.
-          | Note String -- ^ No effect - for commenting
+data Instr = 
+  Enter Reg Reg Reg -- ^ Enter the closure at the first location, with
+                    -- the argument at the second location.  The
+                    -- result of the Enter will be in the register in
+                    -- the third location.
+  | Ret Reg -- ^ Return from procedure call.
+  | AllocC Reg Label Int -- ^ Allocate N values with a label.
+  | AllocD Reg Tag Int -- ^ Allocate data with the tag given and space
+                       -- for the number of arguments.
+  | Copy Reg Reg -- ^ Copy a value from one location to another. The
+                 -- first argument is the source and the second the
+                 -- destination. The value in the destination will be
+                 -- replaced.
+  | Store Reg Field -- ^ Store the value in a register into the field
+                    -- given. The first argument is the register to
+                    -- store. The second is the destination register,
+                    -- with an offset indexed from 0.
+  | Load Field Reg  -- ^ Load a value from a register and offset into
+                    -- a particular register. The first argument is
+                    -- the source register, with an offset indexed
+                    -- from 0. The second argument is the destination
+                    -- register.
+  | Set Reg Val -- ^ Set a register to a value.
+  | FailT Reg Tag Failure Success -- ^ Jump to the given label if the
+                                  -- value in the location specified
+                                  -- does NOT match the tag
+                                  -- given. Otherwise continue
+                                  -- executing.
+  | Label Label -- ^ Label the next instruction with the name given.
+  | Halt -- ^ End execution
+  | Jmp Label -- ^ Jump to the label specified.
+  | Error String -- ^ Halt and print error.
+  | Note String -- ^ No effect - for commenting
+  | MkClo Reg Label Int -- ^ Create a closure using the label give,
+                        -- with the specified number of slots. Values
+                        -- are copied from the arg and clo
+                        -- registers. Put the result in the register
+                        -- given.
   deriving (Show, Read)
 
 -- | Identifies a particular constructor.
@@ -231,6 +248,30 @@ step (Jmp l) machine@(Machine { program = p })
 step (Error _) machine = machine 
 step (Note _) machine = next machine
 
+-- MkClo r lab 0 | program | registers | callStack 
+-------------------------------------------------
+-- In   | ... | ...              | cs 
+-- Out  | ... | r = Data lab []  | cs
+step (MkClo reg lab 0) m = allocate reg lab 0 m
+
+-- MkClo r lab n | program | registers | callStack 
+-------------------------------------------------
+-- In   | ... | v0 = clo[0], v1 = clo[1], ..., vq = clo[n - 1], vn = arg | cs 
+-- Out  | ... | r = Data lab [v0, v1, ... vq, vn]                        | cs
+step (MkClo reg lab cnt) machine@(Machine { registers }) = 
+  let initV = allocate reg lab cnt
+      cloV n = mightErr "Unable to set field based on closure." . 
+               getField (mightErr "closure register not found." . 
+                         getRegister registers $ cloReg) $ n
+      argV = mightErr "Unable to get arg register" $ getRegister registers argReg
+      setF val loc idx = mightErr "Unable to set field." (setField val loc idx)
+
+      setV 0 idx d = setF argV d idx
+      setV n idx d = setV (n - 1) (idx + 1) $ setF (cloV idx) d idx
+
+  in      next $ machine { registers = setRegister dst d' rs }
+setV cnt 0 initV
+
 -- | Advance to next instruction. 
 next :: Machine -> Machine
 next machine@(Machine { program = pc}) = machine { program = nextInstr pc} 
@@ -335,5 +376,8 @@ showVals (w:ws) = foldl (\a b -> a ++ ", " ++ showVal b) (showVal w) ws
 showVal (Num i) = show i
 showVal (Data t vs) = "{" ++ t ++ ": " ++ showVals vs ++ "}"
 showVal (Str l) = l
+
+mightErr :: String -> Maybe a -> a
+mightErr msg = fromMaybe (error msg)
 
 type Stack a = [a]

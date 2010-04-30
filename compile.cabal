@@ -36,19 +36,19 @@ executable register-compiler
   if flag(debug)
     cpp-options:-DDEBUG
 
--- executable register-interpreter
---   main-is: InterpR.hs
---   build-depends: base
---   ghc-options: -O
---   hs-source-dirs: .
+executable register-interpreter
+  main-is: InterpR.hs
+  build-depends: base
+  ghc-options: -O
+  hs-source-dirs: .
 
--- executable x86-compiler
---   main-is: Habit/Compiler/X86/RunCompiler.hs
---   build-depends: base, value-supply, mtl, containers, filepath, habit-front, process
+executable x86-compiler
+  main-is: Habit/Compiler/X86/RunCompiler.hs
+  build-depends: base, value-supply, mtl, containers, filepath, habit-front, process
   
---   ghc-options: -O
---   hs-source-dirs: .
+  ghc-options: -O
+  hs-source-dirs: .
                                 
---   if flag(debug)
---     cpp-options:-DDEBUG
+  if flag(debug)
+    cpp-options:-DDEBUG
 

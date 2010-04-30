@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs, ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wall 	-fno-warn-name-shadowing #-}
+{-# OPTIONS_GHC -Wall -fno-warn-name-shadowing #-}
 module Habit.Compiler.Register.Hoopl 
   (groupsToBody, InstrNode(..) , bodyToGroups
   , Group(..), Norm(..), False(..), True(..) 
