@@ -63,10 +63,9 @@ data Instr =
   | Jmp Label -- ^ Jump to the label specified.
   | Error String -- ^ Halt and print error.
   | Note String -- ^ No effect - for commenting
-  | MkClo Reg Label Int -- ^ Create a closure using the label give,
-                        -- with the specified number of slots. Values
-                        -- are copied from the arg and clo
-                        -- registers. Put the result in the register
+  | MkClo Reg Label [Reg] -- ^ Create a closure using the label given,
+                        -- storing value from the registers
+                        -- specified. Put the result in the register
                         -- given.
   deriving (Show, Read)
 
@@ -252,13 +251,13 @@ step (Note _) machine = next machine
 -------------------------------------------------
 -- In   | ... | ...              | cs 
 -- Out  | ... | r = Data lab []  | cs
-step (MkClo reg lab 0) m = allocate reg lab 0 m
+-- step (MkClo reg lab 0) m = allocate reg lab 0 m
 
 -- MkClo r lab n | program | registers | callStack 
 -------------------------------------------------
 -- In   | ... | v0 = clo[0], v1 = clo[1], ..., vq = clo[n - 1], vn = arg | cs 
 -- Out  | ... | r = Data lab [v0, v1, ... vq, vn]                        | cs
-step (MkClo reg lab cnt) machine@(Machine { registers }) = 
+{- step (MkClo reg lab cnt) machine@(Machine { registers }) = 
   let initV = allocate reg lab cnt
       cloV n = mightErr "Unable to set field based on closure." . 
                getField (mightErr "closure register not found." . 
@@ -270,7 +269,7 @@ step (MkClo reg lab cnt) machine@(Machine { registers }) =
       setV n idx d = setV (n - 1) (idx + 1) $ setF (cloV idx) d idx
 
   in      next $ machine { registers = setRegister dst d' rs }
-setV cnt 0 initV
+setV cnt 0 initV --}
 
 -- | Advance to next instruction. 
 next :: Machine -> Machine

@@ -242,7 +242,7 @@ compileDatas dataDefs env = do
           entry <- newGroup (Just name) 0 $ mkData count (name, count)
           return ((name, r) : e
                  , mkN ("compileData n: " ++ showBinding (name, r))
-                   : H.MkClo r entry 0 : inits)
+                   : H.MkClo r entry [] : inits)
     foldM compileData (env, []) constructors
   where
     constructors = map mkPair . concatMap data_cons $ dataDefs
@@ -487,7 +487,7 @@ compileMAbs env dest name f m = do
                                          -- considered free.
           fvRegs  = [r | Just r <- map (flip lookup env) fvs]
       l <- compileAbs name env f nparams fvs m 
-      return (result, Just $ H.MkClo result l (length fvRegs)
+      return (result, Just $ H.MkClo result l fvRegs
              , [])
   where
     -- Calculate maximum parameters required by a match.
@@ -527,7 +527,7 @@ compileAbs name env f nparams fvs m = newGroup name nfvs $ compileAbs' 1
 mkClosure :: Reg -> String -> [Reg] -> C [Instr]
 mkClosure dst label argRegs = do
   let loads = map (\(r, i) -> H.Store r (dst, i)) . zip (argRegs ++ [H.argReg]) $ [0..]
-  return [H.MkClo dst label (length loads)]
+  return [H.MkClo dst label (argRegs ++ [H.argReg])]
 
 -- | Show a list of names nicely.
 showNames :: [Name] -> String
