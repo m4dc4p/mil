@@ -1,16 +1,18 @@
 module Habit.Compiler.Register.Dataflow 
-  (optGroups, Optimizer, N.noOpOpt, C.constPropOpt, L.liveOpt)
+  (optGroups, Optimizer, N.noOpOpt
+  , C.constPropOpt, L.liveOpt, CE.cloOpt)
 
 where
 
 import Compiler.Hoopl (Label, runWithFuel, Body, FuelMonad)
 
-import qualified Habit.Compiler.Register.Machine as M (Instr(..), Reg, Label)
+import qualified Habit.Compiler.Register.Machine as H (Instr(..), Reg, Label)
 import qualified Habit.Compiler.Register.Compiler as C (Group)
 import Habit.Compiler.Register.Hoopl (InstrNode, groupsToBody, bodyToGroups)
 import qualified Habit.Compiler.Register.NoOp as N (noOpOpt)
 import qualified Habit.Compiler.Register.ConstProp as C (constPropOpt)
 import qualified Habit.Compiler.Register.Liveness as L (liveOpt)
+import qualified Habit.Compiler.Register.ClosureElimination as CE (cloOpt)
 
 type Optimizer = Body InstrNode -> FuelMonad (Body InstrNode)
 
