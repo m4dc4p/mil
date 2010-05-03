@@ -3,7 +3,7 @@
 *.hi
 *.o
 *.manifest
-#*#
+\#*\#
 *.iface
 *.dump
 *.zip
@@ -22,3 +22,4 @@ dist
 *.dot
 *.pdf
 *.png
+*.ps
