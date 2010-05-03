@@ -8,11 +8,12 @@ import Compiler.Hoopl
 import Data.Maybe (fromMaybe)
 import Data.Set (Set, (\\))
 import qualified Data.Set as Set
+import Data.List(foldl')
 
-import qualified Habit.Compiler.Register.Machine as M (Reg, Instr(..))
+import qualified Habit.Compiler.Register.Machine as H (Reg, Instr(..))
 import Habit.Compiler.Register.Hoopl
 
-type LiveFact = Set M.Reg
+type LiveFact = Set H.Reg
 
 liveOpt :: Body InstrNode -> FuelMonad (Body InstrNode)
 liveOpt body = do
@@ -45,19 +46,21 @@ liveLattice = DataflowLattice { fact_name = "Liveness"
 liveTransfer :: BwdTransfer InstrNode LiveFact
 liveTransfer (EntryLabel _ _ l) f = mkFactBase [(l, f)]
 liveTransfer (LabelNode _ _ l) f = mkFactBase [(l, f)]
-liveTransfer (Open (M.Enter src arg dest)) f = Set.insert src . Set.insert arg . Set.delete dest $ f
-liveTransfer (Open (M.AllocC dest _ _)) f = Set.delete dest f
-liveTransfer (Open (M.MkClo dest _ _)) f = Set.delete dest f
-liveTransfer (Open (M.AllocD dest _ _)) f = Set.delete dest f
-liveTransfer (Open (M.Copy _ dest)) f = Set.delete dest f
-liveTransfer (Open (M.Store src (dest, _))) f = Set.insert src (Set.delete dest f)
-liveTransfer (Open (M.Load (dest,_) src)) f = Set.insert src (Set.delete dest f)
-liveTransfer (Open (M.Set dest _)) f = Set.delete dest f
+liveTransfer (Open (H.Enter src arg dest)) f = Set.insert src . Set.insert arg . Set.delete dest $ f
+liveTransfer (Open (H.AllocC dest _ _)) f = Set.delete dest f
+liveTransfer (Open (H.MkClo dest _ srcs)) f = foldl' update (Set.delete dest f) srcs
+  where
+    update set reg = Set.insert reg set
+liveTransfer (Open (H.AllocD dest _ _)) f = Set.delete dest f
+liveTransfer (Open (H.Copy _ dest)) f = Set.delete dest f
+liveTransfer (Open (H.Store src (dest, _))) f = Set.insert src (Set.delete dest f)
+liveTransfer (Open (H.Load (dest,_) src)) f = Set.insert src (Set.delete dest f)
+liveTransfer (Open (H.Set dest _)) f = Set.delete dest f
 liveTransfer (Open _) f = f
-liveTransfer (Closed _ l) f = fromMaybe Set.empty $ lookupFact f l
+liveTransfer (Jmp _ l) f = fromMaybe Set.empty $ lookupFact f l
 liveTransfer (FailT _ (F fl) (T tl)) f = fromMaybe Set.empty (lookupFact f tl) `Set.union`
                                                fromMaybe Set.empty (lookupFact f fl)
-liveTransfer (Ret (M.Ret r)) _ = Set.singleton r
+liveTransfer (Ret (H.Ret r)) _ = Set.singleton r
 liveTransfer (Ret i) _ = error $ "Hoopl Ret instruciton associated with incorrect machine instruction: " ++ show i
 liveTransfer (Error _) _ = Set.empty
 liveTransfer (Halt _) _ = Set.empty
@@ -68,10 +71,10 @@ liveRewrite :: BwdRewrite InstrNode LiveFact
 liveRewrite = shallowBwdRw f
   where
     f :: SimpleBwdRewrite InstrNode LiveFact
-    f (Open (M.Copy _ dest)) live 
+    f (Open (H.Copy _ dest)) live 
             | dest `Set.member` live = Nothing
             | otherwise = Just emptyGraph
-    f (Open (M.Load _ dest)) live 
+    f (Open (H.Load _ dest)) live 
             | dest `Set.member` live = Nothing
             | otherwise = Just emptyGraph
     f _ _ = Nothing

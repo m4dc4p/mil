@@ -37,7 +37,7 @@ data InstrNode e x where
     :: H.Instr -- ^ Original instruction
     -> InstrNode O O
   -- | An instruction which can branch to the label given. 
-  Closed 
+  Jmp 
     :: H.Instr -- ^ Original instruction
     -> Label -- ^ Next node
     -> InstrNode O C
@@ -85,7 +85,7 @@ instance Edges InstrNode where
   -- Order of successors is key to reconstructing the code stream later. true always
   -- follows FailT instruction.
   successors (FailT _ (F false) (T true)) = [true, false]
-  successors (Closed _ next) = [next]
+  successors (Jmp _ next) = [next]
 
 -- | Turn a list of groups into a body.  The first entry is
 -- the "top" group, where execution begins.
@@ -184,7 +184,7 @@ groupToBody (groupLabel, groupCount, codes) = codesToBody' Map.empty codes >>= r
             H.Ret _ -> return (labels, Ret i)
             H.Jmp l -> do
                        (labels', foundL) <- newLabel labels l 
-                       return (labels', Closed i foundL)
+                       return (labels', Jmp i foundL)
             H.Halt -> return (labels, Halt i)
             H.FailT _ _ (H.F f) (H.S t) -> do
                        (labels', falseL) <- newLabel labels f
@@ -272,7 +272,7 @@ bodyToGroups body = Map.elems . snd .
           case instr of
             LabelNode _ _ _ -> []
             EntryLabel _ _ _ -> []
-            Closed i _ -> [i]
+            Jmp i _ -> [i]
             Ret i -> [i]
             FailT i _ _ -> [i]
             Halt i -> [i] 

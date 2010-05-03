@@ -9,7 +9,7 @@ import Data.Maybe (fromMaybe)
 import Data.Map (Map)
 import qualified Data.Map as Map
 
-import qualified Habit.Compiler.Register.Machine as M (Reg)
+import qualified Habit.Compiler.Register.Machine as H (Reg)
 import Habit.Compiler.Register.Hoopl
 
 -- | Apply constant propogation to a body.
@@ -27,7 +27,7 @@ noOpOpt body = do
 data NoOp = NoOp
   deriving Eq 
 
-type NoOpFact = Map M.Reg NoOp
+type NoOpFact = Map H.Reg NoOp
 
 noOpLattice :: DataflowLattice NoOpFact
 noOpLattice = DataflowLattice { fact_bot = Map.empty
@@ -41,7 +41,7 @@ noOpTransfer :: FwdTransfer InstrNode NoOpFact
 noOpTransfer (LabelNode _ _ _) f = Map.empty
 noOpTransfer (EntryLabel _ _ _) f = Map.empty
 noOpTransfer (Open _) f = f
-noOpTransfer (Closed _ _) f = mkFactBase []
+noOpTransfer (Jmp _ _) f = mkFactBase []
 noOpTransfer (Ret _) f = mkFactBase []
 noOpTransfer (Halt _) f = mkFactBase []
 noOpTransfer (FailT _ _ _) f = mkFactBase []

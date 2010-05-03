@@ -8,16 +8,16 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 
-import qualified Habit.Compiler.Register.Machine as M (Reg, Label, Instr(..))
+import qualified Habit.Compiler.Register.Machine as H (Reg, Label, Instr(..))
 import Habit.Compiler.Register.Hoopl
 
-data HasConst = Top | R M.Reg
+data HasConst = Top | R H.Reg
   deriving Eq 
 
 -- Indicates if a register holds a constant value or if it
 -- gets overwritten. The key for the map is the *destination*
 -- register. 
-type ConstFact = Map M.Reg HasConst
+type ConstFact = Map H.Reg HasConst
 
 constPropOpt :: Body InstrNode -> FuelMonad (Body InstrNode)
 constPropOpt body = do
@@ -45,11 +45,11 @@ constLattice = DataflowLattice { fact_bot = Map.empty
 varHasConst :: FwdTransfer InstrNode ConstFact
 varHasConst (EntryLabel _ _ l) f = fromMaybe Map.empty $ lookupFact f l
 varHasConst (LabelNode _ _ l) f = fromMaybe Map.empty $ lookupFact f l
-varHasConst (Open (M.Copy src dst)) fact = Map.insert dst (R src) fact
-varHasConst (Open (M.Load _ dst)) fact = Map.insert dst Top fact
-varHasConst (Open (M.Set dst _)) fact = Map.insert dst Top fact
+varHasConst (Open (H.Copy src dst)) fact = Map.insert dst (R src) fact
+varHasConst (Open (H.Load _ dst)) fact = Map.insert dst Top fact
+varHasConst (Open (H.Set dst _)) fact = Map.insert dst Top fact
 varHasConst (Open _) fact = fact
-varHasConst (Closed _ next) fact = mkFactBase [(next, fact)]
+varHasConst (Jmp _ next) fact = mkFactBase [(next, fact)]
 varHasConst (FailT _ (F false) (T true)) fact = mkFactBase [(true, fact)
                                                    ,(false, fact)]
 varHasConst (Ret _) fact = mkFactBase []
@@ -63,8 +63,8 @@ constProp :: FwdRewrite InstrNode ConstFact
 constProp = shallowFwdRw rewrite
   where
     rewrite :: InstrNode e x -> Fact e ConstFact -> Maybe (AGraph InstrNode e x)
-    rewrite (Ret (M.Ret r)) facts = case findConst r facts of
-                                      Just s -> Just $ mkLast (Ret (M.Ret s))
+    rewrite (Ret (H.Ret r)) facts = case findConst r facts of
+                                      Just s -> Just $ mkLast (Ret (H.Ret s))
                                       Nothing -> Nothing
     rewrite n facts = Nothing
     findConst r facts = case Map.lookup r facts of
