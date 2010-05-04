@@ -47,7 +47,6 @@ liveTransfer :: BwdTransfer InstrNode LiveFact
 liveTransfer (EntryLabel _ _ l) f = mkFactBase [(l, f)]
 liveTransfer (LabelNode _ _ l) f = mkFactBase [(l, f)]
 liveTransfer (Open (H.Enter src arg dest)) f = Set.insert src . Set.insert arg . Set.delete dest $ f
-liveTransfer (Open (H.AllocC dest _ _)) f = Set.delete dest f
 liveTransfer (Open (H.MkClo dest _ srcs)) f = foldl' update (Set.delete dest f) srcs
   where
     update set reg = Set.insert reg set

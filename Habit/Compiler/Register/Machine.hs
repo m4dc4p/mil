@@ -36,7 +36,10 @@ data Instr =
                     -- result of the Enter will be in the register in
                     -- the third location.
   | Ret Reg -- ^ Return from procedure call.
-  | AllocC Reg Label Int -- ^ Allocate N values with a label.
+  | MkClo Reg Label [Reg] -- ^ Create a closure using the label given,
+                        -- storing value from the registers
+                        -- specified. Put the result in the register
+                        -- given.
   | AllocD Reg Tag Int -- ^ Allocate data with the tag given and space
                        -- for the number of arguments.
   | Copy Reg Reg -- ^ Copy a value from one location to another. The
@@ -63,10 +66,6 @@ data Instr =
   | Jmp Label -- ^ Jump to the label specified.
   | Error String -- ^ Halt and print error.
   | Note String -- ^ No effect - for commenting
-  | MkClo Reg Label [Reg] -- ^ Create a closure using the label given,
-                        -- storing value from the registers
-                        -- specified. Put the result in the register
-                        -- given.
   deriving (Show, Read)
 
 -- | Identifies a particular constructor.
@@ -160,11 +159,29 @@ step (Ret r) machine@(Machine { registers = rs'
         _ -> err machine $ "Can't get value for result register " ++ r ++ " in " ++ show rs'
 step (Ret _) machine = err machine $ "Illegal state for Ret."
 
--- AllocC r l locs | program | registers | callStack 
+-- MkClo r lab 0 | program | registers | callStack 
 -------------------------------------------------
--- In   | ... | ...                    | cs 
--- Out  | ... | r = Data l [0, 0, ..]  | cs
-step (AllocC r l m) machine = allocate r l m machine
+-- In   | ... | ...              | cs 
+-- Out  | ... | r = Data lab []  | cs
+-- step (MkClo reg lab 0) m = allocate reg lab 0 m
+
+-- MkClo r lab n | program | registers | callStack 
+-------------------------------------------------
+-- In   | ... | v0 = clo[0], v1 = clo[1], ..., vq = clo[n - 1], vn = arg | cs 
+-- Out  | ... | r = Data lab [v0, v1, ... vq, vn]                        | cs
+{- step (MkClo reg lab cnt) machine@(Machine { registers }) = 
+  let initV = allocate reg lab cnt
+      cloV n = mightErr "Unable to set field based on closure." . 
+               getField (mightErr "closure register not found." . 
+                         getRegister registers $ cloReg) $ n
+      argV = mightErr "Unable to get arg register" $ getRegister registers argReg
+      setF val loc idx = mightErr "Unable to set field." (setField val loc idx)
+
+      setV 0 idx d = setF argV d idx
+      setV n idx d = setV (n - 1) (idx + 1) $ setF (cloV idx) d idx
+
+  in      next $ machine { registers = setRegister dst d' rs }
+setV cnt 0 initV --}
 
 -- AllocD r t n | program | registers | callStack 
 -------------------------------------------------
@@ -246,30 +263,6 @@ step (Jmp l) machine@(Machine { program = p })
 
 step (Error _) machine = machine 
 step (Note _) machine = next machine
-
--- MkClo r lab 0 | program | registers | callStack 
--------------------------------------------------
--- In   | ... | ...              | cs 
--- Out  | ... | r = Data lab []  | cs
--- step (MkClo reg lab 0) m = allocate reg lab 0 m
-
--- MkClo r lab n | program | registers | callStack 
--------------------------------------------------
--- In   | ... | v0 = clo[0], v1 = clo[1], ..., vq = clo[n - 1], vn = arg | cs 
--- Out  | ... | r = Data lab [v0, v1, ... vq, vn]                        | cs
-{- step (MkClo reg lab cnt) machine@(Machine { registers }) = 
-  let initV = allocate reg lab cnt
-      cloV n = mightErr "Unable to set field based on closure." . 
-               getField (mightErr "closure register not found." . 
-                         getRegister registers $ cloReg) $ n
-      argV = mightErr "Unable to get arg register" $ getRegister registers argReg
-      setF val loc idx = mightErr "Unable to set field." (setField val loc idx)
-
-      setV 0 idx d = setF argV d idx
-      setV n idx d = setV (n - 1) (idx + 1) $ setF (cloV idx) d idx
-
-  in      next $ machine { registers = setRegister dst d' rs }
-setV cnt 0 initV --}
 
 -- | Advance to next instruction. 
 next :: Machine -> Machine

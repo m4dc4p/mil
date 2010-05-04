@@ -73,7 +73,7 @@ makeCFG groups =
 showInstr :: Instr -> String
 showInstr (Enter _ _ _) = "Enter"
 showInstr (Ret _) = "Ret"
-showInstr (AllocC _ lab _) = "AllocC " ++ lab
+showInstr (MkClo _ lab _) = "AllocC " ++ lab
 showInstr (AllocD _ tag _) = "AllocD " ++ tag
 showInstr (Copy _ _) = "Copy"
 showInstr (Store _ _) = "Store"
