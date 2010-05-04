@@ -7,7 +7,7 @@ where
 import Compiler.Hoopl
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, fromJust, isJust)
 
 import qualified Habit.Compiler.Register.Machine as H (Reg, Instr(..), Label)
 import Habit.Compiler.Register.Hoopl
@@ -38,15 +38,19 @@ cloOpt body = do
 cloLattice :: DataflowLattice CloFact
 cloLattice = DataflowLattice { fact_name = "Closure elimination"
                               , fact_bot = emptyFact
-                              , fact_extend = undefined -- stdMapJoin extendFact
+                              , fact_extend = extendFact
                               , fact_do_logging = True }
-{-  where
-    extendFact _ (OldFact old) (NewFact new) 
-      | old == new = (NoChange, old)
-      | otherwise = (SomeChange, new) -}
+  where
+    extendFact _ (OldFact old@(CloFact _ oldRef oldAll)) (NewFact new@(CloFact _ newRef newAll)) 
+      | oldRef == newRef && oldAll == newAll = (NoChange, old)
+      | otherwise = let ref' = newRef `Map.union` oldRef
+                        all' = newAll `Map.union` oldAll
+                    in (SomeChange, new { closureRefs = ref'
+                                        , allClosures = all' })
                                            
 
 cloTransfer :: FwdTransfer InstrNode CloFact
+-- Initialize analysis for this block when we see a label.
 cloTransfer (EntryLabel (G l) _ hl) f = 
   let fact = fromMaybe emptyFact $ lookupFact f hl
   in fact { currLabel = Just (l, hl) } 
@@ -54,29 +58,22 @@ cloTransfer (LabelNode _ (N l) hl) f =
   let fact = fromMaybe emptyFact $ lookupFact f hl
   in fact { currLabel = Just (l, hl) }
 
-cloTransfer (Ret (H.Ret r)) f@(CloFact { currLabel = Just (curr, hCurr)
+-- Add teh value of the result register to the map of labels to
+-- closures. If a closure was allocated in this register, and it has
+-- not been overwritten, then it will have the value MkClo. Otherwise,
+-- it will the value Other.
+cloTransfer (Ret (H.Ret _)) f@(CloFact { currLabel = Just (curr, hCurr)
                                        , closureRefs
                                        , allClosures }) 
   = case Map.lookup curr closureRefs of
       Just cloInfo@(MkClo _ _) -> mkFactBase [(hCurr, f { allClosures = Map.insert curr cloInfo allClosures })]
       _ -> mkFactBase []
-cloTransfer (Ret _) _ = mkFactBase []
 
-cloTransfer (Open (H.MkClo r curr regs)) f@(CloFact { closureRefs }) = 
-  let cloInfo = MkClo curr (length regs)
-  in f { closureRefs = Map.insert curr cloInfo closureRefs } 
+cloTransfer (Open (H.MkClo reg _ regs)) f@(CloFact { closureRefs }) = 
+  let cloInfo = MkClo reg (length regs)
+  in f { closureRefs = Map.insert reg cloInfo closureRefs } 
 
-cloTransfer (Open (H.Enter src arg dest)) f@(CloFact { closureRefs }) 
-  = f { closureRefs = Map.insert dest Other closureRefs }
-cloTransfer (Open (H.AllocD dest _ _)) f@(CloFact { closureRefs })  
-  = f { closureRefs = Map.insert dest Other closureRefs }
-cloTransfer (Open (H.Copy _ dest)) f@(CloFact { closureRefs }) 
-  = f { closureRefs = Map.insert dest Other closureRefs }
-cloTransfer (Open (H.Store src (dest, _))) f@(CloFact { closureRefs }) 
-  = f { closureRefs = Map.insert dest Other closureRefs }
-cloTransfer (Open (H.Set dest _)) f@(CloFact { closureRefs }) 
-  = f { closureRefs = Map.insert dest Other closureRefs }
-cloTransfer (Open _) f = f
+-- Transfer our facts to target labels.
 cloTransfer (Jmp _ hl) f@(CloFact { currLabel = Just (curr, hCurr)
                                   , closureRefs
                                   , allClosures }) 
@@ -86,8 +83,7 @@ cloTransfer (Jmp _ hl) f@(CloFact { currLabel = Just (curr, hCurr)
         in mkFactBase [(hl, newFact)
                       , (hCurr, newFact)]
       _ -> mkFactBase []
-cloTransfer (Jmp _ hl) _ = mkFactBase []
-
+-- Transfer our facts to target labels.
 cloTransfer (FailT _ (F fl) (T tl)) f@(CloFact { currLabel = Just (curr, hCurr)
                                                , closureRefs
                                                , allClosures }) 
@@ -98,22 +94,36 @@ cloTransfer (FailT _ (F fl) (T tl)) f@(CloFact { currLabel = Just (curr, hCurr)
                       , (tl, newFact)
                       , (hCurr, newFact)]
       _ -> mkFactBase []
-cloTransfer (FailT _ _ _) _ = mkFactBase []
 
+-- These instructions destroy any information
+-- we have about a register - unknown if it is a function after
+-- this.
+cloTransfer (Open instr) f@(CloFact { closureRefs })
+  | isJust dest = f { closureRefs = Map.insert (fromJust dest) Other closureRefs }
+  | otherwise = f
+    where
+      dest = case instr of
+               H.Enter _ _ d -> Just d
+               H.AllocD d _ _ -> Just d
+               H.Copy _ d -> Just d
+               H.Store _ (d, _) -> Just d
+               H.Set d _ -> Just d
+               _ -> Nothing
+
+-- These conditions don't matter when we don't have a current label.
+cloTransfer (Ret _) _ = mkFactBase []
+cloTransfer (Jmp _ _) _ = mkFactBase []
+cloTransfer (FailT _ _ _) _ = mkFactBase []
 cloTransfer (Halt _) _ = mkFactBase []
 cloTransfer (Error _) _ = mkFactBase []
 
 
 cloRewrite :: FwdRewrite InstrNode CloFact
-cloRewrite = undefined {-shallowFwdRw rewrite
+cloRewrite = shallowFwdRw rewrite
   where
     rewrite :: SimpleFwdRewrite InstrNode CloFact
-    rewrite i@(Open (H.MkClo _ l _)) fact =
-      case fact of
-        Return _ _ _ -> 
-          let note = l ++ ": " ++ show fact 
-          in Just $ catGraphs [mkMiddle (Open (H.Note note))
-                                         , mkMiddle i]
-        Other -> Nothing
-    rewrite _ _ = Nothing-}
-
+    rewrite i@(Open (H.MkClo _ _ _)) f =
+      Just $ catGraphs [mkMiddle (Open (H.Note (show f)))
+                       , mkMiddle i]
+    rewrite i@(Ret _) f = Just $ mkMiddle (Open (H.Note (show f))) <*> mkLast i
+    rewrite _ _ = Nothing
