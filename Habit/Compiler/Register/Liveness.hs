@@ -59,8 +59,7 @@ liveTransfer (Open _) f = f
 liveTransfer (Jmp _ l) f = fromMaybe Set.empty $ lookupFact f l
 liveTransfer (FailT _ (F fl) (T tl)) f = fromMaybe Set.empty (lookupFact f tl) `Set.union`
                                                fromMaybe Set.empty (lookupFact f fl)
-liveTransfer (Ret (H.Ret r)) _ = Set.singleton r
-liveTransfer (Ret i) _ = error $ "Hoopl Ret instruciton associated with incorrect machine instruction: " ++ show i
+liveTransfer (Ret r) _ = Set.singleton r
 liveTransfer (Error _) _ = Set.empty
 liveTransfer (Halt _) _ = Set.empty
 

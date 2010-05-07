@@ -49,7 +49,7 @@ data InstrNode e x where
     -> InstrNode O C
   -- | QED.
   Ret 
-    :: H.Instr -- ^ Original instruction
+    :: H.Reg -- ^ Original instruction
     -> InstrNode O C
   -- | QED.
   Halt 
@@ -181,7 +181,7 @@ groupToBody (groupLabel, groupCount, codes) = codesToBody' Map.empty codes >>= r
       end :: MLabelMap -> H.Instr -> FuelMonad (MLabelMap, InstrNode O C)
       end labels i = do
           case i of
-            H.Ret _ -> return (labels, Ret i)
+            H.Ret r -> return (labels, Ret r)
             H.Jmp l -> do
                        (labels', foundL) <- newLabel labels l 
                        return (labels', Jmp i foundL)
@@ -273,7 +273,7 @@ bodyToGroups body = Map.elems . snd .
             LabelNode _ _ _ -> []
             EntryLabel _ _ _ -> []
             Jmp i _ -> [i]
-            Ret i -> [i]
+            Ret r -> [H.Ret r]
             FailT i _ _ -> [i]
             Halt i -> [i] 
             Error i -> [i] 

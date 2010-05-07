@@ -63,8 +63,8 @@ constProp :: FwdRewrite InstrNode ConstFact
 constProp = shallowFwdRw rewrite
   where
     rewrite :: InstrNode e x -> Fact e ConstFact -> Maybe (AGraph InstrNode e x)
-    rewrite (Ret (H.Ret r)) facts = case findConst r facts of
-                                      Just s -> Just $ mkLast (Ret (H.Ret s))
+    rewrite (Ret r) facts = case findConst r facts of
+                                      Just s -> Just $ mkLast (Ret s)
                                       Nothing -> Nothing
     rewrite n facts = Nothing
     findConst r facts = case Map.lookup r facts of
