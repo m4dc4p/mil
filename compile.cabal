@@ -3,10 +3,6 @@ version: 0.1
 cabal-version: >= 1.2
 build-type: Simple
 
-flag debug
-  description: Include annotations in generated code.
-  default: False
-
 library
   build-depends: base >= 4 && < 5, value-supply >= 0.5 && < 1, mtl >= 1.1 && < 2, containers >= 0.3 && < 1, 
                  filepath >= 1.1 && < 2, habit-front,
@@ -15,9 +11,6 @@ library
   ghc-options: -O
   hs-source-dirs: .
                                 
-  if flag(debug)
-    cpp-options:-DDEBUG
-        
   exposed-modules: Habit.Compiler.Stack.Machine
                    Habit.Compiler.Stack.Compiler
                    Habit.Compiler.Stack.Eval
@@ -33,9 +26,6 @@ executable register-compiler
   ghc-options: -O
   hs-source-dirs: .
                                 
-  if flag(debug)
-    cpp-options:-DDEBUG
-
 -- executable register-interpreter
 --   main-is: InterpR.hs
 --   build-depends: base

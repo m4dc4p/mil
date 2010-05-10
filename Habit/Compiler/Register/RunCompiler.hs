@@ -29,7 +29,6 @@ main = parse_opts `fmap` getArgs >>= \res ->
   case res of
     (opts, xs, []) ->
       do r <- run_session_quiet opts (act (opt_action opts) xs)
-
          case r of
            Right a -> return a
            Left e ->
@@ -73,33 +72,33 @@ save_typed_mod_dump optimizer (AcyclicSCC mo) =
      optGroups <- optimizer file_name (removeNotes unOptGroups)
      save_file (file_name <.> "dump")
                    $ show $ run_pp_with env $ dump_typed_mod m
-     let showFuncs (l, size, codes) = "Group " ++ l ++ " (" ++ show size ++ ") \n" ++ 
-                                (unlines . map ("  " ++) . 
-                                 concatMap (\(l, cs) -> (l ++ ":") : showCode cs) $ codes)
-     save_file (file_name <.> ".r.hs") $ showIR unOptGroups
-     save_file (file_name <.> ".opt.r.hs") $ showIR optGroups
-     save_file (file_name <.> ".opt.f.hs") $ concatMap showFuncs optGroups
-     save_file (file_name <.> ".f.hs") $ concatMap showFuncs unOptGroups
+     save_files file_name unOptGroups optGroups
 
-showCode :: [Instr] -> [String]
-#ifdef DEBUG
-showCode instrs = map show instrs
-#else 
-showCode instrs = map show . filter notNote $ instrs
-  where
-    notNote (Note _) = False
-    notNote _ = True
-#endif
-
-showIR :: [Group] -> String
-showIR = unlines . showCode . getInstrs 
+save_files :: String -> [Group] -> [Group] -> SessionM ()
+save_files file_name unOpt opt = do
+  let showFuncs (l, size, codes) = "Group " ++ l ++ " (" ++ show size ++ ") \n" ++ 
+        (unlines . map ("  " ++) . concatMap (\(l, cs) -> (l ++ ":") : showCode cs) $ codes)
+      no_groups prefix gs = do
+        save_file (file_name <.> prefix <.> "r.hs") . showIR . removeNotes $ gs
+        save_file (file_name <.> prefix <.> "r.note.hs") . showIR $ gs
+      with_groups prefix gs = do
+        save_file (file_name <.> prefix <.> ".f.hs") . concatMap showFuncs . removeNotes $ gs
+        save_file (file_name <.> prefix <.> ".f.note.hs") . concatMap showFuncs $ gs
+      showCode :: [Instr] -> [String]
+      showCode instrs = map show instrs
+      showIR :: [Group] -> String
+      showIR = unlines . showCode . getInstrs 
+  no_groups "" unOpt
+  no_groups ".opt" opt
+  with_groups "" unOpt
+  with_groups ".opt" opt
 
 removeNotes :: [Group] -> [Group]
 removeNotes = 
   let removeNote (l, cs) = (l, filter notNote cs)
+      notNote (Note _) = False
+      notNote _ = True
   in map (\(l, c, css) -> (l, c, map removeNote css))
     
-notNote (Note _) = False
-notNote _ = True
       
 
