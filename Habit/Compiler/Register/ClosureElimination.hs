@@ -19,14 +19,14 @@ data ProcFact = Proc H.Reg Val | NoInfo
   deriving (Eq, Show)
 
 cloOpt :: Body InstrNode -> FuelMonad (Body InstrNode)
-cloOpt body = return body
+cloOpt body = findClosures body >>= return . fst
 
-findClosures :: Body InstrNode -> FuelMonad (FactBase ProcFact)
+findClosures :: Body InstrNode -> FuelMonad (Body InstrNode, FactBase ProcFact)
 findClosures body = do
   let bwd = BwdPass { bp_lattice = findCloLat
                     , bp_transfer = findCloTrans
                     , bp_rewrite = findCloRewrite }
-  analyzeAndRewriteBwd bwd body (mkFactBase []) >>= return . snd
+  analyzeAndRewriteBwd bwd body (mkFactBase [])
 
 findCloLat :: DataflowLattice ProcFact
 findCloLat = DataflowLattice { fact_bot = NoInfo
@@ -39,7 +39,6 @@ findCloLat = DataflowLattice { fact_bot = NoInfo
       let p = procMeet old new
       in (if p == new then NoChange else SomeChange
          , p)
-
 
 findCloTrans :: BwdTransfer InstrNode ProcFact
 -- Return what we've found out so far.
@@ -77,8 +76,14 @@ findCloTrans (Open (H.Set dest _)) (Proc r _)
   | dest == r = Proc r Other
 findCloTrans (Open _) f = f
 
-findCloRewrite :: forall n e x f. n e x -> Fact x f -> Maybe (BwdRes n f e x)
-findCloRewrite = noBwdRewrite
+findCloRewrite :: InstrNode e x -> Fact x ProcFact -> Maybe (BwdRes InstrNode ProcFact e x)
+findCloRewrite = shallowBwdRw f
+  where
+    f :: SimpleBwdRewrite InstrNode ProcFact
+    f i@(EntryLabel _ _ l) procFact = Just $ mkFirst i <*> note (show procFact)
+    f i@(LabelNode _ _ l) procFact = Just $ mkFirst i <*> note (show procFact)
+    f _ _ = Nothing
+    note = mkMiddle . Open . H.Note
 
 -- | Combines Proc values such that 
 -- any ambiguity in the value held by the register
