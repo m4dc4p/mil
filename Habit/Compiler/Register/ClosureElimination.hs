@@ -6,11 +6,19 @@ where
 
 import Compiler.Hoopl
 import Data.Maybe (fromMaybe)
+import Data.Map (Map, (!))
+import qualified Data.Map as Map
+import qualified Data.IntMap as IntMap
 
 import qualified Habit.Compiler.Register.Machine as H (Reg, Instr(..), Label)
 import Habit.Compiler.Register.Hoopl
 
-data Val = Unknown | Other | Clo H.Label Int
+-- | Values that can be returned from a procedure. 
+data Val = Unknown -- ^ No information about the value returned.
+         | Other -- ^ A value that is not a closure is returned.
+         | Clo H.Label Int -- ^ A closure pointing at the label
+                           -- specified with the given number of slots
+                           -- is returned.
   deriving (Eq, Show)
 
 -- | Indicates if a procedure returns a closure
@@ -18,8 +26,74 @@ data Val = Unknown | Other | Clo H.Label Int
 data ProcFact = Proc H.Reg Val | NoInfo
   deriving (Eq, Show)
 
+-- | The values held by a register. 
+type LiftFact = Map H.Reg Val
+
+-- | Maps Machine (i.e., "hardware") labels to Hoopl labels.
+type HLabelMap = Map H.Label Label
+
 cloOpt :: Body InstrNode -> FuelMonad (Body InstrNode)
-cloOpt body = findClosures body >>= return . fst
+cloOpt body = do
+  (body', facts) <- findClosures body
+  liftClosures body' facts 
+
+liftClosures :: Body InstrNode -> FactBase ProcFact -> FuelMonad (Body InstrNode)
+liftClosures body labelFacts = do
+  let fwd  = FwdPass { fp_lattice = undefined -- liftLattice 
+                     , fp_transfer = liftTrans labelMap labelFacts
+                     , fp_rewrite = liftRewrite }
+      -- Initial map of labels to initial facts.
+      bodies = bodyList body
+      initFacts = zip (map fst bodies) (repeat Map.empty)
+      labelMap = Map.fromList (map (labels . snd) bodies)
+      labels :: Block InstrNode C C -> (H.Label, Label)
+      labels block = case blockLabel block of
+                       EntryLabel (G hl) _ l -> (hl, l)
+                       LabelNode  _ (N hl) l -> (hl, l)
+  (body', _) <- analyzeAndRewriteFwd fwd body (mkFactBase initFacts)
+  return body'
+
+liftTrans :: HLabelMap -> FactBase ProcFact -> FwdTransfer InstrNode LiftFact
+liftTrans _ labelFacts (EntryLabel _ _ l) f = fromMaybe Map.empty $ lookupFact f l
+liftTrans _ labelFacts (LabelNode _ _ l) f = fromMaybe Map.empty $ lookupFact f l
+liftTrans labelMap labelFacts (Open (H.MkClo dest lab regs)) f = Map.insert dest (Clo lab (length regs)) f
+liftTrans labelMap labelFacts (Open (H.Enter procReg _ resultReg)) f 
+    | knownProc procReg = 
+        let Clo lab cnt = f ! procReg
+            hooplLab = fromMaybe (error $ "Hardware label " ++ lab ++ " not mapped.") (Map.lookup lab labelMap)
+            labFact = fromMaybe (error $ "No facts about Hoopl label" ++ show hooplLab ++ ".") (lookupFact labelFacts hooplLab)
+        -- We know information about the closure in the register. Look up the label 
+        -- contained in that closure and assign that information to the result
+        -- register here.
+        in case labFact of 
+             Proc _ v -> Map.insert resultReg v f
+             _ -> f -- no info about the result register
+    | otherwise = f -- No info.
+  where
+    knownProc r = case fromMaybe Unknown (Map.lookup procReg f) of
+       Clo lab cnt -> True
+       _ -> False
+{- liftTrans _ _ (Open (H.Copy src dst)) fact = Map.insert dst (R src) fact
+liftTrans _ _ (Open (H.Load _ dst)) fact = Map.insert dst Top fact
+liftTrans _ _ (Open (H.Set dst _)) fact = Map.insert dst Top fact
+liftTrans _ _ (Open _) fact = fact -}
+liftTrans _ labelFacts (Jmp _ next) fact = mkFactBase [(next, fact)]
+liftTrans _ labelFacts (FailT _ (F false) (T true)) fact = mkFactBase [(true, fact)
+                                                                      ,(false, fact)]
+liftTrans _ _ (Ret _) fact = mkFactBase []
+liftTrans _ _ (Halt _) fact = mkFactBase []
+liftTrans _ _ (Error _) fact = mkFactBase []
+
+liftRewrite :: FwdRewrite InstrNode LiftFact
+liftRewrite = shallowFwdRw rewrite
+  where
+    rewrite :: SimpleFwdRewrite InstrNode LiftFact
+    rewrite i@(Open (H.Enter dest arg resultReg)) facts = 
+      case Map.lookup dest facts of
+        Nothing -> Nothing -- no info
+        Just (Clo lab cnt) -> Just $ mkNote ("Closure contains " ++ show lab ++ " and takes " ++ show cnt ++ " arguments.") <*>
+                                 mkMiddle i
+    rewrite _ _ = Nothing
 
 findClosures :: Body InstrNode -> FuelMonad (Body InstrNode, FactBase ProcFact)
 findClosures body = do
@@ -80,10 +154,11 @@ findCloRewrite :: InstrNode e x -> Fact x ProcFact -> Maybe (BwdRes InstrNode Pr
 findCloRewrite = shallowBwdRw f
   where
     f :: SimpleBwdRewrite InstrNode ProcFact
-    f i@(EntryLabel _ _ l) procFact = Just $ mkFirst i <*> note (show procFact)
-    f i@(LabelNode _ _ l) procFact = Just $ mkFirst i <*> note (show procFact)
+    f i@(EntryLabel _ _ l) procFact = Just $ mkFirst i <*> mkNote (show procFact)
+    f i@(LabelNode _ _ l) procFact = Just $ mkFirst i <*> mkNote (show procFact)
     f _ _ = Nothing
-    note = mkMiddle . Open . H.Note
+
+mkNote = mkMiddle . Open . H.Note
 
 -- | Combines Proc values such that 
 -- any ambiguity in the value held by the register
