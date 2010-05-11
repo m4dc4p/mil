@@ -3,7 +3,7 @@
 module Habit.Compiler.Register.Hoopl 
   (groupsToBody, InstrNode(..) , bodyToGroups
   , Group(..), Norm(..), False(..), True(..) 
-  , stdMapJoin)
+  , stdMapJoin, blockLabel)
    
 where
 
