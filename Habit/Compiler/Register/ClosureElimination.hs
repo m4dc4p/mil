@@ -12,6 +12,7 @@ import qualified Data.IntMap as IntMap
 
 import qualified Habit.Compiler.Register.Machine as H (Reg, Instr(..), Label)
 import Habit.Compiler.Register.Hoopl
+import Habit.Compiler.Register.Liveness (liveOpt)
 
 -- | Values that can be returned from a procedure. 
 data Val = Unknown -- ^ No information about the value returned.
@@ -33,9 +34,7 @@ type LiftFact = Map H.Reg Val
 type HLabelMap = Map H.Label Label
 
 cloOpt :: Body InstrNode -> FuelMonad (Body InstrNode)
-cloOpt body = do
-  (body', facts) <- findClosures body
-  liftClosures body' facts 
+cloOpt body = findClosures body >>= uncurry liftClosures >>= liveOpt
 
 liftClosures :: Body InstrNode -> FactBase ProcFact -> FuelMonad (Body InstrNode)
 liftClosures body labelFacts = do
@@ -68,16 +67,17 @@ liftLattice = DataflowLattice { fact_bot = Map.empty
 liftTrans :: HLabelMap -> FactBase ProcFact -> FwdTransfer InstrNode LiftFact
 liftTrans _ labelFacts (EntryLabel _ _ l) f = fromMaybe Map.empty $ lookupFact f l
 liftTrans _ labelFacts (LabelNode _ _ l) f = fromMaybe Map.empty $ lookupFact f l
-liftTrans labelMap labelFacts (Open (H.MkClo dest lab regs)) f = Map.insert dest (Clo lab (length regs)) f
+liftTrans labelMap labelFacts (Open (H.MkClo dest lab regs)) f = 
+  case labFact labelFacts (hooplLabel labelMap lab) of
+    Proc _ v -> Map.insert dest v f
+    _ -> f -- no info known about the label
 liftTrans labelMap labelFacts (Open (H.Enter procReg _ resultReg)) f 
     | knownProc procReg = 
         let Clo lab cnt = f ! procReg
-            hooplLab = fromMaybe (error $ "Hardware label " ++ lab ++ " not mapped.") (Map.lookup lab labelMap)
-            labFact = fromMaybe (error $ "No facts about Hoopl label" ++ show hooplLab ++ ".") (lookupFact labelFacts hooplLab)
         -- We know information about the closure in the register. Look up the label 
         -- contained in that closure and assign that information to the result
         -- register here.
-        in case labFact of 
+        in case labFact labelFacts (hooplLabel labelMap lab) of 
              Proc _ v -> Map.insert resultReg v f
              _ -> f -- no info about the result register
     | otherwise = f -- No info.
@@ -96,16 +96,44 @@ liftTrans _ _ (Ret _) fact = mkFactBase []
 liftTrans _ _ (Halt _) fact = mkFactBase []
 liftTrans _ _ (Error _) fact = mkFactBase []
 
+hooplLabel :: HLabelMap -> H.Label -> Label
+hooplLabel labelMap lab = 
+  case Map.lookup lab labelMap of
+    Nothing -> error $ "Hardware label " ++ lab ++ " not mapped."
+    Just l -> l
+
+labFact :: FactBase ProcFact -> Label -> ProcFact
+labFact labelFacts hooplLab = 
+  case lookupFact labelFacts hooplLab of
+    Nothing -> error $ "No facts about Hoopl label" ++ show hooplLab ++ "."
+    Just f -> f
+
 liftRewrite :: FwdRewrite InstrNode LiftFact
 liftRewrite = shallowFwdRw rewrite
   where
     rewrite :: SimpleFwdRewrite InstrNode LiftFact
-    rewrite i@(Open (H.Enter dest arg resultReg)) facts = 
-      case Map.lookup dest facts of
+    rewrite i@(Open (H.Enter target arg resultReg)) facts = 
+      case Map.lookup target facts of
         Nothing -> Nothing -- no info
-        Just (Clo lab cnt) -> Just $ mkNote ("Closure contains '" ++ lab ++ "' and takes " ++ show cnt ++ " arguments.") <*>
-                                 mkMiddle i
+        Just clo -> replaceEnter facts target arg resultReg clo 
     rewrite _ _ = Nothing
+    -- A closure being lifted should always have at least one slot, to capture
+    -- the argument passed. Still, some optimization may have taken it away
+    replaceEnter facts target arg result clo@(Clo lab 0) = 
+      let enter = H.MkClo result lab []
+      in Just $ mkMiddle (Open enter)
+    replaceEnter facts target arg result clo@(Clo lab 1) = 
+      let enter = H.MkClo result lab [arg]
+      in Just $ mkMiddle (Open enter)
+    replaceEnter facts target arg result clo@(Clo lab n) = 
+      let load i = H.Load (target, i) (target ++ "ce" ++ show i) -- HACK: creating new registers 
+                                                                 -- with special prefix again ...
+          enter dests = H.MkClo result lab (dests ++ [arg])
+          loads = map load [0..n-2]
+          newRegs = map (\(H.Load _ r) -> r) loads
+          instrs = loads ++ [enter newRegs]
+      in Just $ catGraphs (map (mkMiddle . Open) instrs)
+    replaceEnter _ _ _ _ _ = Nothing
 
 findClosures :: Body InstrNode -> FuelMonad (Body InstrNode, FactBase ProcFact)
 findClosures body = do
