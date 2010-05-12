@@ -53,7 +53,7 @@ liveTransfer (Open (H.MkClo dest _ srcs)) f = foldl' update (Set.delete dest f) 
 liveTransfer (Open (H.AllocD dest _ _)) f = Set.delete dest f
 liveTransfer (Open (H.Copy _ dest)) f = Set.delete dest f
 liveTransfer (Open (H.Store src (dest, _))) f = Set.insert src (Set.delete dest f)
-liveTransfer (Open (H.Load (dest,_) src)) f = Set.insert src (Set.delete dest f)
+liveTransfer (Open (H.Load (src,_) dest)) f = Set.insert src (Set.delete dest f)
 liveTransfer (Open (H.Set dest _)) f = Set.delete dest f
 liveTransfer (Open _) f = f
 liveTransfer (Jmp _ l) f = fromMaybe Set.empty $ lookupFact f l
@@ -73,6 +73,12 @@ liveRewrite = shallowBwdRw f
             | dest `Set.member` live = Nothing
             | otherwise = Just emptyGraph
     f (Open (H.Load _ dest)) live 
+            | dest `Set.member` live = Nothing
+            | otherwise = Just emptyGraph
+    f (Open (H.Enter _ _ dest)) live 
+            | dest `Set.member` live = Nothing
+            | otherwise = Just emptyGraph
+    f (Open (H.MkClo dest _ _)) live 
             | dest `Set.member` live = Nothing
             | otherwise = Just emptyGraph
     f _ _ = Nothing
