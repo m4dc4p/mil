@@ -39,7 +39,7 @@ cloOpt body = do
 
 liftClosures :: Body InstrNode -> FactBase ProcFact -> FuelMonad (Body InstrNode)
 liftClosures body labelFacts = do
-  let fwd  = FwdPass { fp_lattice = undefined -- liftLattice 
+  let fwd  = FwdPass { fp_lattice = liftLattice
                      , fp_transfer = liftTrans labelMap labelFacts
                      , fp_rewrite = liftRewrite }
       -- Initial map of labels to initial facts.
@@ -52,6 +52,18 @@ liftClosures body labelFacts = do
                        LabelNode  _ (N hl) l -> (hl, l)
   (body', _) <- analyzeAndRewriteFwd fwd body (mkFactBase initFacts)
   return body'
+
+liftLattice :: DataflowLattice LiftFact
+liftLattice = DataflowLattice { fact_bot = Map.empty
+                               , fact_name = "Closure elimination."
+                               , fact_extend = stdMapJoin extendFact
+                               , fact_do_logging = False }
+  where
+    extendFact :: Label -> OldFact Val -> NewFact Val -> (ChangeFlag, Val)
+    extendFact _ (OldFact old) (NewFact new) = (flag, fact)
+      where
+        fact = if old == new then new else Other
+        flag = if fact == old then NoChange else SomeChange
 
 liftTrans :: HLabelMap -> FactBase ProcFact -> FwdTransfer InstrNode LiftFact
 liftTrans _ labelFacts (EntryLabel _ _ l) f = fromMaybe Map.empty $ lookupFact f l
@@ -73,10 +85,10 @@ liftTrans labelMap labelFacts (Open (H.Enter procReg _ resultReg)) f
     knownProc r = case fromMaybe Unknown (Map.lookup procReg f) of
        Clo lab cnt -> True
        _ -> False
-{- liftTrans _ _ (Open (H.Copy src dst)) fact = Map.insert dst (R src) fact
-liftTrans _ _ (Open (H.Load _ dst)) fact = Map.insert dst Top fact
-liftTrans _ _ (Open (H.Set dst _)) fact = Map.insert dst Top fact
-liftTrans _ _ (Open _) fact = fact -}
+liftTrans _ _ (Open (H.Copy src dst)) fact = Map.insert dst (fromMaybe Unknown $ Map.lookup src fact) fact
+liftTrans _ _ (Open (H.Load _ dst)) fact = Map.insert dst Other fact
+liftTrans _ _ (Open (H.Set dst _)) fact = Map.insert dst Other fact
+liftTrans _ _ (Open _) fact = fact 
 liftTrans _ labelFacts (Jmp _ next) fact = mkFactBase [(next, fact)]
 liftTrans _ labelFacts (FailT _ (F false) (T true)) fact = mkFactBase [(true, fact)
                                                                       ,(false, fact)]
@@ -91,7 +103,7 @@ liftRewrite = shallowFwdRw rewrite
     rewrite i@(Open (H.Enter dest arg resultReg)) facts = 
       case Map.lookup dest facts of
         Nothing -> Nothing -- no info
-        Just (Clo lab cnt) -> Just $ mkNote ("Closure contains " ++ show lab ++ " and takes " ++ show cnt ++ " arguments.") <*>
+        Just (Clo lab cnt) -> Just $ mkNote ("Closure contains '" ++ lab ++ "' and takes " ++ show cnt ++ " arguments.") <*>
                                  mkMiddle i
     rewrite _ _ = Nothing
 
