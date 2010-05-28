@@ -8,7 +8,6 @@ import Compiler.Hoopl
 import Data.Maybe (fromMaybe)
 import Data.Map (Map, (!))
 import qualified Data.Map as Map
-import qualified Data.IntMap as IntMap
 
 import qualified Habit.Compiler.Register.Machine as H (Reg, Instr(..), Label)
 import Habit.Compiler.Register.Hoopl
@@ -33,6 +32,8 @@ type LiftFact = Map H.Reg Val
 -- | Maps Machine (i.e., "hardware") labels to Hoopl labels.
 type HLabelMap = Map H.Label Label
 
+-- | Eliminate useless "Enter" instructions, which only
+-- serve to build intermediate closures.
 cloOpt :: Body InstrNode -> FuelMonad (Body InstrNode)
 cloOpt body = findClosures body >>= uncurry liftClosures >>= liveOpt
 
@@ -65,15 +66,15 @@ liftLattice = DataflowLattice { fact_bot = Map.empty
         flag = if fact == old then NoChange else SomeChange
 
 liftTrans :: HLabelMap -> FactBase ProcFact -> FwdTransfer InstrNode LiftFact
-liftTrans _ labelFacts (EntryLabel _ _ l) f = fromMaybe Map.empty $ lookupFact f l
-liftTrans _ labelFacts (LabelNode _ _ l) f = fromMaybe Map.empty $ lookupFact f l
-liftTrans labelMap labelFacts (Open (H.MkClo dest lab regs)) f = 
+liftTrans _ _ (EntryLabel _ _ l) f = fromMaybe Map.empty $ lookupFact f l
+liftTrans _ _ (LabelNode _ _ l) f = fromMaybe Map.empty $ lookupFact f l
+liftTrans labelMap labelFacts (Open (H.MkClo dest lab _)) f = 
   case labFact labelFacts (hooplLabel labelMap lab) of
     Proc _ v -> Map.insert dest v f
     _ -> f -- no info known about the label
 liftTrans labelMap labelFacts (Open (H.Enter procReg _ resultReg)) f 
     | knownProc procReg = 
-        let Clo lab cnt = f ! procReg
+        let Clo lab _ = f ! procReg
         -- We know information about the closure in the register. Look up the label 
         -- contained in that closure and assign that information to the result
         -- register here.
@@ -82,19 +83,20 @@ liftTrans labelMap labelFacts (Open (H.Enter procReg _ resultReg)) f
              _ -> f -- no info about the result register
     | otherwise = f -- No info.
   where
-    knownProc r = case fromMaybe Unknown (Map.lookup procReg f) of
-       Clo lab cnt -> True
+    knownProc _ = case fromMaybe Unknown (Map.lookup procReg f) of
+       Clo _ _ -> True
        _ -> False
 liftTrans _ _ (Open (H.Copy src dst)) fact = Map.insert dst (fromMaybe Unknown $ Map.lookup src fact) fact
 liftTrans _ _ (Open (H.Load _ dst)) fact = Map.insert dst Other fact
 liftTrans _ _ (Open (H.Set dst _)) fact = Map.insert dst Other fact
 liftTrans _ _ (Open _) fact = fact 
-liftTrans _ labelFacts (Jmp _ next) fact = mkFactBase [(next, fact)]
-liftTrans _ labelFacts (FailT _ (F false) (T true)) fact = mkFactBase [(true, fact)
+liftTrans _ _ (Jmp _ next) fact = mkFactBase [(next, fact)]
+liftTrans _ _ (FailT _ (F false) (T true)) fact = mkFactBase [(true, fact)
                                                                       ,(false, fact)]
-liftTrans _ _ (Ret _) fact = mkFactBase []
-liftTrans _ _ (Halt _) fact = mkFactBase []
-liftTrans _ _ (Error _) fact = mkFactBase []
+liftTrans _ _ (Ret _) _ = mkFactBase []
+liftTrans _ _ (Halt _) _ = mkFactBase []
+liftTrans _ _ (Error _) _ = mkFactBase []
+liftTrans _ _ (Capture _ _ _) _ = mkFactBase []
 
 hooplLabel :: HLabelMap -> H.Label -> Label
 hooplLabel labelMap lab = 
@@ -112,20 +114,20 @@ liftRewrite :: FwdRewrite InstrNode LiftFact
 liftRewrite = shallowFwdRw rewrite
   where
     rewrite :: SimpleFwdRewrite InstrNode LiftFact
-    rewrite i@(Open (H.Enter target arg resultReg)) facts = 
+    rewrite (Open (H.Enter target arg resultReg)) facts = 
       case Map.lookup target facts of
         Nothing -> Nothing -- no info
         Just clo -> replaceEnter facts target arg resultReg clo 
     rewrite _ _ = Nothing
     -- A closure being lifted should always have at least one slot, to capture
     -- the argument passed. Still, some optimization may have taken it away
-    replaceEnter facts target arg result clo@(Clo lab 0) = 
+    replaceEnter _ _ _ result (Clo lab 0) = 
       let enter = H.MkClo result lab []
       in Just $ mkMiddle (Open enter)
-    replaceEnter facts target arg result clo@(Clo lab 1) = 
+    replaceEnter _ _ arg result (Clo lab 1) = 
       let enter = H.MkClo result lab [arg]
       in Just $ mkMiddle (Open enter)
-    replaceEnter facts target arg result clo@(Clo lab n) = 
+    replaceEnter _ target arg result (Clo lab n) = 
       let load i = H.Load (target, i) (target ++ "ce" ++ show i) -- HACK: creating new registers 
                                                                  -- with special prefix again ...
           enter dests = H.MkClo result lab (dests ++ [arg])
@@ -158,9 +160,10 @@ findCloTrans :: BwdTransfer InstrNode ProcFact
 -- Return what we've found out so far.
 findCloTrans (EntryLabel _ _ l) f = mkFactBase [(l, f)]
 findCloTrans (LabelNode _ _  l) f = mkFactBase [(l, f)]
--- Finding a return instruction lets us know what 
--- register is returned from this procedure. Next
--- need to figure out what value it can hold
+-- Capture indicates this group captures a closure.
+findCloTrans (Capture r l cnt) _ = Proc r (Clo l cnt)
+-- Any other closed instruction tells us the group
+-- does not capture a closure.
 findCloTrans (Ret r) _ = Proc r Unknown
 -- Combine facts from both branches to determine
 -- if our return register remains unchanged.
@@ -173,31 +176,17 @@ findCloTrans (Jmp _ l) f = fromMaybe NoInfo $ lookupFact f l
 -- Nothing known yet in these cases.
 findCloTrans (Halt _) _ = NoInfo
 findCloTrans (Error _) _ = NoInfo
--- Determine if this MkClo instruction affects our destination
--- register and, if so, if that overrides information already
--- known or tells us that the procedure returns a closure.
-findCloTrans (Open (H.MkClo dest lab regs)) f@(Proc r _)  
-  | dest == r = procMeet f (Proc dest (Clo lab (length regs)))
-findCloTrans (Open (H.Enter _ _ dest)) (Proc r _) 
-  | dest == r = Proc r Other
-findCloTrans (Open (H.AllocD dest _ _)) (Proc r _) 
-  | dest == r = Proc r Other
-findCloTrans (Open (H.Copy _ dest)) (Proc r _) 
-  | dest == r = Proc r Other
-findCloTrans (Open (H.Load _ dest)) (Proc r _)
-  | dest == r = Proc r Other
-findCloTrans (Open (H.Set dest _)) (Proc r _) 
-  | dest == r = Proc r Other
 findCloTrans (Open _) f = f
 
 findCloRewrite :: InstrNode e x -> Fact x ProcFact -> Maybe (BwdRes InstrNode ProcFact e x)
 findCloRewrite = shallowBwdRw f
   where
     f :: SimpleBwdRewrite InstrNode ProcFact
-    f i@(EntryLabel _ _ l) procFact = Just $ mkFirst i <*> mkNote (show procFact)
-    f i@(LabelNode _ _ l) procFact = Just $ mkFirst i <*> mkNote (show procFact)
+    f i@(EntryLabel _ _ _) procFact = Just $ mkFirst i <*> mkNote (show procFact)
+    f i@(LabelNode _ _ _) procFact = Just $ mkFirst i <*> mkNote (show procFact)
     f _ _ = Nothing
 
+mkNote :: String -> AGraph InstrNode O O
 mkNote = mkMiddle . Open . H.Note
 
 -- | Combines Proc values such that 

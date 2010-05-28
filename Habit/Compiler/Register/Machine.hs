@@ -40,6 +40,10 @@ data Instr =
                         -- storing value from the registers
                         -- specified. Put the result in the register
                         -- given.
+  | Capture Reg Label Int -- ^ Create a new closure to hold the values
+                          -- found in the closure and argument registers. The closure
+                          -- register can be empty. The new closure is placed
+                          -- in the register specified and returned.
   | AllocD Reg Tag Int -- ^ Allocate data with the tag given and space
                        -- for the number of arguments.
   | Copy Reg Reg -- ^ Copy a value from one location to another. The

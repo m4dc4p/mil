@@ -18,7 +18,8 @@ import Habit.Utils.Misc(breaks)
 import Habit.Utils.PP
 
 import Habit.Session
-import Habit.Compiler.Register.Compiler (compile, getInstrs, Group, Code)
+import Habit.Compiler.Register.Compiler (compile, getInstrs, Group, Code, Target(..))
+import qualified Habit.Compiler.Register.Compiler as C (Group(..))
 import Habit.Compiler.Register.Machine (Instr(..))
 import Habit.Compiler.Register.PrintModule (dump_typed_mod)
 import Habit.Compiler.Register.ControlFlowGraph
@@ -69,15 +70,17 @@ save_typed_mod_dump optimizer (AcyclicSCC mo) =
          file_name = mod_name_to_file (mod_name m)
      supply <- io newNumSupply
      let unOptGroups = compile supply m
-     optGroups <- optimizer file_name (removeNotes unOptGroups)
+     -- optGroups <- optimizer file_name (removeNotes unOptGroups)
      save_file (file_name <.> "dump")
                    $ show $ run_pp_with env $ dump_typed_mod m
-     save_files file_name unOptGroups optGroups
+     save_files file_name unOptGroups [] -- optGroups
 
 save_files :: String -> [Group] -> [Group] -> SessionM ()
 save_files file_name unOpt opt = do
-  let showFuncs (l, size, codes) = "Group " ++ l ++ " (" ++ show size ++ ") \n" ++ 
+  let showFuncs (C.Body l size codes) = "Group " ++ l ++ " (" ++ show size ++ ") \n" ++ 
         (unlines . map ("  " ++) . concatMap (\(l, cs) -> (l ++ ":") : showCode cs) $ codes)
+      showFuncs (C.Capture l cnt (T target) r) = "Capture " ++ l ++ " (" ++ show cnt ++ 
+                                               ", " ++ show target ++ ") " ++ r
       no_groups prefix gs = do
         save_file (file_name <.> prefix <.> "r.hs") . showIR . removeNotes $ gs
         save_file (file_name <.> prefix <.> "r.note.hs") . showIR $ gs
@@ -98,7 +101,9 @@ removeNotes =
   let removeNote (l, cs) = (l, filter notNote cs)
       notNote (Note _) = False
       notNote _ = True
-  in map (\(l, c, css) -> (l, c, map removeNote css))
+      rm (C.Body l c css) = C.Body l c (map removeNote css)
+      rm g = g
+  in map rm
     
       
 

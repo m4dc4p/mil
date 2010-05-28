@@ -12,8 +12,10 @@ import Data.Graph.Inductive.Graphviz (graphviz')
 import Data.Map (Map, (!))
 import qualified Data.Map as Map
 
-import Habit.Compiler.Register.Compiler (Group, Code, Label)
+import Habit.Compiler.Register.Compiler (Group, Code, Label, Target(..))
+import qualified Habit.Compiler.Register.Compiler as C (Group(..))
 import Habit.Compiler.Register.Machine (Instr(..), Failure(..), Success(..))
+import qualified Habit.Compiler.Register.Machine as H (Instr(..))
 
 makeCFG :: [Group] -> Gr String ()
 makeCFG groups = 
@@ -65,8 +67,10 @@ makeCFG groups =
                 in (labNode & g, (Map.insert l next labelMap, next + 1))
               addInstrLabels s _ = s
           in foldl addInstrLabels (labNode & g, (Map.insert label next labelMap, next + 1)) instrs
+        getCode (C.Body _ _ c) = c
+        getCode (C.Capture l cnt (T target) r) = [(l, [H.Capture r target cnt])]
         -- Gets all code blocks from all groups
-        blocks = concatMap (\(_, _, code) -> code) groups
+        blocks = concatMap getCode groups
         (labGraph, (labMap, nextNode)) :: (Gr String (), (Map Label Node, Int)) = foldl mkLabelGraph (G.empty, (Map.empty, 0)) blocks
     in fst $ foldl (linkCode labMap) (labGraph, nextNode) blocks
 
@@ -86,6 +90,7 @@ showInstr (Jmp _) = "Jmp"
 showInstr (Error _) = "Error"
 showInstr (Note _) = "Note"
 showInstr (MkClo _ _ _) = "MkClo"
+showInstr (Capture _ _ _) = "Capture"
 
 writeViz :: String -> Gr String () -> IO () 
 writeViz file gr = do

@@ -23,16 +23,22 @@ type Code = (Label, [Instr])
 -- | Specify how to label lists of instructions. 
 type Label = String 
 
--- | A group represents a function body, more or less.  First element
---  is the Label of the code element which is the entry point for the
---  group.  Second element is the number of arguments expected in the
---  closure when the entry point code element is executed. Third
---  element is the code making up the group.
-type Group = (Label, Int, [Code])
+newtype Target = T Label
+  deriving (Eq, Show)
+
+-- | A group represents a function body, more or less. Functions
+-- can be bodies, which do work, or captures, which take arguments and
+-- return a closure containing those arguments.
+data Group = Body Label Int [Code] -- ^ First element is the Label of
+                                   --  the code element which is the entry point for the group.  Second
+                                   --  element is the number of arguments expected in the closure when
+                                   --  the entry point code element is executed. Third element is the
+                                   --  code making up the group.
+           | Capture Label Int Target Reg 
 
 -- | State we need during compilation. nextID gives us
 -- unique integers for labels and registers. inProgress is 
--- a stack of Group defintions, indicating which Groups are
+-- a stack of Group definitions, indicating which Groups are
 -- still being recorded. completed indicates Groups that have
 -- been recorded completely.
 data S = S { nextID :: Supply Int 
@@ -88,14 +94,15 @@ newGlobalReg name = do
   return $ "glob" ++ (replace '.' '_' (showName name)) ++ show (supplyValue s1)
 
 
--- | Begins tracking instructions for a new group. 
-newGroup :: Maybe Name -- ^ Name to embed in the label, if any
+-- | Begins tracking instructions for a new procedure that does
+-- real work. 
+newBody :: Maybe Name -- ^ Name to embed in the label, if any
          -> Int -- ^ Number of slots expected in the closure register.
          -> ([Reg] -> C [Instr])  -- ^ Compilation action. Will be passed the registers which
                                   -- will contain values from the closure. The first slot in
                                   -- the closure is first in the list, and so on.
          -> C Label
-newGroup name size action = do
+newBody name size action = do
   label <- maybe newLabel newNamedLabel name
   let prologue = 
         let mkReg i = do 
@@ -103,17 +110,28 @@ newGroup name size action = do
               return (t, H.Load (H.cloReg, i) t)
         in mapM mkReg [0 .. size - 1] >>= return . unzip
   (regs, init) <- prologue
-  modify (\s -> s { inProgress = (label, size, []) : (inProgress s) })
+  modify (\s -> s { inProgress = Body label size [] : inProgress s })
   body <- action regs
-  let addEntry s@(S { inProgress = (l, i, c) : rest
+  let addEntry s@(S { inProgress = Body l i c : rest
                     , completed = comp }) = s { inProgress = rest
-                                              , completed = (l, i, (label, init ++ body) : c) 
+                                              , completed = Body l i ((label, init ++ body) : c)
                                                             : comp }
       addEntry _ = error $ "Can't add a new group!"
   modify addEntry
   return label
 
--- | Record a labeled block of code.    
+-- | Create a new capture procedure.
+newCapture :: Maybe Name -- ^ Optional name to embed in the group
+                         -- name.
+           -> Target -- ^ Target label for closure created.
+           -> Int  -- ^ Number of values expected in closure register.
+           -> C Label -- ^ Label for the capture procedure.  
+newCapture name target cnt = do
+  label <- maybe newLabel newNamedLabel name
+  destReg <- maybe newReg newNamedReg name
+  modify (\s -> s { inProgress = Capture label cnt target destReg : inProgress s})
+  return label
+
 record :: String -> [Instr] -> C ()
 record l instrs = do
     modify addCode
@@ -121,8 +139,10 @@ record l instrs = do
     code = (l, instrs)
     addCode (S { inProgress = [] }) 
         = error $ "Not able to record right now!"
-    addCode s@(S { inProgress = (l, i, cs) : css }) 
-        = s { inProgress = (l, i, code : cs) : css }
+    addCode (S { inProgress = (Capture _ _ _ _) : _ }) 
+        = error $ "Can't add code to a capture group!"
+    addCode s@(S { inProgress = (Body l i cs) : css }) 
+        = s { inProgress = (Body l i (code : cs)) : css }
 
 maybeRecord :: Maybe Label -> [Instr] -> [Instr] -> C [Instr]
 maybeRecord Nothing block rest = return $ block ++ rest 
@@ -143,7 +163,7 @@ compile :: Supply Int -> Module -> [Group]
 compile supply m 
     = let ((finalReg, init), S _ _ completed) = runState compileTop (S supply [] [])
           lastInstr = maybe H.Halt H.Ret finalReg
-      in ("TOP", 0, [("TOP", init ++ [lastInstr])]) : completed
+      in (Body "TOP" 0 [("TOP", init ++ [lastInstr])]) : completed
   where
     -- Place module data constructors into
     -- the initial environment
@@ -161,11 +181,13 @@ compile supply m
 getInstrs :: [Group] -> [Instr]
 getInstrs groups = concatMap snd . concatMap third . map addLabels $ groups
     where
-      third (_, _,c) = c
+      third (Body _ _ c) = c
+      third (Capture l cnt (T target) dest) = [(l, [H.Label l, H.Capture dest target cnt])]
       addLabels :: Group -> Group
-      addLabels (entry, size, blocks) = 
+      addLabels (Body entry size blocks) = 
           let blocks' = map (\(l, b) -> (l, H.Label l : b)) blocks
-          in (entry, size, blocks')
+          in Body entry size blocks'
+      addLabels g = g
 
 -- | An environment is a list of name & location pairs.
 type Env = [(Name, Reg)]
@@ -226,7 +248,7 @@ compileDatas dataDefs env = do
                             , H.Ret result]
         mkData remain def@(name, _) regs = do
           r <- newNamedReg name
-          entry <- newGroup (Just name) (length regs + 1) $ mkData (remain - 1) def
+          entry <- newBody (Just name) (length regs + 1) $ mkData (remain - 1) def
           closureC <- mkClosure r entry regs
           return $ mkN "mkData n" : closureC ++ [H.Ret r]
         compileData (e, inits) (name, 0) = do
@@ -239,7 +261,7 @@ compileDatas dataDefs env = do
                    : H.AllocD r (showName name) 0 : inits)
         compileData (e, inits) (name, count) = do
           r <- newGlobalReg name
-          entry <- newGroup (Just name) 0 $ mkData count (name, count)
+          entry <- newBody (Just name) 0 $ mkData count (name, count)
           return ((name, r) : e
                  , mkN ("compileData n: " ++ showBinding (name, r))
                    : H.MkClo r entry [] : inits)
@@ -501,11 +523,11 @@ compileMAbs env dest name f m = do
 -- and copying them between closures, until all arguments have
 -- been consumed and the function can do real work.   
 compileAbs :: Maybe Name -> Env -> OnFail -> Int -> [Name] -> Match -> C Label
-compileAbs name env f nparams fvs m = newGroup name nfvs $ compileAbs' 1
+compileAbs name env f nparams fvs m = compileAbs' 1
   where
     nfvs = length fvs
-    compileAbs' n regs 
-      | n == nparams = do
+    compileAbs' n 
+      | n == nparams = newBody name (nfvs + n - 1) $ \regs -> do
           let (fvRegs, argRegs) = splitAt nfvs regs
               env' = zip fvs fvRegs ++ env
               args' = argRegs ++ [H.argReg]
@@ -514,20 +536,15 @@ compileAbs name env f nparams fvs m = newGroup name nfvs $ compileAbs' 1
           matchC <- compileMatch env' (MD f [H.Jmp l]) r m args'
           return $ mkN "compileAbs 1" : matchC ++ [mkN "compileAbs 1 end"]
       | otherwise = do
-          entry <- newGroup name (length regs + 1) . compileAbs' $ (n + 1)
-          r <- newReg
-          closureC <- mkClosure r entry regs
-          return $ mkN "compileAbs n" 
-                     : closureC ++ [H.Ret r] ++ [mkN "compileAbs n end"]
+          entry <- compileAbs' $ (n + 1)
+          newCapture name (T entry) n 
 
 -- | Create a closure in the register given, for the
 -- label specified. The list of registers passed will be
 -- copied into the closure in order. Additionally, the 
 -- argument register is copied into the closure.
 mkClosure :: Reg -> String -> [Reg] -> C [Instr]
-mkClosure dst label argRegs = do
-  let loads = map (\(r, i) -> H.Store r (dst, i)) . zip (argRegs ++ [H.argReg]) $ [0..]
-  return [H.MkClo dst label (argRegs ++ [H.argReg])]
+mkClosure dst label argRegs = return [H.MkClo dst label (argRegs ++ [H.argReg])]
 
 -- | Show a list of names nicely.
 showNames :: [Name] -> String

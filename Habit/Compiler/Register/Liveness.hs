@@ -60,6 +60,7 @@ liveTransfer (Jmp _ l) f = fromMaybe Set.empty $ lookupFact f l
 liveTransfer (FailT _ (F fl) (T tl)) f = fromMaybe Set.empty (lookupFact f tl) `Set.union`
                                                fromMaybe Set.empty (lookupFact f fl)
 liveTransfer (Ret r) _ = Set.singleton r
+liveTransfer (Capture r _ _) _ = Set.singleton r
 liveTransfer (Error _) _ = Set.empty
 liveTransfer (Halt _) _ = Set.empty
 

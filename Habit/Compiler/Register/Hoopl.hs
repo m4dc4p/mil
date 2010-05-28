@@ -41,11 +41,17 @@ data InstrNode e x where
     :: H.Instr -- ^ Original instruction
     -> Label -- ^ Next node
     -> InstrNode O C
-  -- | QED
+  -- | QED.
   FailT 
     :: H.Instr -- ^ Original instruction.
     -> False -- ^ Destination if test fails.
     -> True -- ^ Destination if test succeeds.
+    -> InstrNode O C
+  -- | QED.
+  Capture
+    :: H.Reg 
+    -> H.Label
+    -> Int
     -> InstrNode O C
   -- | QED.
   Ret 
@@ -82,6 +88,7 @@ instance Edges InstrNode where
   successors (Ret _) = []
   successors (Error _) = []
   successors (Halt _) = []
+  successors (Capture _ _ _) = []
   -- Order of successors is key to reconstructing the code stream later. true always
   -- follows FailT instruction.
   successors (FailT _ (F false) (T true)) = [true, false]
@@ -99,7 +106,10 @@ groupsToBody groups
   where
     entry = fst . head . bodyList
     mkGraph :: AGraph InstrNode C C -> C.Group -> FuelMonad (AGraph InstrNode C C)
-    mkGraph prevGraph group@(_, _, codes)
+    mkGraph prevGraph group@(C.Capture _ _ _ _) = do
+      graph <- groupToBody group
+      return $ prevGraph |*><*| graph
+    mkGraph prevGraph group@(C.Body _ _ codes)
       | null codes = return prevGraph
       | otherwise = do
           graph <- groupToBody group
@@ -116,7 +126,7 @@ groupsToBody groups
 -- the data structure. For now I use the ugly hack
 -- of having empty labels
 toBasicBlocks :: C.Group -> C.Group
-toBasicBlocks (gl, c, codes) = (gl, c, basicBlocks codes)
+toBasicBlocks (C.Body gl c codes) = C.Body gl c (basicBlocks codes)
   where basicBlocks = concatMap toBB 
         -- The code list is reconstructed by keeping the
         -- first label with the first code block and
@@ -147,7 +157,11 @@ type MLabelMap = Map H.Label Label
 
 -- | Converts a group to a graph.  
 groupToBody :: C.Group -> FuelMonad (AGraph InstrNode C C)
-groupToBody (groupLabel, groupCount, codes) = codesToBody' Map.empty codes >>= return . snd
+groupToBody (C.Capture label cnt (C.T target) reg) = do
+  fresh <- freshLabel
+  return $ mkFirst (EntryLabel (G label) cnt fresh) <*>
+         mkLast (Capture reg target cnt)
+groupToBody (C.Body groupLabel groupCount codes) = codesToBody' Map.empty codes >>= return . snd
   where
       codesToBody' :: MLabelMap -> [C.Code] -> FuelMonad (MLabelMap, AGraph InstrNode C C)
       codesToBody' _ [] = error $ "Empty code block!"
@@ -234,7 +248,7 @@ bodyToGroups body = Map.elems . snd .
       let (grp, cnt) :: (C.Label, Int) = case blockLabel entryB of
                                            EntryLabel (G l) cnt _ -> (l, cnt)
                                            LabelNode _ (N l) _ -> (l, 0)
-      in Map.insert grp (grp, cnt, toCode (l, entryB) : map toCode rest) groups 
+      in Map.insert grp (C.Body grp cnt (toCode (l, entryB) : map toCode rest)) groups 
     -- | Return all unique, unused successors to the given block. The filter
     -- ensures only blocks that are new are returned. A new, duplicate block
     -- can appear, though, so we use nubBy to get distinct blocks.
