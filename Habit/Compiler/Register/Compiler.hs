@@ -29,12 +29,22 @@ newtype Target = T Label
 -- | A group represents a function body, more or less. Functions
 -- can be bodies, which do work, or captures, which take arguments and
 -- return a closure containing those arguments.
-data Group = Body Label Int [Code] -- ^ First element is the Label of
-                                   --  the code element which is the entry point for the group.  Second
-                                   --  element is the number of arguments expected in the closure when
-                                   --  the entry point code element is executed. Third element is the
-                                   --  code making up the group.
-           | Capture Label Int Target Reg 
+data Group = 
+  Body Label Int [Code] 
+    -- ^ First element is the Label of the code element which is the
+    --  entry point for the group.  Second element is the number of
+    --  arguments expected in the closure when the entry point code
+    --  element is executed. Third element is the code making up the
+    --  group.
+  | Capture Label Int Target Reg 
+    -- ^ A procedure which captures values from an argument
+    -- closure. It copies all values found in the closure register,
+    -- adds the value found in the argument register, and returns a
+    -- closure pointing to the target label given. First argument is
+    -- the name of the new procedure. Second is the number of values
+    -- in the closure argument. Third is the label which will be the
+    -- destination of the closure returned. Fourth is the register
+    -- in which the closure should be stored.
 
 -- | State we need during compilation. nextID gives us
 -- unique integers for labels and registers. inProgress is 
@@ -129,7 +139,7 @@ newCapture :: Maybe Name -- ^ Optional name to embed in the group
 newCapture name target cnt = do
   label <- maybe newLabel newNamedLabel name
   destReg <- maybe newReg newNamedReg name
-  modify (\s -> s { inProgress = Capture label cnt target destReg : inProgress s})
+  modify (\s -> s { completed = Capture label cnt target destReg : completed s})
   return label
 
 record :: String -> [Instr] -> C ()
@@ -536,7 +546,7 @@ compileAbs name env f nparams fvs m = compileAbs' 1
           matchC <- compileMatch env' (MD f [H.Jmp l]) r m args'
           return $ mkN "compileAbs 1" : matchC ++ [mkN "compileAbs 1 end"]
       | otherwise = do
-          entry <- compileAbs' $ (n + 1)
+          entry <- compileAbs' (n + 1)
           newCapture name (T entry) n 
 
 -- | Create a closure in the register given, for the

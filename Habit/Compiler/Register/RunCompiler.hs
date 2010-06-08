@@ -70,17 +70,17 @@ save_typed_mod_dump optimizer (AcyclicSCC mo) =
          file_name = mod_name_to_file (mod_name m)
      supply <- io newNumSupply
      let unOptGroups = compile supply m
-     -- optGroups <- optimizer file_name (removeNotes unOptGroups)
+     optGroups <- optimizer file_name (removeNotes unOptGroups)
      save_file (file_name <.> "dump")
                    $ show $ run_pp_with env $ dump_typed_mod m
-     save_files file_name unOptGroups [] -- optGroups
+     save_files file_name unOptGroups optGroups
 
 save_files :: String -> [Group] -> [Group] -> SessionM ()
 save_files file_name unOpt opt = do
   let showFuncs (C.Body l size codes) = "Group " ++ l ++ " (" ++ show size ++ ") \n" ++ 
         (unlines . map ("  " ++) . concatMap (\(l, cs) -> (l ++ ":") : showCode cs) $ codes)
       showFuncs (C.Capture l cnt (T target) r) = "Capture " ++ l ++ " (" ++ show cnt ++ 
-                                               ", " ++ show target ++ ") " ++ r
+                                               ", " ++ show target ++ ") " ++ r ++ "\n"
       no_groups prefix gs = do
         save_file (file_name <.> prefix <.> "r.hs") . showIR . removeNotes $ gs
         save_file (file_name <.> prefix <.> "r.note.hs") . showIR $ gs
@@ -97,13 +97,14 @@ save_files file_name unOpt opt = do
   with_groups ".opt" opt
 
 removeNotes :: [Group] -> [Group]
-removeNotes = 
-  let removeNote (l, cs) = (l, filter notNote cs)
-      notNote (Note _) = False
-      notNote _ = True
-      rm (C.Body l c css) = C.Body l c (map removeNote css)
-      rm g = g
-  in map rm
+removeNotes = map rm
+  where
+    removeNote (l, cs) = (l, filter notNote cs)
+    notNote (Note _) = False
+    notNote _ = True
+    rm (C.Body l c css) = C.Body l c (map removeNote css)
+    rm g = g
+
     
       
 
