@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs, NamedFieldPuns, RankNTypes  #-}
-{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wall -fno-warn-name-shadowing #-}
 module Habit.Compiler.Register.ClosureElimination (cloOpt)
 
 where
@@ -50,6 +50,7 @@ liftClosures body labelFacts = do
       labels block = case blockLabel block of
                        EntryLabel (G hl) _ l -> (hl, l)
                        LabelNode  _ (N hl) l -> (hl, l)
+                       CaptureLabel  (G hl) _ _ _ _ l -> (hl, l)
   (body', _) <- analyzeAndRewriteFwd fwd body (mkFactBase initFacts)
   return body'
 
@@ -68,6 +69,7 @@ liftLattice = DataflowLattice { fact_bot = Map.empty
 liftTrans :: HLabelMap -> FactBase ProcFact -> FwdTransfer InstrNode LiftFact
 liftTrans _ _ (EntryLabel _ _ l) f = fromMaybe Map.empty $ lookupFact f l
 liftTrans _ _ (LabelNode _ _ l) f = fromMaybe Map.empty $ lookupFact f l
+liftTrans _ _ (CaptureLabel _ _ _ _ _ l) f = fromMaybe Map.empty $ lookupFact f l
 liftTrans labelMap labelFacts (Open (H.MkClo dest lab _)) f = 
   case labFact labelFacts (hooplLabel labelMap lab) of
     Proc _ v -> Map.insert dest v f
@@ -96,7 +98,7 @@ liftTrans _ _ (FailT _ (F false) (T true)) fact = mkFactBase [(true, fact)
 liftTrans _ _ (Ret _) _ = mkFactBase []
 liftTrans _ _ (Halt _) _ = mkFactBase []
 liftTrans _ _ (Error _) _ = mkFactBase []
-liftTrans _ _ (Capture _ _ _) _ = mkFactBase []
+liftTrans _ _ (Capture _ _ _ _) _ = mkFactBase []
 
 hooplLabel :: HLabelMap -> H.Label -> Label
 hooplLabel labelMap lab = 
@@ -160,8 +162,9 @@ findCloTrans :: BwdTransfer InstrNode ProcFact
 -- Return what we've found out so far.
 findCloTrans (EntryLabel _ _ l) f = mkFactBase [(l, f)]
 findCloTrans (LabelNode _ _  l) f = mkFactBase [(l, f)]
+findCloTrans (CaptureLabel _ _ _ _ _ l) f = mkFactBase [(l, f)]
 -- Capture indicates this group captures a closure.
-findCloTrans (Capture r l cnt) _ = Proc r (Clo l cnt)
+findCloTrans (Capture r (N l) _ cnt) _ = Proc r (Clo l cnt)
 -- Any other closed instruction tells us the group
 -- does not capture a closure.
 findCloTrans (Ret r) _ = Proc r Unknown

@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
+{-# OPTIONS_GHC -Wall #-}
 module Habit.Compiler.Register.ConstProp 
-  (constPropOpt, ConstFact(..), HasConst(..))
+  (constPropOpt, ConstFact, HasConst(..))
 
 where
 
@@ -9,7 +10,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 
-import qualified Habit.Compiler.Register.Machine as H (Reg, Label, Instr(..))
+import qualified Habit.Compiler.Register.Machine as H (Reg, Instr(..))
 import Habit.Compiler.Register.Hoopl
 
 -- | Indicates if a register holds a constant value or if it
@@ -54,6 +55,7 @@ constLattice = DataflowLattice { fact_bot = Map.empty
 constTransfer :: FwdTransfer InstrNode ConstFact
 constTransfer (EntryLabel _ _ l) f = fromMaybe Map.empty $ lookupFact f l
 constTransfer (LabelNode _ _ l) f = fromMaybe Map.empty $ lookupFact f l
+constTransfer (CaptureLabel _ _ _ _ _ l) f = fromMaybe Map.empty $ lookupFact f l
 constTransfer (Open (H.MkClo dst _ srcs)) fact 
             | null srcs = fact
             | otherwise = Map.insert dst (Fields srcs) fact
@@ -65,9 +67,10 @@ constTransfer (Open _) fact = fact
 constTransfer (Jmp _ next) fact = mkFactBase [(next, fact)]
 constTransfer (FailT _ (F false) (T true)) fact = mkFactBase [(true, fact)
                                                    ,(false, fact)]
-constTransfer (Ret _) fact = mkFactBase []
-constTransfer (Halt _) fact = mkFactBase []
-constTransfer (Error _) fact = mkFactBase []
+constTransfer (Ret _) _ = mkFactBase []
+constTransfer (Capture _ _ _ _) _ = mkFactBase []
+constTransfer (Halt _) _ = mkFactBase []
+constTransfer (Error _) _ = mkFactBase []
 
 -- Takes a node and facts. Returns a Maybe Graph
 -- forall e x. n e x -> Fact e f -> Fact x f 
@@ -79,7 +82,7 @@ constRewrite = shallowFwdRw rewrite
     rewrite (Ret r) facts = case findConst r facts of
                                       Just s -> Just $ mkLast (Ret s)
                                       Nothing -> Nothing
-    rewrite n facts = Nothing
+    rewrite _ _ = Nothing
     findConst r facts = case Map.lookup r facts of
                           Just (R s) -> Just s
                           _ -> Nothing

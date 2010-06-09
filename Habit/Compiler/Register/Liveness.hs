@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs #-}
-{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wall -fno-warn-name-shadowing #-}
 module Habit.Compiler.Register.Liveness
 
 where
@@ -46,6 +46,7 @@ liveLattice = DataflowLattice { fact_name = "Liveness"
 liveTransfer :: BwdTransfer InstrNode LiveFact
 liveTransfer (EntryLabel _ _ l) f = mkFactBase [(l, f)]
 liveTransfer (LabelNode _ _ l) f = mkFactBase [(l, f)]
+liveTransfer (CaptureLabel _ _ _ _ _ l) f = mkFactBase [(l, f)]
 liveTransfer (Open (H.Enter src arg dest)) f = Set.insert src . Set.insert arg . Set.delete dest $ f
 liveTransfer (Open (H.MkClo dest _ srcs)) f = foldl' update (Set.delete dest f) srcs
   where
@@ -60,7 +61,7 @@ liveTransfer (Jmp _ l) f = fromMaybe Set.empty $ lookupFact f l
 liveTransfer (FailT _ (F fl) (T tl)) f = fromMaybe Set.empty (lookupFact f tl) `Set.union`
                                                fromMaybe Set.empty (lookupFact f fl)
 liveTransfer (Ret r) _ = Set.singleton r
-liveTransfer (Capture r _ _) _ = Set.singleton r
+liveTransfer (Capture r _ _ _) _ = Set.singleton r
 liveTransfer (Error _) _ = Set.empty
 liveTransfer (Halt _) _ = Set.empty
 

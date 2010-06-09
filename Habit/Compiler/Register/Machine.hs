@@ -31,40 +31,39 @@ newtype Success = S Label
 
 -- | Instructions available to the machine.
 data Instr = 
-  Enter Reg Reg Reg -- ^ Enter the closure at the first location, with
-                    -- the argument at the second location.  The
-                    -- result of the Enter will be in the register in
-                    -- the third location.
+  Enter Reg Reg Reg 
+  -- ^ Enter the closure at the first location, with the argument at
+  -- the second location.  The result of the Enter will be in the
+  -- register in the third location.
   | Ret Reg -- ^ Return from procedure call.
-  | MkClo Reg Label [Reg] -- ^ Create a closure using the label given,
-                        -- storing value from the registers
-                        -- specified. Put the result in the register
-                        -- given.
-  | Capture Reg Label Int -- ^ Create a new closure to hold the values
-                          -- found in the closure and argument registers. The closure
-                          -- register can be empty. The new closure is placed
-                          -- in the register specified and returned.
-  | AllocD Reg Tag Int -- ^ Allocate data with the tag given and space
-                       -- for the number of arguments.
-  | Copy Reg Reg -- ^ Copy a value from one location to another. The
-                 -- first argument is the source and the second the
-                 -- destination. The value in the destination will be
-                 -- replaced.
-  | Store Reg Field -- ^ Store the value in a register into the field
-                    -- given. The first argument is the register to
-                    -- store. The second is the destination register,
-                    -- with an offset indexed from 0.
-  | Load Field Reg  -- ^ Load a value from a register and offset into
-                    -- a particular register. The first argument is
-                    -- the source register, with an offset indexed
-                    -- from 0. The second argument is the destination
-                    -- register.
+  | MkClo Reg Label [Reg] 
+  -- ^ Create a closure using the label given, storing value from the
+  -- registers specified. Put the result in the register given.
+  | Capture Reg Label Int 
+  -- ^ Create a new closure to hold the values found in the closure
+  -- and argument registers. The new closure is placed in the register
+  -- specified and returned. The count given represents the number of
+  -- slots expected in the closure, which can be zero.
+  | AllocD Reg Tag Int 
+  -- ^ Allocate data with the tag given and space for the number of
+  -- arguments.
+  | Copy Reg Reg 
+  -- ^ Copy a value from one location to another. The first argument
+  -- is the source and the second the destination. The value in the
+  -- destination will be replaced.
+  | Store Reg Field 
+  -- ^ Store the value in a register into the field given. The first
+  -- argument is the register to store. The second is the destination
+  -- register, with an offset indexed from 0.
+  | Load Field Reg  
+  -- ^ Load a value from a register and offset into a particular
+  -- register. The first argument is the source register, with an
+  -- offset indexed from 0. The second argument is the destination
+  -- register.
   | Set Reg Val -- ^ Set a register to a value.
-  | FailT Reg Tag Failure Success -- ^ Jump to the given label if the
-                                  -- value in the location specified
-                                  -- does NOT match the tag
-                                  -- given. Otherwise continue
-                                  -- executing.
+  | FailT Reg Tag Failure Success 
+  -- ^ Jump to the given label if the value in the location specified
+  -- does NOT match the tag given. Otherwise continue executing.
   | Label Label -- ^ Label the next instruction with the name given.
   | Halt -- ^ End execution
   | Jmp Label -- ^ Jump to the label specified.

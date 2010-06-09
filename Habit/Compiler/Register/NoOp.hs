@@ -1,11 +1,10 @@
 {-# LANGUAGE GADTs #-}
+{-# OPTIONS_GHC -Wall -fno-warn-name-shadowing #-}
 module Habit.Compiler.Register.NoOp (noOpOpt)
 
 where
 
 import Compiler.Hoopl
-import Data.Map (Map)
-import Data.Maybe (fromMaybe)
 import Data.Map (Map)
 import qualified Data.Map as Map
 
@@ -38,16 +37,19 @@ noOpLattice = DataflowLattice { fact_bot = Map.empty
 -- type FwdTransfer n f 
 -- forall e x. n e x -> Fact e f -> Fact x f 
 noOpTransfer :: FwdTransfer InstrNode NoOpFact
-noOpTransfer (LabelNode _ _ _) f = Map.empty
-noOpTransfer (EntryLabel _ _ _) f = Map.empty
+noOpTransfer (LabelNode _ _ _) _ = Map.empty
+noOpTransfer (EntryLabel _ _ _) _ = Map.empty
+noOpTransfer (CaptureLabel _ _ _ _ _ _) _ = Map.empty
 noOpTransfer (Open _) f = f
-noOpTransfer (Jmp _ _) f = mkFactBase []
-noOpTransfer (Ret _) f = mkFactBase []
-noOpTransfer (Halt _) f = mkFactBase []
-noOpTransfer (FailT _ _ _) f = mkFactBase []
-noOpTransfer (Error _) f = mkFactBase []
+noOpTransfer (Jmp _ _) _ = mkFactBase []
+noOpTransfer (Ret _) _ = mkFactBase []
+noOpTransfer (Capture _ _ _ _) _ = mkFactBase []
+noOpTransfer (Halt _) _ = mkFactBase []
+noOpTransfer (FailT _ _ _) _ = mkFactBase []
+noOpTransfer (Error _) _ = mkFactBase []
 
 noOpProp :: FwdRewrite InstrNode NoOpFact
 noOpProp = noFwdRewrite
 
+noOpExtend :: t -> OldFact t1 -> t2 -> (ChangeFlag, t1)
 noOpExtend _ (OldFact f) _ = (NoChange, f)
