@@ -13,6 +13,56 @@
 
 \section*{Compiling to Closures and Blocks}
 
+Mark and I spent the last half of the term talking about how to eliminate
+the intermediate closures that Caffeine creates when compiling Habit code. Every function
+with more than one argument gets compiled into $n - 1$ ``intermediate'' procedures which
+build closures. Each intermediate procedure creates a closure which is used to call
+the next procedure. Only the final procedure (which receives a closure with all but one of
+the arguments needed for the function) actually does ``work.'' 
+
+Mark came up with concept of ``k'' (``capture'') and ``b'' (``block'')
+procedures to describe this process. Capture ($k$) procedures create a
+new closure pointing at the next capture procedure. The new closure
+holds one more argument. The last capture procedure creates a closure
+which will call the block ($b$) procedure for the argument. The block
+procedure actually executes the code defined by the original function.
+
+For example, consider the |const3| function:
+
+> const3 a b c = a
+
+|const3| is translated into two $k$ procedures:
+
+> const3_k0 a = const3_k1 a
+> const3_k1 a b= const3_b a b
+
+|const3_k0| takes one argument (|a|) and calls |const3_k1| with it. |const3_k1| takes
+two arguments and calls |const3_b|, which does the actual work of |const3|:
+
+> const3_b a b c = a
+
+Without optimization, this scheme does not perform well. For example, the |main| program:
+
+> main = const3 1 2 3 
+
+creates 2 intermediate closures before calling the body of |const3|!
+The steps to evaluate |main| would be:
+
+> main = const3 1 2 3 ==>
+>      = (const3_k0 1) 2 3 <-- closure
+>      = (const3_k1 1 2) 3 <-- closure
+>      = (const3_b 1 2 3)  <-- work
+>      = 1
+
+Optimizing this scheme will be described in the next section.
+
+\subsection*{Optimizing Captures}
+
+
+
 \section*{Code Improvements}
+
+\section*{Next Steps}
+
 
 \end{document}
