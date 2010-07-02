@@ -1,5 +1,23 @@
 \documentclass[11pt]{article}
+%include polycode.fmt
+\usepackage{palatino}
+\usepackage[scaled=0.92]{helvet}
+\usepackage{graphicx}
+\usepackage{fullpage}
+\usepackage{url}
+\usepackage{fancyvrb}
+\usepackage{qtree}
+\usepackage{setspace}
+\renewcommand\ttdefault{cmtt}
 \begin{document}
+\doublespacing
+\fvset{fontfamily=cmtt}
+%if False
+\CustomVerbatimEnvironment{code}{Verbatim}{}
+\DefineShortVerb{\|}
+%endif
+\VerbatimFootnotes
+\DefineShortVerb{\#}
 
 \section*{Hoopl}
 
@@ -29,36 +47,107 @@ procedure actually executes the code defined by the original function.
 
 For example, consider the |const3| function:
 
-> const3 a b c = a
+\begin{code}
+const3 a b c = a
+\end{code}
 
 |const3| is translated into two $k$ procedures:
 
-> const3_k0 a = const3_k1 a
-> const3_k1 a b= const3_b a b
+\begin{code}
+  const3_k0 a = const3_k1 a
+  const3_k1 a b= const3_b a b
+\end{code}
 
 |const3_k0| takes one argument (|a|) and calls |const3_k1| with it. |const3_k1| takes
 two arguments and calls |const3_b|, which does the actual work of |const3|:
 
-> const3_b a b c = a
+\begin{code}
+  const3_b a b c = a
+\end{code}
 
 Without optimization, this scheme does not perform well. For example, the |main| program:
 
-> main = const3 1 2 3 
+\begin{code}
+  main = const3 1 2 3 
+\end{code}
 
 creates 2 intermediate closures before calling the body of |const3|!
 The steps to evaluate |main| would be:
 
-> main = const3 1 2 3 ==>
->      = (const3_k0 1) 2 3 <-- closure
->      = (const3_k1 1 2) 3 <-- closure
->      = (const3_b 1 2 3)  <-- work
->      = 1
+\begin{code}
+main = const3 1 2 3
+     = (const3_k0 1) 2 3 -- closure
+     = (const3_k1 1 2) 3 -- closure
+     = (const3_b 1 2 3)  -- work
+     = 1
+\end{code}
+
+Each intermediate $k$ procedure expects two arguments: a closure and a
+new argument. Though the notation shows multiple arguments, all but
+the last are packaged into a closure. The $k$ procedure creates a new
+closure, copies all the values from the existing closure, copies the
+new argument into the new closure, and returns that closure. A procedure
+with $n$ arguments will have $n - 1$ $k$ procedures. For example, |const3|
+has two $k$ procedures. 
 
 Optimizing this scheme will be described in the next section.
 
 \subsection*{Optimizing Captures}
 
+All function applications are treated uniformly, but it is inefficient
+when all arguments are present. In the definition of $main$, for
+example, three function applications occur (see Figure
+\ref{fig_main}). Each intermediate $k$ procedure creates a closure and
+copies values to it.  It would be more efficient to create one closure
+with all arguments in the beginning.
 
+\begin{figure}[h]
+  
+\Tree [.@@
+         [.@@
+           [.@@
+             |const3|
+             |1|
+           ]
+           |2|
+         ]
+         |3|
+      ]
+\caption{The unoptimized represention of |main|. Three application nodes (@) are present.}
+\label{fig_main}
+\end{figure}
+
+When a function application calls a $k$ procedure, we can effectively
+inline the call. If the result of the application is another $k$
+procedure, we can inline again. After optimization, te $b$
+procedure (i.e., the one that actually does work) will be called directly if
+all the arguments were given.
+
+Consider |main|. First, we'll rewrite the $k$ procedures:
+
+\begin{code}
+const3_k0 = \a -> const3_k1 a
+const3_k1 = \a b -> const3_b a b
+\end{code}
+
+This makes it clear that the $k$ procedures really return functions, rather than doing work. Now
+we can rewrite $main$ as follows:
+
+\begin{code}
+  main = const3 1 2 3
+       = (const3_k0 a) 1 2 3
+       = (\a -> const3_k1 a) 1 2 3
+       = (\a -> (\a b -> const3_b a b) a) 1 2 3 
+\end{code}
+
+Now that all the intermediate procedures are inlined, we can substitute their
+arguments when compiling, rather than when executing. These rewrites look like:
+
+\begin{code}
+  main = (\a -> (\a b -> const3_b a b) a) 1 2 3 
+       = ((\a b -> const3_b a b) 1) 2 3
+       = (const3_b 1 2) 3
+\end{code}
 
 \section*{Code Improvements}
 
