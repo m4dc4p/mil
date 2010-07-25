@@ -26,11 +26,11 @@ executable register-compiler
   ghc-options: -O
   hs-source-dirs: .
                                 
--- executable register-interpreter
---   main-is: InterpR.hs
---   build-depends: base
---   ghc-options: -O
---   hs-source-dirs: .
+executable register-interpreter
+  main-is: InterpR.hs
+  build-depends: base
+  ghc-options: -O
+  hs-source-dirs: .
 
 -- executable x86-compiler
 --   main-is: Habit/Compiler/X86/RunCompiler.hs

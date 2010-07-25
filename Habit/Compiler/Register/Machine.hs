@@ -8,6 +8,7 @@ import qualified Data.Map as Map
 import Data.Map (Map)
 import Data.List (intercalate)
 import Data.Maybe (fromJust, fromMaybe)
+import Control.Monad (foldM)
 
 -- | A register is just a unique name for
 -- a location. 
@@ -43,7 +44,7 @@ data Instr =
   -- ^ Create a new closure to hold the values found in the closure
   -- and argument registers. The new closure is placed in the register
   -- specified and returned. The count given represents the number of
-  -- slots expected in the closure, which can be zero.
+  -- slots expected in the closure register, which can be zero.
   | AllocD Reg Tag Int 
   -- ^ Allocate data with the tag given and space for the number of
   -- arguments.
@@ -154,7 +155,7 @@ step (Enter r1 r2 r3) machine@(Machine { program = p
 -- In   | p  | ...     | (dst, p') : cs 
 -- Out  | p' | dst = r | cs
 step (Ret r) machine@(Machine { registers = rs'
-                              , callStack = ((rs, dst, p') : cs) })
+                              , callStack = (rs, dst, p') : cs })
     = case getRegister rs' r of
         Just v -> machine { program = p'
                           , registers = setRegister dst v rs
@@ -162,35 +163,43 @@ step (Ret r) machine@(Machine { registers = rs'
         _ -> err machine $ "Can't get value for result register " ++ r ++ " in " ++ show rs'
 step (Ret _) machine = err machine $ "Illegal state for Ret."
 
--- MkClo r lab 0 | program | registers | callStack 
+-- MkClo r lab rs_n | program | registers | callStack 
 -------------------------------------------------
--- In   | ... | ...              | cs 
--- Out  | ... | r = Data lab []  | cs
--- step (MkClo reg lab 0) m = allocate reg lab 0 m
+-- In   | ... | v0 = rs[0], v1 = rs[1], ..., vq = rs[n - 1] | cs 
+-- Out  | ... | r = Data lab [v0, v1, ..., vq, vn]           | cs
+step (MkClo reg lab regs) machine@(Machine { registers = rs }) = 
+  let initV = mkData lab (length regs)
+      cloM = do
+        regsV <- mapM (getRegister rs) regs
+        foldM (\v (idx, r) -> setField r v idx) initV (zip [0..] regsV)
+      closureV = mightErr "Unable to make closure." cloM
+  in next $ machine { registers = setRegister reg closureV rs }
 
--- MkClo r lab n | program | registers | callStack 
+-- Capture r lab n | program | registers | callStack 
 -------------------------------------------------
--- In   | ... | v0 = clo[0], v1 = clo[1], ..., vq = clo[n - 1], vn = arg | cs 
--- Out  | ... | r = Data lab [v0, v1, ... vq, vn]                        | cs
-{- step (MkClo reg lab cnt) machine@(Machine { registers }) = 
-  let initV = allocate reg lab cnt
-      cloV n = mightErr "Unable to set field based on closure." . 
-               getField (mightErr "closure register not found." . 
-                         getRegister registers $ cloReg) $ n
-      argV = mightErr "Unable to get arg register" $ getRegister registers argReg
-      setF val loc idx = mightErr "Unable to set field." (setField val loc idx)
-
-      setV 0 idx d = setF argV d idx
-      setV n idx d = setV (n - 1) (idx + 1) $ setF (cloV idx) d idx
-
-  in      next $ machine { registers = setRegister dst d' rs }
-setV cnt 0 initV --}
+-- In   | p  | v0 = clo[0], v1 = clo[1], ..., v_(n-1) = clo[n-1], v_n = arg | (dst, p') : cs 
+-- Out  | p' | dst = r = Data lab [v0, v1, ..., v_n] | cs
+step (Capture _ lab cnt) machine@(Machine { registers = rs'
+                                          , callStack = (rs, dst, p') : cs }) = 
+  let initV = mkData lab (cnt + 1)
+      valM = do
+        cloV <- getRegister rs' cloReg
+        cloFs <- mapM (getField cloV) [0..cnt - 1]
+        intrmV <- foldM (\v (idx, fv) -> setField fv v idx) initV (zip [0..] cloFs)
+        argV <- getRegister rs' argReg
+        setField intrmV argV cnt
+      valV = mightErr "Unable to capture closure." valM
+  in next $ machine { program = p'
+                    , registers = setRegister dst valV rs
+                    , callStack = cs }
+step (Capture _ _ _) machine = err machine "Illegal state for Capture."
 
 -- AllocD r t n | program | registers | callStack 
 -------------------------------------------------
 -- In   | ... | ...                    | cs 
 -- Out  | ... | r = Data t [0, 0, ..]  | cs
-step (AllocD r t m) machine = allocate r t m machine
+step (AllocD reg tag amt) machine@(Machine { registers = rs }) = 
+  next $ machine { registers = setRegister reg (mkData tag amt) rs }
 
 -- Copy src dst | program | registers | callStack 
 -------------------------------------------------
@@ -315,12 +324,10 @@ err machine@(Machine { program = (Program prev i rest) }) str
                           (Error $ str ++ showMachine machine) 
                           (i:rest) }
 
--- | Allocate data at the register given, with the tag or label
--- provided, and with the given number of fields. Fields are initialized
--- to 0.
-allocate reg str amt machine@(Machine { registers = rs })
-    = let v = (Data str . replicate amt $ Num 0)
-      in next $ machine { registers = setRegister reg v rs }
+-- | Create a data value with the tag given and
+-- number of fields specified. All fields are 
+-- initialized to -1.
+mkData tag amt = Data tag . replicate amt $ Num (-1)
 
 -- | Get the value of a register, if the register exists.
 getRegister :: Registers -> Reg -> Maybe Val
