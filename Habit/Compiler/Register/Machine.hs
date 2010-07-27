@@ -7,7 +7,7 @@ where
 import qualified Data.Map as Map
 import Data.Map (Map)
 import Data.List (intercalate)
-import Data.Maybe (fromJust, fromMaybe)
+import Data.Maybe (fromJust, fromMaybe, catMaybes)
 import Control.Monad (foldM)
 
 -- | A register is just a unique name for
@@ -146,7 +146,7 @@ step (Enter r1 r2 r3) machine@(Machine { program = p
         _ -> err machine $ "Register " ++ r1 ++ " is not a closure because it does not contain the appropriate value."
       where
         getRegs = do
-          clo' <- getRegister rs $ r1
+          clo' <- getRegister rs r1
           arg' <- getRegister rs r2
           return (clo', arg')
         
@@ -182,16 +182,16 @@ step (MkClo reg lab regs) machine@(Machine { registers = rs }) =
 step (Capture _ lab cnt) machine@(Machine { registers = rs'
                                           , callStack = (rs, dst, p') : cs }) = 
   let initV = mkData lab (cnt + 1)
+      cloV = mightErr "Could not get closure register in Capture." $ getRegister rs' cloReg
+      argV = mightErr "Could not get argument register in Capture." $ getRegister rs' argReg 
+      cloFs = catMaybes . map (getField cloV) $ [0..cnt - 1]
       valM = do
-        cloV <- getRegister rs' cloReg
-        cloFs <- mapM (getField cloV) [0..cnt - 1]
-        intrmV <- foldM (\v (idx, fv) -> setField fv v idx) initV (zip [0..] cloFs)
-        argV <- getRegister rs' argReg
-        setField intrmV argV cnt
-      valV = mightErr "Unable to capture closure." valM
-  in next $ machine { program = p'
-                    , registers = setRegister dst valV rs
-                    , callStack = cs }
+        intrmM <- foldM (\v (idx, fv) -> setField fv v idx) initV (zip [0..] cloFs)
+        setField argV intrmM cnt
+      valV = mightErr "Unable to capture closure." $ valM
+  in machine { program = p'
+             , registers = setRegister dst valV rs
+             , callStack = cs }
 step (Capture _ _ _) machine = err machine "Illegal state for Capture."
 
 -- AllocD r t n | program | registers | callStack 
