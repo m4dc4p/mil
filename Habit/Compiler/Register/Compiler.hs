@@ -547,7 +547,7 @@ compileAbs name env f nparams fvs m = compileAbs' 1
           return $ mkN "compileAbs 1" : matchC ++ [mkN "compileAbs 1 end"]
       | otherwise = do
           entry <- compileAbs' (n + 1)
-          newCapture name (T entry) n 
+          newCapture name (T entry) (n - 1)
 
 -- | Create a closure in the register given, for the
 -- label specified. The list of registers passed will be
