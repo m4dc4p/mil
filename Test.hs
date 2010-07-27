@@ -8,17 +8,17 @@ import qualified Habit.Compiler.Register.Machine as MR
 
 main = runTestTT allTests
 
-allTests = test [testMap
-                , testMap2
-                , testMap3
-                , testMap4
-                , testMap5
-                , testMap6
-                , testSimple
-                , testComp
-                , testFib
-                , testAdd ]
-
+allTests = test ["testMap" ~: testMap
+                , "testMap2" ~: testMap2
+                , "testMap3" ~: testMap3
+                , "testMap4" ~: testMap4
+                , "testMap5" ~: testMap5
+                , "testMap6" ~: testMap6
+                , "testSimple" ~: testSimple
+                , "testComp" ~: testComp
+                , "testFib" ~: testFib
+                , "testAdd" ~: testAdd ]
+           
 -- | Test Map.hs
 testMap = 
     let expected = 
