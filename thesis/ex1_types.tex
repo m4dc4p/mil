@@ -10,10 +10,13 @@
 \begin{document}
 \doublespacing
 \fvset{fontfamily=cmtt}
+
 %if False
 \CustomVerbatimEnvironment{code}{Verbatim}{}
-\DefineShortVerb{\|}
+\DefineShortVerb{\|%|
+}
 %endif
+
 \VerbatimFootnotes
 \DefineShortVerb{\#}
 
@@ -23,7 +26,10 @@ This analysis only considers simple values and a few different instructions.
 
 \section*{Values}
 
-Currently, we consider two types of values: characters (32 bit values) and strings. Characters are 32 bit values which are either NULL (0) or some other value. A string is a pointer to a contiguous sequence of characters, terminated by a NULL-valued character.
+Currently, we consider two types of values: characters (32 bit values)
+and strings. Characters are 32 bit values which are either NULL (0) or
+some other value. A string is a pointer to a contiguous sequence of
+characters, terminated by a NULL-valued character.
 
 These values cannot be unrestricted, however. For example, we do not
 want to allow a |String| to point past its terminator or de-reference a
@@ -63,7 +69,11 @@ arm of the case:
 <   Ptr Char -> String 
 <   Char -> Char
 
-This says that if we know |r1| is a pointer to a character (``|Ptr Char|''), we can stay it is a |String| afterwards\footnote{We cannot say it is a Ptr or EOS because we haven't tested the value pointed to yet.}. If |r1| is a character, it is still a character afterwards.
+This says that if we know |r1| is a pointer to a character (``|Ptr
+Char|''), we can stay it is a |String| afterwards\footnote{We cannot
+  say it is a Ptr or EOS because we haven't tested the value pointed
+  to yet.}. If |r1| is a character, it is still a character
+afterwards.
 
 What is more interesting is the cases that are NOT allowed. Imagine these cases:
 
@@ -83,7 +93,7 @@ Consider this instruction:
   cmpl    $0, r1
 \end{verbatim}
 
-#cmpl# will set the Zero Flag (ZF) if r1 equals 0. Otherwise, ZF will
+|cmpl| will set the Zero Flag (ZF) if r1 equals 0. Otherwise, ZF will
 be 1. If r1 is a character, this doesn't tell us much. If it is a
 |String|, we know a little more. If |r1| is 0, we know it holds
 NULL. Otherwise, it points to a character or the end of a string. Using
@@ -107,19 +117,12 @@ test:
 loop:   
 \end{verbatim}
 
-If control passed to #loop#, we know that ZF was not 0 and therefore
+If control passed to |loop|, we know that ZF was not 0 and therefore
 |r1| is is a |Ptr Char| rather than |EOS|. If control falls through the
 branch, then we know |r1| is |EOS| and therefore we have reached
 the end of the string. 
 
 Conditional branches, therefore, allow us to determine which ``branch'' should
 be taken on a match. 
-
-\section*{Typing}
-
-The previous suggests some typing rules. 
-
-
-
 
 \end{document}
