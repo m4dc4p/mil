@@ -2,18 +2,24 @@
 \usepackage{url}
 \usepackage{fancyvrb}
 \usepackage{setspace}
+\newcommand{\Ques}[1]{\noindent%
+\textbf{Question:} #1}
 \begin{document}
+\VerbatimFootnotes
 \DefineShortVerb{\#}
 \doublespacing
 
-\textbf{Question:} Can we compile the #prioset# example such that it uses no heap memory for data structures or closures?
+\Ques{Can we use a monadic intermediate language to compile
+  ``bare-metal'' programs such that no heap allocation occurs?}
 
 \bigskip
 
-I will explore efficient compilation techniques for Habit programs. My
-research will focus on minimizing or eliminating the allocation of two
-types of data: algebraic data types and function closures. The #prioset#
-example from the Habit language report will motivate my research. 
+I will explore efficient compilation techniques for Habit programs
+using a mondaic intermediate language. My research will focus on
+minimizing or eliminating the allocation of two types of data:
+algebraic data types and function closures. The #prioset# example from
+the Habit language report will motivate my research, as well as other
+low-level core operating system algorithms.
 
 A successful project will show that the program can be compiled such
 that no heap memory gets allocated --- all data will be stored in
@@ -22,5 +28,19 @@ annotations; that is, the optimizations implemented will be general
 purpose. Other motivating examples will need to be found to validate
 that the optimizations are truly general.
 
-\end{enumerate}
+\bigskip
+
+\Ques{How efficiently can we compile \Verb=bitdata= expressions?}
+
+#bitdata# provides a new way to express bit-level operations using
+high-level, abstract expressions. It replaces traditional masking,
+shifting and ``bit-twiddling'' with pattern-matching and data
+constructors similar to those in Haskell. 
+
+This research will explore efficient compilation techniques for #bitdata#
+expressions. I will research well-known bit-twiddling algorithms and implement
+them as compiler transformations. A successful project will present novel 
+techniques for automatically applying known algorithms and algebraic properties
+to #bitdata# expressions.
+
 \end{document}
