@@ -8,7 +8,40 @@
 \bibliographystyle{abbrvnat}
 \nobibliography{biblio}
 
+\bibentry{Kennedy07Compiling}
+\bigskip
+
+Kennedy contrasts an earlier implemention of his SML.NET compiler that
+used a ``monadic intermediate language'' (MIL) with a new
+implementation that uses continuation-passing style. He highlights
+three problems with MIL the MIL approach:
+
+\begin{enumerate}
+\item ``Administrative'' reduction rules must be defined. He uses
+  \textsc{CC-Let}, the associativity of let statements, to illustrate
+  one of these rules.
+\item The order of reductions can significantly affect performance. He
+  gives an example which can cause $O(n)$ reductions one way, and
+  $O(n^2)$ another.
+\item ``Join point'' functions -- when a case construct is lifted out
+  of a let, terms can be duplicated. A ``Join point'' function is
+  usually introduced to avoid duplication. These functions can be hard
+  to eliminate.
+\end{enumerate}
+
+On the third point, will introducing ``k'' functions avoid creating
+explicit ``join point'' functions?
+
+This paper has several good examples in the section that contrasts MIL
+with CPS. They are clearly designed to make CPS look good so being
+able to compile them efficiently would be a nice result.
+
+In related work, he mentions the Sequential Intermediate Language described by
+\citet{TOLMACH98FromML}. Worth looking into.
+
+\bigskip
 \bibentry{Morris73Advice}
+\bigskip
 
 Unclear the relevance of this paper. Not studied close enough.
 
