@@ -14,7 +14,7 @@
 Kennedy contrasts an earlier implemention of his SML.NET compiler that
 used a ``monadic intermediate language'' (MIL) with a new
 implementation that uses continuation-passing style. He highlights
-three problems with MIL the MIL approach:
+three problems with the MIL approach:
 
 \begin{enumerate}
 \item ``Administrative'' reduction rules must be defined. He uses
@@ -38,6 +38,31 @@ able to compile them efficiently would be a nice result.
 
 In related work, he mentions the Sequential Intermediate Language described by
 \citet{TOLMACH98FromML}. Worth looking into.
+
+\bigskip
+\bibentry{TOLMACH98FromML}
+\bigskip
+
+Section 10 (``Optimization of first-order code'') describes several
+interesting closure analysis techniques. Section 10.2 (``Implicit
+type-based closure analysis'') discusses how they use type-inference
+to narrow the functions that might be invoked at each call site. Only
+functions that match the types required will be called. In many cases
+this lets them narrow the possible functions to a small number,
+sometimes even one. Those sites become candidates for explicit jumps
+rather than indirect calls through a pointer. Section 10.3 (``Explicit
+closure analysis'') does not describe a technique that directly
+eliminates closures or indirection. However, the analysis seems to
+make it easier for later stages to eliminate indirection. I was not as
+clear on the benefit of this technique, but it seems worth
+investigating.
+
+Section 12.2 (``Algebraic type representation'') talks about ways to
+avoid representing values in the heap, and discusses the tradeoffs
+involved. They say they do the ``standard stuff'' and reference two
+other papers for details: \emph{Compiling with Continuations}
+\citep{Appel92Compiling} and ``Compiling a Functional Language''
+\citep{Cardelli84Compiling}.
 
 \bigskip
 \bibentry{Morris73Advice}
