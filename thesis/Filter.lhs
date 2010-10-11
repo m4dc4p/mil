@@ -4,6 +4,7 @@ to our language of blocks and closure captures (MBC)?
 First, ``filter'' in Habit (I use case statements to reduce the number
 of source expressions that need to be transformed):
 
+> filter :: (a -> Bool) -> [a] -> [a]
 > filter f xs = 
 >   case xs of
 >     Nil -> Nil
@@ -14,42 +15,66 @@ of source expressions that need to be transformed):
 
 The first transformation turns the definition of ``filter''
 into a series of ``closure'' and ``block'' 
-definitions. I only consider the block definition right now.
+definitions. 
 
+The first closure definition, below, captures the predicate argument
+(f). The notation ``{}'' indicates variables held in the closure when the
+function is invoked. filter0 does not expect any variables in the
+closure. The ``Alloc'' result type means memory might be allocated
+when the value is computed. ``filter0'' constructs a closure for ``filter1'', 
+which allocates memory (NB: what about regular data -- do we differentiate). 
+
+> filter0 :: (a -> Bool) -> Alloc ([a] -> Alloc (((a -> Bool), [a]) -> Alloc [a]))
+> filter0 {} f = filter1 {f}
+
+``filter1'' finds one argument in its closure (``f'') and expects
+a second argument ``xs''. It constructs a closure which points to
+filter, the ``block'' that actually executes the function. Again,
+``Alloc'' means memory will be allocated, due to the closure constructed.
+
+> filter1 :: [a] -> Alloc (((a -> Bool), [a]) -> Alloc [a])
+> filter1 {f} xs = filter(f,xs)
+
+``filter'' now takes a tuple of arguments, instead of separate
+arguments as in the original program. A ``block'' requires that all
+arguments be present, and a tuple guarantees that. The recursive call
+to filter makes the result type ``Alloc'' as well, since a closure
+will be constructed when the call is made (NB: Will tail-recursive functions
+NOT have the Alloc type? What about mutually recursive? Non-recursive?).
+
+> filter :: ((a -> Bool), [a]) -> Alloc [a]
 > filter(f, xs) = do
->   let v = xs
->   case v of
+>   case xs of
 >     Nil -> fb1
 >     Cons x xs' -> fb2(f, x, xs')
-
-Note that (f,xs) does NOT pattern-match on a tuple -- instead, it
-describes the arguments to the ``filter'' block. 
 
 Each case arm can only contain a call to another block, which explains
 ``fb1'' and ``fb2'' above. ``fb1'' doesn't do much:
 
+> fb1 :: Alloc a
 > fb1 = Nil
 
 ``fb2'', however, tests the element given:
 
-> fb2(f, x, xs') = 
->   let v1 = f 
->       v2 = x
->       v3 = v1(v2)
+> fb2 :: ((a -> Bool), a, [a]) -> Alloc [a]
+> fb2(f, x, xs') = do
+>   let v3 = f(x)
 >   case v3 of
 >     True -> fb3(v1, v2, xs')
 >     _ -> fb4(v1, xs')
 
-``fb3'' and ``fb4'' both handle the recursive call to ``filter''. 
-Notice that ``filter'' can be called directly - we don't need to
-call the closure capturing portions, since fb3 and fb4 get all 
-the arguments at once:
+``fb3'' and ``fb4'' both handle the recursive call to ``filter''.  An
+obvious optimization would be to call ``filter'' directly, instead of
+going through the closure capture process again, but we'll leave that
+to later:
 
-> fb3(f, x, xs) = 
->   let xs = filter(f, xs)
+> fb3 :: ((a -> Bool), a, [a]) -> Alloc [a]
+> fb3(f, x, xs) = do
+>   let xs' = (filter0 f) xs
 >   Cons x xs'
 >
-> fb4(f, xs) = filter(f, xs)
+> fb4 :: ((a -> Bool), [a]) -> Alloc [a]
+> fb4(f, xs) = (filter0 f) xs
 
 The entire program:
 
