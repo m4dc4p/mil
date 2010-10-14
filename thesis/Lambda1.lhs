@@ -1,11 +1,63 @@
+> {-# LANGUAGE NoImplicitPrelude #-}
 > module Lambda1
 >
 > where
 > 
 > import Control.Monad.State (State(runState), get, put)
 > import Text.PrettyPrint 
+> import Prelude hiding (abs, flip, succ)
 
-Some useful synonyms first:
+To compile a program, give it to the run function:
+
+> run :: Prog -> IO ()
+> run = putStrLn . printM . compile
+
+Some functions. A helper for defining abstractions first:
+
+> abs :: Var -> (Expr -> Expr) -> Expr
+> abs n body = Abs n (body (Var n))
+
+Then our friends the Church numerals. Starting with zero:
+
+> zero :: Expr
+> zero = abs "s" $ \s -> 
+>        abs "z" $ \z -> z
+
+We can define successor:
+
+> succ :: Expr -> Expr
+> succ n = abs "n" $ \n -> 
+>        abs "s" $ \s -> 
+>        abs "z" $ \z -> App s (App (App n s) z)
+
+A program to calculate three:
+
+> three :: Prog
+> three = [("three", succ (succ (succ zero)))]
+
+Some other classics:
+
+then the compose function:
+
+> compose :: Prog 
+> compose = [("compose", def)]
+>   where
+>     def = abs "f" $ \f -> 
+>           abs "g" $ \g -> 
+>           abs "x" $ \x ->
+>           App f (App g x)
+
+Flip:
+
+> flip :: Prog
+> flip = [("flip", def)]
+>   where
+>     def = abs "f" $ \f ->
+>           abs "a" $ \a ->
+>           abs "b" $ \b ->
+>           App (App f b) a
+
+Now we define the language used above. Some useful synonyms first:
 
 > type Var = String
 > type Fun = String
@@ -98,25 +150,22 @@ expression:
 > compile :: Prog -> [DefM]
 > compile prog = fst $ runState (compProg prog) 0
 >                
-> compose :: Prog 
-> compose = [("compose", def)]
->   where
->     def = abs "f" $ \f -> 
->           abs "g" $ \g -> 
->           abs "x" $ \x ->
->           App f (App g x)
->     abs :: Var -> (Expr -> Expr) -> Expr
->     abs n body = Abs n (body (Var n))
->     
+
+
+Utility functions for printing:
 
 > printM :: ProgM -> String
 > printM prog = render $ vcat' (map printDef prog)
 >
 > printDef :: DefM -> Doc
-> printDef (name, BlockM vars body) = text name <> parens (hcat $ punctuate comma (map text vars)) <+> text "=" <+> printExprs body
+> printDef (name, BlockM vars body) = def <+> printExprs nesting body
+>   where
+>     def = text name <> parens (hcat $ punctuate comma (map text vars)) <+> 
+>                        text "=" 
+>     nesting = length (render def) 
 
-> printExprs :: [ExprM] -> Doc
-> printExprs exprs = text "do" $+$ nest (-4) (vcat' (map printExpr exprs))
+> printExprs :: Int -> [ExprM] -> Doc
+> printExprs nesting exprs = text "do" $+$ nest (nesting * (-1)) (vcat' (map printExpr exprs))
 > 
 > printExpr :: ExprM -> Doc
 > printExpr (Let def) = text "let" <+> printDef def
@@ -128,5 +177,3 @@ expression:
 > vcat' :: [Doc] -> Doc
 > vcat' = foldl ($+$) empty
 
-> run :: Prog -> IO ()
-> run = putStrLn . printM . compile
