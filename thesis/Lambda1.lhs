@@ -15,7 +15,7 @@ To compile a program, give it to the run function:
 Some functions. A helper for defining abstractions first:
 
 > abs :: Name -> (Expr -> Expr) -> Expr
-> abs n body = Abs n (body (VarL n))
+> abs n body = Abs [n] (body (VarL n))
 
 Then our friends the Church numerals. Starting with zero:
 
@@ -62,6 +62,7 @@ Now we define the language used above. Some useful synonyms first:
 > type Name = String
 > type Fun = String
 > type Env = [Name]
+> type Prog = [Def]
 
 Define \lamA terms:
 
@@ -81,65 +82,68 @@ An program is a sequence of monadic expressions:
 
   prog ::= m1; ...; mN
 
-A monadic expression consists of one of the five terms below. ``v'' indicates that
-the term cannot take an arbitrary expression, only a variable. 
-  
+or
+
+> type ProgM = [DefM]
+
+
+A monadic expression consists of one of the five terms below. ``v''
+indicates that the term cannot take an arbitrary expression, only a
+variable. 
+
   expr ::= return v
     | v <- prog
     | enter v1 v2
-    | closure vs prog
-    | let [v1 = prog, ..., vN = prog] in prog
+    | closure v [v1, ..., vN]
     | v
  
 > data ExprM = Return Name
 >   | Bind Name ExprM 
 >   | Enter Name Name
->   | Closure [Var] ProgM
->   | Let ProgM ExprM
+>   | Closure Name [Name] 
+>   | Let Name [Name] [ExprM]
 >   | Var Name
 >   deriving (Eq, Show)
 
 Compilation scheme:
    
-[[app e1 e2]] =>
+[[app e1 e2]] => do
    v1 <- [[e1]]
    v2 <- [[e2]]
    enter v1 v2
 
-[[abs v1, v2, ..., vN e]] = closure [v1, v2, ..., vn] [[e]]
+[[abs v1, v2, ..., vN e]] = do
+  let f(v1, ..., vN ++ free(e)) = [[e]]
+  closure f ([v1, v2, ..., vn] ++ free(e))
 
 [[var v]] = return v
 
+> compDef :: Def -> Comp DefM
+> compDef (fun, body) = do
+>   bodyM <- (compExpr [] body $ \_ p -> do
+>              c <- fresh "c"
+>              return [Bind c (Closure p []), Return c])
+>   return (fun, [], bodyM)
+
 Compiling expressions to our monadic language:
 
-> compDef :: Def -> Comp DefM
-> compDef (fun, vars, body) = do
->   c <- fresh "c"
->   compProg vars body $ \_ p ->
->     [Bind c (Closure vs p), Return c]
+> compExpr :: Env -> Expr -> (Env -> Name -> Comp [ExprM]) -> Comp [ExprM]
+> compExpr env (VarL v) k = k env v 
+> compExpr env (App e1 e2) k = 
+>   compExpr env e1 $ \env' v1 ->
+>   compExpr env' e2 $ \env'' v2 -> do
+>     r <- fresh "r"
+>     rest <- k env'' r
+>     return $ Bind r (Enter v1 v2) : rest
 
-> compProg :: Env -> Expr -> (Env -> Name -> Comp ExprM) -> Comp [ExprM]
-> compProg env (e:es) = 
-> compProg env (VarL v) = return [Var v]
-> compProg env (App e1 e2) = do
->   v1 <- fresh "v"
->   v2 <- fresh "v"
->   e1M <- compProg env e1
->   e2M <- compProg env e2
->   return [Let (v1, BlockM [] e1M)
->          , Let (v2, BlockM [] e2M)
->          , Enter (ClosureM v1 (free env e2)) v2]
-> compProg env (Abs v e1) = do
->   expr <- compProg (v : env) e1
+> compExpr env (Abs vs e1) k = do
 >   f <- fresh "f"
->   return [Let (f, BlockM [v] expr)]
-
-> compProg :: Prog -> Comp [DefM]
-> compProg ((name, def) : ds) = do
->   body <- compExpr [] def
->   rest <- compProg ds
->   return $ (name, BlockM [] body) : rest
-> compProg [] = return []
+>   (_, _, body) <- compDef (f, e1)
+>   r <- fresh "r"
+>   rest <- k env r
+>   return $ Let f vs body
+>            : Bind r (Closure f (vs ++ free env e1)) 
+>            : rest
 
 Our compilation monad creates new names for 
 us:
@@ -159,14 +163,13 @@ expression:
 > free e ex = free' e ex
 >   where
 >     free' env (App e1 e2) = free' env e1 ++ free' env e2
->     free' env (Abs v e1) = free' (v : env) e1
->     free' env (Var v) 
+>     free' env (Abs vs e1) = free' (vs ++ env) e1
+>     free' env (VarL v) 
 >           | v `elem` env = []
 >           | otherwise = [v]
 >                         
-> compile :: Prog -> [DefM]
-> compile prog = fst $ runState (compProg prog) 0
->                
+> compile :: Prog -> ProgM
+> compile prog = fst $ runState (mapM compDef prog) 0
 
 
 Utility functions for printing:
@@ -175,21 +178,27 @@ Utility functions for printing:
 > printM prog = render $ vcat' (map printDef prog)
 >
 > printDef :: DefM -> Doc
-> printDef (name, BlockM vars body) = def <+> printExprs nesting body
+> printDef (name, vars, body) = decl <+> printExprs nesting body
 >   where
->     def = text name <> parens (hcat $ punctuate comma (map text vars)) <+> 
->                        text "=" 
->     nesting = length (render def) 
+>     decl = text name <> 
+>            parens (commaSep text vars) <+> 
+>            text "=" 
+>     nesting = length (render decl) 
 
 > printExprs :: Int -> [ExprM] -> Doc
 > printExprs nesting exprs = text "do" $+$ nest (nesting * (-1)) (vcat' (map printExpr exprs))
 > 
 > printExpr :: ExprM -> Doc
-> printExpr (Let def) = text "let" <+> printDef def
-> printExpr (Enter (ClosureM f vs) arg) = 
->   text "clo <-" <+> text "closure" <+> text f <+> brackets (hcat $ punctuate comma (map text vs)) $+$
->   text "enter clo" <+> text arg
+> printExpr (Return n) = text "return" <+> text n
+> printExpr (Bind n v) = text n <+> text "<-" <+> printExpr v
+> printExpr (Enter f arg) = text "enter" <+> text f <+> text arg
+> printExpr (Closure f vs) = text "closure" <+> text f <+> parens (commaSep text vs)
+> printExpr (Let n vs body) = text "let" <+> printDef (n, vs, body)
 > printExpr (Var v) = text v 
+
+
+> commaSep :: (a -> Doc) -> [a] -> Doc
+> commaSep f = hcat . punctuate comma . map f
 
 > vcat' :: [Doc] -> Doc
 > vcat' = foldl ($+$) empty
