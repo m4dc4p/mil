@@ -14,8 +14,8 @@ To compile a program, give it to the run function:
 
 Some functions. A helper for defining abstractions first:
 
-> abs :: Var -> (Expr -> Expr) -> Expr
-> abs n body = Abs n (body (Var n))
+> abs :: Name -> (Expr -> Expr) -> Expr
+> abs n body = Abs n (body (VarL n))
 
 Then our friends the Church numerals. Starting with zero:
 
@@ -59,61 +59,78 @@ Flip:
 
 Now we define the language used above. Some useful synonyms first:
 
-> type Var = String
+> type Name = String
 > type Fun = String
-> type Env = [Var]
+> type Env = [Name]
 
 Define \lamA terms:
 
-> type Prog = [Def]
 > type Def = (Fun, Expr)
 
 > data Expr = App Expr Expr
->   | Abs Var Expr
->   | Var Var
+>   | Abs [Name] Expr
+>   | VarL Name
 >   deriving (Eq, Show)
 
-Our monadic language. Top-level definitions have  a name, list of arguments
+Our monadic language. Top-level definitions have a name, list of arguments
 and a body:
 
-> type ProgM = [DefM]
-> type DefM = (Fun, BodyM)
+> type DefM = (Fun, [Name], [ExprM])
 
-The body of each definition can capture a variable and put it in
-a closure (``Capture'') or be a block of real code (``BlockM''):
+An program is a sequence of monadic expressions: 
 
-> data BodyM = Capture [Var] Var BodyM
->   | BlockM [Var] [ExprM]
+  prog ::= m1; ...; mN
+
+A monadic expression consists of one of the five terms below. ``v'' indicates that
+the term cannot take an arbitrary expression, only a variable. 
+  
+  expr ::= return v
+    | v <- prog
+    | enter v1 v2
+    | closure vs prog
+    | let [v1 = prog, ..., vN = prog] in prog
+    | v
+ 
+> data ExprM = Return Name
+>   | Bind Name ExprM 
+>   | Enter Name Name
+>   | Closure [Var] ProgM
+>   | Let ProgM ExprM
+>   | Var Name
 >   deriving (Eq, Show)
 
-Expressions can define a new value (``Let''), enter a closure (``Enter'') or
-return a value from the environment (``VarM'')
+Compilation scheme:
+   
+[[app e1 e2]] =>
+   v1 <- [[e1]]
+   v2 <- [[e2]]
+   enter v1 v2
 
-> data ExprM = Let DefM
->   | Enter ClosureM Var
->   | VarM Var
->   deriving (Eq, Show)
+[[abs v1, v2, ..., vN e]] = closure [v1, v2, ..., vn] [[e]]
 
-Finally, a closure points to a function and carries a number of
-variables around:
-
-> data ClosureM = ClosureM Fun [Var]
->   deriving (Eq, Show)
+[[var v]] = return v
 
 Compiling expressions to our monadic language:
 
-> compExpr :: Env -> Expr -> Comp [ExprM]
-> compExpr env (Var v) = return [VarM v]
-> compExpr env (App e1 e2) = do
+> compDef :: Def -> Comp DefM
+> compDef (fun, vars, body) = do
+>   c <- fresh "c"
+>   compProg vars body $ \_ p ->
+>     [Bind c (Closure vs p), Return c]
+
+> compProg :: Env -> Expr -> (Env -> Name -> Comp ExprM) -> Comp [ExprM]
+> compProg env (e:es) = 
+> compProg env (VarL v) = return [Var v]
+> compProg env (App e1 e2) = do
 >   v1 <- fresh "v"
 >   v2 <- fresh "v"
->   e1M <- compExpr env e1
->   e2M <- compExpr env e2
+>   e1M <- compProg env e1
+>   e2M <- compProg env e2
 >   return [Let (v1, BlockM [] e1M)
 >          , Let (v2, BlockM [] e2M)
 >          , Enter (ClosureM v1 (free env e2)) v2]
-> compExpr env (Abs v e1) = do
->   expr <- compExpr (v : env) e1
+> compProg env (Abs v e1) = do
+>   expr <- compProg (v : env) e1
 >   f <- fresh "f"
 >   return [Let (f, BlockM [v] expr)]
 
@@ -138,7 +155,7 @@ us:
 ``free'' returns the free variables in an
 expression:
 
-> free :: Env -> Expr -> [Var]
+> free :: Env -> Expr -> [Name]
 > free e ex = free' e ex
 >   where
 >     free' env (App e1 e2) = free' env e1 ++ free' env e2
@@ -172,7 +189,7 @@ Utility functions for printing:
 > printExpr (Enter (ClosureM f vs) arg) = 
 >   text "clo <-" <+> text "closure" <+> text f <+> brackets (hcat $ punctuate comma (map text vs)) $+$
 >   text "enter clo" <+> text arg
-> printExpr (VarM v) = text v 
+> printExpr (Var v) = text v 
 
 > vcat' :: [Doc] -> Doc
 > vcat' = foldl ($+$) empty
