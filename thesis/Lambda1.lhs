@@ -1,4 +1,4 @@
-> {-# LANGUAGE NoImplicitPrelude #-}
+> {-# LANGUAGE NoImplicitPrelude, FunctionalDependencies, MultiParamTypeClasses, FlexibleInstances, TypeSynonymInstances #-}
 > module Lambda1
 >
 > where
@@ -9,26 +9,28 @@
 
 To compile a program, give it to the run function:
 
-> run :: Prog -> IO ()
-> run = putStrLn . printM . compile
+> monProg :: Prog -> IO ()
+> monProg = putStrLn . printM . compile
 
-Some functions. A helper for defining abstractions first:
+> lambdaProg :: Prog -> IO ()
+> lambdaProg = putStrLn . printL
 
-> abs :: Name -> (Expr -> Expr) -> Expr
-> abs n body = Abs [n] (body (VarL n))
+Some functions. A helper for defining abstractions first. The class declaration
+lets me pass nested tuples for multiple arguments:
+
+> abs :: (Names a, Args a b) => a -> (b -> Expr) -> Expr
+> abs n body = Abs (names n) (body (vars n))
 
 Then our friends the Church numerals. Starting with zero:
 
 > zero :: Expr
-> zero = abs "s" $ \s -> 
->        abs "z" $ \z -> z
+> zero = abs ("s", "z") $ \(VarL _, z) -> z
 
 We can define successor:
 
 > succ :: Expr -> Expr
-> succ n = abs "n" $ \n -> 
->        abs "s" $ \s -> 
->        abs "z" $ \z -> App s (App (App n s) z)
+> succ n = abs ("n", ("s", "z")) $ \(n, (s, z)) -> 
+>          App s (App (App n s) z)
 
 A program to calculate three:
 
@@ -42,10 +44,8 @@ then the compose function:
 > compose :: Prog 
 > compose = [("compose", def)]
 >   where
->     def = abs "f" $ \f -> 
->           abs "g" $ \g -> 
->           abs "x" $ \x ->
->           App f (App g x)
+>     def = abs ("f",("g", "x")) $ 
+>           \(f, (g, x)) -> App f (App g x)
 
 Flip:
 
@@ -63,6 +63,8 @@ Now we define the language used above. Some useful synonyms first:
 > type Fun = String
 > type Env = [Name]
 > type Prog = [Def]
+> type Captured = String
+> type Arg = String
 
 Define \lamA terms:
 
@@ -76,7 +78,7 @@ Define \lamA terms:
 Our monadic language. Top-level definitions have a name, list of arguments
 and a body:
 
-> type DefM = (Fun, [Name], [ExprM])
+> type DefM = (Fun, [Captured], [Arg], [ExprM])
 
 An program is a sequence of monadic expressions: 
 
@@ -100,8 +102,8 @@ variable.
 > data ExprM = Return Name
 >   | Bind Name ExprM 
 >   | Enter Name Name
->   | Closure Name [Name] 
->   | Let Name [Name] [ExprM]
+>   | Closure Fun [Captured] 
+>   | Let Name [Captured] [Arg] [ExprM]
 >   | Var Name
 >   deriving (Eq, Show)
 
@@ -120,10 +122,8 @@ Compilation scheme:
 
 > compDef :: Def -> Comp DefM
 > compDef (fun, body) = do
->   bodyM <- (compExpr [] body $ \_ p -> do
->              c <- fresh "c"
->              return [Bind c (Closure p []), Return c])
->   return (fun, [], bodyM)
+>   bodyM <- compExpr [] body $ \_ p -> return [Return p]
+>   return (fun, [], [], bodyM)
 
 Compiling expressions to our monadic language:
 
@@ -138,11 +138,11 @@ Compiling expressions to our monadic language:
 
 > compExpr env (Abs vs e1) k = do
 >   f <- fresh "f"
->   (_, _, body) <- compDef (f, e1)
+>   (_, _, _, body) <- compDef (f, e1)
 >   r <- fresh "r"
 >   rest <- k env r
->   return $ Let f vs body
->            : Bind r (Closure f (vs ++ free env e1)) 
+>   return $ Let f (free (vs ++ env) e1) vs body
+>            : Bind r (Closure f vs) 
 >            : rest
 
 Our compilation monad creates new names for 
@@ -171,16 +171,30 @@ expression:
 > compile :: Prog -> ProgM
 > compile prog = fst $ runState (mapM compDef prog) 0
 
-
 Utility functions for printing:
+
+> printL :: Prog -> String
+> printL prog = render $ vcat' (map printDefL prog)
+
+> printDefL :: Def -> Doc
+> printDefL (fun, expr) = decl <+> printExprL (maximum [0, nesting - 2]) expr
+>   where
+>     decl = text fun <+> text "="
+>     nesting = length (render decl)
+>   
+> printExprL :: Int -> Expr -> Doc
+> printExprL n (App e1 e2) = parens $ hang (printExprL n e1) n (printExprL n e2)
+> printExprL n (Abs vs e1) = text "\\" <> spaced text vs <> text "." <+> printExprL (n + 2) e1
+> printExprL n (VarL v) = text v
 
 > printM :: ProgM -> String
 > printM prog = render $ vcat' (map printDef prog)
 >
 > printDef :: DefM -> Doc
-> printDef (name, vars, body) = decl <+> printExprs nesting body
+> printDef (name, capt, vars, body) = decl <+> printExprs nesting body
 >   where
->     decl = text name <> 
+>     decl = text name <>
+>            braces (commaSep text capt) <+>
 >            parens (commaSep text vars) <+> 
 >            text "=" 
 >     nesting = length (render decl) 
@@ -193,13 +207,32 @@ Utility functions for printing:
 > printExpr (Bind n v) = text n <+> text "<-" <+> printExpr v
 > printExpr (Enter f arg) = text "enter" <+> text f <+> text arg
 > printExpr (Closure f vs) = text "closure" <+> text f <+> parens (commaSep text vs)
-> printExpr (Let n vs body) = text "let" <+> printDef (n, vs, body)
+> printExpr (Let n capt vs body) = text "let" <+> printDef (n, capt, vs, body)
 > printExpr (Var v) = text v 
 
 
-> commaSep :: (a -> Doc) -> [a] -> Doc
-> commaSep f = hcat . punctuate comma . map f
+> commaSep = punctuated comma 
+> spaced = punctuated space 
+
+> punctuated :: Doc -> (a -> Doc) -> [a] -> Doc
+> punctuated sep f = hcat . punctuate sep . map f
 
 > vcat' :: [Doc] -> Doc
 > vcat' = foldl ($+$) empty
+
+Simple type-level lists to make definining abstractions easier:
+
+> class Names a where
+>   names :: a -> [Arg]
+> instance Names String where
+>   names a = [a] 
+> instance (Names b) => Names (String, b) where
+>   names (a, b) = a : names b
+
+> class Args a b where
+>   vars :: a -> b
+> instance Args String Expr where
+>   vars a = VarL a
+> instance (Args a b) => Args (String, a) (Expr, b) where
+>   vars (a, b) = (VarL a, vars b)
 
