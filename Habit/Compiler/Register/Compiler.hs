@@ -503,7 +503,7 @@ compileMAbs :: Env -> Maybe Reg -> Maybe Name -> OnFail -> Match -> C (Reg, Mayb
 compileMAbs env dest name f m = do
   result <- case (dest, name) of
               (Just r, _) -> return r
-              (Nothing, Just n) -> newNamedReg n
+              (_, Just n) -> newNamedReg n
               (_, _) -> newReg
   case countParams m of
     0 -> do
