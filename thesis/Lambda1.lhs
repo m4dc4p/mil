@@ -1,6 +1,6 @@
 > {-# LANGUAGE NoImplicitPrelude, FunctionalDependencies, 
->   MultiParamTypeClasses, FlexibleInstances, 
->   TypeSynonymInstances #-}
+>   MultiParamTypeClasses, FlexibleInstances, FlexibleContexts,
+>   TypeSynonymInstances, GADTs #-}
 >
 > module Lambda1
 >
@@ -8,17 +8,31 @@
 > 
 > import Control.Monad.State (State(runState), get, put)
 > import Text.PrettyPrint 
-> import Prelude hiding (abs, flip, succ)
+> import Prelude hiding (abs, flip, succ, id)
+> import Data.List (union, delete)
+> import Compiler.Hoopl
+> import Control.Monad.State
 
-To compile a program, use ``monProg'':
-
-> monProg :: Prog -> IO ()
-> monProg = putStrLn . printM . compile
+> main = do
+>   let hRuled title prog = do
+>          putStrLn $ take 72 (repeat '-') 
+>          putStrLn title
+>          putStrLn $ take 72 (repeat '-') 
+>          m2Prog prog
+>   hRuled "compose" compose
+>   hRuled "flip" flip
+>   hRuled "id" id
+>   hRuled "compose . id" composeId
 
 ``lambdaProg'' pretty-prints the original program:
 
 > lambdaProg :: Prog -> IO ()
 > lambdaProg = putStrLn . printL
+
+``m2Prog'' compiles a lambda program to a monadic language:
+
+> m2Prog :: Prog -> IO ()
+> m2Prog = putStrLn . printM2 . compileM2
 
 Some functions. A helper for defining abstractions first. The class declaration
 lets me pass nested tuples for multiple arguments:
@@ -26,20 +40,15 @@ lets me pass nested tuples for multiple arguments:
 > abs :: (Names a, Args a b) => a -> (b -> Expr) -> Expr
 > abs n body = Abs (names n) (body (vars n))
 
-The compose function:
+The compose function. The definition and the program must be 
+separate so compose can be re-used later.:
 
 > compose :: Prog 
-> compose = [("compose", def)]
->   where
->     def = abs ("f",("g", "x")) $ 
->           \(f, (g, x)) -> App f (App g x)
+> compose = [("compose", composeDef)]
 
-> compose2 :: Prog 
-> compose2 = [("compose2", def)]
->   where
->     def = abs "f" $ \f -> 
->           abs "g" $ \g ->
->           abs "x" $ \x -> App f (App g x)
+> composeDef :: Expr           
+> composeDef  = abs ("f",("g", "x")) $ 
+>               \(f, (g, x)) -> App f (App g x)
 
 Flip:
 
@@ -50,6 +59,18 @@ Flip:
 >           abs "a" $ \a ->
 >           abs "b" $ \b ->
 >           App (App f b) a
+
+Identity:
+
+> id :: Prog
+> id = [("id", idDef)]
+
+> idDef :: Expr
+> idDef = abs "x" $ \x -> x
+
+Identity w/ compose:
+
+> composeId = [("composeId", (App composeDef (App composeDef idDef)))]
 
 Now we define the language used above. Some useful synonyms first:
 
@@ -72,144 +93,158 @@ Define \lamA terms:
 Our monadic language. Functions take a closure containing free variables and a
 single argument. A list of expressions make up the body of the function:
 
-> type DefM = (Fun, [Captured], Arg, [ExprM])
+> type DefM2 = (Fun, [Captured], Arg, ExprM2 O C)
 
 An program is a sequence of function definitions, which can be 
 mutually recursive:\footnote{Not yet implemented}
 
-> type ProgM = [DefM]
+> type ProgM2 = [DefM2]
 
-A monadic expression consists of one of the five terms below. ``v''
+A monadic expression consists of one of the four terms below. ``v''
 indicates that the term cannot take an arbitrary expression, only a
 variable. 
 
   expr ::= return v
-    | v <- prog
     | enter v1 v2
     | closure v [v1, ..., vN]
-    | v
+    | v <- prog
 
-> data ExprM = Return Name
->   | Bind Name ExprM 
->   | Enter Name Name
->   | Closure Fun [Captured]
->   | Let Name [Captured] Arg [ExprM]
->   | Var Name
->   deriving (Eq, Show)
+Expressions in this language can be in tail position (at the
+end of a do block) or not. Tail position expressions have type 
+``ExprM2 e O'', where ``e'' can be either ``O'' or ``C'' (from Hoopl). 
 
-``return'' simply returns the variable given. ``<-'' (``bind'')
-evaluates the sequence of statements on the right-hand side and
-assigns the result to ``v.'' ``prog'' can create side-effects, such as
-memory allocation. ``enter'' expects v1 to contain a closure. The
-function body pointed to by the closure will be executed, using ``v2''
-as the argument. The value created by ``closure'' will point to the
-function referred to in ``v'' and will capture the variables
-given. The function will expect to receive these variables along with
-an argument. The list of captured variables can be empty. Finally,
-``v'' simply refers to a variable in scope.
+> data ExprM2 e x where 
 
-Following mon3.hs (and Andrew Kennedy), I use a continuation-based
-compilation scheme. First, we must compile top-level
-definitions. ``compDef'' takes a \lamA expression ``Def'' and produces
-a monadic program, ``DefM''. The free variables (less one) become the
-variables the definition expects in the closure given to it, if
-any. The remaining free variable becomes an argument to the
-function. If the funciton does not contain any free variables, a dummy
-argument gets created.
+First I describe the tail position instructions. ReturnT just returns
+the variable specified.
 
-> compDef :: Def -> Comp DefM
-> compDef (fun, body) = do
->   bodyM <- compExpr [] body $ \_ p -> return [Return p]
->   let freeV = freeM [] bodyM
->   (captured, arg) <- if null freeV 
->                      then (do { dummy <- fresh "dummy"; return ([], dummy) })
->                      else return (init freeV, last freeV)
->   return (fun, captured, arg, bodyM)
+>   ReturnT :: Name -> ExprM2 O C
 
-``compExpr'' compiles an expression in a particular environment,
-``Env''. It produces a list of monadic statements,
-``[ExprM]]''. ``compExpr'' also gets a continuation \emph{for the
-compiler}, which represents compiling the ``rest'' of the program. The
-continuation takes a new environment and a name. The name represents
-the result of the preceding portion of the program. This arguments
-lets the compiler send destinations ``forward'', so later compilation
-can use newly boudn variables.
+``ClosureT'' allocates a closure pointing to particular function, with
+a list of captured variables.
 
-> compExpr :: Env -> Expr -> (Env -> Name -> Comp [ExprM]) -> Comp [ExprM]
+>   ClosureT :: Fun -- The variable holding the address of the function.
+>     -> [Captured] -- List of captured free varaibles
+>     -> ExprM2 O C
 
-Compiling ``VarL'' means simply passing the name of the variable along to
-the rest of the compilation.
+Enter a closure in the first postion with an argument in the
+second. ``EnterT'' always returns a value, making it a closed
+instruction.
 
-> compExpr env (VarL v) k = k env v 
+>   EnterT :: Name -- Variable holding the closure
+>     -> Name  -- Argument to the function.
+>     -> ExprM2 O C
 
-To compile ``App'', we first recursively compile ``e1'' and ``e2''.
-Notice that the functions we pass to ``compExpr'' take an environment
-and a variable name (``v1'' and ``v2''). These arguments represent the
-destination in which ``e1'' and ``e2'' will put their values. This
-allows us to ``know'' that ``v1'' and ``v2'' are variables. In turn,
-``compExpr'' creates a destination for the application's result
-(``r'') and passes that to the rest of the compiler (``k env'
-r''). ``Enter'' and ``Bind'' instructions execute the application and
-store its result in the previously created location, respectively. The
-code generated by the ``rest'' of the compiler gets appended to these
-instructions and returned.
+Now the open instructions. ``BindT'' does not return a
+value. However, the expression it evaluates must be closed. The code
+following ``BindT'' can be open or closed, which gets reflected in 
+``BindT's'' type. This might get us in trouble later when we use
+Hoopl to combine multiple instructions together -- I think it will want
+BindT to be Open-Open, but it works for now.
 
-> compExpr env (App e1 e2) k = 
->   compExpr env e1 $ \env' v1 ->
->   compExpr env' e2 $ \env'' v2 -> do
->     r <- fresh "r"
->     rest <- k env'' r
->     return $ Bind r (Enter v1 v2) : rest
+>   BindT :: Name  -- Name of variable to bidn value to.
+>     -> ExprM2 e1 C   -- Expression that computes the value we want.
+>     -> ExprM2 O x1   -- Code following the bind.
+>     -> ExprM2 O x1   
 
-An abstraction gets compiled to two distinct pieces. A local function,
-``f'', gets defined. That function expects all free variables in the
-body (``e1'') and all the abstaction's arguments, less one, to be
-``captured'' in a closure. The function also takes one argument, which
-may be a dummy if the abstraction doesn't define any arguments.
+LetT introduces local function definitions. Each definition a list of
+captured variables and argument. The body of the function must be
+closed, though it can consist of multiple expressions. LetT gets the
+same type as BindT, with the same caveats.
 
-A closure gets created which points to the new local function and 
-captures all the variables expected. The location of the closure
-gets passed to the ``rest'' of the compiler. The code returned
-defines the local function ``f'', makes sure ``r'' gets 
-bound to the closure, and follows with the ``rest'' of the
-code returned by calling the continuation (``k'') given.
+>   LetT :: Name 
+>     -> [Captured]  -- Captured variables expected in the closure.
+>     -> Arg         -- Name of arg to function
+>     -> ExprM2 e1 C -- Body of function definition
+>     -> ExprM2 O x1 -- Code following the Let
+>     -> ExprM2 O x1 
 
-> compExpr env (Abs vs e1) k = do
->   let captured = free (arg : env) e1
->       arg = last vs
->   body <- compExpr env e1 (\_ r -> return [Return r])
->   f <- fresh "f"
->   r <- fresh "r"
->   rest <- k (r : f : env) r
->   return $ Let f captured arg body
->            : Bind r (Closure f captured)
->            : rest
+To compile an expression, ``compExprM2'' gets a function that will
+``finish'' the compilation (i.e., ``fin''). Each case passes the
+instruction that should go at the end of the compiled expression, for
+that particular expression. Hoopl's ``C'' type guarantees that only a
+tail-position instruction can end a expression. ``fin'' always returns
+free variables as well, so that the compilation can determine which
+arguments will need to be captured in closures, or will appear as
+top-level arguments.
 
-To find free variables in the monadic program, we analyze
-each statement in turn and return a list of free names:
+> compExprM2 :: Expr 
+>            -> ([Name] 
+>                -> ExprM2 O C 
+>                -> CompM2 ([Name], ExprM2 e2 C)) 
+>            -> CompM2 ([Name], ExprM2 e2 C)
 
-> freeM :: Env -> [ExprM] -> [Name]
-> freeM initEnv = fst . foldl findFree ([], initEnv) 
+A variable merely returns its value. The variable is the only free
+varialbe, as well, so it gets passed along.
+
+> compExprM2 (VarL v) fin = fin [v] (ReturnT v)
+
+For application, we must ensure that the values of e1 and e2 get into
+variables. Once variables are bound, an ``EnterT'' instruction will
+implement the application. The ``fin'' function given is used once
+we have e1 and e2 in variables. Free variables won't be changed so
+we just pass the union of free variables found during compilation of e1
+and e2.
+
+> compExprM2 (App e1 e2) fin = 
+>   compExprM2 e1 $ \e1fvs t1 -> 
+>   compExprM2 e2 $ \e2fvs t2 -> do
+>     f <- fresh "f"
+>     a <- fresh "a"
+>     fin (union e1fvs e2fvs) 
+>         (BindT f t1 (BindT a t2 (EnterT f a)))
+
+> compExprM2 (Abs vs e) fin = do
+>   let compClosure [a] = compExprM2 e (\lvs b -> return (lvs, b))
+>       compClosure (a:as) = do
+>         (cvs, b) <- compClosure as
+>         let cvs' = delete a cvs
+>         f <- fresh "q"
+>         return (cvs', (LetT f cvs' a b (ClosureT f cvs')))
+>   dummy <- fresh "dummy"
+>   (cvs, b) <- if null vs
+>               then compClosure [dummy]
+>               else compClosure vs
+>   fin cvs b
+
+> type CompM2 = State Int
+
+> compDefM2 :: Def -> CompM2 DefM2
+> compDefM2 (f, body) = do
+>   (fvs, body) <- compExprM2 body (\fvs t -> return (fvs, t))
+>   dummy <- fresh "dummy"
+>   (capts, arg) <- getCaptures fvs
+>   return (f, capts, arg, body)                   
+
+> getCaptures :: [Name] -> CompM2 ([Name], Name)
+> getCaptures [] = do
+>   dummy <- fresh "dummy"
+>   return ([], dummy)
+> getCaptures vs = return (init vs, last vs)
+
+> compileM2 :: Prog -> ProgM2
+> compileM2 = compile compDefM2 0
+
+> printM2 :: ProgM2 -> String
+> printM2 = render . vcat' . map printDefM2 
+
+> printDefM2 :: DefM2 -> Doc
+> printDefM2 (f, capts, arg, body) = decl <+> text "do" $+$ nest 2 (printExprM2s body)
 >   where
->     findFree :: ([Name], Env) -> ExprM -> ([Name], Env)
->     findFree (fv, env) (Return n) = (n `inEnv` env ++ fv, env)
->     findFree (fv, env) (Bind n e) = (freeM env [e] ++ fv, n : env)
->     findFree (fv, env) (Enter n1 n2) = (n1 `inEnv` env ++ n2 `inEnv` env, env)
->     findFree (fv, env) (Closure f capts) =
->       (f `inEnv` env ++ concatMap (`inEnv` env) capts ++ fv, env)
->     findFree (fv, env) (Let n capt arg body) = (freeM (n : arg : capt ++ env) body ++ fv, n : env)
->     findFree (fv, env) (Var n) = (n `inEnv` env ++ fv, env)
->     inEnv :: Name -> Env -> [Name]
->     inEnv n env 
->       | n `elem` env = []
->       | otherwise = [n]
-      
-Our compilation monad creates new names for 
-us:
+>     decl = text f <+> braces (commaSep text capts) <+> text arg <+> text "="
+>     amt = 1
 
-> type Comp = State Int
->
-> fresh :: String -> Comp String
+> printExprM2s :: ExprM2 e x -> Doc
+> printExprM2s (ReturnT n) = text "return" <+> text n
+> printExprM2s (ClosureT f vs) = text "closure" <+> text f <+> braces (commaSep text vs)
+> printExprM2s (EnterT f a) = text f <+> text "@" <+> text a
+> printExprM2s (BindT n b r) = text n <+> text "<- do" <+> nest 2 (printExprM2s b) $+$ printExprM2s r
+> printExprM2s (LetT f capts arg b r) = text "let" <+> text f <+> 
+>                                       braces (commaSep text capts) <+> text arg <+> text "=" <+>
+>                                       text "do" $$ nest 2 (printExprM2s b) $+$
+>                                       printExprM2s r
+
+> fresh :: (MonadState Int m) => String -> m String
 > fresh prefix = do
 >   i <- get
 >   put (i + 1)
@@ -227,8 +262,6 @@ expression:
 >           | v `elem` env = []
 >           | otherwise = [v]
 >                         
-> compile :: Prog -> ProgM
-> compile prog = fst $ runState (mapM compDef prog) 0
 
 Utility functions for printing:
 
@@ -246,30 +279,6 @@ Utility functions for printing:
 > printExprL n (Abs vs e1) = text "\\" <> spaced text vs <> text "." <+> printExprL (n + 2) e1
 > printExprL n (VarL v) = text v
 
-> printM :: ProgM -> String
-> printM prog = render $ vcat' (map printDef prog)
->
-> printDef :: DefM -> Doc
-> printDef (name, capt, var, body) = decl <+> printExprs nesting body
->   where
->     decl = text name <>
->            braces (commaSep text capt) <+>
->            parens (text var) <+> 
->            text "=" 
->     nesting = length (render decl) 
-
-> printExprs :: Int -> [ExprM] -> Doc
-> printExprs nesting exprs = text "do" $+$ nest (nesting * (-1)) (vcat' (map printExpr exprs))
-> 
-> printExpr :: ExprM -> Doc
-> printExpr (Return n) = text "return" <+> text n
-> printExpr (Bind n v) = text n <+> text "<-" <+> printExpr v
-> printExpr (Enter f arg) = text "enter" <+> text f <+> text arg
-> printExpr (Closure f capts) = text "closure" <+> text f <+> braces (commaSep text capts)
-> printExpr (Let n capt vs body) = text "let" <+> printDef (n, capt, vs, body)
-> printExpr (Var v) = text v 
-
-
 > commaSep = punctuated comma 
 > spaced = punctuated space 
 
@@ -278,6 +287,10 @@ Utility functions for printing:
 
 > vcat' :: [Doc] -> Doc
 > vcat' = foldl ($+$) empty
+
+Combinator for compiling our programs to different languages:
+
+> compile compiler init prog = fst $ runState (mapM compiler prog) init
 
 Simple type-level lists to make definining abstractions easier:
 
