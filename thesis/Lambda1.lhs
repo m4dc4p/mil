@@ -195,7 +195,7 @@ and e2.
 >         (BindT f t1 (BindT a t2 (EnterT f a)))
 
 > compExprM2 (Abs vs e) fin = do
->   let compClosure [a] = compExprM2 e (\lvs b -> return (lvs, b))
+>   let compClosure [] = compExprM2 e (\lvs b -> return (lvs, b))
 >       compClosure (a:as) = do
 >         (cvs, b) <- compClosure as
 >         let cvs' = delete a cvs
@@ -249,19 +249,6 @@ and e2.
 >   i <- get
 >   put (i + 1)
 >   return (prefix ++ show i)
-
-``free'' returns the free variables in an
-expression:
-
-> free :: Env -> Expr -> [Name]
-> free e ex = free' e ex
->   where
->     free' env (App e1 e2) = free' env e1 ++ free' env e2
->     free' env (Abs vs e1) = free' (vs ++ env) e1
->     free' env (VarL v) 
->           | v `elem` env = []
->           | otherwise = [v]
->                         
 
 Utility functions for printing:
 
