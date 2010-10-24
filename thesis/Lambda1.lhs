@@ -11,7 +11,6 @@
 > import Prelude hiding (abs, flip, succ, id)
 > import Data.List (union, delete)
 > import Compiler.Hoopl
-> import Control.Monad.State
 
 > main = do
 >   let hRuled title prog = do
@@ -93,12 +92,7 @@ Define \lamA terms:
 Our monadic language. Functions take a closure containing free variables and a
 single argument. A list of expressions make up the body of the function:
 
-> type DefM2 = (Fun, [Captured], Arg, ExprM2 O C)
-
-An program is a sequence of function definitions, which can be 
-mutually recursive:\footnote{Not yet implemented}
-
-> type ProgM2 = [DefM2]
+> type DefM2 = (Fun, [Captured], Arg, ExprM2 C C)
 
 A monadic expression consists of one of the four terms below. ``v''
 indicates that the term cannot take an arbitrary expression, only a
@@ -159,6 +153,16 @@ same type as BindT, with the same caveats.
 >     -> ExprM2 O x1 -- Code following the Let
 >     -> ExprM2 O x1 
 
+Each function appears in its own block. The function's "C C" type shows
+execution can only jump to it, and execution can only leave throug a jump. The 
+function cannot be ``inserted'' into a larger instruction stream.
+
+>   Fun :: Name -- Name of the function
+>     -> [Captured] -- Captured variables in the closure
+>     -> Arg -- Argument
+>     -> ExprM2 e x -- Body of function
+>     -> ExprM2 C C 
+
 To compile an expression, ``compExprM2'' gets a function that will
 ``finish'' the compilation (i.e., ``fin''). Each case passes the
 instruction that should go at the end of the compiled expression, for
@@ -197,6 +201,7 @@ and e2.
 >         (cvs, b) <- compClosure as
 >         let cvs' = delete a cvs
 >         f <- fresh "q"
+>         newFun f cvs' a b 
 >         return (cvs', (LetT f cvs' a b (ClosureT f cvs')))
 >   dummy <- fresh "dummy"
 >   (cvs, b) <- if null vs
@@ -205,15 +210,32 @@ and e2.
 >   fin cvs b
 
 > compVar :: Expr 
->         -> ([Name] -> Name -> CompM2 ([Name], ExprM2 O C))
->         -> CompM2 ([Name], ExprM2 O C)
+>         -> ([Name] -> Name -> CompM2 ([Name], ExprM2 e2 C))
+>         -> CompM2 ([Name], ExprM2 e2 C)
 > compVar (VarL v) finV = finV [v] v
 > compVar e finV = compExprM2 e $ \efvs t -> do
 >   a <- fresh "a"
 >   (efvs', rest) <- finV efvs a 
 >   return (efvs', BindT a t rest)
 
-> type CompM2 = State Int
+> compFun :: Name 
+>         -> [Captured] 
+>         -> Arg 
+>         -> ExprM2 O x
+>         -> CompM2 ()
+> compFun f capt arg body fin = \(i, progs) -> 
+>   let def = Fun f capt arg body
+>   in (i, (f, capt, arg, def))
+>   
+An program is a sequence of function definitions, which can be 
+mutually recursive:\footnote{Not yet implemented}
+
+> type ProgM2 = [DefM2]
+
+Our compiler monad can create fresh variables and store multiple
+function definitions:
+
+> type CompM2 = State (Int, ProgM2)
 
 > compDefM2 :: Def -> CompM2 DefM2
 > compDefM2 (f, body) = do
@@ -229,7 +251,7 @@ and e2.
 > getCaptures vs = return (init vs, last vs)
 
 > compileM2 :: Prog -> ProgM2
-> compileM2 = compile compDefM2 0
+> compileM2 = compile compDefM2 (0, [])
 
 > printM2 :: ProgM2 -> String
 > printM2 = render . vcat' . map printDefM2 
