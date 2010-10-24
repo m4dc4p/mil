@@ -171,8 +171,8 @@ top-level arguments.
 > compExprM2 :: Expr 
 >            -> ([Name] 
 >                -> ExprM2 O C 
->                -> CompM2 ([Name], ExprM2 e2 C)) 
->            -> CompM2 ([Name], ExprM2 e2 C)
+>                -> CompM2 ([Name], ExprM2 O C)) 
+>            -> CompM2 ([Name], ExprM2 O C)
 
 A variable merely returns its value. The variable is the only free
 varialbe, as well, so it gets passed along.
@@ -187,12 +187,9 @@ we just pass the union of free variables found during compilation of e1
 and e2.
 
 > compExprM2 (App e1 e2) fin = 
->   compExprM2 e1 $ \e1fvs t1 -> 
->   compExprM2 e2 $ \e2fvs t2 -> do
->     f <- fresh "f"
->     a <- fresh "a"
->     fin (union e1fvs e2fvs) 
->         (BindT f t1 (BindT a t2 (EnterT f a)))
+>   compVar e1 $ \e1fvs f ->
+>   compVar e2 $ \e2fvs x ->
+>     fin (union e1fvs e2fvs) (EnterT f x)
 
 > compExprM2 (Abs vs e) fin = do
 >   let compClosure [] = compExprM2 e (\lvs b -> return (lvs, b))
@@ -206,6 +203,15 @@ and e2.
 >               then compClosure [dummy]
 >               else compClosure vs
 >   fin cvs b
+
+> compVar :: Expr 
+>         -> ([Name] -> Name -> CompM2 ([Name], ExprM2 O C))
+>         -> CompM2 ([Name], ExprM2 O C)
+> compVar (VarL v) finV = finV [v] v
+> compVar e finV = compExprM2 e $ \efvs t -> do
+>   a <- fresh "a"
+>   (efvs', rest) <- finV efvs a 
+>   return (efvs', BindT a t rest)
 
 > type CompM2 = State Int
 
