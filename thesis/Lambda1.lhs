@@ -6,7 +6,7 @@
 >
 > where
 > 
-> import Control.Monad.State (State(runState), get, put)
+> import Control.Monad.State (MonadState, State(runState), get, put)
 > import Text.PrettyPrint 
 > import Prelude hiding (abs, flip, succ, id)
 > import Data.List (union, delete)
@@ -15,9 +15,8 @@
 > main = do
 >   let hRuled title prog = do
 >          putStrLn $ take 72 (repeat '-') 
->          putStrLn title
->          putStrLn $ take 72 (repeat '-') 
 >          m2Prog prog
+>          putStrLn $ take 72 (repeat '-') 
 >   hRuled "compose" compose
 >   hRuled "flip" flip
 >   hRuled "id" id
@@ -33,11 +32,10 @@
 > m2Prog :: Prog -> IO ()
 > m2Prog = putStrLn . printM2 . compileM2
 
-Some functions. A helper for defining abstractions first. The class declaration
-lets me pass nested tuples for multiple arguments:
+Some functions. A helper for defining abstractions first. 
 
-> abs :: (Names a, Args a b) => a -> (b -> Expr) -> Expr
-> abs n body = Abs (names n) (body (vars n))
+> abs :: String -> (Expr -> Expr) -> Expr
+> abs n body = Abs n (body (VarL n))
 
 The compose function. The definition and the program must be 
 separate so compose can be re-used later.:
@@ -46,8 +44,9 @@ separate so compose can be re-used later.:
 > compose = [("compose", composeDef)]
 
 > composeDef :: Expr           
-> composeDef  = abs ("f",("g", "x")) $ 
->               \(f, (g, x)) -> App f (App g x)
+> composeDef  = abs "f" $ \f -> 
+>               abs "g" $ \g -> 
+>               abs "x" $ \x -> App f (App g x)
 
 Flip:
 
@@ -74,7 +73,6 @@ Identity w/ compose:
 Now we define the language used above. Some useful synonyms first:
 
 > type Name = String
-> type Fun = String
 > type Env = [Name]
 > type Prog = [Def]
 > type Captured = String
@@ -82,17 +80,25 @@ Now we define the language used above. Some useful synonyms first:
 
 Define \lamA terms:
 
-> type Def = (Fun, Expr)
+> type Def = (Name, Expr)
 
 > data Expr = App Expr Expr
->   | Abs [Name] Expr
+>   | Abs Name Expr
 >   | VarL Name
 >   deriving (Eq, Show)
 
-Our monadic language. Functions take a closure containing free variables and a
-single argument. A list of expressions make up the body of the function:
+Our monadic language. Functions take a closure containing free
+variables and a single argument. ach function appears in its own
+block. The "C C" type shows execution can only jump to the function,
+and execution can only leave through a jump. The function cannot be
+``inserted'' into a larger instruction stream.
 
-> type DefM2 = (Fun, [Captured], Arg, ExprM2 C C)
+> data DefM2 e x where
+>   Fun :: Name 
+>     -> [Captured] 
+>     -> Maybe Arg 
+>     -> ExprM2 O C 
+>     -> DefM2 C C
 
 A monadic expression consists of one of the four terms below. ``v''
 indicates that the term cannot take an arbitrary expression, only a
@@ -117,7 +123,7 @@ the variable specified.
 ``ClosureT'' allocates a closure pointing to particular function, with
 a list of captured variables.
 
->   ClosureT :: Fun -- The variable holding the address of the function.
+>   ClosureT :: Name -- The variable holding the address of the function.
 >     -> [Captured] -- List of captured free varaibles
 >     -> ExprM2 O C
 
@@ -153,16 +159,6 @@ same type as BindT, with the same caveats.
 >     -> ExprM2 O x1 -- Code following the Let
 >     -> ExprM2 O x1 
 
-Each function appears in its own block. The function's "C C" type shows
-execution can only jump to it, and execution can only leave throug a jump. The 
-function cannot be ``inserted'' into a larger instruction stream.
-
->   Fun :: Name -- Name of the function
->     -> [Captured] -- Captured variables in the closure
->     -> Arg -- Argument
->     -> ExprM2 e x -- Body of function
->     -> ExprM2 C C 
-
 To compile an expression, ``compExprM2'' gets a function that will
 ``finish'' the compilation (i.e., ``fin''). Each case passes the
 instruction that should go at the end of the compiled expression, for
@@ -195,71 +191,70 @@ and e2.
 >   compVar e2 $ \e2fvs x ->
 >     fin (union e1fvs e2fvs) (EnterT f x)
 
-> compExprM2 (Abs vs e) fin = do
->   let compClosure [] = compExprM2 e (\lvs b -> return (lvs, b))
->       compClosure (a:as) = do
->         (cvs, b) <- compClosure as
+> compExprM2 (Abs v e) fin = do
+>   let compClosure a = do
+>         (cvs, b) <- compExprM2 e (\lvs b -> return (lvs, b)) 
 >         let cvs' = delete a cvs
 >         f <- fresh "q"
 >         newFun f cvs' a b 
->         return (cvs', (LetT f cvs' a b (ClosureT f cvs')))
->   dummy <- fresh "dummy"
->   (cvs, b) <- if null vs
->               then compClosure [dummy]
->               else compClosure vs
+>         return (cvs', ClosureT f cvs')
+>   (cvs, b) <- compClosure v
 >   fin cvs b
 
 > compVar :: Expr 
->         -> ([Name] -> Name -> CompM2 ([Name], ExprM2 e2 C))
->         -> CompM2 ([Name], ExprM2 e2 C)
+>         -> ([Name] -> Name -> CompM2 ([Name], ExprM2 O C))
+>         -> CompM2 ([Name], ExprM2 O C)
 > compVar (VarL v) finV = finV [v] v
 > compVar e finV = compExprM2 e $ \efvs t -> do
 >   a <- fresh "a"
 >   (efvs', rest) <- finV efvs a 
 >   return (efvs', BindT a t rest)
 
-> compFun :: Name 
+> newFun :: Name 
 >         -> [Captured] 
 >         -> Arg 
->         -> ExprM2 O x
+>         -> ExprM2 O C
 >         -> CompM2 ()
-> compFun f capt arg body fin = \(i, progs) -> 
->   let def = Fun f capt arg body
->   in (i, (f, capt, arg, def))
->   
-An program is a sequence of function definitions, which can be 
+> newFun f capt arg body = do
+>   (i, progs) <- get
+>   put (i, Fun f capt (Just arg) body : progs)
+>   return ()
+
+A program is a sequence of function definitions, which can be 
 mutually recursive:\footnote{Not yet implemented}
 
-> type ProgM2 = [DefM2]
+> type ProgM2 = [DefM2 C C]
 
 Our compiler monad can create fresh variables and store multiple
 function definitions:
 
 > type CompM2 = State (Int, ProgM2)
 
-> compDefM2 :: Def -> CompM2 DefM2
+> compDefM2 :: Def -> CompM2 (DefM2 C C)
 > compDefM2 (f, body) = do
 >   (fvs, body) <- compExprM2 body (\fvs t -> return (fvs, t))
->   dummy <- fresh "dummy"
 >   (capts, arg) <- getCaptures fvs
->   return (f, capts, arg, body)                   
+>   return $ Fun f capts arg body
 
-> getCaptures :: [Name] -> CompM2 ([Name], Name)
+> getCaptures :: [Name] -> CompM2 ([Name], Maybe Name)
 > getCaptures [] = do
->   dummy <- fresh "dummy"
->   return ([], dummy)
-> getCaptures vs = return (init vs, last vs)
+>   return ([], Nothing)
+> getCaptures vs = return (init vs, Just (last vs))
 
 > compileM2 :: Prog -> ProgM2
-> compileM2 = compile compDefM2 (0, [])
+> compileM2 prog = concatMap compDef prog
+>   where
+>     compDef p = 
+>       let (mp, (_, mps)) = runState (compDefM2 p) (0, [])
+>       in (mp:mps)
 
 > printM2 :: ProgM2 -> String
 > printM2 = render . vcat' . map printDefM2 
 
-> printDefM2 :: DefM2 -> Doc
-> printDefM2 (f, capts, arg, body) = decl <+> text "do" $+$ nest 2 (printExprM2s body)
+> printDefM2 :: DefM2 C C -> Doc
+> printDefM2 (Fun f capts arg body) = decl <+> text "do" $+$ nest 2 (printExprM2s body)
 >   where
->     decl = text f <+> braces (commaSep text capts) <+> text arg <+> text "="
+>     decl = text f <+> braces (commaSep text capts) <+> parens (maybe empty (text) arg) <+> text "="
 >     amt = 1
 
 > printExprM2s :: ExprM2 e x -> Doc
@@ -267,15 +262,11 @@ function definitions:
 > printExprM2s (ClosureT f vs) = text "closure" <+> text f <+> braces (commaSep text vs)
 > printExprM2s (EnterT f a) = text f <+> text "@" <+> text a
 > printExprM2s (BindT n b r) = text n <+> text "<- do" <+> nest 2 (printExprM2s b) $+$ printExprM2s r
-> printExprM2s (LetT f capts arg b r) = text "let" <+> text f <+> 
->                                       braces (commaSep text capts) <+> text arg <+> text "=" <+>
->                                       text "do" $$ nest 2 (printExprM2s b) $+$
->                                       printExprM2s r
 
-> fresh :: (MonadState Int m) => String -> m String
+> fresh :: String -> CompM2 String
 > fresh prefix = do
->   i <- get
->   put (i + 1)
+>   (i, p) <- get
+>   put (i + 1, p)
 >   return (prefix ++ show i)
 
 Utility functions for printing:
@@ -291,7 +282,7 @@ Utility functions for printing:
 >   
 > printExprL :: Int -> Expr -> Doc
 > printExprL n (App e1 e2) = parens $ hang (printExprL n e1) n (printExprL n e2)
-> printExprL n (Abs vs e1) = text "\\" <> spaced text vs <> text "." <+> printExprL (n + 2) e1
+> printExprL n (Abs v e1) = text "\\" <> text v <> text "." <+> printExprL (n + 2) e1
 > printExprL n (VarL v) = text v
 
 > commaSep = punctuated comma 
@@ -302,24 +293,4 @@ Utility functions for printing:
 
 > vcat' :: [Doc] -> Doc
 > vcat' = foldl ($+$) empty
-
-Combinator for compiling our programs to different languages:
-
-> compile compiler init prog = fst $ runState (mapM compiler prog) init
-
-Simple type-level lists to make definining abstractions easier:
-
-> class Names a where
->   names :: a -> [Arg]
-> instance Names String where
->   names a = [a] 
-> instance (Names b) => Names (String, b) where
->   names (a, b) = a : names b
-
-> class Args a b where
->   vars :: a -> b
-> instance Args String Expr where
->   vars a = VarL a
-> instance (Args a b) => Args (String, a) (Expr, b) where
->   vars (a, b) = (VarL a, vars b)
 
