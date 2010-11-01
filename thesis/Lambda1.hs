@@ -14,21 +14,15 @@ import Compiler.Hoopl ((|*><*|), (<*>), mkFirst, mkLast, mkMiddle
                       , Block, MaybeO(..), MaybeC(..), blockToNodeList'
                       , Unique, UniqueMonad(freshUnique), intToUnique)
 
-main = do
-  let sep = putStrLn $ replicate 72 '='
-  sequence_ $ intersperse sep [mProg compose
-                              , mProg flip
-                              , mProg id
-                              , mProg composeId]
-
--- ``lambdaProg'' pretty-prints the original program:
-lambdaProg :: Prog -> IO ()
-lambdaProg = putStrLn . printL
+main = 
+  mapM_ putStrLn .
+  intersperse (replicate 72 '=') . 
+  map (render . printProg) $ [compose, flip, id, composeId]
 
 -- ``mProg'' compiles a lambda program to a monadic language:
 
-mProg :: Prog -> IO ()
-mProg = putStrLn . printM . compileM
+printProg :: Prog -> Doc
+printProg p = hang (printL p <+> text "==>") 2 (printM . compileM $ p)
 
 -- Some functions. A helper for defining abstractions first. 
 
@@ -299,8 +293,8 @@ resultM fvs t = return (fvs, mkLast t)
 
 -- Functions for printing:
 
-printM :: CFG C C -> String
-printM = render . vcat' . printGraph
+printM :: CFG C C -> Doc
+printM = vcat' . printGraph
   where
     printGraph :: CFG x e -> [Doc]
     printGraph GNil = []
@@ -329,8 +323,8 @@ printExprMs (Fun _ f capts arg) = decl <+> text "do"
     decl = text f <+> braces (commaSep text capts) <+> parens (maybe empty (text) arg) <+> text "="
     amt = 1
 
-printL :: Prog -> String
-printL prog = render $ vcat' (map printDefL prog)
+printL :: Prog -> Doc
+printL prog = vcat' (map printDefL prog)
 
 printDefL :: Def -> Doc
 printDefL (fun, expr) = decl <+> printExprL (maximum [0, nesting - 2]) expr
