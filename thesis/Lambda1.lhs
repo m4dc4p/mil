@@ -6,31 +6,36 @@
 >
 > where
 > 
-> import Control.Monad.State (MonadState, State(runState), get, put)
+> import Control.Monad.State (MonadState, State(runState)
+>                             , get, put, modify)
+> import Control.Exception (bracket_)
 > import Text.PrettyPrint 
 > import Prelude hiding (abs, flip, succ, id)
 > import Data.List (union, delete)
-> import Compiler.Hoopl
+> import Compiler.Hoopl ((|*><*|), (<*>), mkFirst, mkLast, mkMiddle
+>                       , O, C, emptyClosedGraph, Graph, Graph'(..)
+>                       , NonLocal(..), Label, freshLabel, IsMap(..)
+>                       , Block, MaybeO(..), MaybeC(..), blockToNodeList
+>                       , Unique, UniqueMonad(freshUnique), intToUnique)
 
 > main = do
->   let hRuled title prog = do
->          putStrLn $ take 72 (repeat '-') 
->          m2Prog prog
->          putStrLn $ take 72 (repeat '-') 
->   hRuled "compose" compose
->   hRuled "flip" flip
->   hRuled "id" id
->   hRuled "compose . id" composeId
+>   let hRuled prog = do
+>          let sep = putStrLn $ take 72 (repeat '-') 
+>          bracket_ sep sep (mProg prog)  
+>   hRuled compose
+>   hRuled flip
+>   hRuled id
+>   hRuled composeId
 
 ``lambdaProg'' pretty-prints the original program:
 
 > lambdaProg :: Prog -> IO ()
 > lambdaProg = putStrLn . printL
 
-``m2Prog'' compiles a lambda program to a monadic language:
+``mProg'' compiles a lambda program to a monadic language:
 
-> m2Prog :: Prog -> IO ()
-> m2Prog = putStrLn . printM2 . compileM2
+> mProg :: Prog -> IO ()
+> mProg = putStrLn . printM . compileM
 
 Some functions. A helper for defining abstractions first. 
 
@@ -87,22 +92,9 @@ Define \lamA terms:
 >   | VarL Name
 >   deriving (Eq, Show)
 
-Our monadic language. Functions take a closure containing free
-variables and a single argument. ach function appears in its own
-block. The "C C" type shows execution can only jump to the function,
-and execution can only leave through a jump. The function cannot be
-``inserted'' into a larger instruction stream.
-
-> data DefM2 e x where
->   Fun :: Name 
->     -> [Captured] 
->     -> Maybe Arg 
->     -> ExprM2 O C 
->     -> DefM2 C C
-
-A monadic expression consists of one of the four terms below. ``v''
-indicates that the term cannot take an arbitrary expression, only a
-variable. 
+Our monadic language. A monadic expression consists of one of the four
+terms below. ``v'' indicates that the term cannot take an arbitrary
+expression, only a variable.
 
   expr ::= return v
     | enter v1 v2
@@ -111,55 +103,48 @@ variable.
 
 Expressions in this language can be in tail position (at the
 end of a do block) or not. Tail position expressions have type 
-``ExprM2 e O'', where ``e'' can be either ``O'' or ``C'' (from Hoopl). 
+``ExprM e O'', where ``e'' can be either ``O'' or ``C'' (from Hoopl). 
 
-> data ExprM2 e x where 
+> data ExprM e x where 
 
 First I describe the tail position instructions. ReturnT just returns
 the variable specified.
 
->   ReturnT :: Name -> ExprM2 O C
+>   Return :: Name -> ExprM O C
 
-``ClosureT'' allocates a closure pointing to particular function, with
+``Closure'' allocates a closure pointing to particular function, with
 a list of captured variables.
 
->   ClosureT :: Name -- The variable holding the address of the function.
+>   Closure :: Name -- The variable holding the address of the function.
 >     -> [Captured] -- List of captured free varaibles
->     -> ExprM2 O C
+>     -> ExprM O C
 
 Enter a closure in the first postion with an argument in the
-second. ``EnterT'' always returns a value, making it a closed
+second. ``Enter'' always returns a value, making it a closed
 instruction.
 
->   EnterT :: Name -- Variable holding the closure
+>   Enter :: Name -- Variable holding the closure
 >     -> Name  -- Argument to the function.
->     -> ExprM2 O C
+>     -> ExprM O C
 
-Now the open instructions. ``BindT'' does not return a
+Now the open instructions. ``Bind'' does not return a
 value. However, the expression it evaluates must be closed. The code
-following ``BindT'' can be open or closed, which gets reflected in 
-``BindT's'' type. This might get us in trouble later when we use
+following ``Bind'' can be open or closed, which gets reflected in 
+``Bind's'' type. This might get us in trouble later when we use
 Hoopl to combine multiple instructions together -- I think it will want
-BindT to be Open-Open, but it works for now.
+Bind to be Open-Open, but it works for now.
 
->   BindT :: Name  -- Name of variable to bidn value to.
->     -> ExprM2 e1 C   -- Expression that computes the value we want.
->     -> ExprM2 O x1   -- Code following the bind.
->     -> ExprM2 O x1   
+>   Bind :: Name  -- Name of variable that will be bound.
+>     -> ExprM O C   -- Expression that computes the value we want.
+>     -> ExprM O O   -- Open/open since bind does not end an expression
 
-LetT introduces local function definitions. Each definition a list of
-captured variables and argument. The body of the function must be
-closed, though it can consist of multiple expressions. LetT gets the
-same type as BindT, with the same caveats.
+>   Fun :: Label       -- Label for the function's entry point.
+>     -> Name       -- Name of the function
+>     -> [Captured] -- List of variables expected in closure
+>     -> Maybe Arg  -- Name of argument
+>     -> ExprM C O  -- One entry and exit makes functions closed/closed
 
->   LetT :: Name 
->     -> [Captured]  -- Captured variables expected in the closure.
->     -> Arg         -- Name of arg to function
->     -> ExprM2 e1 C -- Body of function definition
->     -> ExprM2 O x1 -- Code following the Let
->     -> ExprM2 O x1 
-
-To compile an expression, ``compExprM2'' gets a function that will
+To compile an expression, ``compExprM'' gets a function that will
 ``finish'' the compilation (i.e., ``fin''). Each case passes the
 instruction that should go at the end of the compiled expression, for
 that particular expression. Hoopl's ``C'' type guarantees that only a
@@ -168,106 +153,129 @@ free variables as well, so that the compilation can determine which
 arguments will need to be captured in closures, or will appear as
 top-level arguments.
 
-> compExprM2 :: Expr 
+> instance NonLocal ExprM where
+>   entryLabel (Fun l _ _ _) = l
+>   successors _ = []
+
+> compExprM :: Expr 
 >            -> ([Name] 
->                -> ExprM2 O C 
->                -> CompM2 ([Name], ExprM2 O C)) 
->            -> CompM2 ([Name], ExprM2 O C)
+>                -> ExprM O C 
+>                -> CompM ([Name], Graph ExprM O C)) 
+>            -> CompM ([Name], Graph ExprM O C)
 
 A variable merely returns its value. The variable is the only free
 varialbe, as well, so it gets passed along.
 
-> compExprM2 (VarL v) fin = fin [v] (ReturnT v)
+> compExprM (VarL v) fin = fin [v] (Return v)
 
 For application, we must ensure that the values of e1 and e2 get into
-variables. Once variables are bound, an ``EnterT'' instruction will
+variables. Once variables are bound, an ``Enter'' instruction will
 implement the application. The ``fin'' function given is used once
 we have e1 and e2 in variables. Free variables won't be changed so
 we just pass the union of free variables found during compilation of e1
 and e2.
 
-> compExprM2 (App e1 e2) fin = 
+> compExprM (App e1 e2) fin = 
 >   compVar e1 $ \e1fvs f ->
 >   compVar e2 $ \e2fvs x ->
->     fin (union e1fvs e2fvs) (EnterT f x)
+>     fin (union e1fvs e2fvs) (Enter f x)
 
-> compExprM2 (Abs v e) fin = do
+> compExprM (Abs v e) fin = do
 >   let compClosure a = do
->         (cvs, b) <- compExprM2 e (\lvs b -> return (lvs, b)) 
+>         (cvs, b) <- compExprM e (\lvs b -> return (lvs, mkLast b)) 
 >         let cvs' = delete a cvs
 >         f <- fresh "q"
->         newFun f cvs' a b 
->         return (cvs', ClosureT f cvs')
+>         newFun f cvs' (Just a) b 
+>         return (cvs', Closure f cvs')
 >   (cvs, b) <- compClosure v
 >   fin cvs b
 
 > compVar :: Expr 
->         -> ([Name] -> Name -> CompM2 ([Name], ExprM2 O C))
->         -> CompM2 ([Name], ExprM2 O C)
+>         -> ([Name] -> Name -> CompM ([Name], Graph ExprM O C))
+>         -> CompM ([Name], Graph ExprM O C)
 > compVar (VarL v) finV = finV [v] v
-> compVar e finV = compExprM2 e $ \efvs t -> do
+> compVar e finV = compExprM e $ \efvs t -> do
 >   a <- fresh "a"
 >   (efvs', rest) <- finV efvs a 
->   return (efvs', BindT a t rest)
+>   return (efvs', mkMiddle (Bind a t) <*> rest)
 
 > newFun :: Name 
 >         -> [Captured] 
->         -> Arg 
->         -> ExprM2 O C
->         -> CompM2 ()
+>         -> Maybe Arg 
+>         -> Graph ExprM O C
+>         -> CompM (Graph ExprM C C)
 > newFun f capt arg body = do
->   (i, progs) <- get
->   put (i, Fun f capt (Just arg) body : progs)
->   return ()
-
-A program is a sequence of function definitions, which can be 
-mutually recursive:\footnote{Not yet implemented}
-
-> type ProgM2 = [DefM2 C C]
+>   l <- freshLabel
+>   let def = mkFirst (Fun l f capt arg) <*> body
+>   (i, defs) <- get
+>   put (i, def |*><*| defs)
+>   return def
 
 Our compiler monad can create fresh variables and store multiple
 function definitions:
 
-> type CompM2 = State (Int, ProgM2)
+> type CompM = State (Int, Graph ExprM C C)
 
-> compDefM2 :: Def -> CompM2 (DefM2 C C)
-> compDefM2 (f, body) = do
->   (fvs, body) <- compExprM2 body (\fvs t -> return (fvs, t))
+> instance UniqueMonad CompM where
+>   freshUnique = freshVal
+
+> compFunM :: Def -> CompM (Graph ExprM C C)
+> compFunM (f, body) = do
+>   (fvs, bodyM) <- compExprM body (\fvs t -> return (fvs, mkLast t))
 >   (capts, arg) <- getCaptures fvs
->   return $ Fun f capts arg body
+>   newFun f capts arg bodyM
 
-> getCaptures :: [Name] -> CompM2 ([Name], Maybe Name)
+> getCaptures :: [Name] -> CompM ([Name], Maybe Name)
 > getCaptures [] = do
 >   return ([], Nothing)
 > getCaptures vs = return (init vs, Just (last vs))
 
-> compileM2 :: Prog -> ProgM2
-> compileM2 prog = concatMap compDef prog
+> compileM :: Prog -> Graph ExprM C C
+> compileM = snd . foldl compDef (0, emptyClosedGraph)
 >   where
->     compDef p = 
->       let (mp, (_, mps)) = runState (compDefM2 p) (0, [])
->       in (mp:mps)
+>     compDef s p = snd . runState (compFunM p) $ s
 
-> printM2 :: ProgM2 -> String
-> printM2 = render . vcat' . map printDefM2 
+> printM :: Graph ExprM C C -> String
+> printM = render . vcat' . printGraph
+>   where
+>     printGraph :: Graph ExprM x e -> [Doc]
+>     printGraph GNil = []
+>     printGraph (GUnit block) = [printBlock block]
+>     printGraph (GMany entry middles exit) = printBlockMaybe entry :
+>                                             (map printBlock . mapElems $ middles) ++
+>                                             [printBlockMaybe exit]
+>     printBlock :: Block ExprM x e -> Doc
+>     printBlock = p . blockToNodeList
+>       where p (e, bs, x) = hang (printNodeMaybe e) 2
+>                                 (vcat' (map printExprMs bs) $+$
+>                                        printNodeMaybe x)
+>     printBlockMaybe :: MaybeO e1 (Block ExprM e2 x) -> Doc
+>     printBlockMaybe (JustO b) = printBlock b
+>     printBlockMaybe _ = empty
+>     printNodeMaybe :: MaybeC e1 (ExprM e2 x) -> Doc
+>     printNodeMaybe (JustC e) = printExprMs e
 
-> printDefM2 :: DefM2 C C -> Doc
-> printDefM2 (Fun f capts arg body) = decl <+> text "do" $+$ nest 2 (printExprM2s body)
+> printExprMs :: ExprM e x -> Doc
+> printExprMs (Return n) = text "return" <+> text n
+> printExprMs (Closure f vs) = text "closure" <+> text f <+> braces (commaSep text vs)
+> printExprMs (Enter f a) = text f <+> text "@" <+> text a
+> printExprMs (Bind n b) = text n <+> text "<- do" <+> nest 2 (printExprMs b)
+> printExprMs (Fun _ f capts arg) = decl <+> text "do" 
 >   where
 >     decl = text f <+> braces (commaSep text capts) <+> parens (maybe empty (text) arg) <+> text "="
 >     amt = 1
 
-> printExprM2s :: ExprM2 e x -> Doc
-> printExprM2s (ReturnT n) = text "return" <+> text n
-> printExprM2s (ClosureT f vs) = text "closure" <+> text f <+> braces (commaSep text vs)
-> printExprM2s (EnterT f a) = text f <+> text "@" <+> text a
-> printExprM2s (BindT n b r) = text n <+> text "<- do" <+> nest 2 (printExprM2s b) $+$ printExprM2s r
-
-> fresh :: String -> CompM2 String
+> fresh :: String -> CompM String
 > fresh prefix = do
 >   (i, p) <- get
 >   put (i + 1, p)
 >   return (prefix ++ show i)
+
+> freshVal :: CompM Unique
+> freshVal = do
+>   (i, p) <- get
+>   put (i + 1, p)
+>   return (intToUnique i)
 
 Utility functions for printing:
 
