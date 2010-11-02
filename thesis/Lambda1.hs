@@ -14,10 +14,11 @@ import Compiler.Hoopl ((|*><*|), (<*>), mkFirst, mkLast, mkMiddle
                       , Block, MaybeO(..), MaybeC(..), blockToNodeList'
                       , Unique, UniqueMonad(freshUnique), intToUnique)
 
-main = 
-  mapM_ putStrLn .
-  intersperse (replicate 72 '=') . 
-  map (render . printProg) $ [compose, flip, id, composeId]
+main = putStrLn 
+       . render 
+       . vcat' 
+       . intersperse (text (replicate 72 '=')) 
+       . map printProg $ [compose, flip, id, composeId]
 
 -- ``mProg'' compiles a lambda program to a monadic language:
 
