@@ -142,13 +142,31 @@ data ExprM e x where
 
 type CFG = Graph ExprM
 type CFGEnv e x = (Env, CFG e x)
-
 type CompM = State (Int, CFG C C)
 
 compileExprM :: Env 
              -> Expr 
              -> (Env -> ExprM O C -> CompM (CFG O C)) 
              -> CompM (CFG O C)
+
+compileExprM env (Var v) fin = fin env (Return v)
+
+compileExprM env (App e1 e2) fin = 
+  compVarM env e1 $ \_ f ->
+  compVarM env e2 $ \_ x -> 
+    fin env (Enter f x)
+
+compileExprM env (Abs v e) fin = do
+  let env' = v : env
+      fvs = free env' e
+      free = undefined
+  clos <- do
+    body <- compileExprM env' e (\_ t -> return (mkLast t))
+    name <- fresh "c"
+    addDefn name fvs (Just v) body
+    return (Closure name fvs)
+  fin env' clos
+
 compileExprM env (Case expr alts) fin = 
   compVarM env expr $ \env' t -> do
     altsM <- mapM (compAlt env) alts
@@ -158,13 +176,23 @@ compileExprM env (Case expr alts) fin =
     compAlt env (Alt cons vs e) = do
       expr <- compVarM (env \\ vs) e $ \_ t -> return (mkLast $ Return t)
       return (Alt cons vs expr)
-                      
+
+compileExprM env (Constr cons es) fin = compileVarsM env es []
+  where
+    compileVarsM env (e:es) vs = compVarM env e $ \env' v ->
+                                 compileVarsM env' es (v:vs) 
+    compileVarsM env [] vs = fin env (ConstrM cons (reverse vs))
+        
 compVarM :: Env 
          -> Expr 
          -> (Env -> Name -> CompM (CFG O C)) 
          -> CompM (CFG O C)
-compVarM env (Var v) = undefined
-compVarM env expr = undefined
+compVarM env (Var v) fin = fin env v
+compVarM env expr fin = compileExprM env expr $ \env' t -> do
+  a <- fresh "a"
+  rest <- fin env' a
+  return $ mkMiddle (Bind a t) <*> rest
+  
 
 compileM :: Prog -> CFG C C
 compileM defs = snd . foldr compDef (0, emptyClosedGraph) $ defs
@@ -174,7 +202,10 @@ compileM defs = snd . foldr compDef (0, emptyClosedGraph) $ defs
     compFunM :: Def -> CompM (CFG C C)
     compFunM (f, body) = do
       bodyM <- compileExprM top body undefined
-      undefined
+      addDefn f [] Nothing bodyM
+
+addDefn :: Name -> [Name] -> Maybe Name -> CFG O C -> CompM (CFG C C)
+addDefn = undefined
 
 -- | Create a fresh variable with the given
 -- prefix.
@@ -194,6 +225,10 @@ freshVal = do
 
 instance UniqueMonad CompM where
   freshUnique = freshVal
+
+instance NonLocal ExprM where
+  entryLabel (Fun l _ _ _) = l
+  successors _ = []
 
 -- Printing lambda-calculus terms
 

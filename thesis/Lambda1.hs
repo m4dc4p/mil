@@ -175,7 +175,7 @@ how individual blocks in the control flow graph relate to each other.
 instance NonLocal ExprM where
   entryLabel (Fun l _ _ _) = l
   successors _ = []
-
+ 
 {- 
 
 To compile an expression, ``compExprM'' gets a function that will
