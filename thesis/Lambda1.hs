@@ -1,5 +1,4 @@
- {-# LANGUAGE TypeSynonymInstances, GADTs #-}
-
+{-# LANGUAGE TypeSynonymInstances, GADTs #-}
 module Lambda1
 
 where
