@@ -77,7 +77,7 @@ Our monadic language:
     | f(v1, ..., v)  -- Call a known function.
     | closure f {v1, ..., vN} -- Create closure pointing to a function.
 
-  alt ::= C v1 ... vN -> call f(v1, ..., vN)
+  alt ::= C v1 ... vN -> call f(u1, ..., uM)
 
   defM ::= f {v1, ..., vN} v = bodyM -- ``f'' stands for the name of the function.
 
@@ -104,19 +104,43 @@ data StmtM e x where
   Done :: TailM  -- Finish a block.
       -> StmtM O C
 
--- | TailM conclueds a list of statements. Each
+-- | TailM concludes a list of statements. Each
 -- block ends with a TailM except when CaseM ends
 -- the blocks.
 data TailM = Return Name 
-  | Enter Name     -- Variable holding the closure
+  | Enter Name     -- Variable holding the closure.
       Name         -- Argument to the function.
   | Closure Name   -- The variable holding the address of the function.
-      [Name]       -- List of captured free varaibles
-  | Call Name     -- Name of function
-      [Name]       -- Arguments to functino
-  | ConstrM Constructor  -- Constructor name
-      [Name]            -- Only variables allowes as arguments to constructor.
+      [Name]       -- List of captured free variables.
+  | Call Name      -- Name of function.
+      [Name]       -- Arguments to function.
+  | ConstrM Constructor  -- Constructor name.
+      [Name]             -- Only variables allowed as arguments to constructor.
   deriving (Eq, Show)
+
+-- Collect free variables in a program.
+freeM :: ProgM O C -> [Name] 
+freeM = filter (not . null) . concat . maybeGraph [[]] freeB
+
+freeB :: Block StmtM x e -> [Name] 
+freeB b = 
+  let (e, bs, x) = blockToNodeList' b
+      mids = foldr useDef (maybeC id useDef x [])  bs
+
+      useDef                    :: StmtM e x -> [Name] -> [Name] 
+      useDef (Entry _ _ _) live = live
+      useDef (Bind v t) live    = delete v live ++ useTail t
+      useDef (CaseM v alts) _   = v : concatMap (\(Alt _ vs t) -> useTail t \\ vs) alts
+      useDef (Done t) live      = live ++ useTail t
+
+      useTail                :: TailM -> [Name] 
+      useTail (Return v)     = [v]
+      useTail (Enter v1 v2)  = [v1, v2]
+      useTail (Closure _ vs) = vs
+      useTail (Call _ vs)    = vs
+      useTail (ConstrM _ vs) = vs
+
+  in maybeC id useDef e mids
 
 -- Compiling from lambda-calculus to the monadic language.
 
@@ -169,30 +193,7 @@ compileStmtM (Case e alts) ctx = do
   callDefn name body = do 
     f <- newTop name 
     tops <- gets compT
-    -- Collect free variables in a program.
-    let freeM :: ProgM O C -> [Name] 
-        freeM = filter (not . null) . concat . maybeGraph [[]] freeB
-
-        freeB :: Block StmtM x e -> [Name] 
-        freeB b = 
-          let (e, bs, x) = blockToNodeList' b
-              mids = foldr useDef (maybeC id useDef x [])  bs
-
-              useDef                    :: StmtM e x -> [Name] -> [Name] 
-              useDef (Entry _ _ _) live = live
-              useDef (Bind v t) live    = delete v live ++ useTail t
-              useDef (CaseM v alts) _   = v : concatMap (\(Alt _ vs t) -> useTail t \\ vs) alts
-              useDef (Done t) live      = live ++ useTail t
-
-              useTail                :: TailM -> [Name] 
-              useTail (Return v)     = [v]
-              useTail (Enter v1 v2)  = [v1, v2]
-              useTail (Closure v vs) = v : vs
-              useTail (Call v vs)    = v : vs
-              useTail (ConstrM _ vs) = vs
-
-          in maybeC id useDef e mids
-        fvs = nub (freeM body \\ tops)
+    let fvs = nub (freeM body \\ tops)
     addDefn f fvs body
     return (Call f fvs)
 
