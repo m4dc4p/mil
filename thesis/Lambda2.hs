@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeSynonymInstances, GADTs, RankNTypes
-  , NamedFieldPuns #-}
+  , NamedFieldPuns, TypeFamilies #-}
 
 module Lambda2
 
@@ -9,11 +9,19 @@ import Prelude hiding (abs)
 import Control.Monad.State (State, execState, modify, gets)
 import Text.PrettyPrint 
 import Data.List (intersperse, (\\), union, nub, delete)
+import Data.Maybe (fromMaybe)
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Compiler.Hoopl ((|*><*|), (<*>), mkFirst, mkLast, mkMiddle
                       , O, C, emptyClosedGraph, Graph, Graph'(..)
-                      , NonLocal(..), Label, freshLabel, IsMap(mapElems)
+                      , NonLocal(..), Label, freshLabel, IsMap(mapElems, mapEmpty)
                       , Block, MaybeO(..), MaybeC(..), blockToNodeList'
-                      , Unique, UniqueMonad(freshUnique), intToUnique)
+                      , Unique, UniqueMonad(freshUnique), intToUnique
+                      , BwdPass(..), analyzeAndRewriteBwd, mkFactBase
+                      , DataflowLattice(..), OldFact(..), NewFact(..)
+                      , ChangeFlag(..), BwdRewrite, BwdTransfer, FuelMonad(..)
+                      , changeIf, mkBTransfer, Fact, lookupFact
+                      , CheckpointMonad)
 
 
 {-
@@ -57,6 +65,15 @@ type Env = [Name]
 type Def = (Name, Expr)
 type Prog = [Def]
 
+-- | Collect free variables from Abs terms on 
+-- the lambda-calculus expression.
+collectFree :: Expr -> [Name]
+collectFree (Abs _ vs _) = vs
+collectFree (App e1 e2) = collectFree e1 ++ collectFree e2
+collectFree (Var v) = [] 
+collectFree (Case e alts) = collectFree e ++ concatMap (\(Alt _ _ e) -> collectFree e) alts
+collectFree (Constr _ exprs) = concatMap collectFree exprs
+
 {-
 
 Our monadic language:
@@ -74,7 +91,7 @@ Our monadic language:
 
   tailM ::= return v
     | v1 @ v2         -- Call an unknown function.
-    | f(v1, ..., v)  -- Call a known function.
+    | f(v1, ..., v)  -- Goto a known block.
     | closure f {v1, ..., vN} -- Create closure pointing to a function.
 
   alt ::= C v1 ... vN -> call f(u1, ..., uM)
@@ -89,7 +106,7 @@ Our monadic language:
 data StmtM e x where
   -- | Entry point to a list of statements.
   Entry :: Name -- Name of the function
-    -> [Name]   -- Arguments
+    -> Maybe [Name]   -- Arguments
     -> Label    -- Label of the entry point.
     -> StmtM C O
 
@@ -109,38 +126,41 @@ data StmtM e x where
 -- the blocks.
 data TailM = Return Name 
   | Enter Name     -- Variable holding the closure.
-      Name         -- Argument to the function.
+    Name         -- Argument to the function.
   | Closure Name   -- The variable holding the address of the function.
-      [Name]       -- List of captured free variables.
-  | Call Name      -- Name of function.
-      [Name]       -- Arguments to function.
+    [Name]               -- List of captured free variables.
+  | Goto Name            -- Address of the block
+    (Maybe [Name])       -- Arguments/live variables used in the
+                         -- block. Uses Maybe so arguments can be
+                         -- filled after live variable analysis of
+                         -- the block
   | ConstrM Constructor  -- Constructor name.
       [Name]             -- Only variables allowed as arguments to constructor.
   deriving (Eq, Show)
 
--- Collect free variables in a program.
+-- | Collect free variables in a program.
 freeM :: ProgM O C -> [Name] 
 freeM = filter (not . null) . concat . maybeGraph [[]] freeB
 
+-- | Free variables in a block.
 freeB :: Block StmtM x e -> [Name] 
-freeB b = 
-  let (e, bs, x) = blockToNodeList' b
-      mids = foldr useDef (maybeC id useDef x [])  bs
+freeB b = maybeC id useDef e mids
+  where
+    (e, bs, x) = blockToNodeList' b
+    mids = foldr useDef (maybeC id useDef x [])  bs
+         
+    useDef                    :: StmtM e x -> [Name] -> [Name] 
+    useDef (Entry _ _ _) live = live
+    useDef (Bind v t) live    = delete v live ++ useTail t
+    useDef (CaseM v alts) _   = v : concatMap (\(Alt _ vs t) -> useTail t \\ vs) alts
+    useDef (Done t) live      = live ++ useTail t
 
-      useDef                    :: StmtM e x -> [Name] -> [Name] 
-      useDef (Entry _ _ _) live = live
-      useDef (Bind v t) live    = delete v live ++ useTail t
-      useDef (CaseM v alts) _   = v : concatMap (\(Alt _ vs t) -> useTail t \\ vs) alts
-      useDef (Done t) live      = live ++ useTail t
-
-      useTail                :: TailM -> [Name] 
-      useTail (Return v)     = [v]
-      useTail (Enter v1 v2)  = [v1, v2]
-      useTail (Closure _ vs) = vs
-      useTail (Call _ vs)    = vs
-      useTail (ConstrM _ vs) = vs
-
-  in maybeC id useDef e mids
+    useTail                :: TailM -> [Name] 
+    useTail (Return v)     = [v]
+    useTail (Enter v1 v2)  = [v1, v2]
+    useTail (Closure _ vs) = vs
+    useTail (Goto _ vs)    = maybe [] id vs
+    useTail (ConstrM _ vs) = vs
 
 -- Compiling from lambda-calculus to the monadic language.
 
@@ -156,15 +176,7 @@ compileM defs = compG $ foldr compDef initial $ addFVs defs
     newDefn name body = do
       addTop name
       prog <- compileStmtM body (return . mkLast . Done)
-      addDefn name (collectFree body) prog
-    -- | Collect free variables from Abs terms on 
-    -- the lambda-calculus expression.
-    collectFree :: Expr -> [Name]
-    collectFree (Abs _ vs _) = vs
-    collectFree (App e1 e2) = collectFree e1 ++ collectFree e2
-    collectFree (Var v) = [] 
-    collectFree (Case e alts) = collectFree e ++ concatMap (\(Alt _ _ e) -> collectFree e) alts
-    collectFree (Constr _ exprs) = concatMap collectFree exprs
+      addDefn name prog
 
 compileStmtM :: Expr 
   -> (TailM -> CompM (ProgM O C))
@@ -187,21 +199,16 @@ compileStmtM (Case e alts) ctx = do
   altsM <- mapM compAlt alts
   compVarM e $ \v -> return (mkLast (CaseM v altsM))
   where
-  callDefn :: String 
-           -> ProgM O C 
-           -> CompM TailM
-  callDefn name body = do 
-    f <- newTop name 
-    tops <- gets compT
-    let fvs = nub (freeM body \\ tops)
-    addDefn f fvs body
-    return (Call f fvs)
+    callDefn :: String -> ProgM O C -> CompM TailM
+    callDefn name body = do 
+      f <- newTop name 
+      return (Goto f Nothing)
 
 compileStmtM (Abs v fvs b) ctx = do
   let makeFunction b fvs = do
         prog <- compileStmtM b (return . mkLast . Done)
         name <- newTop "absBody"
-        addDefn name (v:fvs) prog
+        addDefn name prog
         return name
   f <- makeFunction b fvs
   ctx (Closure f fvs)
@@ -246,10 +253,10 @@ newTop name = do
 
 -- | Adds a function definition to the
 -- control flow graph.
-addDefn :: Name -> [Name] -> ProgM O C -> CompM ()
-addDefn name args progM = do
+addDefn :: Name -> ProgM O C -> CompM ()
+addDefn name progM = do
   l <- freshLabel
-  let def = mkFirst (Entry name args l) <*> progM
+  let def = mkFirst (Entry name Nothing l) <*> progM
   modify (\s@(C { compG, compT }) -> s { compG = def |*><*| compG })
 
 -- | Create a fresh variable with the given
@@ -333,7 +340,7 @@ printProgM = vcat' . maybeGraph empty printBlock
  
 printStmtM :: StmtM e x -> Doc
 printStmtM (Bind n b) = text n <+> text "<-" <+> nest 2 (printTailM b)
-printStmtM (Entry f args _ ) = text f <> parens (commaSep text args) <> text ":" 
+printStmtM (Entry f args _ ) = text f <> parens (maybeP (commaSep text) args) <> text ":" 
 printStmtM (CaseM v alts) = hang (text "case" <+> text v <+> text "of") 2 (vcat' $ map printAlt alts)
   where
     printAlt (Alt cons vs tailM) = text cons <+> hsep (texts vs) <+> text "->" <+> printTailM tailM
@@ -343,7 +350,7 @@ printTailM :: TailM -> Doc
 printTailM (Return n) = text "return" <+> text n
 printTailM (Enter f a) = text f <+> text "@" <+> text a
 printTailM (Closure f vs) = text "closure" <+> text f <+> braces (commaSep text vs)
-printTailM (Call f vs) = text f <> parens (hsep (punctuate comma (texts vs)))
+printTailM (Goto f vs) = text f <> parens (maybeP (commaSep text) vs)
 printTailM (ConstrM cons vs) = text cons <+> (hsep $ texts vs)
 
 -- Pretty-printing utilities
@@ -357,6 +364,11 @@ texts = map text
 
 punctuated :: Doc -> (a -> Doc) -> [a] -> Doc
 punctuated sep f = hcat . punctuate sep . map f
+
+-- | Use the printer given when j is a Just value,
+-- otherwise use the empty document.
+maybeP :: (a -> Doc) -> Maybe a -> Doc
+maybeP j = maybe empty j 
 
 -- Hoopl utilities
 
@@ -447,3 +459,82 @@ true :: Expr
 true = Constr "True" []
 
 
+-- Determining liveness in StmtM
+
+type LiveFact = Set Name
+
+liveOpt :: (map a ~ Fact x LiveFact,
+            FuelMonad m,
+            IsMap map,
+            CheckpointMonad m) => ProgM C x
+        -> m (ProgM C x)
+liveOpt body = do
+  let bwd = BwdPass { bp_lattice = liveLattice
+                       , bp_transfer = liveTransfer 
+                       , bp_rewrite = liveRewrite }
+      entry :: MaybeC C Label
+      entry = case body of
+                (GMany _ _ (JustO ex)) -> 
+                        case blockToNodeList' ex of
+                          (JustC (Entry _ _ l), _, _) -> JustC l
+  (body', _, _) <- analyzeAndRewriteBwd bwd entry body mapEmpty
+  return body'
+
+liveLattice :: DataflowLattice LiveFact
+liveLattice = DataflowLattice { fact_name = "Liveness"
+                              , fact_bot = Set.empty
+                              , fact_join = extend }
+  where
+    equal s1 s2 = Set.null (Set.difference s1 s2) && Set.null (Set.difference s2 s1)
+    extend _ (OldFact old) (NewFact new) = (changeIf (equal old new), Set.union old new)
+                                         
+{- | liveTransfer adds facts based on the type of node:
+
+    Open/Closed: Transfer all live registers from target labels.
+    Open/Open: Transfer all register that are live, remove any that are killed.
+    Closed/Open: Return all registers that are known to be live now.
+
+    Does this work for global registers allocated in TOP but only used elsewhere?
+-}
+liveTransfer :: BwdTransfer StmtM LiveFact
+liveTransfer = mkBTransfer live
+  where
+    live :: StmtM e x -> Fact x LiveFact -> LiveFact
+    live (Entry _ _ l) f = f
+    live (Bind v t) f = Set.delete v f  `Set.union` tailVars t
+    live (CaseM v alts) _ = Set.insert v (Set.unions (map setAlt alts))
+    live (Done t) _ = tailVars t
+    setAlt :: Alt TailM -> Set Name
+    setAlt (Alt _ ns e) = Set.difference (tailVars e) (Set.fromList ns)
+    fact f l = fromMaybe Set.empty $ lookupFact l f
+
+-- | Returns variables used in a tail expression.
+tailVars :: TailM -> Set Name
+tailVars (Enter v1 v2) = Set.fromList [v1, v2]
+tailVars (Closure _ vs) = Set.fromList vs
+tailVars (Goto _ vs) = maybe Set.empty (Set.fromList) vs
+tailVars (ConstrM _ vs) = Set.fromList vs
+
+
+-- type BwdRewrite n f = forall e x. n e x -> Fact x f -> Maybe (BwdRes n f e x)
+-- data BwdRes n f e x = BwdRes (AGraph n e x) (BwdRewrite n f)
+liveRewrite :: forall m . FuelMonad m => BwdRewrite m StmtM LiveFact
+liveRewrite = undefined
+{-
+liveRewrite = shallowBwdRw f
+  where
+    f :: SimpleBwdRewrite InstrNode LiveFact
+    f (Open (H.Copy _ dest)) live 
+            | dest `Set.member` live = Nothing
+            | otherwise = Just emptyGraph
+    f (Open (H.Load _ dest)) live 
+            | dest `Set.member` live = Nothing
+            | otherwise = Just emptyGraph
+    f (Open (H.Enter _ _ dest)) live 
+            | dest `Set.member` live = Nothing
+            | otherwise = Just emptyGraph
+    f (Open (H.MkClo dest _ _)) live 
+            | dest `Set.member` live = Nothing
+            | otherwise = Just emptyGraph
+    f _ _ = Nothing
+                                               -}
