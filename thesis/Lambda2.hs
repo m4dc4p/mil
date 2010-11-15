@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeSynonymInstances, GADTs, RankNTypes
-  , NamedFieldPuns, TypeFamilies #-}
+  , NamedFieldPuns, TypeFamilies, ScopedTypeVariables #-}
 
 module Lambda2
 
@@ -14,14 +14,15 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Compiler.Hoopl ((|*><*|), (<*>), mkFirst, mkLast, mkMiddle
                       , O, C, emptyClosedGraph, Graph, Graph'(..)
-                      , NonLocal(..), Label, freshLabel, IsMap(mapElems, mapEmpty)
+                      , NonLocal(..), Label, freshLabel, IsMap(..)
                       , Block, MaybeO(..), MaybeC(..), blockToNodeList'
                       , Unique, UniqueMonad(freshUnique), intToUnique
                       , BwdPass(..), analyzeAndRewriteBwd, mkFactBase
                       , DataflowLattice(..), OldFact(..), NewFact(..)
                       , ChangeFlag(..), BwdRewrite, BwdTransfer, FuelMonad(..)
-                      , changeIf, mkBTransfer, Fact, lookupFact
-                      , CheckpointMonad)
+                      , changeIf, mkBTransfer, Fact, lookupFact, FactBase
+                      , CheckpointMonad, noBwdRewrite, infiniteFuel, runWithFuel
+                      , runSimpleUniqueMonad, SimpleFuelMonad, SimpleUniqueMonad)
 
 
 {-
@@ -128,7 +129,7 @@ data TailM = Return Name
   | Enter Name     -- Variable holding the closure.
     Name         -- Argument to the function.
   | Closure Name   -- The variable holding the address of the function.
-    [Name]               -- List of captured free variables.
+    (Maybe [Name])               -- List of captured free variables.
   | Goto Name            -- Address of the block
     (Maybe [Name])       -- Arguments/live variables used in the
                          -- block. Uses Maybe so arguments can be
@@ -158,7 +159,8 @@ freeB b = maybeC id useDef e mids
     useTail                :: TailM -> [Name] 
     useTail (Return v)     = [v]
     useTail (Enter v1 v2)  = [v1, v2]
-    useTail (Closure _ vs) = vs
+    useTail (Closure _ (Just vs)) = vs
+    useTail (Closure _ _) = []
     useTail (Goto _ vs)    = maybe [] id vs
     useTail (ConstrM _ vs) = vs
 
@@ -211,7 +213,7 @@ compileStmtM (Abs v fvs b) ctx = do
         addDefn name prog
         return name
   f <- makeFunction b fvs
-  ctx (Closure f fvs)
+  ctx (Closure f (Just fvs))
 
 compileStmtM (Constr cons exprs) ctx = 
   let compExpr vs [] = ctx (ConstrM cons (reverse vs))
@@ -340,7 +342,7 @@ printProgM = vcat' . maybeGraph empty printBlock
  
 printStmtM :: StmtM e x -> Doc
 printStmtM (Bind n b) = text n <+> text "<-" <+> nest 2 (printTailM b)
-printStmtM (Entry f args _ ) = text f <> parens (maybeP (commaSep text) args) <> text ":" 
+printStmtM (Entry f args l ) = text (show l) <+> text f <> parens (maybeP (commaSep text) args) <> text ":" 
 printStmtM (CaseM v alts) = hang (text "case" <+> text v <+> text "of") 2 (vcat' $ map printAlt alts)
   where
     printAlt (Alt cons vs tailM) = text cons <+> hsep (texts vs) <+> text "->" <+> printTailM tailM
@@ -349,7 +351,7 @@ printStmtM (Done t) = printTailM t
 printTailM :: TailM -> Doc
 printTailM (Return n) = text "return" <+> text n
 printTailM (Enter f a) = text f <+> text "@" <+> text a
-printTailM (Closure f vs) = text "closure" <+> text f <+> braces (commaSep text vs)
+printTailM (Closure f vs) = text "closure" <+> text f <+> braces (maybeP (commaSep text) vs)
 printTailM (Goto f vs) = text f <> parens (maybeP (commaSep text) vs)
 printTailM (ConstrM cons vs) = text cons <+> (hsep $ texts vs)
 
@@ -396,7 +398,13 @@ main = do
   
 prog = putStrLn . render . vcat'. map printDef . addFVs 
 
-progM = putStrLn . render . printProgM . compileM 
+progM progs = do
+  let compProgs = compileM progs
+      pProgs = printProgM compProgs
+      liveVars = runSimpleUniqueMonad (runWithFuel 0 (findLive compProgs))
+      pLive = printFBL liveVars
+  putStrLn (render pProgs)
+  putStrLn (render pLive)
 
 abs :: Var -> (Expr -> Expr) -> Expr
 abs v f = Abs v [] (f (Var v))
@@ -463,22 +471,26 @@ true = Constr "True" []
 
 type LiveFact = Set Name
 
-liveOpt :: (map a ~ Fact x LiveFact,
-            FuelMonad m,
-            IsMap map,
-            CheckpointMonad m) => ProgM C x
-        -> m (ProgM C x)
-liveOpt body = do
+-- | Finds the live variables in the program
+-- given. 
+findLive :: (map a ~ Fact x LiveFact,
+            IsMap map) => ProgM C x
+        -> SimpleFuelMonad (FactBase LiveFact)
+findLive body = do
   let bwd = BwdPass { bp_lattice = liveLattice
                        , bp_transfer = liveTransfer 
                        , bp_rewrite = liveRewrite }
-      entry :: MaybeC C Label
+      getEntry :: (MaybeC e (StmtM C O)
+                  , [StmtM O O]
+                  , MaybeC x (StmtM O C)) -> Label
+      getEntry (JustC (Entry _ _ l), _, _) = l
+                  
+      entry :: MaybeC C [Label]
       entry = case body of
-                (GMany _ _ (JustO ex)) -> 
-                        case blockToNodeList' ex of
-                          (JustC (Entry _ _ l), _, _) -> JustC l
-  (body', _, _) <- analyzeAndRewriteBwd bwd entry body mapEmpty
-  return body'
+                (GMany _ blocks _) 
+                   | not (mapNull blocks) -> JustC (map (getEntry . blockToNodeList') (mapElems blocks))
+  (_, facts, _) <- analyzeAndRewriteBwd bwd entry body mapEmpty
+  return facts
 
 liveLattice :: DataflowLattice LiveFact
 liveLattice = DataflowLattice { fact_name = "Liveness"
@@ -511,7 +523,8 @@ liveTransfer = mkBTransfer live
 -- | Returns variables used in a tail expression.
 tailVars :: TailM -> Set Name
 tailVars (Enter v1 v2) = Set.fromList [v1, v2]
-tailVars (Closure _ vs) = Set.fromList vs
+tailVars (Closure _ (Just vs)) = Set.fromList vs
+tailVars (Closure _ _) = Set.empty
 tailVars (Goto _ vs) = maybe Set.empty (Set.fromList) vs
 tailVars (ConstrM _ vs) = Set.fromList vs
 
@@ -519,22 +532,18 @@ tailVars (ConstrM _ vs) = Set.fromList vs
 -- type BwdRewrite n f = forall e x. n e x -> Fact x f -> Maybe (BwdRes n f e x)
 -- data BwdRes n f e x = BwdRes (AGraph n e x) (BwdRewrite n f)
 liveRewrite :: forall m . FuelMonad m => BwdRewrite m StmtM LiveFact
-liveRewrite = undefined
-{-
-liveRewrite = shallowBwdRw f
-  where
-    f :: SimpleBwdRewrite InstrNode LiveFact
-    f (Open (H.Copy _ dest)) live 
-            | dest `Set.member` live = Nothing
-            | otherwise = Just emptyGraph
-    f (Open (H.Load _ dest)) live 
-            | dest `Set.member` live = Nothing
-            | otherwise = Just emptyGraph
-    f (Open (H.Enter _ _ dest)) live 
-            | dest `Set.member` live = Nothing
-            | otherwise = Just emptyGraph
-    f (Open (H.MkClo dest _ _)) live 
-            | dest `Set.member` live = Nothing
-            | otherwise = Just emptyGraph
-    f _ _ = Nothing
-                                               -}
+liveRewrite = noBwdRewrite
+
+-- print live facts
+
+progLive :: Prog -> IO ()
+progLive prog = do
+  let progM = compileM prog
+      facts :: FactBase LiveFact = runSimpleUniqueMonad (runWithFuel 0 (findLive progM))
+  putStrLn (render (printFBL facts))
+
+printFBL :: FactBase LiveFact -> Doc
+printFBL = vcat . map printFact . mapToList
+
+printFact :: (Label, Set Name) -> Doc
+printFact (l, ns) = text (show l) <> text ":" <+> commaSep text (Set.elems ns)
