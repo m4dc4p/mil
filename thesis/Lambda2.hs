@@ -104,6 +104,8 @@ Our monadic language:
            defMN
 -}
 
+type Dest = (Name, Label)
+
 data StmtM e x where
   -- | Entry point to a list of statements.
   Entry :: Name -- Name of the function
@@ -128,9 +130,9 @@ data StmtM e x where
 data TailM = Return Name 
   | Enter Name     -- Variable holding the closure.
     Name         -- Argument to the function.
-  | Closure Name   -- The variable holding the address of the function.
+  | Closure Dest   -- The variable holding the address of the function.
     (Maybe [Name])               -- List of captured free variables.
-  | Goto Name            -- Address of the block
+  | Goto Dest         -- Address of the block
     (Maybe [Name])       -- Arguments/live variables used in the
                          -- block. Uses Maybe so arguments can be
                          -- filled after live variable analysis of
@@ -179,6 +181,7 @@ compileM defs = compG $ foldr compDef initial $ addFVs defs
       addTop name
       prog <- compileStmtM body (return . mkLast . Done)
       addDefn name prog
+      return ()
 
 compileStmtM :: Expr 
   -> (TailM -> CompM (ProgM O C))
@@ -204,15 +207,14 @@ compileStmtM (Case e alts) ctx = do
     callDefn :: String -> ProgM O C -> CompM TailM
     callDefn name body = do 
       f <- newTop name 
-      addDefn f body
-      return (Goto f Nothing)
+      dest <- addDefn f body
+      return (Goto dest Nothing)
 
 compileStmtM (Abs v fvs b) ctx = do
   let makeFunction b fvs = do
         prog <- compileStmtM b (return . mkLast . Done)
         name <- newTop "absBody"
         addDefn name prog
-        return name
   f <- makeFunction b fvs
   ctx (Closure f (Just fvs))
 
@@ -256,11 +258,12 @@ newTop name = do
 
 -- | Adds a function definition to the
 -- control flow graph.
-addDefn :: Name -> ProgM O C -> CompM ()
+addDefn :: Name -> ProgM O C -> CompM Dest
 addDefn name progM = do
   l <- freshLabel
   let def = mkFirst (Entry name Nothing l) <*> progM
   modify (\s@(C { compG, compT }) -> s { compG = def |*><*| compG })
+  return (name, l)
 
 -- | Create a fresh variable with the given
 -- prefix.
@@ -343,7 +346,7 @@ printProgM = vcat' . maybeGraph empty printBlock
  
 printStmtM :: StmtM e x -> Doc
 printStmtM (Bind n b) = text n <+> text "<-" <+> nest 2 (printTailM b)
-printStmtM (Entry f args l ) = text (show l) <+> text f <> parens (maybeP (commaSep text) args) <> text ":" 
+printStmtM (Entry f args l ) = text (show l) <+> quotes (text f) <> parens (maybeP (commaSep text) args) <> text ":" 
 printStmtM (CaseM v alts) = hang (text "case" <+> text v <+> text "of") 2 (vcat' $ map printAlt alts)
   where
     printAlt (Alt cons vs tailM) = text cons <+> hsep (texts vs) <+> text "->" <+> printTailM tailM
@@ -352,9 +355,12 @@ printStmtM (Done t) = printTailM t
 printTailM :: TailM -> Doc
 printTailM (Return n) = text "return" <+> text n
 printTailM (Enter f a) = text f <+> text "@" <+> text a
-printTailM (Closure f vs) = text "closure" <+> text f <+> braces (maybeP (commaSep text) vs)
-printTailM (Goto f vs) = text f <> parens (maybeP (commaSep text) vs)
+printTailM (Closure dest vs) = text "closure" <+> printDest dest <+> braces (maybeP (commaSep text) vs)
+printTailM (Goto dest vs) = printDest dest <> parens (maybeP (commaSep text) vs)
 printTailM (ConstrM cons vs) = text cons <+> (hsep $ texts vs)
+
+printDest :: Dest -> Doc
+printDest (name, l) = text (show l) <+> quotes (text name)
 
 -- Pretty-printing utilities
 
