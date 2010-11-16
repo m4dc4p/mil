@@ -204,6 +204,7 @@ compileStmtM (Case e alts) ctx = do
     callDefn :: String -> ProgM O C -> CompM TailM
     callDefn name body = do 
       f <- newTop name 
+      addDefn f body
       return (Goto f Nothing)
 
 compileStmtM (Abs v fvs b) ctx = do
@@ -527,7 +528,7 @@ tailVars (Closure _ (Just vs)) = Set.fromList vs
 tailVars (Closure _ _) = Set.empty
 tailVars (Goto _ vs) = maybe Set.empty (Set.fromList) vs
 tailVars (ConstrM _ vs) = Set.fromList vs
-
+tailVars (Return n) = Set.singleton n
 
 -- type BwdRewrite n f = forall e x. n e x -> Fact x f -> Maybe (BwdRes n f e x)
 -- data BwdRes n f e x = BwdRes (AGraph n e x) (BwdRewrite n f)
