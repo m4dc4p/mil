@@ -461,6 +461,13 @@ myMap = ("myMap", def)
                                                    (App (App (Var "myMap") f)
                                                         (Var "xs")))]
 
+funkyDef :: Def
+funkyDef  = ("funky", funky)
+-- \x y -> (case y of True -> (\z -> z))  x
+funky   = abs "x" $ \x ->
+           abs "y" $ \y ->
+            App (Case y [Alt "True" [] (abs "z" id)]) x
+
 mkCons :: Expr -> Expr -> Expr                                        
 mkCons x xs = Constr "Cons" [x, xs]
 
@@ -480,7 +487,7 @@ type LiveFact = Set Name
 
 -- | Finds the live variables in the program
 -- given. 
-findLive :: (map a ~ Fact x LiveFact,
+findLive :: (Fact x LiveFact ~ map a,
             IsMap map) => ProgM C x
         -> SimpleFuelMonad (FactBase LiveFact)
 findLive body = do
