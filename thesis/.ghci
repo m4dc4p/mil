@@ -1,0 +1,5 @@
+:def sl (\ _ -> return ":steplocal")
+:def st (\args -> return $ ":step " ++ args)
+:def sm (\ _ -> return ":stepmodule")
+:set stop :list
+

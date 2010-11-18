@@ -10,20 +10,11 @@ import Control.Monad.State (State, execState, modify, gets)
 import Text.PrettyPrint 
 import Data.List (intersperse, (\\), union, nub, delete)
 import Data.Maybe (fromMaybe)
+import Data.Map (Map)
+import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Compiler.Hoopl ((|*><*|), (<*>), mkFirst, mkLast, mkMiddle
-                      , O, C, emptyClosedGraph, Graph, Graph'(..)
-                      , NonLocal(..), Label, freshLabel, IsMap(..)
-                      , Block, MaybeO(..), MaybeC(..), blockToNodeList'
-                      , Unique, UniqueMonad(freshUnique), intToUnique
-                      , BwdPass(..), analyzeAndRewriteBwd, mkFactBase
-                      , DataflowLattice(..), OldFact(..), NewFact(..)
-                      , ChangeFlag(..), BwdRewrite, BwdTransfer, FuelMonad(..)
-                      , changeIf, mkBTransfer, Fact, lookupFact, FactBase
-                      , CheckpointMonad, noBwdRewrite, infiniteFuel, runWithFuel
-                      , runSimpleUniqueMonad, SimpleFuelMonad, SimpleUniqueMonad)
-
+import Compiler.Hoopl hiding (addTop)
 
 {-
 
@@ -409,49 +400,48 @@ maybeGraph b f (GMany entry middles exit) = maybeO b f entry :
                                         (map f . mapElems $ middles) ++
                                         [maybeO b f exit]
 
+-- | Get all the labels at entry points in 
+-- the program.
+entryPoints :: ProgM C C -> [Label]
+entryPoints (GMany _ blocks _) = map (getEntry . blockToNodeList') (mapElems blocks)
+  where
+    getEntry :: (MaybeC e (StmtM C O)
+                , [StmtM O O]
+                , MaybeC x (StmtM O C)) -> Label
+    getEntry (JustC (Entry _ _ _ l), _, _) = l
+                  
+
 -- Determining liveness in StmtM
 
 type LiveFact = Set Name
 
-findLive tops = runSimpleUniqueMonad . runWithFuel 0 . findLive' tops
+-- | Finds the live variables in all blocks in the
+-- program given. The tops argument specifies top-level
+-- names that cannot be free.
+findLive :: [Name] -> ProgM C C -> FactBase LiveFact
+findLive tops body = runSimpleUniqueMonad $ runWithFuel 0 findLive' 
+  where
+    -- | Finds the live variables in the program
+    -- given. 
+    findLive' :: SimpleFuelMonad (FactBase LiveFact)
+    findLive' = do
+      (_, f, _) <- analyzeAndRewriteBwd bwd (JustC (entryPoints body)) body mapEmpty
+      return f
+    bwd = BwdPass { bp_lattice = liveLattice
+                  , bp_transfer = liveTransfer (Set.fromList tops)
+                  -- we don't rewrite on this analysis
+                  , bp_rewrite = noBwdRewrite } 
 
--- | Finds the live variables in the program
--- given. 
-findLive' :: (Fact x LiveFact ~ map a,
-            IsMap map) => [Name] 
-          -> ProgM C x
-          -> SimpleFuelMonad (FactBase LiveFact)
-findLive' tops body = do
-  let bwd = BwdPass { bp_lattice = liveLattice
-                       , bp_transfer = liveTransfer (Set.fromList tops)
-                       , bp_rewrite = liveRewrite }
-      getEntry :: (MaybeC e (StmtM C O)
-                  , [StmtM O O]
-                  , MaybeC x (StmtM O C)) -> Label
-      getEntry (JustC (Entry _ _ _ l), _, _) = l
-                  
-      entry :: MaybeC C [Label]
-      entry = case body of
-                (GMany _ blocks _) -> JustC (map (getEntry . blockToNodeList') (mapElems blocks))
-  (_, facts, _) <- analyzeAndRewriteBwd bwd entry body mapEmpty
-  return facts
-
+-- | Initial setup for liveness analysis.
 liveLattice :: DataflowLattice LiveFact
 liveLattice = DataflowLattice { fact_name = "Liveness"
                               , fact_bot = Set.empty
                               , fact_join = extend }
   where
-    equal s1 s2 = Set.null (Set.difference s1 s2) && Set.null (Set.difference s2 s1)
-    extend _ (OldFact old) (NewFact new) = (changeIf (equal old new), Set.union old new)
-                                         
-{- | liveTransfer adds facts based on the type of node:
+    extend _ (OldFact old) (NewFact new) = (changeIf (Set.null (Set.difference new old))
+                                           , Set.union old new)
 
-    Open/Closed: Transfer all live registers from target labels.
-    Open/Open: Transfer all register that are live, remove any that are killed.
-    Closed/Open: Return all registers that are known to be live now.
-
-    Does this work for global registers allocated in TOP but only used elsewhere?
--}
+-- | Transfer liveness backwards across nodes.                                         
 liveTransfer :: Set Name -> BwdTransfer StmtM LiveFact
 liveTransfer tops = mkBTransfer live
   where
@@ -464,20 +454,17 @@ liveTransfer tops = mkBTransfer live
     setAlt :: FactBase LiveFact -> Alt TailM -> Set Name
     setAlt f (Alt _ ns e) = Set.difference (tailVars f e) (Set.fromList ns)
 
-    fact f l = fromMaybe Set.empty $ lookupFact l f
-
     -- | Returns variables used in a tail expression.
     tailVars :: FactBase LiveFact -> TailM -> Set Name
-    tailVars f (Closure (_, l) vs) = Set.fromList vs `Set.union` fact f l
-    tailVars f (Goto (_, l) vs) = Set.fromList vs `Set.union` fact f l
+    tailVars f (Closure (_, l) vs) = Set.fromList vs `Set.union` liveFact f l
+    tailVars f (Goto (_, l) vs) = Set.fromList vs `Set.union` liveFact f l
     tailVars _ (Enter v1 v2) = Set.fromList [v1, v2]
     tailVars _ (ConstrM _ vs) = Set.fromList vs
     tailVars _ (Return n) = Set.singleton n
 
--- type BwdRewrite n f = forall e x. n e x -> Fact x f -> Maybe (BwdRes n f e x)
--- data BwdRes n f e x = BwdRes (AGraph n e x) (BwdRewrite n f)
-liveRewrite :: forall m . FuelMonad m => BwdRewrite m StmtM LiveFact
-liveRewrite = noBwdRewrite
+-- | Retrieve a fact or the empty set
+liveFact :: FactBase LiveFact -> Label -> Set Name
+liveFact f l = fromMaybe Set.empty $ lookupFact l f
 
 -- print live facts
 
@@ -486,6 +473,69 @@ printFBL = vcat . map printFact . mapToList
 
 printFact :: (Label, Set Name) -> Doc
 printFact (l, ns) = text (show l) <> text ":" <+> commaSep text (Set.elems ns)
+
+
+-- From mon5.lhs
+--     v <- return w; c  ==>  c       if v == w
+--                       ==> [w/v] c  otherwise
+--     Bind v (Return w) c  ==> c    if v==w
+--                       c  ==> [w/v] c  otherwise
+
+-- | Substitute the key for the value.
+type BindFact = Map Name Name
+
+bindSubst :: ProgM C C -> ProgM C C
+bindSubst body = runSimpleUniqueMonad $ runWithFuel infiniteFuel bindSubst'
+  where
+    bindSubst' :: SimpleFuelMonad (ProgM C C)
+    bindSubst' = do
+      let entries = entryPoints body
+          initial = mapFromList (zip entries (repeat Map.empty))
+      (p, _, _) <- analyzeAndRewriteFwd fwd (JustC entries) body initial
+      return p
+    fwd = FwdPass { fp_lattice = bindSubstLattice
+                  , fp_transfer = bindSubstTransfer
+                  , fp_rewrite = bindSubstRewrite }
+
+bindSubstLattice :: DataflowLattice BindFact
+bindSubstLattice = DataflowLattice { fact_name = "Bind/Return substitution"
+                                   , fact_bot = Map.empty
+                                   , fact_join = extend }
+  where
+    extend _ (OldFact old) (NewFact new) = (changeIf (Map.isProperSubmapOf old new)
+                                           , new)
+
+bindSubstTransfer :: FwdTransfer StmtM BindFact
+bindSubstTransfer = mkFTransfer bindSubst
+  where
+    bindSubst :: StmtM e x -> BindFact -> Fact x BindFact
+    bindSubst (Bind v (Return w)) m = Map.insert v w m 
+    bindSubst (Bind v _) m = m 
+    bindSubst (Entry _ _ _ l) m = m 
+    bindSubst (CaseM _ alts) m = 
+      mkFactBase bindSubstLattice (zip (concatMap altLabels alts) (repeat m))
+    bindSubst (Done t) m = 
+      mkFactBase bindSubstLattice (zip (tailLabel t) (repeat m))
+
+    altLabels :: Alt TailM -> [Label]
+    altLabels (Alt _ _ t) = tailLabel t
+
+    tailLabel :: TailM -> [Label]
+    tailLabel (Closure (_, l) _) = [l]
+    tailLabel (Goto (_, l) _ ) = [l]
+    tailLabel _ = []
+
+bindSubstRewrite :: FwdRewrite SimpleFuelMonad StmtM BindFact
+bindSubstRewrite = mkFRewrite sub
+  where
+    sub :: forall e x. StmtM e x -> BindFact -> SimpleFuelMonad (Maybe (ProgM e x))
+    sub (Bind v (Return w)) f
+      | v == w  || Map.member v f = return (Just emptyGraph)
+      | otherwise = return Nothing
+    sub _ _ = return Nothing
+
+bindFact :: FactBase BindFact -> Label -> Map Name Name
+bindFact f l = fromMaybe Map.empty $ lookupFact l f
 
 -- Testing & Examples
 
@@ -507,7 +557,11 @@ main = progM defs
 progM progs = do
   let tops = map fst defs
       compiled def = (def, compileM tops def)
-      withLive (def, comp) = (def, (comp, findLive tops comp))
+
+      addLive (def, comp) = (def, (comp, findLive tops comp))
+
+      withBindSubst (def, comp) = (def, bindSubst comp )
+
       printWithLive live p = 
         let (e, _, _) = blockToNodeList' p 
             vars = maybe [] Set.elems (lookupFact (((\(JustC (Entry _ _ _ l)) -> l) :: MaybeC e (StmtM C O) -> Label) e) live)
@@ -518,8 +572,11 @@ progM progs = do
            printBlockM p 
       print (def, (comp, live)) = printDef def $+$
                                   vcat' (maybeGraph empty (printWithLive live) comp)
-  putStrLn (render (vcat' (map ((text "" $+$) . print . withLive . compiled) progs)))
+  putStrLn (render (vcat' (map ((text "" $+$) . print . addLive . compiled) progs)))
+  putStrLn "============================"
+  putStrLn (render (vcat' (map ((text "" $+$) . print . addLive . withBindSubst . compiled) progs)))
 
+           
 abs :: Var -> (Expr -> Expr) -> Expr
 abs v f = Abs v [] (f (Var v))
 
