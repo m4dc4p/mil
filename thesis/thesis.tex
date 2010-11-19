@@ -14,12 +14,13 @@
 \usepackage{ifthen}
 \newboolean{lhs2tex}
 \setboolean{lhs2tex}{true}
+% Awkward Habit: Design and Optimization of A Monadic Intermediate Language
 \title{Design and optimization of a monadic intermediate language}
 %if False
 \setboolean{lhs2tex}{false}
-\author{Justin Bailey \\ \url{jgbailey@gmail.com}}
+\author{Justin Bailey \\ \url{justinb@cs.pdx.edu}}
 %else
-\ifthenelse{\boolean{lhs2tex}}{\author{Justin Bailey \\ \url{jgbailey@@gmail.com}}}{}
+\ifthenelse{\boolean{lhs2tex}}{\author{Justin Bailey \\ \url{justinb@@cs.pdx.edu}}}{}
 %endif
 \date{\today}
 
@@ -32,12 +33,12 @@
 
 \section{Abstract}
 
-This thesis describes two related efforts from Caffeine, a compiler
-from the functional language Habit to x86 assembly. The
-first, a novel monadic intermediate language named BC, makes
-allocation of heap objects such as closures and data values
-explicit. The second uses the Hoopl library to implement dataflow
-optimizations for BC based on the ``monad laws.''
+This thesis describes two related efforts in Caffeine, a compiler for
+the Habit programming language. The first, a novel monadic
+intermediate language named BC, makes allocation of heap objects such
+as closures and data values explicit. The second uses the Hoopl
+library to implement dataflow optimizations for BC based on the
+``monad laws.''
 
 \section{Audience}
 
@@ -59,7 +60,7 @@ Describes Hoopl and its use.
 
 Catalog of optimizations implemented over BC using Hoopl.
 
-\section{Eliminating Heap Alloction in BC using Hoopl}
+\section{Eliminating Heap Allocation in BC using Hoopl}
 
 Special attention to an optimization for eliminating heap allocation
 in BC programs.
