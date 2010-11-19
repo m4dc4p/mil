@@ -403,13 +403,14 @@ maybeGraph b f (GMany entry middles exit) = maybeO b f entry :
 -- | Get all the labels at entry points in 
 -- the program.
 entryPoints :: ProgM C C -> [Label]
-entryPoints (GMany _ blocks _) = map (getEntry . blockToNodeList') (mapElems blocks)
-  where
-    getEntry :: (MaybeC e (StmtM C O)
-                , [StmtM O O]
-                , MaybeC x (StmtM O C)) -> Label
-    getEntry (JustC (Entry _ _ _ l), _, _) = l
-                  
+entryPoints (GMany _ blocks _) = map getEntryLabel (mapElems blocks)
+
+getEntryLabel :: Block StmtM e x -> Label
+getEntryLabel block = case blockToNodeList' block of
+  (JustC (Entry _ _ _ l), _, _) -> l
+
+printFB :: (IsMap map) => ((KeyOf map, a) -> Doc) -> map a -> Doc
+printFB p = vcat . map p . mapToList
 
 -- Determining liveness in StmtM
 
@@ -468,12 +469,11 @@ liveFact f l = fromMaybe Set.empty $ lookupFact l f
 
 -- print live facts
 
-printFBL :: FactBase LiveFact -> Doc
-printFBL = vcat . map printFact . mapToList
+printLiveFacts :: FactBase LiveFact -> Doc
+printLiveFacts = printFB printFact
 
 printFact :: (Label, Set Name) -> Doc
 printFact (l, ns) = text (show l) <> text ":" <+> commaSep text (Set.elems ns)
-
 
 -- From mon5.lhs
 --     v <- return w; c  ==>  c       if v == w
@@ -484,15 +484,15 @@ printFact (l, ns) = text (show l) <> text ":" <+> commaSep text (Set.elems ns)
 -- | Substitute the key for the value.
 type BindFact = Map Name Name
 
-bindSubst :: ProgM C C -> ProgM C C
+bindSubst :: ProgM C C -> (ProgM C C, FactBase BindFact)
 bindSubst body = runSimpleUniqueMonad $ runWithFuel infiniteFuel bindSubst'
   where
-    bindSubst' :: SimpleFuelMonad (ProgM C C)
+    bindSubst' :: SimpleFuelMonad (ProgM C C, FactBase BindFact)
     bindSubst' = do
       let entries = entryPoints body
           initial = mapFromList (zip entries (repeat Map.empty))
-      (p, _, _) <- analyzeAndRewriteFwd fwd (JustC entries) body initial
-      return p
+      (p, facts, _) <- analyzeAndRewriteFwd fwd (JustC entries) body initial
+      return (p, facts)
     fwd = FwdPass { fp_lattice = bindSubstLattice
                   , fp_transfer = bindSubstTransfer
                   , fp_rewrite = bindSubstRewrite }
@@ -502,7 +502,7 @@ bindSubstLattice = DataflowLattice { fact_name = "Bind/Return substitution"
                                    , fact_bot = Map.empty
                                    , fact_join = extend }
   where
-    extend _ (OldFact old) (NewFact new) = (changeIf (Map.isProperSubmapOf old new)
+    extend _ (OldFact old) (NewFact new) = (changeIf (old /= new)
                                            , new)
 
 bindSubstTransfer :: FwdTransfer StmtM BindFact
@@ -510,8 +510,8 @@ bindSubstTransfer = mkFTransfer bindSubst
   where
     bindSubst :: StmtM e x -> BindFact -> Fact x BindFact
     bindSubst (Bind v (Return w)) m = Map.insert v w m 
-    bindSubst (Bind v _) m = m 
-    bindSubst (Entry _ _ _ l) m = m 
+    bindSubst (Bind v _) m = Map.delete v m 
+    bindSubst (Entry n _ _ l) m = m
     bindSubst (CaseM _ alts) m = 
       mkFactBase bindSubstLattice (zip (concatMap altLabels alts) (repeat m))
     bindSubst (Done t) m = 
@@ -537,6 +537,12 @@ bindSubstRewrite = mkFRewrite sub
 bindFact :: FactBase BindFact -> Label -> Map Name Name
 bindFact f l = fromMaybe Map.empty $ lookupFact l f
 
+printBindFacts :: FactBase BindFact -> Doc
+printBindFacts = printFB printFact
+  where
+    printFact :: (Label, Map Name Name) -> Doc
+    printFact (l, ns) = text (show l) <> text ":" <+> commaSep (text . show) (Map.toList ns)
+
 -- Testing & Examples
 
 defs = [isnt
@@ -560,21 +566,30 @@ progM progs = do
 
       addLive (def, comp) = (def, (comp, findLive tops comp))
 
-      withBindSubst (def, comp) = (def, bindSubst comp )
-
-      printWithLive live p = 
-        let (e, _, _) = blockToNodeList' p 
-            vars = maybe [] Set.elems (lookupFact (((\(JustC (Entry _ _ _ l)) -> l) :: MaybeC e (StmtM C O) -> Label) e) live)
+      withBindSubst (def, comp) = (def, bindSubst comp)
+      
+      printLive live p = 
+        let label = getEntryLabel p
+            vars = maybe [] Set.elems (lookupFact label live)
             livePrefix = if null vars
                          then text "[nothing live]"
                          else brackets (commaSep text vars) 
-        in livePrefix <+>
-           printBlockM p 
-      print (def, (comp, live)) = printDef def $+$
-                                  vcat' (maybeGraph empty (printWithLive live) comp)
-  putStrLn (render (vcat' (map ((text "" $+$) . print . addLive . compiled) progs)))
+        in livePrefix <+> printBlockM p 
+      printWithLive (def, (comp, live)) = printDef def $+$
+                                  vcat' (maybeGraph empty (printLive live) comp)
+      printBind bindByLabel p =
+        let label = getEntryLabel p
+            binds = maybe [] Map.toList (lookupFact label bindByLabel)
+            bindPrefix = if null binds
+                         then text "[no binds]"
+                         else brackets (commaSep (text . show) binds)
+        in bindPrefix <+> printBlockM p
+      printWithBind (def, (comp, binds)) = printDef def $+$
+                                           vcat' (maybeGraph empty (printBind binds) comp) 
+  
+  putStrLn (render (vcat' (map ((text "" $+$) . printWithLive . addLive . compiled) progs)))
   putStrLn "============================"
-  putStrLn (render (vcat' (map ((text "" $+$) . print . addLive . withBindSubst . compiled) progs)))
+  putStrLn (render (vcat' (map ((text "" $+$) . printWithBind . withBindSubst . compiled) progs)))
 
            
 abs :: Var -> (Expr -> Expr) -> Expr
