@@ -529,10 +529,17 @@ bindSubstRewrite :: FwdRewrite SimpleFuelMonad StmtM BindFact
 bindSubstRewrite = mkFRewrite sub
   where
     sub :: forall e x. StmtM e x -> BindFact -> SimpleFuelMonad (Maybe (ProgM e x))
-    sub (Bind v (Return w)) f
-      | v == w  || Map.member v f = return (Just emptyGraph)
+    sub (Bind v (Return w)) f 
+      | v == w || Map.member v f = return (Just emptyGraph)
       | otherwise = return Nothing
     sub _ _ = return Nothing
+
+{-bindSubstRewriteIllegal :: FwdRewrite SimpleFuelMonad StmtM BindFact
+bindSubstRewriteIllegal = wrapFR (const (sub Map.empty)) (noFwdRewrite :: FwdRewrite SimpleFuelMonad StmtM BindFact)
+  where
+    sub :: forall e x. BindFact -> StmtM e x -> BindFact -> SimpleFuelMonad (Maybe (ProgM e x, FwdRewrite SimpleFuelMonad StmtM BindFact))
+    sub _ (Bind v (Return w)) = return (Just (emptyGraph, noFwdRewrite))
+    sub _ _ _ = return Nothing-}
 
 bindFact :: FactBase BindFact -> Label -> Map Name Name
 bindFact f l = fromMaybe Map.empty $ lookupFact l f
