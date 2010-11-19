@@ -9,8 +9,8 @@ import Prelude hiding (abs)
 import Control.Monad.State (State, execState, modify, gets)
 import Text.PrettyPrint 
 import Data.List (intersperse, (\\), union, nub, delete)
-import Data.Maybe (fromMaybe)
-import Data.Map (Map)
+import Data.Maybe (fromMaybe, isJust)
+import Data.Map (Map, (!))
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -100,7 +100,7 @@ type Dest = (Name, Label)
 data StmtM e x where
   -- | Entry point to a list of statements.
   Entry :: Name -- Name of the function
-    -> [Name] -- argument
+    -> [Name] -- arguments
     -> [Name]   -- Variables in closure
     -> Label    -- Label of the entry point.
     -> StmtM C O
@@ -484,15 +484,15 @@ printFact (l, ns) = text (show l) <> text ":" <+> commaSep text (Set.elems ns)
 -- | Substitute the key for the value.
 type BindFact = Map Name Name
 
-bindSubst :: ProgM C C -> (ProgM C C, FactBase BindFact)
+bindSubst :: ProgM C C -> (ProgM C C)
 bindSubst body = runSimpleUniqueMonad $ runWithFuel infiniteFuel bindSubst'
   where
-    bindSubst' :: SimpleFuelMonad (ProgM C C, FactBase BindFact)
+    bindSubst' :: SimpleFuelMonad (ProgM C C)
     bindSubst' = do
       let entries = entryPoints body
           initial = mapFromList (zip entries (repeat Map.empty))
-      (p, facts, _) <- analyzeAndRewriteFwd fwd (JustC entries) body initial
-      return (p, facts)
+      (p, _, _) <- analyzeAndRewriteFwd fwd (JustC entries) body initial
+      return p
     fwd = FwdPass { fp_lattice = bindSubstLattice
                   , fp_transfer = bindSubstTransfer
                   , fp_rewrite = bindSubstRewrite }
@@ -525,24 +525,50 @@ bindSubstTransfer = mkFTransfer bindSubst
     tailLabel (Goto (_, l) _ ) = [l]
     tailLabel _ = []
 
-bindSubstRewrite :: FwdRewrite SimpleFuelMonad StmtM BindFact
-bindSubstRewrite = mkFRewrite sub
+bindSubstRewrite :: FuelMonad m => FwdRewrite m StmtM BindFact
+bindSubstRewrite = iterFwdRw (mkFRewrite sub) -- deep rewriting used
+                                              -- so all possible
+                                              -- substitutions occur
   where
-    sub :: forall e x. StmtM e x -> BindFact -> SimpleFuelMonad (Maybe (ProgM e x))
-    sub (Bind v (Return w)) f 
-      | v == w || Map.member v f = return (Just emptyGraph)
-      | otherwise = return Nothing
+    sub :: FuelMonad m => forall e x. StmtM e x -> BindFact -> m (Maybe (ProgM e x))
+    sub (Bind v t) f = bind v (subTail f t)
+    sub (CaseM v alts) f 
+        | Map.member v f = _case (f ! v) alts
+        | any isJust alts' = _case v (zipWith altZip alts alts')
+        where
+          alts' = map replaceAlt alts
+          replaceAlt (Alt c ns t) 
+            | anyIn f ns = Just $ Alt c (map (replace f) ns) t
+            | otherwise = maybe Nothing (Just . Alt c ns) (subTail f t)
+          altZip _ (Just a) = a
+          altZip a _ = a
+    sub (Done t) f = done (subTail f t)
     sub _ _ = return Nothing
 
-{-bindSubstRewriteIllegal :: FwdRewrite SimpleFuelMonad StmtM BindFact
-bindSubstRewriteIllegal = wrapFR (const (sub Map.empty)) (noFwdRewrite :: FwdRewrite SimpleFuelMonad StmtM BindFact)
-  where
-    sub :: forall e x. BindFact -> StmtM e x -> BindFact -> SimpleFuelMonad (Maybe (ProgM e x, FwdRewrite SimpleFuelMonad StmtM BindFact))
-    sub _ (Bind v (Return w)) = return (Just (emptyGraph, noFwdRewrite))
-    sub _ _ _ = return Nothing-}
+    subTail :: BindFact -> TailM -> Maybe TailM
+    subTail f (Return v) 
+      | Map.member v f = Just $ Return (f ! v)
+    subTail f (Enter v w)
+      | Map.member v f = Just $ Enter (f ! v) w
+      | Map.member w f = Just $ Enter v (f ! w)
+    subTail f (Closure d ns) 
+      | anyIn f ns = Just $ Closure d (map (replace f) ns)
+    subTail f (Goto d ns) 
+      | anyIn f ns = Just $ Goto d (map (replace f) ns)
+    subTail _ _ = Nothing
 
-bindFact :: FactBase BindFact -> Label -> Map Name Name
-bindFact f l = fromMaybe Map.empty $ lookupFact l f
+    anyIn f ns = any (\n -> Map.member n f) ns
+
+    replace f n = fromMaybe n (Map.lookup n f)
+
+    done :: FuelMonad m => Maybe TailM -> m (Maybe (ProgM O C))
+    done = return . maybe Nothing (Just . mkLast . Done)
+
+    bind :: FuelMonad m => Name -> Maybe TailM -> m (Maybe (ProgM O O))
+    bind v = return . maybe Nothing (Just . mkMiddle . Bind v)
+
+    _case :: FuelMonad m => Name -> [Alt TailM] -> m (Maybe (ProgM O C))
+    _case v = return . Just . mkLast . CaseM v
 
 printBindFacts :: FactBase BindFact -> Doc
 printBindFacts = printFB printFact
@@ -584,18 +610,11 @@ progM progs = do
         in livePrefix <+> printBlockM p 
       printWithLive (def, (comp, live)) = printDef def $+$
                                   vcat' (maybeGraph empty (printLive live) comp)
-      printBind bindByLabel p =
-        let label = getEntryLabel p
-            binds = maybe [] Map.toList (lookupFact label bindByLabel)
-            bindPrefix = if null binds
-                         then text "[no binds]"
-                         else brackets (commaSep (text . show) binds)
-        in bindPrefix <+> printBlockM p
-      printWithBind (def, (comp, binds)) = printDef def $+$
-                                           vcat' (maybeGraph empty (printBind binds) comp) 
+      printWithBind (def, comp) = printDef def $+$
+                                           vcat' (maybeGraph empty printBlockM comp) 
   
   putStrLn (render (vcat' (map ((text "" $+$) . printWithLive . addLive . compiled) progs)))
-  putStrLn "============================"
+  putStrLn "\n============================"
   putStrLn (render (vcat' (map ((text "" $+$) . printWithBind . withBindSubst . compiled) progs)))
 
            
