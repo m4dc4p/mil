@@ -14,8 +14,7 @@
 \usepackage{ifthen}
 \newboolean{lhs2tex}
 \setboolean{lhs2tex}{true}
-\title{Efficient compilation of functional languages using a monadic
-  intermediate language.}
+\title{Design and optimization of a monadic intermediate language}
 %if False
 \setboolean{lhs2tex}{false}
 \author{Justin Bailey \\ \url{jgbailey@gmail.com}}
@@ -31,23 +30,43 @@
 
 \maketitle
 
+\section{Abstract}
+
+This thesis describes two related efforts from Caffeine, a compiler
+from the functional language Habit to x86 assembly. The
+first, a novel monadic intermediate language named BC, makes
+allocation of heap objects such as closures and data values
+explicit. The second uses the Hoopl library to implement dataflow
+optimizations for BC based on the ``monad laws.''
+
 \section{Audience}
 
 \section{Introduction/Overview}
 
 \section{BC -- The Language of Blocks and Captures}
 
-Defines the basic BC language.
+Defines, motivates and gives examples of the BC language.
 
 \section{Compiling the \lamA to BC}
 
 Demonstrates compiliation from a variant of the \lamA to BC. 
 
-\section{Closure Elimination using BC}
+\section{Dataflow Optimization and the Hoopl Library}
 
-\section{Compiling Habit to BC}
+Describes Hoopl and its use.
 
-\section{Other Optimizations}
+\section{Optimizing BC Programs Using Hoopl}
+
+Catalog of optimizations implemented over BC using Hoopl.
+
+\section{Eliminating Heap Alloction in BC using Hoopl}
+
+Special attention to an optimization for eliminating heap allocation
+in BC programs.
+
+\section{Compiling Habit to BC to x86}
+
+How it all came together.
 
 \section{Conclusion \& Future Work}
 
