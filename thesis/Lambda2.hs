@@ -455,12 +455,13 @@ _case v f alts
 
 type LiveFact = Set Name
 
--- | Adds free variables to BlockEntry and Goto statements. Returns
--- the rewritten program and the live variables at all labels
--- (BlockEntry and CloEntry). The tops argument specifies top-level
--- names that cannot be free.
-addLive :: [Name] -> ProgM C C -> (ProgM C C, FactBase LiveFact)
-addLive tops body = runSimpleUniqueMonad $ runWithFuel infiniteFuel findLive' 
+-- | Used to apply different rewriters which all require 
+-- live variable analysis.
+usingLive :: (forall m. FuelMonad m => (BwdRewrite m StmtM LiveFact)) -- ^ Rewrite to use
+          -> [Name] -- ^ Top-level variables
+          -> ProgM C C -- ^ Program to rewrite
+          -> (ProgM C C, FactBase LiveFact) -- Results
+usingLive rewriter tops body = runSimpleUniqueMonad $ runWithFuel infiniteFuel findLive' 
   where
     -- | Finds the live variables in the program
     -- given. 
@@ -470,40 +471,15 @@ addLive tops body = runSimpleUniqueMonad $ runWithFuel infiniteFuel findLive'
       return (p, f)
     bwd = BwdPass { bp_lattice = liveLattice
                   , bp_transfer = liveTransfer (Set.fromList tops)
-                  , bp_rewrite = liveRewrite } 
+                  , bp_rewrite = rewriter } 
 
-liveRewrite :: FuelMonad m => BwdRewrite m StmtM LiveFact
-liveRewrite = mkBRewrite rewrite
-  where
-    rewrite :: FuelMonad m => forall e x. StmtM e x -> Fact x LiveFact -> m (Maybe (ProgM e x))
-    rewrite (Done t) f = done (rewriteTail f t)
-    rewrite (BlockEntry n l args) live 
-      | live /= Set.fromList args = blockEntry n l (sort (Set.toList live))
-    rewrite (CaseM n alts) f = _case n (rewriteAlt f) alts
-    -- Why do I not need to worry about Bind here? What shows I can't have a 
-    -- Goto in the tail?
-    rewrite _ _ = return Nothing
-    
-    rewriteAlt f (Alt c ns t) = maybe Nothing (Just . Alt c ns) (rewriteTail f t)
-
-    rewriteTail :: FactBase LiveFact -> TailM -> Maybe TailM
-    rewriteTail f (Goto (n, l) vs) = 
-      case l `mapLookup` f of
-        Just vs' 
-          | vs' /= Set.fromList vs -> Just (Goto (n,l) (sort (Set.toList vs')))
-        _ -> Nothing
-    rewriteTail _ _ = Nothing
-    
-    blockEntry :: FuelMonad m => Name -> Label -> [Name] -> m (Maybe (ProgM C O))
-    blockEntry n l args = return $ Just $ mkFirst $ BlockEntry n l args
-    
 -- | Initial setup for liveness analysis.
 liveLattice :: DataflowLattice LiveFact
 liveLattice = DataflowLattice { fact_name = "Liveness"
                               , fact_bot = Set.empty
                               , fact_join = extend }
-
-extend _ (OldFact old) (NewFact new) = (changeIf (not (Set.null (Set.difference new old)))
+  where
+    extend _ (OldFact old) (NewFact new) = (changeIf (not (Set.null (Set.difference new old)))
                                            , new)
 
 -- | Transfer liveness backwards across nodes.                                         
@@ -535,13 +511,71 @@ liveTransfer tops = mkBTransfer live
 liveFact :: FactBase LiveFact -> Label -> Set Name
 liveFact f l = fromMaybe Set.empty $ lookupFact l f
 
--- print live facts
+-- | Returns live variables associated with each
+-- label in the program.
+findLive :: [Name] -- ^ Top-level variables
+         -> ProgM C C -- ^ Program to analyze
+         -> FactBase LiveFact -- Results
+findLive tops = snd . usingLive noBwdRewrite tops 
 
+-- | Adds live variables to Goto and BlockEntry instructions. Not
+-- filled in by the compiler - added in this pass instead.
+addLiveRewriter :: FuelMonad m => BwdRewrite m StmtM LiveFact
+addLiveRewriter = mkBRewrite rewrite
+  where
+    rewrite :: FuelMonad m => forall e x. StmtM e x -> Fact x LiveFact -> m (Maybe (ProgM e x))
+    rewrite (Done t) f = done (rewriteTail f t)
+    rewrite (BlockEntry n l args) live 
+      | live /= Set.fromList args = blockEntry n l (sort (Set.toList live))
+    rewrite (CaseM n alts) f = _case n (rewriteAlt f) alts
+    -- Why do I not need to worry about Bind here? What shows I can't have a 
+    -- Goto in the tail?
+    rewrite _ _ = return Nothing
+    
+    rewriteAlt f (Alt c ns t) = maybe Nothing (Just . Alt c ns) (rewriteTail f t)
+
+    rewriteTail :: FactBase LiveFact -> TailM -> Maybe TailM
+    rewriteTail f (Goto (n, l) vs) = 
+      case l `mapLookup` f of
+        Just vs' 
+          | vs' /= Set.fromList vs -> Just (Goto (n,l) (sort (Set.toList vs')))
+        _ -> Nothing
+    rewriteTail _ _ = Nothing
+    
+    blockEntry :: FuelMonad m => Name -> Label -> [Name] -> m (Maybe (ProgM C O))
+    blockEntry n l args = return $ Just $ mkFirst $ BlockEntry n l args
+
+-- | From mon5.lhs
+--
+--   Compile-time garbage collection:
+--    Bind v a c           ==> c         if a is an allocator and
+--                                          v doesn't appear in c
+--
+-- deadRewriter implemented similary, where "safeTail" determines if the
+-- expression on the right of the array can be elminiated safely.
+-- 
+deadRewriter :: FuelMonad m => BwdRewrite m StmtM LiveFact
+deadRewriter = mkBRewrite rewrite
+  where
+    rewrite :: FuelMonad m => forall e x. StmtM e x -> Fact x LiveFact -> m (Maybe (ProgM e x))
+    rewrite (Bind v t) f 
+            | safeTail t && not (v `Set.member` f) = return (Just emptyGraph)
+    rewrite _ _ = return Nothing
+
+    -- Indicates when it is OK to eliminate a tail instruction in a monadic
+    -- expression.
+    safeTail :: TailM -> Bool
+    safeTail (Return _) = True
+    safeTail (Closure _ _) = True
+    safeTail (ConstrM _ _) = True
+    safeTail _ = False
+
+-- | printing live facts
 printLiveFacts :: FactBase LiveFact -> Doc
 printLiveFacts = printFB printFact
-
-printFact :: (Label, Set Name) -> Doc
-printFact (l, ns) = text (show l) <> text ":" <+> commaSep text (Set.elems ns)
+  where
+    printFact :: (Label, Set Name) -> Doc
+    printFact (l, ns) = text (show l) <> text ":" <+> commaSep text (Set.elems ns)
 
 -- From mon5.lhs
 --     v <- return w; c  ==>  c       if v == w
@@ -654,10 +688,10 @@ progM progs = do
   let tops = map fst defs
       compiled def = (def, compileM tops def)
 
-      withLive (def, comp) = (def, addLive tops comp)
+      opt1 = fst . usingLive addLiveRewriter tops
+      opt2 = bindSubst 
+      opt3 = fst . usingLive deadRewriter tops 
 
-      withBindSubst (def, comp) = (def, bindSubst comp)
-      
       printLive live p = 
         let label = getEntryLabel p
             vars = maybe [] Set.elems (lookupFact label live)
@@ -665,15 +699,19 @@ progM progs = do
                          then text "[nothing live]"
                          else brackets (commaSep text vars) 
         in livePrefix <+> printBlockM p 
-      printWithLive (def, (comp, live)) = printDef def $+$
-                                  vcat' (maybeGraph empty (printLive live) comp)
-      printWithBind (def, comp) = printDef def $+$
-                                           vcat' (maybeGraph empty printBlockM comp) 
-  
-  putStrLn (render (vcat' (map ((text "" $+$) . printWithLive . withLive . compiled) progs)))
---  putStrLn "\n============================"
---  putStrLn (render (vcat' (map ((text "" $+$) . printWithBind . withBindSubst . compiled) progs)))
 
+      printWithLive (def, comp) = 
+        let live = findLive tops comp
+        in printDef def $+$
+           vcat' (maybeGraph empty (printLive live) comp)
+      
+      compile opts = map (opts . compileM tops)
+      printResult defs progs = putStrLn (render (vcat' (map ((text "" $+$) . printWithLive) (zip defs progs))))
+                     
+  putStrLn "\n ========= BEFORE ============"
+  printResult progs (compile id progs)
+  putStrLn "\n ========= AFTER ============="
+  printResult progs (compile (opt3 . opt2 . opt1) progs)
            
 abs :: Var -> (Expr -> Expr) -> Expr
 abs v f = Abs v [] (f (Var v))
