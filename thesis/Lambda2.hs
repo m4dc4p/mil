@@ -267,10 +267,23 @@ blockDefn name args progM = withNewLabel $ \l -> do
   
 -- | Add a new closure-capturing block.
 cloDefn :: Name -> Name -> [Name] -> ProgM O C -> CompM Dest
-cloDefn name arg clos progM = withNewLabel $ \l -> do
-  addProg (mkFirst (CloEntry name l clos arg) <*> progM)
-  return (name, l)
-  
+cloDefn name arg clos progM 
+  | not (isCapture progM) = withNewLabel $ \l -> do
+                          let args = clos ++ [arg]
+                          dest <- blockDefn ("block" ++ name) args progM
+                          addProg (mkFirst (CloEntry name l clos arg) <*>
+                                   mkLast (Done (Goto dest args)))
+                          return (name, l)
+  | otherwise = withNewLabel $ \l -> do
+                  addProg (mkFirst (CloEntry name l clos arg) <*> progM)
+                  return (name, l)
+  where
+    isCapture :: ProgM O C -> Bool
+    isCapture (GMany (JustO block) _ _ ) = 
+      case blockToNodeList' block of
+        (_, [], (JustC (Done (Closure _ _)))) -> True
+        _ -> False
+
 -- | Add a program (C C block) to the list of blocks
 -- maintained by the monad.
 addProg :: ProgM C C -> CompM ()
@@ -645,19 +658,10 @@ bindSubstTransfer = mkFTransfer fw
     fw (BlockEntry _ _ _) m = m
     fw (CloEntry _ _ _ _) m = m
     fw (CaseM _ alts) m = 
-      -- mkFactBase bindSubstLattice (zip (concatMap altLabels alts) (repeat m))
       mkFactBase bindSubstLattice []
     fw (Done t) m = 
-      -- mkFactBase bindSubstLattice (zip (tailLabel t) (repeat m))
       mkFactBase bindSubstLattice []
 
-    altLabels :: Alt TailM -> [Label]
-    altLabels (Alt _ _ t) = tailLabel t
-
-    tailLabel :: TailM -> [Label]
-    tailLabel (Closure (_, l) _) = [l]
-    tailLabel (Goto (_, l) _ ) = [l]
-    tailLabel _ = []
 
 bindSubstRewrite :: FuelMonad m => FwdRewrite m StmtM BindFact
 bindSubstRewrite = iterFwdRw (mkFRewrite rewrite) -- deep rewriting used
@@ -766,83 +770,93 @@ collapseLattice = DataflowLattice { fact_name = "Closure collapse"
 
 -- | Find blocks which have CloEntry labels but
 -- do more than capture a closure. Return 
-findBlocks :: ProgM C C -> FactBase (Maybe Label)
-findBlocks body = runSimpleUniqueMonad $ runWithFuel infiniteFuel findBlocks' 
-  where
-    findBlocks' :: SimpleFuelMonad (FactBase (Maybe Label))
-    findBlocks' = do
-      (_, f, _) <- analyzeAndRewriteBwd bwd (JustC (map fst (entryPoints body))) body mapEmpty
-      return f
-    bwd = BwdPass { bp_lattice = addBlockLattice
-                  , bp_transfer = addBlockTransfer
-                  , bp_rewrite = noBwdRewrite } 
+-- findBlocks :: ProgM C C -> FactBase (Maybe Label)
+-- findBlocks body = runSimpleUniqueMonad $ runWithFuel infiniteFuel findBlocks' 
+--   where
+--     findBlocks' :: SimpleFuelMonad (FactBase (Maybe Label))
+--     findBlocks' = do
+--       (_, f, _) <- analyzeAndRewriteBwd bwd (JustC (map fst (entryPoints body))) body mapEmpty
+--       return f
+--     bwd = BwdPass { bp_lattice = addBlockLattice
+--                   , bp_transfer = addBlockTransfer
+--                   , bp_rewrite = noBwdRewrite } 
 
-addBlockLattice :: DataflowLattice (Maybe Label)
-addBlockLattice = DataflowLattice { fact_name = "Find blocks"
-                                  , fact_bot = Nothing
-                                  , fact_join = extend }
-  where
-    extend _ (OldFact old) (NewFact new) = (changeIf (old /= new), new)
+-- addBlockLattice :: DataflowLattice (Maybe Label)
+-- addBlockLattice = DataflowLattice { fact_name = "Find blocks"
+--                                   , fact_bot = Nothing
+--                                   , fact_join = extend }
+--   where
+--     extend _ (OldFact old) (NewFact new) = (changeIf (old /= new), new)
 
-addBlockTransfer :: BwdTransfer StmtM (Maybe Label)
-addBlockTransfer = mkBTransfer bw
-  where
-    bw :: StmtM e x -> Fact x (Maybe Label) -> Maybe Label
-    bw (CloEntry _ l clo arg) f = maybe Nothing (const (Just l)) f
-    bw (BlockEntry _ _ _) _ = Nothing
-    bw (Bind _ _) _ = Just (error "don't examine Bind case")
-    bw (CaseM _ _) _ = Just (error "don't examine CaseM case")
-    bw (Done (Closure _ _)) _ = Nothing
-    bw (Done _) _ = Just (error "don't examine Done case")
+-- addBlockTransfer :: BwdTransfer StmtM (Maybe Label)
+-- addBlockTransfer = mkBTransfer bw
+--   where
+--     bw :: StmtM e x -> Fact x (Maybe Label) -> Maybe Label
+--     bw (CloEntry _ l clo arg) f = maybe Nothing (const (Just l)) f
+--     bw (BlockEntry _ _ _) _ = Nothing
+--     bw (Bind _ _) _ = Just (error "don't examine Bind case")
+--     bw (CaseM _ _) _ = Just (error "don't examine CaseM case")
+--     bw (Done (Closure _ _)) _ = Nothing
+--     bw (Done _) _ = Just (error "don't examine Done case")
            
--- | Move code from CloEntry labels to new blocks; replace
--- CloEntry blocks with a goto.
-addGotoBlocks :: FactBase (Maybe Label) -> ProgM C C -> ProgM C C
-addGotoBlocks foundLabels body = runSimpleUniqueMonad $ runWithFuel infiniteFuel addBlocks'
-  where
-    addBlocks' :: SimpleFuelMonad (ProgM C C)
-    addBlocks' = do
-      let entries = map fst (entryPoints body)
-      (p, _, _) <- analyzeAndRewriteFwd fwd (JustC entries) body foundLabels
-      return p
-    fwd = FwdPass { fp_lattice = constLattice Nothing
-                  , fp_transfer = noFwdTransfer
-                  , fp_rewrite =  addBlockRewrite (Map.fromList (allBlocks body)) }
+-- -- | Move code from CloEntry labels to new blocks; replace
+-- -- CloEntry blocks with a goto.
+-- addGotoBlocks :: FactBase (Maybe Label) -> ProgM C C -> ProgM C C
+-- addGotoBlocks foundLabels body = runSimpleUniqueMonad $ runWithFuel infiniteFuel addBlocks'
+--   where
+--     addBlocks' :: SimpleFuelMonad (ProgM C C)
+--     addBlocks' = do
+--       let entries = map fst (entryPoints body)
+--       (p, _, _) <- analyzeAndRewriteFwd fwd (JustC entries) body mapEmpty
+--       return p
+--     fwd = FwdPass { fp_lattice = labelLattice
+--                   , fp_transfer = labelTransfer
+--                   , fp_rewrite =  addBlockRewrite (Map.fromList (allBlocks body)) }
 
-constLattice :: f -> DataflowLattice f
-constLattice constant = DataflowLattice { fact_name = "Constant lattice"
-                                        , fact_bot = constant
-                                        , fact_join = \_ _ _ -> (NoChange, constant) }
+--     labelLattice :: DataflowLattice (Set Label)
+--     labelLattice = DataflowLattice { fact_name = "Visited Label Lattice"
+--                                             , fact_bot = Set.empty
+--                                             , fact_join = extend }
+--     extend _ (OldFact old) (NewFact new) = (changeIf (not (Set.null (new `Set.difference` old)))
+--                                            , new)
                
-noFwdTransfer :: FwdTransfer StmtM f
-noFwdTransfer = mkFTransfer fw
-  where
-    fw :: StmtM e x -> f -> Fact x f
-    fw (CloEntry _ _ _ _) f = f
-    fw (BlockEntry _ _ _) f = f
-    fw (Bind _ _) f = f
-    fw (CaseM _ _) _ = mkFactBase undefined []
-    fw (Done _) _ = mkFactBase undefined []
+--     labelTransfer :: FwdTransfer StmtM (Set Label)
+--     labelTransfer = mkFTransfer fw
+--       where
+--         fw :: StmtM e x -> Set Label -> Fact x (Set Label)
+--         fw (CloEntry _ l _ _) f = l `Set.insert` f 
+--         fw (BlockEntry _ l _) f = l `Set.insert` f
+--         fw (Bind _ _) f = f
+--         fw (CaseM _ alts) f = mkFactBase labelLattice (zip (concatMap altLabels alts) (repeat f))
+--         fw (Done t) f = mkFactBase labelLattice (zip (tailLabel t) (repeat f))
 
-type BlockMap = Map Label (Block StmtM C C)
+--     altLabels :: Alt TailM -> [Label]
+--     altLabels (Alt _ _ t) = tailLabel t
 
-addBlockRewrite :: (UniqueMonad m, FuelMonad m) => BlockMap -> FwdRewrite m StmtM (Maybe Label)
-addBlockRewrite orig = mkFRewrite rewriter
-  where
-    rewriter :: (UniqueMonad m, FuelMonad m) => forall e x. StmtM e x -> Maybe Label -> m (Maybe (ProgM e x))
-    rewriter (Done _) (Just l) = gotoBlock orig l
-    rewriter (CaseM _ _) (Just l)  = gotoBlock orig l
-    rewriter (Bind _ _) (Just _) = return (Just emptyGraph)
-    rewriter _ _ = return Nothing
+--     tailLabel :: TailM -> [Label]
+--     tailLabel (Closure (_, l) _) = [l]
+--     tailLabel (Goto (_, l) _ ) = [l]
+--     tailLabel _ = []
 
-    gotoBlock :: (UniqueMonad m, FuelMonad m) => BlockMap -> Label -> m (Maybe (ProgM O C))
-    gotoBlock orig label  = 
-      withNewLabel $ \bl -> do 
-        let bn = "block" ++ show bl
-            block = orig ! label
-            (CloEntry _ _ clo arg) :: StmtM C O = snd $ getEntryLabel block
-            newBlock = mkFirst (BlockEntry bn bl (arg:clo)) <*> blockTail block
-        return $ Just (mkLast (Done (Goto (bn, bl) (arg:clo))) |*><*| newBlock)
+-- type BlockMap = Map Label (Block StmtM C C)
+
+-- addBlockRewrite :: (UniqueMonad m, FuelMonad m) => BlockMap -> FwdRewrite m StmtM (Set Label)
+-- addBlockRewrite orig = mkFRewrite rewriter
+--   where
+--     rewriter :: (UniqueMonad m, FuelMonad m) => forall e x. StmtM e x -> Maybe Label -> m (Maybe (ProgM e x))
+--     rewriter (Done _) (Just l) = gotoBlock orig l
+--     rewriter (CaseM _ _) (Just l)  = gotoBlock orig l
+--     rewriter (Bind _ _) (Just _) = return (Just emptyGraph)
+--     rewriter _ _ = return Nothing
+
+--     gotoBlock :: (UniqueMonad m, FuelMonad m) => BlockMap -> Label -> m (Maybe (ProgM O C))
+--     gotoBlock orig label  = 
+--       withNewLabel $ \bl -> do 
+--         let bn = "block" ++ show bl
+--             block = orig ! label
+--             (CloEntry _ _ clo arg) :: StmtM C O = snd $ getEntryLabel block
+--             newBlock = mkFirst (BlockEntry bn bl (clo++[arg])) <*> blockTail block
+--         return $ Just (mkLast (Done (Goto (bn, bl) (clo++[arg]))) |*><*| newBlock)
 
     
 -- Testing & Examples
@@ -870,9 +884,9 @@ progM progs = do
       opt2 = bindSubst 
       opt3 = fst . usingLive deadRewriter tops 
       opt4 = collapse
-      opt5 prog = 
-        let cloBlocks = findBlocks prog
-        in addGotoBlocks cloBlocks prog
+      -- opt5 prog = 
+      --   let cloBlocks = findBlocks prog
+      --   in addGotoBlocks cloBlocks prog
 
       printLive :: FactBase LiveFact -> Block StmtM C x -> Doc
       printLive live p = 
