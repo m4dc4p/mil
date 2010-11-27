@@ -531,7 +531,7 @@ liveTransfer tops = mkBTransfer live
     -- | Returns variables used in a tail expression.
     tailVars :: FactBase LiveFact -> TailM -> Set Name
     tailVars f (Closure (_, l) vs) = Set.fromList vs 
-    tailVars f (Goto (_, l) vs) = liveFact f l
+    tailVars f (Goto (_, l) vs) = Set.fromList vs
     tailVars _ (Enter v1 v2) = Set.fromList [v1, v2]
     tailVars _ (ConstrM _ vs) = Set.fromList vs
     tailVars _ (Return n) = Set.singleton n
