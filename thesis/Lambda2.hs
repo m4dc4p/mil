@@ -645,9 +645,11 @@ bindSubstTransfer = mkFTransfer fw
     fw (BlockEntry _ _ _) m = m
     fw (CloEntry _ _ _ _) m = m
     fw (CaseM _ alts) m = 
-      mkFactBase bindSubstLattice (zip (concatMap altLabels alts) (repeat m))
+      -- mkFactBase bindSubstLattice (zip (concatMap altLabels alts) (repeat m))
+      mkFactBase bindSubstLattice []
     fw (Done t) m = 
-      mkFactBase bindSubstLattice (zip (tailLabel t) (repeat m))
+      -- mkFactBase bindSubstLattice (zip (tailLabel t) (repeat m))
+      mkFactBase bindSubstLattice []
 
     altLabels :: Alt TailM -> [Label]
     altLabels (Alt _ _ t) = tailLabel t
@@ -1006,15 +1008,6 @@ kennedy1 = [("kennedy1", def)
                                      x, x]) 
            (Var "y"))
 
--- Below gives incorrect live variables in top-level
--- closure:
---
---   fst = \p {}. case p of Pair l r -> l
---   [result0] L2_caseJoin1 (): return result0
---   ...
---   [p] L6_absBody5 (p) {}: case p of Pair l r -> L4_altBodyPair3()
---   [nothing live] L7_fst (***p***) {}: closure L6_absBody5 {p}
---
 myFst = ("fst", fstDef)
   where
     fstDef = abs "p" $ \p -> Case p [Alt "Pair" ["l", "r"] (Var "l")]
