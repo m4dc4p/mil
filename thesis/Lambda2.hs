@@ -177,12 +177,12 @@ compileM tops def = compG $ foldr compDef initial $ addFVs tops [def]
     -- using the arguments given and adds it
     -- to the control flow graph.    
     newDefn :: Name -> Expr -> CompM ()
+    newDefn name (Abs v fvs b) = do
+      prog <- compileStmtM b (return . mkLast . Done)
+      cloDefn name v fvs prog >> return ()
     newDefn name body = do
       prog <- compileStmtM body (return . mkLast . Done)
-      ts <- gets compT
-      case body of
-        (Abs v fvs _) -> cloDefn name v fvs prog >> return ()
-        _ -> blockDefn name [] prog >> return ()
+      blockDefn name [] prog >> return ()
 
 compileStmtM :: Expr 
   -> (TailM -> CompM (ProgM O C))
@@ -992,7 +992,7 @@ badClosure = ("bad", def)
           (Var "y")
 
 kennedy1 = [("kennedy1", def)
-           , ("fst", fstDef)
+           , myFst
            , ("g", abs "x" $ \x -> x)]
   where
     -- From "Compiling with Continuations, Continued" by Andrew Knnedy
@@ -1005,6 +1005,18 @@ kennedy1 = [("kennedy1", def)
                   Constr "Pair" [App (Var "g") 
                                      x, x]) 
            (Var "y"))
+
+-- Below gives incorrect live variables in top-level
+-- closure:
+--
+--   fst = \p {}. case p of Pair l r -> l
+--   [result0] L2_caseJoin1 (): return result0
+--   ...
+--   [p] L6_absBody5 (p) {}: case p of Pair l r -> L4_altBodyPair3()
+--   [nothing live] L7_fst (***p***) {}: closure L6_absBody5 {p}
+--
+myFst = ("fst", fstDef)
+  where
     fstDef = abs "p" $ \p -> Case p [Alt "Pair" ["l", "r"] (Var "l")]
 
 mkCons :: Expr -> Expr -> Expr                                        
