@@ -625,6 +625,10 @@ printLiveFacts = printFB printFact
 --     Bind v (Return w) c  ==> c    if v==w
 --                       c  ==> [w/v] c  otherwise
 
+-- v <- x
+-- return v
+--  ==>
+-- x
 -- | Substitute the key for the value.
 type BindFact = Map Name Name
 
@@ -855,9 +859,8 @@ notNil = ("notNil", def)
     def = abs "xs" $ \xs -> App (Var "isnt") (App (Var "nil") xs)
 
 compose :: Def
-compose = ("compose", def)
-  where
-    def = abs "f" $ \f -> 
+compose = ("compose", composeDef)
+composeDef = abs "f" $ \f -> 
               abs "g" $ \g ->
               abs "x" $ \x -> App f (App g x)
 
@@ -913,6 +916,10 @@ kennedy1 = [("kennedy1", def)
 myFst = ("fst", fstDef)
   where
     fstDef = abs "p" $ \p -> Case p [Alt "Pair" ["l", "r"] (Var "l")]
+
+origExample = [("main", App (App composeDef 
+                            (Var "foo")) (Var "bar"))
+              , compose]
 
 mkCons :: Expr -> Expr -> Expr                                        
 mkCons x xs = Constr "Cons" [x, xs]
