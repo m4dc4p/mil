@@ -9,7 +9,7 @@ import Prelude hiding (abs)
 import Control.Monad.State (State, execState, modify, gets)
 import Text.PrettyPrint 
 import Data.List (intersperse, (\\), union, nub, delete, sort)
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe (fromMaybe, isJust, catMaybes)
 import Data.Map (Map, (!))
 import qualified Data.Map as Map
 import Data.Set (Set)
@@ -711,27 +711,33 @@ printBindFacts = printFB printFact
 -- Closure/App collapse (aka "Beta-Fun" from "Compiling with
 -- Continuations, Continued" section 2.3)
 --
---   v0 <- closure f {x}
---   v1 <- v0 @ y 
+--   v0 <- closure f {x,y,z}
+--   v1 <- v0 @ w 
 --    ==>
---   v1 <- f(x,y)  if f only takes two arguments
+--   v1 <- f(x,y,z,w)  
 -- 
-type CollapseFact = Map Name (WithTop TailM)
+type CollapseFact = Map Name (WithTop TailM) -- Need to track
+                                             -- variables stored in a
+                                             -- closure as well
 
 collapse :: ProgM C C -> ProgM C C
 collapse body = runSimpleUniqueMonad $ runWithFuel infiniteFuel collapse'
   where
     entryLabels = map fst (entryPoints body)
-    bodies = Map.fromList (map (\l -> (l, toBody (lookupBlock body l))) entryLabels)
+    bodies = Map.fromList (catMaybes $ map (getBlock body) entryLabels)
     initial = mapFromList (zip entryLabels (repeat Map.empty))
     collapse' :: SimpleFuelMonad (ProgM C C)
     collapse' = do
       (p, _, _) <- analyzeAndRewriteFwd fwd (JustC entryLabels) body initial
       return p
-    toBody :: BlockResult StmtM C -> ProgM O C
-    toBody (BodyBlock block) = 
-      case blockToNodeList' block of
-        (_, mids, (JustC last)) -> mkMiddles mids <*> mkLast last
+    getBlock :: ProgM C C -> Label -> Maybe (Label, (StmtM C O, TailM))
+    getBlock body l = case lookupBlock body l of
+                   BodyBlock block ->
+                     case blockToNodeList' block of
+                       (JustC first, [], JustC (Done stmt@(Goto _ _))) -> Just (l, (first, stmt))
+                       (JustC first, [], JustC (Done stmt@(Closure _ _))) -> Just (l, (first, stmt))
+                       _ -> Nothing
+                   _ -> Nothing
     fwd = FwdPass { fp_lattice = collapseLattice
                   , fp_transfer = collapseTransfer
                   , fp_rewrite = collapseRewrite bodies }
@@ -740,29 +746,36 @@ collapseTransfer :: FwdTransfer StmtM CollapseFact
 collapseTransfer = mkFTransfer fw
   where
     fw :: StmtM e x -> CollapseFact -> Fact x CollapseFact
-    fw (Bind v t@(Closure _ _)) f = Map.insert v (PElem t) f
-    fw (Bind _ _) f = f
+    fw (Bind v t@(Closure _ args)) bound = Map.insert v (PElem t) bound
+    fw (Bind v _) bound = Map.insert v Top bound
     fw (CaseM _ _) _ = mkFactBase collapseLattice []
     fw (Done _) _ = mkFactBase collapseLattice []
     fw (BlockEntry _ _ _) f = f
     fw (CloEntry _ _ _ _) f = f
+    
+    addUsed binding used arg = Map.insert arg binding used
 
-collapseRewrite :: FuelMonad m => Map Label (ProgM O C) -> FwdRewrite m StmtM CollapseFact
-collapseRewrite blocks = mkFRewrite rewriter
+collapseRewrite :: FuelMonad m => Map Label (StmtM C O, TailM) -> FwdRewrite m StmtM CollapseFact
+collapseRewrite blocks = iterFwdRw (mkFRewrite rewriter)
   where
     rewriter :: FuelMonad m => forall e x. StmtM e x -> CollapseFact -> m (Maybe (ProgM e x))
-    rewriter (Bind v (Enter f x)) col = 
+    rewriter (Done (Enter f x)) col = done (collapse col f x)
+    rewriter (Bind v (Enter f x)) col = bind v (collapse col f x)
+    rewriter _ _ = return Nothing
+
+    collapse :: CollapseFact -> Name -> Name -> Maybe TailM
+    collapse col f x =       
       case Map.lookup f col of
         Just (PElem (Closure dest@(_, l) vs)) ->
-          case jumpsToBlock (blocks ! l) of
-            Just dest -> bind v (Just (Goto dest (vs ++ [x])))
-            _ -> return Nothing
-        _ -> return Nothing
-    rewriter _ _ = return Nothing
-    jumpsToBlock :: ProgM O C -> Maybe Dest
-    jumpsToBlock (GMany (JustO block) _ _) = 
-      case blockToNodeList' block of
-        (_, [], (JustC (Done (Goto dest args)))) -> Just (dest)
+          case l `Map.lookup` blocks of
+            Just (CloEntry _ _ _ _, Goto dest args) -> 
+              Just (Goto dest (vs ++ [x]))
+            Just (CloEntry _  _ clo arg, Closure dest args) ->
+              let cloArgs = if arg `elem` args
+                            then vs ++ [x]
+                            else vs
+              in Just (Closure dest cloArgs)
+            _ -> Nothing
         _ -> Nothing
 
 collapseLattice :: DataflowLattice CollapseFact
@@ -823,7 +836,7 @@ progM progs = do
       printResult defs progs = putStrLn (render (vcat' (map ((text "" $+$) . printWithLive) (zip defs progs))))
                      
   putStrLn "\n ========= BEFORE ============"
-  printResult (addFVs tops progs) (compile id progs)
+  printResult (addFVs tops progs) (compile opt1 progs)
   putStrLn "\n ========= AFTER ============="
   printResult (addFVs tops progs) (compile (opt4 . opt3 . opt2 . opt1) progs)
            
@@ -919,6 +932,12 @@ myFst = ("fst", fstDef)
 
 origExample = [("main", App (App composeDef 
                             (Var "foo")) (Var "bar"))
+              , compose]
+
+origExample2 = [("main", App (App (App composeDef 
+                                   (Var "foo")) 
+                              (Var "bar"))
+                 (Var "baz"))
               , compose]
 
 mkCons :: Expr -> Expr -> Expr                                        
