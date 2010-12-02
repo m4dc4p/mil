@@ -14,7 +14,7 @@ import Data.Map (Map, (!))
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Compiler.Hoopl hiding (addTop)
+import Compiler.Hoopl
 
 {-
 
@@ -56,15 +56,6 @@ data Alt e = Alt Constructor [Name] e
 type Free = [Name] 
 type Def = (Name, Expr)
 type Prog = [Def]
-
--- | Collect free variables from Abs terms on 
--- the lambda-calculus expression.
-collectFree :: Expr -> [Name]
-collectFree (Abs _ vs _) = vs
-collectFree (App e1 e2) = collectFree e1 ++ collectFree e2
-collectFree (Var v) = [] 
-collectFree (Case e alts) = collectFree e ++ concatMap (\(Alt _ _ e) -> collectFree e) alts
-collectFree (Constr _ exprs) = concatMap collectFree exprs
 
 {-
 
@@ -138,33 +129,6 @@ data TailM = Return Name
   | ConstrM Constructor  -- Constructor name.
       [Name]             -- Only variables allowed as arguments to constructor.
   deriving (Eq, Show)
-
--- -- | Collect free variables in a program.
--- freeM :: [Name] -> ProgM O C -> [Name] 
--- freeM tops prog = 
---   let fvs = nub . filter (not . null) . concat . maybeGraph [[]] freeB
---   in (fvs prog) \\ tops
-
--- -- | Free variables in a block.
--- freeB :: Block StmtM x e -> [Name] 
--- freeB b = maybeC id useDef e mids
---   where
---     (e, bs, x) = blockToNodeList' b
---     mids = foldr useDef (maybeC id useDef x [])  bs
-         
---     useDef                    :: StmtM e x -> [Name] -> [Name] 
---     useDef (BlockEntry _ _ _) live = live
---     useDef (CloEntry _ _ _ _) live = live
---     useDef (Bind v t) live    = delete v live ++ useTail t
---     useDef (CaseM v alts) _   = v : concatMap (\(Alt _ vs t) -> useTail t \\ vs) alts
---     useDef (Done t) live      = live ++ useTail t
-
---     useTail                :: TailM -> [Name] 
---     useTail (Return v)     = [v]
---     useTail (Enter v1 v2)  = [v1, v2]
---     useTail (Closure _ vs) = vs
---     useTail (Goto _ vs)    = vs
---     useTail (ConstrM _ vs) = vs
 
 -- Compiling from lambda-calculus to the monadic language.
 
@@ -248,15 +212,15 @@ type ProgM = Graph StmtM
 type CompM = State CompS
 
 -- | Add a name to the list of top-level functions.
-addTop :: Name -> CompM ()
-addTop name = modify (\s@(C { compT }) -> s { compT = name : compT })
+addName :: Name -> CompM ()
+addName name = modify (\s@(C { compT }) -> s { compT = name : compT })
 
 -- | Make a new top-level function name, based on the
 -- prefix given.
 newTop :: Name -> CompM Name
 newTop name = do
   f <- fresh name
-  addTop f
+  addName f
   return f
 
 -- | Add a new block.
@@ -373,7 +337,7 @@ printVar e = parens (printExpr e)
 
 -- Pretty printing programs
 printProgM :: ProgM C C -> Doc
-printProgM = vcat' . maybeGraph empty printBlockM
+printProgM = vcat' . maybeGraphCC empty printBlockM
 
 printBlockM = p . blockToNodeList'
   where p (e, bs, x) = hang (maybeC empty printStmtM e) 2
@@ -428,35 +392,8 @@ maybeO :: a -> (n -> a) -> MaybeO e1 n -> a
 maybeO def f (JustO b) = f b
 maybeO def f _ = def
 
-{-
- 
-The below definition will not compile with maybeGraph2. I think it maybeGraph2 is too
-polymorphic - I don't know if I can ever write a function that will satisfy it.
-
-printWithLive2 :: (Def, ProgM C C) -> Doc
-printWithLive2 (def, comp) = 
-  let live = findLive [] comp
-      printLive :: FactBase LiveFact -> Block StmtM C x -> Doc
-      printLive live p = 
-        let label = fst (getEntryLabel p)
-            vars = maybe [] Set.elems (lookupFact label live)
-            livePrefix = if null vars
-                         then text "[nothing live]"
-                         else brackets (commaSep text vars) 
-        in livePrefix <+> printBlockM p 
-  in printDef def $+$
-     vcat' (maybeGraph2 empty (printLive live) comp)
-
-maybeGraph2 :: b -> (forall e1 x1. block node e1 x1 -> b) -> Graph' block node e2 x2 -> [b]
-maybeGraph2 b _ GNil = []
-maybeGraph2 b f (GUnit block) = [f block]
-maybeGraph2 b f (GMany entry middles exit) = maybeO b f entry :
-                                        (map f . mapElems $ middles) ++
-                                        [maybeO b f exit]
-
--}
-maybeGraph :: b -> (block node C C -> b) -> Graph' block node C C -> [b]
-maybeGraph b f (GMany _ middles _) = map f . mapElems $ middles
+maybeGraphCC :: b -> (block node C C -> b) -> Graph' block node C C -> [b]
+maybeGraphCC b f (GMany _ middles _) = map f . mapElems $ middles
 
 -- | Get all the labels at entry points in 
 -- the program.
@@ -492,6 +429,11 @@ _case v f alts
     alts' = map f alts
     altZip _ (Just a) = a
     altZip a _ = a
+
+-- | Run a Hoopl optimization pas with infinite fuel,
+-- using the monad Hoopl provides.
+runSimple :: SimpleFuelMonad a -> a
+runSimple p = runSimpleUniqueMonad $ runWithFuel infiniteFuel p
     
 -- Determining liveness in StmtM
 
@@ -503,14 +445,10 @@ usingLive :: (forall m. FuelMonad m => (BwdRewrite m StmtM LiveFact)) -- ^ Rewri
           -> [Name] -- ^ Top-level variables
           -> ProgM C C -- ^ Program to rewrite
           -> (ProgM C C, FactBase LiveFact) -- Results
-usingLive rewriter tops body = runSimpleUniqueMonad $ runWithFuel infiniteFuel findLive' 
-  where
-    -- | Finds the live variables in the program
-    -- given. 
-    findLive' :: SimpleFuelMonad (ProgM C C, FactBase LiveFact)
-    findLive' = do
+usingLive rewriter tops body = runSimple $ do
       (p, f, _) <- analyzeAndRewriteBwd bwd (JustC (map fst (entryPoints body))) body mapEmpty
       return (p, f)
+  where
     bwd = BwdPass { bp_lattice = liveLattice
                   , bp_transfer = liveTransfer (Set.fromList tops)
                   , bp_rewrite = rewriter } 
@@ -633,14 +571,12 @@ printLiveFacts = printFB printFact
 type BindFact = Map Name Name
 
 bindSubst :: ProgM C C -> ProgM C C
-bindSubst body = runSimpleUniqueMonad $ runWithFuel infiniteFuel bindSubst'
-  where
-    bindSubst' :: SimpleFuelMonad (ProgM C C)
-    bindSubst' = do
+bindSubst body = runSimple $ do
       let entries = map fst (entryPoints body)
           initial = mapFromList (zip entries (repeat Map.empty))
       (p, _, _) <- analyzeAndRewriteFwd fwd (JustC entries) body initial
       return p
+  where
     fwd = FwdPass { fp_lattice = bindSubstLattice
                   , fp_transfer = bindSubstTransfer
                   , fp_rewrite = bindSubstRewrite }
@@ -716,37 +652,49 @@ printBindFacts = printFB printFact
 --    ==>
 --   v1 <- f(x,y,z,w)  
 -- 
-type CollapseFact = Map Name (WithTop TailM) -- Need to track
+
+-- | Associates a label with the destination
+-- which it either captures (Closure) or 
+-- jumps to (Goto).
+data DestOf = Jump Dest 
+            | Capture Dest Bool
+              deriving (Eq, Show)
+
+-- | Stores destination and arguments for a 
+-- closure value. Mostly to remove annoying
+-- GADT type variables.
+data CloVal = CloVal Dest [Name]
+            deriving (Eq, Show)
+
+type CollapseFact = Map Name (WithTop CloVal) -- Need to track
                                              -- variables stored in a
                                              -- closure as well
 
 collapse :: ProgM C C -> ProgM C C
-collapse body = runSimpleUniqueMonad $ runWithFuel infiniteFuel collapse'
-  where
-    entryLabels = map fst (entryPoints body)
-    bodies = Map.fromList (catMaybes $ map (getBlock body) entryLabels)
-    initial = mapFromList (zip entryLabels (repeat Map.empty))
-    collapse' :: SimpleFuelMonad (ProgM C C)
-    collapse' = do
+collapse body = runSimple $ do
       (p, _, _) <- analyzeAndRewriteFwd fwd (JustC entryLabels) body initial
       return p
-    getBlock :: ProgM C C -> Label -> Maybe (Label, (StmtM C O, TailM))
-    getBlock body l = case lookupBlock body l of
+  where
+    entryLabels = map fst (entryPoints body)
+    destinations = Map.fromList . catMaybes . map (destOf body) 
+    initial = mapFromList (zip entryLabels (repeat Map.empty))
+    destOf :: ProgM C C -> Label -> Maybe (Label, DestOf)
+    destOf body l = case lookupBlock body l of
                    BodyBlock block ->
                      case blockToNodeList' block of
-                       (JustC first, [], JustC (Done stmt@(Goto _ _))) -> Just (l, (first, stmt))
-                       (JustC first, [], JustC (Done stmt@(Closure _ _))) -> Just (l, (first, stmt))
+                       (JustC (CloEntry {}), [], JustC (Done (Goto d _))) -> Just (l, Jump d)
+                       (JustC (CloEntry _ _ _ arg), [], JustC (Done (Closure d args))) -> Just (l, Capture d (arg `elem` args))
                        _ -> Nothing
                    _ -> Nothing
     fwd = FwdPass { fp_lattice = collapseLattice
                   , fp_transfer = collapseTransfer
-                  , fp_rewrite = collapseRewrite bodies }
+                  , fp_rewrite = collapseRewrite (destinations entryLabels) }
 
 collapseTransfer :: FwdTransfer StmtM CollapseFact
 collapseTransfer = mkFTransfer fw
   where
     fw :: StmtM e x -> CollapseFact -> Fact x CollapseFact
-    fw (Bind v t@(Closure _ args)) bound = Map.insert v (PElem t) bound
+    fw (Bind v (Closure dest args)) bound = Map.insert v (PElem (CloVal dest args)) bound
     fw (Bind v _) bound = Map.insert v Top bound
     fw (CaseM _ _) _ = mkFactBase collapseLattice []
     fw (Done _) _ = mkFactBase collapseLattice []
@@ -755,7 +703,7 @@ collapseTransfer = mkFTransfer fw
     
     addUsed binding used arg = Map.insert arg binding used
 
-collapseRewrite :: FuelMonad m => Map Label (StmtM C O, TailM) -> FwdRewrite m StmtM CollapseFact
+collapseRewrite :: FuelMonad m => Map Label DestOf -> FwdRewrite m StmtM CollapseFact
 collapseRewrite blocks = iterFwdRw (mkFRewrite rewriter)
   where
     rewriter :: FuelMonad m => forall e x. StmtM e x -> CollapseFact -> m (Maybe (ProgM e x))
@@ -763,18 +711,14 @@ collapseRewrite blocks = iterFwdRw (mkFRewrite rewriter)
     rewriter (Bind v (Enter f x)) col = bind v (collapse col f x)
     rewriter _ _ = return Nothing
 
-    collapse :: CollapseFact -> Name -> Name -> Maybe TailM
     collapse col f x =       
       case Map.lookup f col of
-        Just (PElem (Closure dest@(_, l) vs)) ->
+        Just (PElem (CloVal dest@(_, l) vs)) ->
           case l `Map.lookup` blocks of
-            Just (CloEntry _ _ _ _, Goto dest args) -> 
-              Just (Goto dest (vs ++ [x]))
-            Just (CloEntry _  _ clo arg, Closure dest args) ->
-              let cloArgs = if arg `elem` args
-                            then vs ++ [x]
-                            else vs
-              in Just (Closure dest cloArgs)
+            Just (Jump dest) -> Just (Goto dest (vs ++ [x]))
+            Just (Capture dest usesArg) 
+              | usesArg -> Just (Closure dest (vs ++ [x]))
+              | otherwise -> Just (Closure dest vs)
             _ -> Nothing
         _ -> Nothing
 
@@ -784,9 +728,9 @@ collapseLattice = DataflowLattice { fact_name = "Closure collapse"
                                   , fact_join = joinMaps (extendJoinDomain extend) }
   where
     extend :: Label 
-           -> OldFact TailM 
-           -> NewFact TailM 
-           -> (ChangeFlag, WithTop TailM)
+           -> OldFact CloVal
+           -> NewFact CloVal
+           -> (ChangeFlag, WithTop CloVal)
     extend _ (OldFact old) (NewFact new) 
       | old == new = (NoChange, PElem new)
       | otherwise = (SomeChange, Top)
@@ -830,7 +774,7 @@ progM progs = do
       printWithLive (def, comp) = 
         let live = findLive tops comp
         in printDef def $+$
-           vcat' (maybeGraph empty (printLive live) comp)
+           vcat' (maybeGraphCC empty (printLive live) comp)
       
       compile opts = map (opts . compileM tops)
       printResult defs progs = putStrLn (render (vcat' (map ((text "" $+$) . printWithLive) (zip defs progs))))
