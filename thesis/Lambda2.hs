@@ -133,7 +133,7 @@ data TailM = Return Name
 -- Compiling from lambda-calculus to the monadic language.
 
 compileM :: [Name] -> Def -> ProgM C C
-compileM tops def = compG $ foldr compDef initial $ addFVs tops [def]
+compileM tops def = compG $ foldr compDef initial $ prepareExpr tops [def]
   where
     compDef p = execState (uncurry newDefn p)
     initial = C 0 emptyClosedGraph tops
@@ -290,10 +290,35 @@ tailDest (Closure (_, l) _) = [l]
 tailDest (Goto (_, l) _) = [l]
 tailDest _ = []
 
--- | Annotate lambda-calculus programs with free variables.
-addFVs :: [Name] -> Prog -> Prog
-addFVs tops ps = map (\(name, body) -> (name, snd $ annotate body)) ps
+-- | Annotate lambda-calculus programs with free variables and
+-- rename variables so we can always generate safe fresh names.
+prepareExpr :: [Name] -> Prog -> Prog
+prepareExpr tops = addFVs . renameVars 
   where
+    addFVs = map (\(name, body) -> (name, snd $ annotate body))
+    -- All variables have an underscore attached. The compiler will
+    -- never generate variables with underscores, guaranteeing
+    -- it can always create a fresh variable name.
+    renameVars = map (\(name, body) -> (name, renameInExpr Map.empty body))
+    renameInExpr :: Map Name Name -> Expr -> Expr
+    renameInExpr env (Abs vs [] b) = 
+      let ([vs'], env') = addNames env [vs]
+      in Abs vs' [] (renameInExpr env' b)
+    renameInExpr env (App e1 e2) = App (renameInExpr env e1) (renameInExpr env e2)
+    renameInExpr env (Case e alts) = 
+      let alts' = map (renameAlt env) alts
+      in Case (renameInExpr env e) alts'
+    renameInExpr env (Constr c exprs) = 
+      Constr c (map (renameInExpr env) exprs)
+    renameInExpr env (Var v) 
+                 | v `Map.member` env  = Var (env ! v)
+                 | otherwise = Var v
+    renameAlt env (Alt c ns e) = 
+      let (ns', env') = addNames env ns
+      in Alt c ns' (renameInExpr env' e)
+    addNames env vs = 
+      let vs' = map (++ "_") vs
+      in  (vs', env `Map.union` Map.fromList (zip vs vs'))
     -- Add free variables to each lambda.
     annotate :: Expr -> (Free, Expr)
     annotate (Abs v _ expr)   
@@ -412,6 +437,9 @@ getEntryLabel block = case blockToNodeList' block of
   (JustC e@(BlockEntry _ l _), _, _) -> (l, e)
   (JustC e@(CloEntry _ l _ _), _, _) -> (l, e)
 
+entryLabels :: ProgM C C -> [Label]
+entryLabels = map fst . entryPoints 
+
 printFB :: (IsMap map) => ((KeyOf map, a) -> Doc) -> map a -> Doc
 printFB p = vcat . map p . mapToList
 
@@ -446,7 +474,7 @@ usingLive :: (forall m. FuelMonad m => (BwdRewrite m StmtM LiveFact)) -- ^ Rewri
           -> ProgM C C -- ^ Program to rewrite
           -> (ProgM C C, FactBase LiveFact) -- Results
 usingLive rewriter tops body = runSimple $ do
-      (p, f, _) <- analyzeAndRewriteBwd bwd (JustC (map fst (entryPoints body))) body mapEmpty
+      (p, f, _) <- analyzeAndRewriteBwd bwd (JustC (entryLabels body)) body mapEmpty
       return (p, f)
   where
     bwd = BwdPass { bp_lattice = liveLattice
@@ -563,16 +591,17 @@ printLiveFacts = printFB printFact
 --     Bind v (Return w) c  ==> c    if v==w
 --                       c  ==> [w/v] c  otherwise
 
--- v <- x
--- return v
---  ==>
--- x
--- | Substitute the key for the value.
+-- | Associates a binding (the key) with the
+-- value that should be substituted for it. Only
+-- variables that are bound with the form v <- return w
+-- end up here.
 type BindFact = Map Name Name
 
+-- | Find "useless" bindings which have no visible
+-- effect other than allocation and remove them.
 bindSubst :: ProgM C C -> ProgM C C
 bindSubst body = runSimple $ do
-      let entries = map fst (entryPoints body)
+      let entries = entryLabels body
           initial = mapFromList (zip entries (repeat Map.empty))
       (p, _, _) <- analyzeAndRewriteFwd fwd (JustC entries) body initial
       return p
@@ -647,10 +676,14 @@ printBindFacts = printFB printFact
 -- Closure/App collapse (aka "Beta-Fun" from "Compiling with
 -- Continuations, Continued" section 2.3)
 --
---   v0 <- closure f {x,y,z}
---   v1 <- v0 @ w 
+--   f1 (t) {x, y,z} : g(x,y,z,t)
+--   ...
+--   h1:
+--     v0 <- closure f1 {x,y,z}
+--     v1 <- v0 @ w 
 --    ==>
---   v1 <- f(x,y,z,w)  
+--   h1:
+--     v1 <- g(x,y,z,w)  
 -- 
 
 -- | Associates a label with the destination
@@ -666,18 +699,24 @@ data DestOf = Jump Dest
 data CloVal = CloVal Dest [Name]
             deriving (Eq, Show)
 
+-- | Indicates if the given name holds an allocated
+-- closure or an unknown value.
 type CollapseFact = Map Name (WithTop CloVal) -- Need to track
                                              -- variables stored in a
                                              -- closure as well
 
+-- | Collapse closure allocations - when we can tell a variable holds
+-- a closure, and that closure only allocates another closure or jumps
+-- to a block, then avoid that extra step and directly allocate the
+-- closure or jump to the block.
 collapse :: ProgM C C -> ProgM C C
 collapse body = runSimple $ do
-      (p, _, _) <- analyzeAndRewriteFwd fwd (JustC entryLabels) body initial
+      (p, _, _) <- analyzeAndRewriteFwd fwd (JustC labels) body initial
       return p
   where
-    entryLabels = map fst (entryPoints body)
+    labels = entryLabels body
     destinations = Map.fromList . catMaybes . map (destOf body) 
-    initial = mapFromList (zip entryLabels (repeat Map.empty))
+    initial = mapFromList (zip labels (repeat Map.empty))
     destOf :: ProgM C C -> Label -> Maybe (Label, DestOf)
     destOf body l = case lookupBlock body l of
                    BodyBlock block ->
@@ -688,7 +727,7 @@ collapse body = runSimple $ do
                    _ -> Nothing
     fwd = FwdPass { fp_lattice = collapseLattice
                   , fp_transfer = collapseTransfer
-                  , fp_rewrite = collapseRewrite (destinations entryLabels) }
+                  , fp_rewrite = collapseRewrite (destinations labels) }
 
 collapseTransfer :: FwdTransfer StmtM CollapseFact
 collapseTransfer = mkFTransfer fw
@@ -735,6 +774,91 @@ collapseLattice = DataflowLattice { fact_name = "Closure collapse"
       | old == new = (NoChange, PElem new)
       | otherwise = (SomeChange, Top)
 
+-- Implementing CC-Let (figure 6) from Kennedy's paper:
+--
+--   x2 <- (x1 <- A; B); C
+-- ==>
+--   x1 <- A; x2 <- B; C
+--
+-- This manifests as inlining in our language:
+--
+--   L2: x1 <- L1() -- L1 defines A, not shown.
+--       ...
+--       bN  -- L2 defines B.
+--   L3: x2 <- L2()  
+--       ...
+--       cN   -- L3 defines C.
+--
+-- which we want to rewrite as:
+-- 
+--   L3: x1 <- L1()
+--       ...
+--       x2 <- bN -- If L2 consists only of x1 <- L1() then this statement
+--                -- collapses to x2 <- L1() and x1 <- L1() disappears.
+--       c1 
+--       ...
+--       cN
+--
+-- This program only inlines L2 when only one predecessor exists (i.e.,
+-- it has only one caller).
+
+
+-- Maps labels to their predecessors.
+type Preds = (Label, Map Label [Label])
+
+inlineBlock :: ProgM C C -> ProgM C C
+inlineBlock body = runSimple $ do
+      (p, _, _) <- analyzeAndRewriteFwd fwd (JustC labels) body initial
+      return p
+  where
+    labels = entryLabels body
+    initial = mapFromList (zip labels (repeat (undefined, Map.empty)))
+    fwd = FwdPass { fp_lattice = inlineLattice
+                  , fp_transfer = inlineTransfer
+                  , fp_rewrite = inlineRewrite body }
+
+inlineRewrite :: FuelMonad m => ProgM C C -> FwdRewrite m StmtM Preds
+inlineRewrite prog  = mkFRewrite rewriter
+  where
+    rewriter :: FuelMonad m => forall e x. StmtM e x -> Preds -> m (Maybe (ProgM e x))
+    rewriter (Bind v (Goto (_, l) _)) (_, preds)
+      | l `Map.member` preds && length (preds ! l) == 1 = 
+        case lookupBlock prog l of
+          BodyBlock block -> 
+            case blockToNodeList' block of
+              (_, mids, JustC (Done t)) -> return (Just (mkMiddles mids <*> mkMiddle (Bind v t)))
+              _ -> return Nothing
+          _ -> return Nothing    
+    rewriter _ _ = return Nothing
+
+inlineTransfer :: FwdTransfer StmtM Preds
+inlineTransfer = mkFTransfer fw
+  where
+    fw :: StmtM e x -> Preds -> Fact x Preds
+    fw (Bind v (Goto (_, dest) _)) (curr, preds) = (curr, Map.insertWith (++) curr [dest] preds)
+    fw (Bind v _) f = f
+    fw (CaseM _ _) f = mkFactBase inlineLattice []
+    fw (Done _) f = mkFactBase inlineLattice []
+    fw (BlockEntry _ l _) (_, preds) = (l, preds)
+    fw (CloEntry _ l _ _) (_, preds) = (l, preds)
+
+inlineLattice :: DataflowLattice Preds
+inlineLattice = DataflowLattice { fact_name = "Inline blocks"
+                                , fact_bot = (undefined, Map.empty)
+                                , fact_join = joinPreds }
+  where
+    joinPreds :: Label -> OldFact Preds -> NewFact Preds -> (ChangeFlag, Preds)
+    joinPreds l (OldFact (_, oldPreds)) (NewFact (curr, newPreds)) 
+      = let (flag, result) = (joinMaps extend) l (OldFact oldPreds) (NewFact newPreds)
+        in (flag, (curr, result))
+    extend :: Label 
+           -> OldFact [Label]
+           -> NewFact [Label]
+           -> (ChangeFlag, [Label])
+    extend _ (OldFact old) (NewFact new) 
+      | null (old \\ new) = (NoChange, new)
+      | otherwise = (SomeChange, new)
+
 -- Testing & Examples
 
 defs = [isnt
@@ -760,6 +884,7 @@ progM progs = do
       opt2 = bindSubst 
       opt3 = fst . usingLive deadRewriter tops 
       opt4 = fst . usingLive deadRewriter tops . collapse
+      opt5 = inlineBlock
 
       printLive :: FactBase LiveFact -> Block StmtM C x -> Doc
       printLive live p = 
@@ -780,9 +905,9 @@ progM progs = do
       printResult defs progs = putStrLn (render (vcat' (map ((text "" $+$) . printWithLive) (zip defs progs))))
                      
   putStrLn "\n ========= BEFORE ============"
-  printResult (addFVs tops progs) (compile opt1 progs)
+  printResult (prepareExpr tops progs) (compile opt1 progs)
   putStrLn "\n ========= AFTER ============="
-  printResult (addFVs tops progs) (compile (opt4 . opt3 . opt2 . opt1) progs)
+  printResult (prepareExpr tops progs) (compile (opt5 . opt4 . opt3 . opt2 . opt1) progs)
            
 abs :: Var -> (Expr -> Expr) -> Expr
 abs v f = Abs v [] (f (Var v))
