@@ -804,7 +804,34 @@ collapseLattice = DataflowLattice { fact_name = "Closure collapse"
 
 
 -- Maps labels to their predecessors.
-type Preds = (Label, Map Label [Label])
+type Preds = Map Label [Label]
+type PredsWork = (Label, Preds)
+
+deadBlocks :: ProgM C C -> ProgM C C
+deadBlocks body = runSimple $ do
+      (p, _, _) <- analyzeAndRewriteFwd fwd (JustC labels) body initial
+      return p
+  where
+    labels = entryLabels body
+    initial = mapFromList (zip labels (repeat (undefined, Map.empty)))
+    fwd = FwdPass { fp_lattice = inlineLattice { fact_name = "Dead blocks" }
+                  , fp_transfer = inlineTransfer
+                  , fp_rewrite = deadBlockRewrite }
+
+deadBlockRewrite :: FuelMonad m => FwdRewrite m StmtM PredsWork
+deadBlockRewrite = mkFRewrite rewriter
+  where
+    rewriter :: FuelMonad m => forall e x. StmtM e x -> PredsWork -> m (Maybe (ProgM e x))
+    rewriter (Bind  _ _) (curr, preds) 
+      | isOrphan preds curr = return (Just emptyGraph)
+    rewriter (CaseM _ _) (curr, preds) 
+      | isOrphan preds curr = done (Just (ConstrM "Unit" []))
+    rewriter (Done _) (curr, preds) 
+      | isOrphan preds curr = done (Just (ConstrM "Unit" []))
+    rewriter _ _ = return Nothing
+
+    isOrphan :: Preds -> Label -> Bool
+    isOrphan preds l = l `Map.member` preds && null (drop 1 (preds ! l)) 
 
 inlineBlock :: ProgM C C -> ProgM C C
 inlineBlock body = runSimple $ do
@@ -817,10 +844,10 @@ inlineBlock body = runSimple $ do
                   , fp_transfer = inlineTransfer
                   , fp_rewrite = inlineRewrite body }
 
-inlineRewrite :: FuelMonad m => ProgM C C -> FwdRewrite m StmtM Preds
+inlineRewrite :: FuelMonad m => ProgM C C -> FwdRewrite m StmtM PredsWork
 inlineRewrite prog  = mkFRewrite rewriter
   where
-    rewriter :: FuelMonad m => forall e x. StmtM e x -> Preds -> m (Maybe (ProgM e x))
+    rewriter :: FuelMonad m => forall e x. StmtM e x -> PredsWork -> m (Maybe (ProgM e x))
     rewriter (Bind v (Goto (_, l) _)) (_, preds)
       | l `Map.member` preds && length (preds ! l) == 1 = 
         case lookupBlock prog l of
@@ -831,10 +858,10 @@ inlineRewrite prog  = mkFRewrite rewriter
           _ -> return Nothing    
     rewriter _ _ = return Nothing
 
-inlineTransfer :: FwdTransfer StmtM Preds
+inlineTransfer :: FwdTransfer StmtM PredsWork
 inlineTransfer = mkFTransfer fw
   where
-    fw :: StmtM e x -> Preds -> Fact x Preds
+    fw :: StmtM e x -> PredsWork -> Fact x PredsWork
     fw (Bind v (Goto (_, dest) _)) (curr, preds) = (curr, Map.insertWith (++) curr [dest] preds)
     fw (Bind v _) f = f
     fw (CaseM _ _) f = mkFactBase inlineLattice []
@@ -842,12 +869,12 @@ inlineTransfer = mkFTransfer fw
     fw (BlockEntry _ l _) (_, preds) = (l, preds)
     fw (CloEntry _ l _ _) (_, preds) = (l, preds)
 
-inlineLattice :: DataflowLattice Preds
+inlineLattice :: DataflowLattice PredsWork
 inlineLattice = DataflowLattice { fact_name = "Inline blocks"
                                 , fact_bot = (undefined, Map.empty)
                                 , fact_join = joinPreds }
   where
-    joinPreds :: Label -> OldFact Preds -> NewFact Preds -> (ChangeFlag, Preds)
+    joinPreds :: Label -> OldFact PredsWork -> NewFact PredsWork -> (ChangeFlag, PredsWork)
     joinPreds l (OldFact (_, oldPreds)) (NewFact (curr, newPreds)) 
       = let (flag, result) = (joinMaps extend) l (OldFact oldPreds) (NewFact newPreds)
         in (flag, (curr, result))
@@ -884,7 +911,7 @@ progM progs = do
       opt2 = bindSubst 
       opt3 = fst . usingLive deadRewriter tops 
       opt4 = fst . usingLive deadRewriter tops . collapse
-      opt5 = inlineBlock
+      opt5 = inlineBlock . deadBlocks
 
       printLive :: FactBase LiveFact -> Block StmtM C x -> Doc
       printLive live p = 
