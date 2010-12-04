@@ -132,11 +132,13 @@ data TailM = Return Name
 
 -- Compiling from lambda-calculus to the monadic language.
 
-compileM :: [Name] -> Def -> ProgM C C
-compileM tops def = compG $ foldr compDef initial $ prepareExpr tops [def]
+compileM :: [Name] -> Int -> Def -> (Int, ProgM C C)
+compileM tops labelSeed def = 
+  let result = foldr compDef initial $ prepareExpr tops [def]
+  in (compI result + 1, compG result)
   where
     compDef p = execState (uncurry newDefn p)
-    initial = C 0 emptyClosedGraph tops
+    initial = C labelSeed emptyClosedGraph tops
     -- | Creates a new function definition
     -- using the arguments given and adds it
     -- to the control flow graph.    
@@ -463,6 +465,10 @@ _case v f alts
 runSimple :: SimpleFuelMonad a -> a
 runSimple p = runSimpleUniqueMonad $ runWithFuel infiniteFuel p
     
+nameOfEntry :: StmtM C O -> Name
+nameOfEntry (BlockEntry n _ _) = n
+nameOfEntry (CloEntry n _ _ _) = n
+
 -- Determining liveness in StmtM
 
 type LiveFact = Set Name
@@ -477,13 +483,13 @@ usingLive rewriter tops body = runSimple $ do
       (p, f, _) <- analyzeAndRewriteBwd bwd (JustC (entryLabels body)) body mapEmpty
       return (p, f)
   where
-    bwd = BwdPass { bp_lattice = liveLattice
+    bwd = BwdPass { bp_lattice = liveLattice "live statements" :: DataflowLattice LiveFact
                   , bp_transfer = liveTransfer (Set.fromList tops)
                   , bp_rewrite = rewriter } 
 
 -- | Initial setup for liveness analysis.
-liveLattice :: DataflowLattice LiveFact
-liveLattice = DataflowLattice { fact_name = "Liveness"
+liveLattice :: Ord a => String -> DataflowLattice (Set a)
+liveLattice name = DataflowLattice { fact_name = name
                               , fact_bot = Set.empty
                               , fact_join = extend }
   where
@@ -804,44 +810,59 @@ collapseLattice = DataflowLattice { fact_name = "Closure collapse"
 
 
 -- Maps labels to their predecessors.
-type Preds = Map Label [Label]
-type PredsWork = (Label, Preds)
+type LiveBlock = Set Label
 
-deadBlocks :: ProgM C C -> ProgM C C
-deadBlocks body = runSimple $ do
-      (p, _, _) <- analyzeAndRewriteFwd fwd (JustC labels) body initial
-      return p
+deadBlocks :: [Name] -> ProgM C C -> ProgM C C
+deadBlocks tops body = 
+  let (result, prog) = runSimple $ do
+                         (_, f, _) <- analyzeAndRewriteBwd bwd (JustC labels) body initial
+                         return $ removeOrphans body (Set.unions (mapElems f))
+  in if result == SomeChange
+     then deadBlocks tops prog
+     else prog
   where
+    
     labels = entryLabels body
-    initial = mapFromList (zip labels (repeat (undefined, Map.empty)))
-    fwd = FwdPass { fp_lattice = inlineLattice { fact_name = "Dead blocks" }
-                  , fp_transfer = inlineTransfer
-                  , fp_rewrite = deadBlockRewrite }
+    initial = mkFactBase (bp_lattice bwd) (zip labels (repeat (Set.fromList topLabels)))
+    bwd = BwdPass { bp_lattice = liveLattice "Live blocks" :: DataflowLattice LiveBlock
+                  , bp_transfer = deadBlockTransfer
+                  , bp_rewrite = noBwdRewrite }
 
-deadBlockRewrite :: FuelMonad m => FwdRewrite m StmtM PredsWork
-deadBlockRewrite = mkFRewrite rewriter
+    removeOrphans :: ProgM C C -> LiveBlock -> (ChangeFlag, ProgM C C)
+    removeOrphans (GMany _ blocks _) live = foldl (removeOrphan live) (NoChange, emptyClosedGraph) (mapToList blocks)
+
+    removeOrphan :: LiveBlock -> (ChangeFlag, ProgM C C) -> (Label, Block StmtM C C) -> (ChangeFlag, ProgM C C)
+    removeOrphan live (flag, prog) (label, block)
+      | label `Set.member` live = (flag, blockGraph block |*><*| prog)
+      | otherwise = (SomeChange, prog)
+
+    topLabels :: [Label]
+    topLabels = map fst . filter (\(_, s) -> nameOfEntry s `elem` tops) . entryPoints $ body
+
+deadBlockTransfer :: BwdTransfer StmtM LiveBlock
+deadBlockTransfer = mkBTransfer bw
   where
-    rewriter :: FuelMonad m => forall e x. StmtM e x -> PredsWork -> m (Maybe (ProgM e x))
-    rewriter (Bind  _ _) (curr, preds) 
-      | isOrphan preds curr = return (Just emptyGraph)
-    rewriter (CaseM _ _) (curr, preds) 
-      | isOrphan preds curr = done (Just (ConstrM "Unit" []))
-    rewriter (Done _) (curr, preds) 
-      | isOrphan preds curr = done (Just (ConstrM "Unit" []))
-    rewriter _ _ = return Nothing
+    bw :: StmtM e x -> Fact x LiveBlock -> LiveBlock
+    bw (Bind v tail) live = (tailLabel tail) `Set.union` live
+    bw (CaseM _ alts) lives = Set.unions (map (\(Alt _ _ e) -> tailLabel e) alts ++ mapElems lives)
+    bw (Done tail) lives =  Set.unions (tailLabel tail : mapElems lives)
+    bw (BlockEntry _ l _) live = live
+    bw (CloEntry _ l _ _) live = live
 
-    isOrphan :: Preds -> Label -> Bool
-    isOrphan preds l = l `Map.member` preds && null (drop 1 (preds ! l)) 
+    tailLabel :: TailM -> Set Label
+    tailLabel (Goto (_, dest) _) = Set.singleton dest
+    tailLabel (Closure (_, dest) _) = Set.singleton dest
+    tailLabel _ = Set.empty
 
-inlineBlock :: ProgM C C -> ProgM C C
+{-inlineBlock :: ProgM C C -> ProgM C C
 inlineBlock body = runSimple $ do
       (p, _, _) <- analyzeAndRewriteFwd fwd (JustC labels) body initial
       return p
   where
     labels = entryLabels body
     initial = mapFromList (zip labels (repeat (undefined, Map.empty)))
-    fwd = FwdPass { fp_lattice = inlineLattice
-                  , fp_transfer = inlineTransfer
+    fwd = FwdPass { fp_lattice = liveLattice "Live blocks" :: DataflowLattice LiveBlock
+                  , fp_transfer = deadBlockTransfer
                   , fp_rewrite = inlineRewrite body }
 
 inlineRewrite :: FuelMonad m => ProgM C C -> FwdRewrite m StmtM PredsWork
@@ -857,34 +878,7 @@ inlineRewrite prog  = mkFRewrite rewriter
               _ -> return Nothing
           _ -> return Nothing    
     rewriter _ _ = return Nothing
-
-inlineTransfer :: FwdTransfer StmtM PredsWork
-inlineTransfer = mkFTransfer fw
-  where
-    fw :: StmtM e x -> PredsWork -> Fact x PredsWork
-    fw (Bind v (Goto (_, dest) _)) (curr, preds) = (curr, Map.insertWith (++) curr [dest] preds)
-    fw (Bind v _) f = f
-    fw (CaseM _ _) f = mkFactBase inlineLattice []
-    fw (Done _) f = mkFactBase inlineLattice []
-    fw (BlockEntry _ l _) (_, preds) = (l, preds)
-    fw (CloEntry _ l _ _) (_, preds) = (l, preds)
-
-inlineLattice :: DataflowLattice PredsWork
-inlineLattice = DataflowLattice { fact_name = "Inline blocks"
-                                , fact_bot = (undefined, Map.empty)
-                                , fact_join = joinPreds }
-  where
-    joinPreds :: Label -> OldFact PredsWork -> NewFact PredsWork -> (ChangeFlag, PredsWork)
-    joinPreds l (OldFact (_, oldPreds)) (NewFact (curr, newPreds)) 
-      = let (flag, result) = (joinMaps extend) l (OldFact oldPreds) (NewFact newPreds)
-        in (flag, (curr, result))
-    extend :: Label 
-           -> OldFact [Label]
-           -> NewFact [Label]
-           -> (ChangeFlag, [Label])
-    extend _ (OldFact old) (NewFact new) 
-      | null (old \\ new) = (NoChange, new)
-      | otherwise = (SomeChange, new)
+-}
 
 -- Testing & Examples
 
@@ -905,13 +899,12 @@ main = progM defs
 
 progM progs = do
   let tops = map fst progs
-      compiled def = (def, compileM tops def)
 
       opt1 = fst . usingLive addLiveRewriter tops
       opt2 = bindSubst 
       opt3 = fst . usingLive deadRewriter tops 
       opt4 = fst . usingLive deadRewriter tops . collapse
-      opt5 = inlineBlock . deadBlocks
+      opt5 = deadBlocks tops
 
       printLive :: FactBase LiveFact -> Block StmtM C x -> Doc
       printLive live p = 
@@ -928,7 +921,12 @@ progM progs = do
         in printDef def $+$
            vcat' (maybeGraphCC empty (printLive live) comp)
       
-      compile opts = map (opts . compileM tops)
+      compileOne opts p (i, ps) = 
+        let (j, p') = compileM tops i p
+        in (j, (opts p') : ps)
+
+      compile opts = snd . foldr (compileOne opts) (0, []) 
+
       printResult defs progs = putStrLn (render (vcat' (map ((text "" $+$) . printWithLive) (zip defs progs))))
                      
   putStrLn "\n ========= BEFORE ============"
