@@ -284,12 +284,12 @@ instance NonLocal StmtM where
   successors = stmtSuccessors
                         
 stmtSuccessors :: StmtM e C -> [Label]
-stmtSuccessors (CaseM _ alts) = concatMap (\(Alt _ _ t) -> tailDest t) alts
-stmtSuccessors (Done t) = tailDest t
+stmtSuccessors (CaseM _ alts) = map snd (concatMap (\(Alt _ _ t) -> tailDest t) alts)
+stmtSuccessors (Done t) = map snd (tailDest t)
 
-tailDest :: TailM -> [Label]
-tailDest (Closure (_, l) _) = [l]
-tailDest (Goto (_, l) _) = [l]
+tailDest :: TailM -> [Dest]
+tailDest (Closure dest _) = [dest]
+tailDest (Goto dest _) = [dest]
 tailDest _ = []
 
 -- | Annotate lambda-calculus programs with free variables and
@@ -427,12 +427,31 @@ maybeGraphCC b f (GMany _ middles _) = map f . mapElems $ middles
 entryPoints :: ProgM C C -> [(Label, StmtM C O)]
 entryPoints (GMany _ blocks _) = map getEntryLabel (mapElems blocks)
 
-allBlocks :: ProgM C C -> [(Label, Block StmtM C C)]
-allBlocks (GMany _ blocks _) = map (\b -> (fst (getEntryLabel b), b)) (mapElems blocks)
+allBlocks :: ProgM C C -> [(Dest, Block StmtM C C)]
+allBlocks (GMany _ blocks _) = map blockToDest (mapElems blocks)
 
-blockTail :: Block StmtM C C -> ProgM O C
+blockToDest :: Block StmtM C C -> (Dest, Block StmtM C C)
+blockToDest block = (destOfEntry (blockEntry block), block)
+
+-- | Get the first instruction in a block.
+blockEntry :: Block StmtM C C -> StmtM C O
+blockEntry b = case blockToNodeList' b of
+                 (JustC entry, _, _) -> entry
+
+
+-- | Get the tail of a block. Will exclude
+-- the entry instruction (if C C) or the
+-- first instruction in the block (O C)
+blockTail :: Block StmtM x C -> ProgM O C
 blockTail b = case blockToNodeList' b of
                 (JustC _, mid, JustC end) -> mkMiddles mid <*> mkLast end
+
+-- | Find a block with a given label in the propgram
+-- and return it paired with it's label and name.
+blockOfLabel :: ProgM C C -> Label -> Maybe (Dest, Block StmtM C C)
+blockOfLabel body l = case lookupBlock body l of
+                  BodyBlock block -> Just (blockToDest block)
+                  _ -> Nothing
 
 getEntryLabel :: Block StmtM C x -> (Label, StmtM C O)
 getEntryLabel block = case blockToNodeList' block of
@@ -466,8 +485,11 @@ runSimple :: SimpleFuelMonad a -> a
 runSimple p = runSimpleUniqueMonad $ runWithFuel infiniteFuel p
     
 nameOfEntry :: StmtM C O -> Name
-nameOfEntry (BlockEntry n _ _) = n
-nameOfEntry (CloEntry n _ _ _) = n
+nameOfEntry = fst . destOfEntry
+
+destOfEntry :: StmtM C O -> Dest
+destOfEntry (BlockEntry n l _) = (n, l)
+destOfEntry (CloEntry n l _ _) = (n, l)
 
 -- Determining liveness in StmtM
 
@@ -475,7 +497,7 @@ type LiveFact = Set Name
 
 -- | Used to apply different rewriters which all require 
 -- live variable analysis.
-usingLive :: (forall m. FuelMonad m => (BwdRewrite m StmtM LiveFact)) -- ^ Rewrite to use
+usingLive :: (forall m. FuelMonad m => BwdRewrite m StmtM LiveFact) -- ^ Rewrite to use
           -> [Name] -- ^ Top-level variables
           -> ProgM C C -- ^ Program to rewrite
           -> (ProgM C C, FactBase LiveFact) -- Results
@@ -724,8 +746,8 @@ collapse body = runSimple $ do
     destinations = Map.fromList . catMaybes . map (destOf body) 
     initial = mapFromList (zip labels (repeat Map.empty))
     destOf :: ProgM C C -> Label -> Maybe (Label, DestOf)
-    destOf body l = case lookupBlock body l of
-                   BodyBlock block ->
+    destOf body l = case blockOfLabel body l of
+                   Just (_,  block) ->
                      case blockToNodeList' block of
                        (JustC (CloEntry {}), [], JustC (Done (Goto d _))) -> Just (l, Jump d)
                        (JustC (CloEntry _ _ _ arg), [], JustC (Done (Closure d args))) -> Just (l, Capture d (arg `elem` args))
@@ -809,76 +831,61 @@ collapseLattice = DataflowLattice { fact_name = "Closure collapse"
 -- it has only one caller).
 
 
--- Maps labels to their predecessors.
-type LiveBlock = Set Label
+-- | Maps labels to their predecessors. The values
+-- for a given key represent predecessors for that
+-- block.
+type BlockPredecessors = Map Dest [Dest]
 
-deadBlocks :: [Name] -> ProgM C C -> ProgM C C
-deadBlocks tops body = 
-  let (result, prog) = runSimple $ do
-                         (_, f, _) <- analyzeAndRewriteBwd bwd (JustC labels) body initial
-                         return $ removeOrphans body (Set.unions (mapElems f))
-  in if result == SomeChange
-     then deadBlocks tops prog
-     else prog
+-- | Names the set of live blocks (i.e., those
+-- that can be called from elsewhere) in a program.
+type LiveBlock = Set Dest
+
+findBlockPreds :: [Name] -> ProgM C C -> BlockPredecessors
+findBlockPreds tops body = runSimple $ do
+    (_, f, _) <- analyzeAndRewriteBwd bwd (JustC labels) body initial
+    return $ Map.fromList (catMaybes (map convert (mapToList f)))
   where
-    
+    convert (label, set) = case blockOfLabel body label of
+                                 Just (dest, _) -> Just (dest, Set.toList set)
+                                 _ -> Nothing
     labels = entryLabels body
-    initial = mkFactBase (bp_lattice bwd) (zip labels (repeat (Set.fromList topLabels)))
+    initial = mkFactBase (bp_lattice bwd) (zip labels (repeat (Set.fromList (topLabels body))))
     bwd = BwdPass { bp_lattice = liveLattice "Live blocks" :: DataflowLattice LiveBlock
-                  , bp_transfer = deadBlockTransfer
+                  , bp_transfer = liveBlockTransfer
                   , bp_rewrite = noBwdRewrite }
-
-    removeOrphans :: ProgM C C -> LiveBlock -> (ChangeFlag, ProgM C C)
-    removeOrphans (GMany _ blocks _) live = foldl (removeOrphan live) (NoChange, emptyClosedGraph) (mapToList blocks)
-
-    removeOrphan :: LiveBlock -> (ChangeFlag, ProgM C C) -> (Label, Block StmtM C C) -> (ChangeFlag, ProgM C C)
-    removeOrphan live (flag, prog) (label, block)
-      | label `Set.member` live = (flag, blockGraph block |*><*| prog)
-      | otherwise = (SomeChange, prog)
-
-    topLabels :: [Label]
-    topLabels = map fst . filter (\(_, s) -> nameOfEntry s `elem` tops) . entryPoints $ body
-
-deadBlockTransfer :: BwdTransfer StmtM LiveBlock
-deadBlockTransfer = mkBTransfer bw
+    topLabels :: ProgM C C -> [Dest]
+    topLabels = filter (\(n, l) -> n `elem` tops) . map fst . allBlocks
+    
+liveBlockTransfer :: BwdTransfer StmtM LiveBlock
+liveBlockTransfer = mkBTransfer bw
   where
     bw :: StmtM e x -> Fact x LiveBlock -> LiveBlock
-    bw (Bind v tail) live = (tailLabel tail) `Set.union` live
-    bw (CaseM _ alts) lives = Set.unions (map (\(Alt _ _ e) -> tailLabel e) alts ++ mapElems lives)
-    bw (Done tail) lives =  Set.unions (tailLabel tail : mapElems lives)
+    bw (Bind v tail) live = Set.fromList (tailDest tail) `Set.union` live
+    bw (CaseM _ alts) lives = Set.unions (map (\(Alt _ _ e) -> Set.fromList (tailDest e)) alts ++ mapElems lives)
+    bw (Done tail) lives =  Set.unions (Set.fromList (tailDest tail) : mapElems lives)
     bw (BlockEntry _ l _) live = live
     bw (CloEntry _ l _ _) live = live
 
-    tailLabel :: TailM -> Set Label
-    tailLabel (Goto (_, dest) _) = Set.singleton dest
-    tailLabel (Closure (_, dest) _) = Set.singleton dest
-    tailLabel _ = Set.empty
-
-{-inlineBlock :: ProgM C C -> ProgM C C
-inlineBlock body = runSimple $ do
-      (p, _, _) <- analyzeAndRewriteFwd fwd (JustC labels) body initial
-      return p
+deadBlocks :: [Name] -> ProgM C C -> ProgM C C
+deadBlocks tops prog = 
+  case removeOrphans (liveSet prog) prog of
+    (SomeChange, prog') -> deadBlocks tops prog'
+    _ -> prog
   where
-    labels = entryLabels body
-    initial = mapFromList (zip labels (repeat (undefined, Map.empty)))
-    fwd = FwdPass { fp_lattice = liveLattice "Live blocks" :: DataflowLattice LiveBlock
-                  , fp_transfer = deadBlockTransfer
-                  , fp_rewrite = inlineRewrite body }
+    liveSet = Set.fromList . concat . Map.elems . findBlockPreds tops
 
-inlineRewrite :: FuelMonad m => ProgM C C -> FwdRewrite m StmtM PredsWork
-inlineRewrite prog  = mkFRewrite rewriter
-  where
-    rewriter :: FuelMonad m => forall e x. StmtM e x -> PredsWork -> m (Maybe (ProgM e x))
-    rewriter (Bind v (Goto (_, l) _)) (_, preds)
-      | l `Map.member` preds && length (preds ! l) == 1 = 
-        case lookupBlock prog l of
-          BodyBlock block -> 
-            case blockToNodeList' block of
-              (_, mids, JustC (Done t)) -> return (Just (mkMiddles mids <*> mkMiddle (Bind v t)))
-              _ -> return Nothing
-          _ -> return Nothing    
-    rewriter _ _ = return Nothing
--}
+    removeOrphans :: LiveBlock 
+                  -> ProgM C C 
+                  -> (ChangeFlag, ProgM C C)
+    removeOrphans live = foldl (removeOrphan live) (NoChange, emptyClosedGraph) . allBlocks
+
+    removeOrphan :: LiveBlock 
+                 -> (ChangeFlag, ProgM C C) 
+                 -> (Dest, Block StmtM C C) 
+                 -> (ChangeFlag, ProgM C C)
+    removeOrphan live (flag, prog) (dest, block) 
+      | dest `Set.member` live = (flag, blockGraph block |*><*| prog)
+      | otherwise = (SomeChange, prog)
 
 -- Testing & Examples
 
@@ -889,7 +896,10 @@ defs = [isnt
        , mapNot
        , myMap
        , applyNil
-       , funky] ++ kennedy1
+       , funky] ++ kennedy1 ++
+       origExample ++
+       origExample2
+       
 
 main = progM defs
 
