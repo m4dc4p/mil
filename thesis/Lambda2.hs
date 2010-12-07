@@ -444,7 +444,7 @@ blockEntry b = case blockToNodeList' b of
 -- first instruction in the block (O C)
 blockTail :: Block StmtM x C -> ProgM O C
 blockTail b = case blockToNodeList' b of
-                (JustC _, mid, JustC end) -> mkMiddles mid <*> mkLast end
+                (_, mid, JustC end) -> mkMiddles mid <*> mkLast end
 
 -- | Find a block with a given label in the propgram
 -- and return it paired with it's label and name.
@@ -830,6 +830,99 @@ collapseLattice = DataflowLattice { fact_name = "Closure collapse"
 -- This program only inlines L2 when only one predecessor exists (i.e.,
 -- it has only one caller).
 
+-- Nothing -- unknown
+-- Maybe True - will inline
+-- Maybe False - will not inline
+type InlineFact = Maybe Bool
+
+inlineBlocks :: [Name] -> ProgM C C -> ProgM C C
+inlineBlocks tops body = 
+  case runInline tops body of
+    (True, body') -> inlineBlocks tops (deadBlocks tops body')
+    (_, body') -> body'
+  where
+    runInline tops body = runSimple $ do
+      (body', f, _) <- analyzeAndRewriteBwd bwd (JustC labels) body initial
+      return (or (catMaybes (mapElems f)), body')
+    preds = findBlockPreds tops body
+    labels = entryLabels body
+    initial = mkFactBase (bp_lattice bwd) (zip labels (repeat Nothing))
+    bwd = BwdPass { bp_lattice = inlineLattice
+                  , bp_transfer = inlineTransfer preds body
+                  , bp_rewrite = inlineRewrite preds body }
+
+
+inlineLattice :: DataflowLattice InlineFact
+inlineLattice = DataflowLattice { fact_name = "Inline blocks"
+                                , fact_bot = Nothing
+                                , fact_join = extend }
+  where
+    extend _ (OldFact old) (NewFact new) = (changeIf (old /= new)
+                                           , new)
+
+inlineTransfer :: BlockPredecessors -> ProgM C C -> BwdTransfer StmtM InlineFact
+inlineTransfer preds prog = mkBTransfer bw
+  where
+    -- Find blocks which are the sole predecessor to another
+    -- block. 
+    bw :: StmtM e x -> Fact x InlineFact -> InlineFact
+    bw (Bind v (Goto dest vs)) f = singlePred preds dest f 
+    bw (Bind {}) f = f
+    bw (CaseM {}) _ = Just False
+    bw (Done (Goto dest _)) f = Nothing -- singlePred preds dest Nothing -- not yet implemented
+    bw (Done {}) _ = Nothing
+    bw (CloEntry {}) f = f
+    bw (BlockEntry {}) f = f
+
+singlePred :: BlockPredecessors -> Dest -> InlineFact -> InlineFact
+singlePred preds dest f 
+  | dest `Map.member` preds && null (drop 1 (preds ! dest)) = Just (maybe True (True &&) f)
+  | otherwise = f
+
+inlineRewrite :: FuelMonad m => BlockPredecessors -> ProgM C C -> BwdRewrite m StmtM InlineFact
+inlineRewrite preds prog = mkBRewrite rewriter
+  where
+    rewriter :: FuelMonad m => forall e x. StmtM e x -> Fact x InlineFact -> m (Maybe (ProgM e x))
+    rewriter (Bind v (Goto dest vs)) (Just False) = return Nothing
+    rewriter (Done (Goto dest vs)) _ = 
+      case singlePred preds dest Nothing of
+        Just True -> return (inlineDone dest vs)
+        _ -> return Nothing
+    rewriter (Bind v (Goto dest vs)) _ = return (inlineBind v dest vs)
+
+    rewriter _ _ = return Nothing
+
+    inlineDone :: Dest -> [Name] -> Maybe (ProgM O C)
+    inlineDone (_, l) args = Nothing -- not yet implemented
+
+    inlineBind :: Name -> Dest -> [Name] -> Maybe (ProgM O O)
+    inlineBind result (_, l) args = maybe Nothing (Just . snd . renameInBody . snd) (blockOfLabel prog l)
+      where
+          renameInBody body = foldGraphNodes rename  
+                                             (blockTail body) 
+                                             (mkEnv body, emptyGraph)
+          -- Create a map from formal arguements
+          -- to actual arguments so we can rename.
+          mkEnv :: Block StmtM C C -> Map Name Name
+          mkEnv body = Map.fromList (zip (entryArgs body) args)
+          entryArgs :: Block StmtM C C -> [Name]
+          entryArgs body = case blockEntry body of
+                             BlockEntry  _ _ args -> args
+                             CloEntry _ _ clo arg -> clo ++ [arg]
+          rename :: forall e x. StmtM e x -> (Map Name Name, ProgM O O) -> (Map Name Name, ProgM O O)
+          rename (Bind v tail) (env, prog) 
+            | v `Map.member` env = (Map.delete v env, newProg)
+            | otherwise = (env, newProg)
+            where
+              newProg = prog <*> mkMiddle (Bind v (changeTail env tail))
+          rename (Done tail) (env, prog) = (env, prog <*> mkMiddle (Bind result (changeTail env tail)))
+          changeTail :: Map Name Name -> TailM -> TailM
+          changeTail env (Return n) = Return (changeVar env n)
+          changeTail env (Enter f x) = Enter (changeVar env f) (changeVar env x)
+          changeTail env (Closure dest vs) = Closure dest (map (changeVar env) vs)
+          changeTail env (Goto dest vs) = Goto dest (map (changeVar env) vs)
+          changeTail env (ConstrM c ns) = ConstrM c (map (changeVar env) ns)
+          changeVar env f = Map.findWithDefault f f env
 
 -- | Maps labels to their predecessors. The values
 -- for a given key represent predecessors for that
@@ -915,6 +1008,7 @@ progM progs = do
       opt3 = fst . usingLive deadRewriter tops 
       opt4 = fst . usingLive deadRewriter tops . collapse
       opt5 = deadBlocks tops
+      opt6 = deadBlocks tops . inlineBlocks tops
 
       printLive :: FactBase LiveFact -> Block StmtM C x -> Doc
       printLive live p = 
@@ -942,7 +1036,7 @@ progM progs = do
   putStrLn "\n ========= BEFORE ============"
   printResult (prepareExpr tops progs) (compile opt1 progs)
   putStrLn "\n ========= AFTER ============="
-  printResult (prepareExpr tops progs) (compile (opt5 . opt4 . opt3 . opt2 . opt1) progs)
+  printResult (prepareExpr tops progs) (compile (opt6 . opt5 . opt4 . opt3 . opt2 . opt1) progs)
            
 abs :: Var -> (Expr -> Expr) -> Expr
 abs v f = Abs v [] (f (Var v))
