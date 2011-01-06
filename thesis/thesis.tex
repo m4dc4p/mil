@@ -15,7 +15,8 @@
 \newboolean{lhs2tex}
 \setboolean{lhs2tex}{true}
 % Awkward Habit: Design and Optimization of A Monadic Intermediate Language
-\title{Design and optimization of a monadic intermediate language}
+% \title{Dataflow Optimization of a Monadic Intermediate Language using Hoopl}
+\title{Optimizing Monadic Programs using Hoopl}
 %if False
 \setboolean{lhs2tex}{false}
 \author{Justin Bailey \\ \url{justinb@cs.pdx.edu}}
@@ -33,16 +34,33 @@
 
 \section{Abstract}
 
-This thesis describes two related efforts in Caffeine, a compiler for
-the Habit programming language. The first, a novel monadic
-intermediate language named BC, makes allocation of heap objects such
-as closures and data values explicit. The second uses the Hoopl
-library to implement dataflow optimizations for BC based on the
-``monad laws.''
+This thesis describes a monadic intermediate language and how we used
+the Hoopl library to implement optimizations for programs written in
+it. We show that our monadic language makes it simpler to
+implement optimizations, such as Lazy Code Motion, not normally applied
+to functional languages. Besides Lazy Code Motion, we also demonstrate an optimization
+that can eliminate many intra- and inter-procedure closure allocations and several
+optimizations based on the so-called \emph{monad laws}.
 
 \section{Audience}
 
 \section{Introduction/Overview}
+
+
+\section{Background}
+\subsection{Dataflow Optimization}
+
+A short section giving the history of dataflow optimization techniques
+and basic concepts.
+
+\subsection{Monadic Languages}
+
+Introduce what a ``monadic'' language looks like and the advantages such a form
+gives us.
+
+\section{The Hoopl Library}
+
+Explains the purpose of the Hoopl library and basic concepts (nodes, graphs, rewrites and transfers)
 
 \section{BC -- The Language of Blocks and Captures}
 
