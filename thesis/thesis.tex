@@ -49,8 +49,80 @@ several optimizations based on the \emph{monad laws}.
 \section{Background}
 \subsection{Dataflow Optimization}
 
-A short section giving the history of dataflow optimization techniques
-and basic concepts.
+%% A short section giving the history of dataflow optimization techniques
+%% and basic concepts.
+
+\subsubsection{Basic Blocks and Contrl--Flow Graphs}
+
+\citet{SoAndSo}\comment{Gary Kindal?} first defined dataflow
+optimization techniques. A dataflow optimization operates over a
+``control-flow graph'' (CFG) of the program -- a directed graph where edges
+encode branches or jumps and nodes represent statements. Programs run
+by entering a node from a predecessor, executing the statements in
+turn, and exiting the node to a successor. Multiple successors imply a
+conditional branch, though the program can only choose one. A special
+``entry'' node, with no predecssors, exists to give the program a
+starting point.
+
+The statements in each node must define a ``basic block,'' which means
+there can only be one entry and one exit to the node. Each 
+predeccessor starts at the same statement; execution cannot start in
+the ``middle'' of the statements in the node. Each successor also
+leaves from the same instruction, so only one ``branch'' can exist in
+each node.
+
+For example, consider the ``fall-through'' implied by the use of case
+statements in this C language program fragment:
+
+\begin{verbatim}
+  switch(i) {
+  case 1:
+    printf("1");
+    break;
+  case 2:
+    printf("2");
+  case 3:
+    printf("3");
+  }
+
+  printf("4");
+\end{verbatim}
+
+Figure \ref{switchCfgEg} shows a CFG for this fragment. Execution
+begins at node A. Node C has two predeccessors: A and B. The edge
+between Node B and C represents fall-through from the second to third
+case. They cannot be combined because the node would need two distinct
+entry points. Encoding a program into basic blocks usually involves
+inserting similar branches. The CFG makes explicit control--flow that
+exists by implication in the source program.
+
+\begin{comment}
+\begin{verbatim}
+   A
+  switch   ----<-
+  | |  |  |      |
+  | |  |  v C    ^
+  | |   ->case 3 |
+  | |     |      |
+  | |      ->----_-- 
+  | | B          |  |
+  |  ->case 2 ->-   v
+  |                 |
+  |   D       ----<-
+   ->case 1  |
+     |       v
+     v       |
+   --------<-      
+  |  E
+   ->printf("3")
+\end{verbatim}
+\end{comment}
+
+% What does dataflow mean?
+
+% How do you use it? 
+
+% Example
 
 \subsection{Monadic Languages}
 
@@ -59,7 +131,8 @@ gives us.
 
 \section{The Hoopl Library}
 
-Explains the purpose of the Hoopl library and basic concepts (nodes, graphs, rewrites and transfers)
+Explains the purpose of the Hoopl library and basic concepts (nodes,
+graphs, rewrites and transfers)
 
 \section{BC -- The Language of Blocks and Captures}
 
