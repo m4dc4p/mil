@@ -49,20 +49,25 @@ several optimizations based on the \emph{monad laws}.
 \section{Background}
 \subsection{Dataflow Optimization}
 
+\citet{SoAndSo}\comment{Gary Kindal?} first defined dataflow
+optimization techniques. They operate by transforming a
+\emph{control-flow graph} (CFG) representation of a program. This
+section introduces the concepts necessary to understand how dataflow
+optimization works, and describes how the technique is usually
+implemented.
+
 %% A short section giving the history of dataflow optimization techniques
 %% and basic concepts.
 
-\subsubsection{Basic Blocks and Contrl--Flow Graphs}
+\subsubsection{Basic Blocks and Control--Flow Graphs}
 
-\citet{SoAndSo}\comment{Gary Kindal?} first defined dataflow
-optimization techniques. A dataflow optimization operates over a
-``control-flow graph'' (CFG) of the program -- a directed graph where edges
-encode branches or jumps and nodes represent statements. Programs run
-by entering a node from a predecessor, executing the statements in
-turn, and exiting the node to a successor. Multiple successors imply a
-conditional branch, though the program can only choose one. A special
-``entry'' node, with no predecssors, exists to give the program a
-starting point.
+A dataflow optimization operates over a ``control-flow graph'' (CFG)
+of the program -- a directed graph where edges encode branches or
+jumps and nodes represent statements. Programs run by entering a node
+from a predecessor, executing the statements in turn, and exiting the
+node to a successor. Multiple successors imply a conditional branch,
+though the program can only choose one. A special ``entry'' node, with
+no predecssors, exists to give the program a starting point.
 
 The statements in each node must define a ``basic block,'' which means
 there can only be one entry and one exit to the node. Each 
@@ -88,15 +93,6 @@ statements in this C language program fragment:
   printf("4");
 \end{verbatim}
 
-Figure \ref{switchCfgEg} shows a CFG for this fragment. Execution
-begins at node A. Node C has two predeccessors: A and B. The edge
-between Node B and C represents fall-through from the second to third
-case. They cannot be combined because the node would need two distinct
-entry points. Encoding a program into basic blocks usually involves
-inserting similar branches. The CFG makes explicit control--flow that
-exists by implication in the source program.
-
-\begin{comment}
 \begin{verbatim}
    A
   switch   ----<-
@@ -116,7 +112,29 @@ exists by implication in the source program.
   |  E
    ->printf("3")
 \end{verbatim}
-\end{comment}
+
+Figure \ref{switchCfgEg} shows a CFG for this fragment. Execution
+begins at node A. Node C has two predeccessors: A and B. The edge
+between Node B and C represents fall-through from the second to third
+case. They cannot be combined because the node would need two distinct
+entry points. Encoding a program into basic blocks usually involves
+inserting similar branches. The CFG makes explicit control--flow that
+exists by implication in the source program.
+
+\subsubsection{Dataflow over CFGs}
+
+Dataflow optimizations transform the CFG representation of a program,
+with the goal of making a faster (or smaller, or more efficient, etc.)
+program. Dataflow computes a set of ``entry'' assumptions and ``exit''
+facts for each node in the graph. Facts for one node become
+assumptions for the nodes' successors (thus the term
+``dataflow''). The algorithm operate over the entire graph until a
+fixed point is reached -- that is, facts and assumptions no longer
+change. The computed facts can then be used to transform the graph.
+
+\emph{Constant propagation example -- or something more functional?}
+
+\emph{Introduce forward and backwards dataflow.}
 
 % What does dataflow mean?
 
