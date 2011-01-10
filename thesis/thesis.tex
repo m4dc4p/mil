@@ -1,5 +1,6 @@
 \documentclass[11pt]{article}
 \usepackage{standalone}
+\usepackage{comment}
 %include polycode.fmt
 \usepackage{sectsty}
 \usepackage{palatino}
@@ -16,7 +17,7 @@
 \setboolean{lhs2tex}{true}
 % Awkward Habit: Design and Optimization of A Monadic Intermediate Language
 % \title{Dataflow Optimization of a Monadic Intermediate Language using Hoopl}
-\title{Optimizing Monadic Programs using Hoopl}
+\title{Using Dataflow Optimization Techniques with a Monadic Intermediate Language}
 %if False
 \setboolean{lhs2tex}{false}
 \author{Justin Bailey \\ \url{justinb@cs.pdx.edu}}
@@ -32,24 +33,94 @@
 
 \maketitle
 
-\section{Abstract}
+\begin{abstract}
+  Dataflow analysis underlies a number of important optimizations
+  generally implemented in compilers for imperative
+  languages. Traditional intermediate representations for functional
+  languages make the implementation of optimizations using dataflow
+  analysis awkward and difficult. We show that, by chosing a monadic
+  representation, we are able to implement several optimizations using
+  dataflow analysis straightforwardly. We demonstrate several common
+  optimizations, such as constant propagation and dead-code
+  elimination. We implement an optimization which eliminates
+  intermediate closure construction, essential to the performance of
+  any functional program. Finally, we implement one of the most
+  complicated dataflow-based optimizations, \emph{Lazy Code
+    Motion}. To our knowledge this is the first time it has been
+  implemented in a functional language compiler over a monadic
+  intermediate language. Our work uses the Hoopl library to implement
+  our optimizations and thus also serves as a case-study
+  for advanced uses of that library.
+\end{abstract}
 
-This thesis describes a monadic intermediate language and how we used
-the Hoopl library to implement optimizations for programs written in
-it. We show that our monadic language makes it simpler to implement
-optimizations, such as Lazy Code Motion, not normally applied to
-functional languages. We also demonstrate an optimization that can
-eliminate many intra- and inter-procedure closure allocations and
-several optimizations based on the \emph{monad laws}.
+\begin{comment}
+  This thesis describes a monadic intermediate language and how we used
+  the Hoopl library to implement optimizations for programs written in
+  it. We show that our monadic language makes it simpler to implement
+  optimizations, such as Lazy Code Motion, not normally applied to
+  functional languages. We also demonstrate an optimization that can
+  eliminate many intra- and inter-procedure closure allocations and
+  several optimizations based on the \emph{monad laws}.
+\end{comment}
 
-\section{Audience}
+% \section{Audience}
 
 \section{Introduction/Overview}
+
+Compilers for functional languages typically \rem{reference?}
+optimize programs through \emph{algebraic rewriting}. Expressions in
+the program are transformed via relations that define equivalent
+expressions (except the new expression is faster, smaller, more
+efficient, etc.). For example, the fizzbang \emph{monad law}:
+\rem{reference}
+
+\begin{verbatim}
+  v <- return w; e 
+    ==> [w/v] e (if w not in e)
+\end{verbatim}
+
+states that $w$ can be substituted for $v$ in $e$ if the conditions
+above hold. A compiler that implements this law through rewriting would
+recognize the first expression and replace the program with the second.
+
+Compilers for imperitave languages, however, implement many
+optimizations using \emph{dataflow analysis}. This method treats the
+program as a graph, where edges represent execution paths and nodes
+statements in the program. Dataflow analysis computes facts about each
+node and then transforms the graph into an equivalent program (except
+faster, smaller, etc.). Optimizations which use dataflow analysis
+include constant propagation, dead-code elimination,
+common-subexpression elimination and many others.
+
+Dataflow analysis on imperitave programs seems natural, due to the
+explicit flow-of-control from statement to statement. For pure
+functional languages, with flow-of-control determined by evaluation
+order, the fit seems more awkward. However, call-by-value, pure,
+\emph{monadic} functional programs seem to embody the best of both
+styles: expression-based evaluation \emph{and} explicit
+control-flow. 
+
+Our work, then, defines a monadic language and optimizes programs in
+it using dataflow analysis. We implement a number of optimizations,
+such as constant propagation and dead-code elimination. We implement
+an optimization which eliminates intermediate closure construction,
+showing that this technique can be used for functional-language
+specific optimizations. Finally, we implement \emph{lazy code motion},
+which to our knowledge has not been applied to programs in a monadic
+language before.
+
+\rem{foo}
+
+We use the Hoopl library \rem{reference} to implement our
+optimizations.  Besides showing that it is possible (and even
+desirable) to use dataflow analysis in this context, our work 
+also serves as a Hoopl tutorial for those interested in implementing
+their own optimizations using it. 
 
 \section{Background}
 \subsection{Dataflow Optimization}
 
-\citet{SoAndSo}\comment{Gary Kindal?} first defined dataflow
+\citet{SoAndSo}\rem{Gary Kindal?} first defined dataflow
 optimization techniques. They operate by transforming a
 \emph{control-flow graph} (CFG) representation of a program. This
 section introduces the concepts necessary to understand how dataflow
@@ -59,7 +130,7 @@ implemented.
 %% A short section giving the history of dataflow optimization techniques
 %% and basic concepts.
 
-\subsubsection{Basic Blocks and Control--Flow Graphs}
+\subsubsection{Basic Blocks and Control-Flow Graphs}
 
 A dataflow optimization operates over a ``control-flow graph'' (CFG)
 of the program -- a directed graph where edges encode branches or
@@ -78,7 +149,6 @@ each node.
 
 For example, consider the ``fall-through'' implied by the use of case
 statements in this C language program fragment:
-
 \begin{verbatim}
   switch(i) {
   case 1:
@@ -92,7 +162,6 @@ statements in this C language program fragment:
 
   printf("4");
 \end{verbatim}
-
 \begin{verbatim}
    A
   switch   ----<-
@@ -112,7 +181,6 @@ statements in this C language program fragment:
   |  E
    ->printf("3")
 \end{verbatim}
-
 Figure \ref{switchCfgEg} shows a CFG for this fragment. Execution
 begins at node A. Node C has two predeccessors: A and B. The edge
 between Node B and C represents fall-through from the second to third
