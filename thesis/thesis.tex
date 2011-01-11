@@ -6,6 +6,7 @@
 \usepackage{palatino}
 \usepackage[scaled=0.92]{helvet}
 \usepackage{xspace}
+\usepackage{verbatim}
 \renewcommand\ttdefault{cmtt}
 \allsectionsfont{\sffamily}
 \usepackage{url}
@@ -34,9 +35,10 @@
 \maketitle
 
 \begin{abstract}
-  Dataflow analysis underlies a number of important optimizations
-  generally implemented in compilers for imperative
-  languages. Traditional intermediate representations for functional
+  Dataflow analysis underlies many optimizations implemented by
+  compilers for imperative languages. Functional languages implement
+  many of the same optimizations using algebraic
+  rewriting. Traditional intermediate representations for functional
   languages make the implementation of optimizations using dataflow
   analysis awkward and difficult. We show that, by chosing a monadic
   representation, we are able to implement several optimizations using
@@ -49,27 +51,11 @@
     Motion}. To our knowledge this is the first time it has been
   implemented in a functional language compiler over a monadic
   intermediate language. Our work uses the Hoopl library to implement
-  our optimizations and thus also serves as a case-study
-  for advanced uses of that library.
+  our optimizations and thus also serves as a case-study for advanced
+  uses of that library.
 \end{abstract}
 
 \section{Introduction/Overview}
-
-Compilers for functional languages typically \rem{reference?}
-optimize programs through \emph{algebraic rewriting}. Expressions in
-the program are transformed via relations that define equivalent
-expressions, except the new expression is faster, smaller, more
-efficient, etc. For example, consider the bind/return \emph{monad law}:
-\rem{reference}
-
-\begin{verbatim}
-  v <- return w; e 
-    ==> [w/v] e (if w not in e).
-\end{verbatim}
-
-It states that $w$ can be substituted for $v$ in $e$ if the conditions
-above hold. A compiler that implements this law through rewriting would
-recognize the first expression and replace it with the second.
 
 Compilers for imperitave languages implement many optimizations using
 \emph{dataflow analysis}. This method treats the program as a graph,
@@ -98,10 +84,10 @@ languages. Finally, we implement \emph{lazy code motion}, which to our
 knowledge has not been applied to programs in a monadic language
 before.
 
-We use the Hoopl library \rem{reference} to implement our
+We use the Hoopl library\rem{reference} to implement our
 optimizations. Besides showing that it is possible (and even
-desirable) to use dataflow analysis in this context, our work 
-also serves as a case-study for advanced uses of Hoopl. 
+desirable) to use dataflow analysis in this context, our work also
+serves as a case-study for advanced uses of Hoopl.
 
 \section{Background}
 
@@ -114,7 +100,7 @@ also serves as a case-study for advanced uses of Hoopl.
 
 \subsection{Dataflow Optimization}
 
-\citet{SoAndSo}\rem{Gary Kindal?} first described dataflow
+\citet{SoAndSo} first described dataflow
 analysis. It works by transforming a \emph{control-flow graph} (CFG)
 representation of the program. This section introduces the concepts
 necessary to understand how dataflow optimization works and describes
@@ -137,8 +123,9 @@ the ``middle'' of the statements in the node. Each successor also
 leaves from the same instruction, so only one ``branch'' can exist in
 each node.
 
-For example, consider the ``fall-through'' implied by the use of case
-statements in this C language program fragment:
+For example, consider the ``fall-through'' implied by the use of #case#
+statements in this C-language program fragment:
+
 \begin{verbatim}
   switch(i) {
   case 1:
@@ -149,9 +136,11 @@ statements in this C language program fragment:
   case 3:
     printf("3");
   }
-
-  printf("4");
 \end{verbatim}
+
+\SaveVerb{switch}#switch#
+
+\begin{figure}[h]
 \begin{verbatim}
    A
   switch   ----<-
@@ -167,10 +156,15 @@ statements in this C language program fragment:
    ->case 1  |
      |       v
      v       |
-   --------<-      
-  |  E
-   ->printf("3")
+   --+-----<-      
+  |  
+   -> ...
 \end{verbatim}
+\caption{CFG illustrating \emph{fall-through} allowed by the
+  C-language \texttt{switch} statement.}
+\label{switchCfgEg}
+\end{figure}
+
 Figure \ref{switchCfgEg} shows a CFG for this fragment. Execution
 begins at node A. Node C has two predeccessors: A and B. The edge
 between Node B and C represents fall-through from the second to third
@@ -188,7 +182,7 @@ with the goal of making a faster (or smaller, or more efficient, etc.)
 program. Dataflow computes a set of ``entry'' assumptions and ``exit''
 facts for each node in the graph. Facts for one node become
 assumptions for the nodes' successors (thus the term
-``dataflow''). The algorithm operate over the entire graph until a
+``dataflow''). The algorithm iteratves over the entire graph until a
 fixed point is reached -- that is, facts and assumptions no longer
 change. The computed facts can then be used to transform the graph.
 
@@ -212,11 +206,11 @@ lattices will be described. }
 \section{Languages}
 
 \emph{Defines the languages used in the thesis and a simple
-  compilation scheme from a \lam variant to our monadic language. }
+  compilation scheme from a \lamA variant to our monadic language. }
 
 \subsection{Source Language}
 
-\emph{Defines a \lam variant with some monadic effects, enough to
+\emph{Defines a \lamA variant with some monadic effects, enough to
   illustrate interesting programs.}
 
 \subsection{Monadic Intermediate Language}
@@ -229,7 +223,7 @@ lattices will be described. }
 \subsection{Compiling to Our MIL}
 \emph{A compilation scheme which uses Hoopls ``shapes'' is
 described. This scheme will give use our initial, unoptimized
-MIL program. An example (possibly compose, or const3) illustrates 
+MIL program. An example (possibly |compose|, or |const3|) illustrates 
 our scheme.}
 
 \section{``Traditional'' Optimizations}
@@ -270,11 +264,24 @@ or hindered the implementation}
   monadic fuzzbang (inlining)}
 
 \subsection{Bind/Return Collapse}
+\emph{Collapsing ``|x <- return y; p|'' to ``|[y/x] p|''.}
 \subsubsection{Example of Desired Optimization}
 \subsubsection{Implementation}
 \subsubsection{Reflection}
 
 \subsection{Monadic FuzzBang}
+\emph{``FuzzBang'' --  monadic inlining. That is:}
+
+> y <- (z <- x; p1)
+> p2
+
+\noindent
+\emph{becomes:}
+
+> z <- x
+> y <- p1
+> p2
+
 \subsubsection{Example of Desired Optimization}
 \subsubsection{Implementation}
 \subsubsection{Reflection}
@@ -282,10 +289,10 @@ or hindered the implementation}
 \section{Intermediate Closure Elimimation}
 \emph{Describes our optimization for collapsing intermediate
 closures. Our choice of representation is analyzed to
-show how it facilitates this optimization. We should how one
-closure can be eliminated from a program, and how the optimization
+show how it facilitates this optimization. We should show one
+closure can be eliminated from a program and how the optimization
 is applied over and over until a fixed point is reached. The format
-for this section will vary from the other two}
+for this section will vary from the other two.}
 
 \section{Implementing Lazy Code Motion}
 \emph{Describes our implementation of LCM in terms of the four passes
