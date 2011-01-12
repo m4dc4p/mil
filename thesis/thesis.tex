@@ -1,61 +1,74 @@
-\documentclass[11pt]{article}
-\usepackage{standalone}
+\documentclass[12pt]{report}
 \usepackage{comment}
 %include polycode.fmt
-\usepackage{sectsty}
 \usepackage{palatino}
 \usepackage[scaled=0.92]{helvet}
 \usepackage{xspace}
 \usepackage{verbatim}
 \renewcommand\ttdefault{cmtt}
-\allsectionsfont{\sffamily}
 \usepackage{url}
 \usepackage{fancyvrb}
 \usepackage{setspace}
 \usepackage{cmds}
+
 \usepackage{ifthen}
 \newboolean{lhs2tex}
 \setboolean{lhs2tex}{true}
-% Awkward Habit: Design and Optimization of A Monadic Intermediate Language
-% \title{Dataflow Optimization of a Monadic Intermediate Language using Hoopl}
-\title{Using Dataflow Optimization Techniques with a Monadic Intermediate Language}
 %if False
+% lhs2tex ignores this section
 \setboolean{lhs2tex}{false}
-\author{Justin Bailey \\ \url{justinb@cs.pdx.edu}}
+\newcommand{\authorEmail}{\url{justinb@cs.pdx.edu}}
 %else
-\ifthenelse{\boolean{lhs2tex}}{\author{Justin Bailey \\ \url{justinb@@cs.pdx.edu}}}{}
+% LaTeX ignores this section, unless pre-processed with lhs2Text
+\ifthenelse{\boolean{lhs2tex}}%
+           {\newcommand{\authorEmail}{\url{justinb@@cs.pdx.edu}}}%
+           {}
 %endif
-\date{\today}
+
+\usepackage[left=1.5in, right=1in, top=1in, bottom=1in]{geometry}
+\usepackage{abstract}
+\usepackage[sf, bf, tiny]{titlesec}
+\titleformat{\chapter}[hang]{}% format
+ {\sffamily\bfseries\thechapter}
+ {1em}
+ {\sffamily\bfseries}
+\titlespacing{\chapter}{}{}{2ex}
 
 \begin{document}
+
+\date{}
+\author{Justin Bailey \\ \authorEmail}
+\title{Using Dataflow Optimization Techniques with a Monadic Intermediate Language}
+
 \VerbatimFootnotes
 \DefineShortVerb{\#}
 \doublespacing
 
 \maketitle
 
+\renewcommand{\abstractnamefont}{\normalfont\small\sffamily\bfseries}
 \begin{abstract}
-  Dataflow analysis underlies many optimizations implemented by
-  compilers for imperative languages. Functional languages implement
-  many of the same optimizations using algebraic
-  rewriting. Traditional intermediate representations for functional
-  languages make the implementation of optimizations using dataflow
-  analysis awkward and difficult. We show that, by chosing a monadic
-  representation, we are able to implement several optimizations using
-  dataflow analysis straightforwardly. We demonstrate several common
-  optimizations, such as constant propagation and dead-code
-  elimination. We implement an optimization which eliminates
-  intermediate closure construction, essential to the performance of
-  any functional program. Finally, we implement one of the most
-  complicated dataflow-based optimizations, \emph{Lazy Code
-    Motion}. To our knowledge this is the first time it has been
-  implemented in a functional language compiler over a monadic
-  intermediate language. Our work uses the Hoopl library to implement
-  our optimizations and thus also serves as a case-study for advanced
-  uses of that library.
+  Dataflow analysis of programs as control-flow graphs (CFGs) of basic
+  blocks underlies many optimizations implemented by compilers for
+  imperative languages. Functional language compilers, in contrast,
+  traditionally optimize by rewriting terms according to algebraic
+  relations. We show that, by compiling to a \emph{monadic
+    intermediate language}, we can treat our functional programs as
+  CFGs of basic blocks. This representation lets us easily re-using
+  dataflow techniques from the imperative world in a compiler for a
+  functional language. We warm up with constant-propagation and
+  dead-code elimination, showing alternative implementations than
+  usually seen in a functional language compiler. We then demonstrate
+  elimination of intermediate closures, again in a new style. Finally,
+  we implement one of the most complicated dataflow-based
+  optimizations, \emph{Lazy Code Motion} (LCM). To our knowledge this
+  is the first implementation of LCM over a monadic intermediate
+  language. Throughout, we use the \emph{Hoopl} library to implement
+  our optimizations, making our work a case-study for the library as
+  well.
 \end{abstract}
 
-\section{Introduction/Overview}
+\chapter{Introduction}
 
 Compilers for imperitave languages implement many optimizations using
 \emph{dataflow analysis}. This method treats the program as a graph,
@@ -89,7 +102,7 @@ optimizations. Besides showing that it is possible (and even
 desirable) to use dataflow analysis in this context, our work also
 serves as a case-study for advanced uses of Hoopl.
 
-\section{Background}
+\chapter{Background}
 
 %% A short section giving the history of dataflow optimization techniques
 %% and basic concepts.
@@ -98,7 +111,7 @@ serves as a case-study for advanced uses of Hoopl.
 % concepts: basic blocks, control flow, facts, and
 % rewrites. Bind/Return elimination is used as an an example.
 
-\subsection{Dataflow Optimization}
+\section{Dataflow Optimization}
 
 \citet{SoAndSo} first described dataflow
 analysis. It works by transforming a \emph{control-flow graph} (CFG)
@@ -106,7 +119,7 @@ representation of the program. This section introduces the concepts
 necessary to understand how dataflow optimization works and describes
 how the technique is usually implemented.
 
-\subsubsection{Basic Blocks and Control-Flow Graphs}
+\subsection{Basic Blocks and Control-Flow Graphs}
 
 A dataflow optimization operates over a ``control-flow graph'' (CFG)
 of the program -- a directed graph where edges encode branches or
@@ -173,9 +186,9 @@ entry points. Encoding a program into basic blocks usually involves
 inserting similar branches. The CFG makes explicit control--flow that
 exists by implication in the source program.
 
-\subsubsection{Direction, Facts and Rewrites}
+\subsection{Direction, Facts and Rewrites}
 
-\subsubsection{Example: Bind/Return Collapse}
+\subsection{Example: Bind/Return Collapse}
 
 Dataflow optimizations transform the CFG representation of a program,
 with the goal of making a faster (or smaller, or more efficient, etc.)
@@ -196,37 +209,37 @@ change. The computed facts can then be used to transform the graph.
 
 % Example
 
-\section{The Hoopl Library}
+\chapter{The Hoopl Library}
 
 \emph{Introduce the Hoopl library, describing how
 it approaches dataflow analysis. Important concepts
 such as shape, transfer and rewrite functions, facts and
 lattices will be described. }
 
-\section{Languages}
+\chapter{Languages}
 
 \emph{Defines the languages used in the thesis and a simple
   compilation scheme from a \lamA variant to our monadic language. }
 
-\subsection{Source Language}
+\section{Source Language}
 
 \emph{Defines a \lamA variant with some monadic effects, enough to
   illustrate interesting programs.}
 
-\subsection{Monadic Intermediate Language}
+\section{Monadic Intermediate Language}
 
 \emph{Defines our monadic language and explains the terms in
   it. Example programs are given which illustrate closure construction
   and data allocation. The use of ``tail'' vs. statements is motivated
   and described. }
 
-\subsection{Compiling to Our MIL}
+\section{Compiling to Our MIL}
 \emph{A compilation scheme which uses Hoopls ``shapes'' is
 described. This scheme will give use our initial, unoptimized
 MIL program. An example (possibly |compose|, or |const3|) illustrates 
 our scheme.}
 
-\section{``Traditional'' Optimizations}
+\chapter{``Traditional'' Optimizations}
 
 \emph{The bulk of our work. Each optimization implemented is
   described. Each subsection should follow a common recipe: describe
@@ -239,37 +252,37 @@ our scheme.}
 describe all forward optimizations, then all backward ones. That may help
 set up the concepts necessary to describe LCM.}
 
-\subsection{Constant-Propagation}
+\section{Constant-Propagation}
 \emph{This portion gives an overview of the optimization, without
 code or (much) notation.}
 
-\subsubsection{Example of Desired Optimization}
+\subsection{Example of Desired Optimization}
 \emph{A program is given and we show what we'd like it to be
 transformed to.}
 
-\subsubsection{Implementation}
+\subsection{Implementation}
 \emph{``Interesting'' pieces of the implementation are described.}
 
-\subsubsection{Reflection}
+\subsection{Reflection}
 \emph{What was good, what didn't work so well, and how Hoopl helped
 or hindered the implementation}
 
-\subsection{Dead-code elimination}
-\subsubsection{Example of Desired Optimization}
-\subsubsection{Implementation}
-\subsubsection{Reflection}
+\section{Dead-code elimination}
+\subsection{Example of Desired Optimization}
+\subsection{Implementation}
+\subsection{Reflection}
 
-\section{Monadic Optimizations}
+\chapter{Monadic Optimizations}
 \emph{Describes optimizations based on the monad laws: bind/return collapse and
   monadic fuzzbang (inlining)}
 
-\subsection{Bind/Return Collapse}
+\section{Bind/Return Collapse}
 \emph{Collapsing ``|x <- return y; p|'' to ``|[y/x] p|''.}
-\subsubsection{Example of Desired Optimization}
-\subsubsection{Implementation}
-\subsubsection{Reflection}
+\subsection{Example of Desired Optimization}
+\subsection{Implementation}
+\subsection{Reflection}
 
-\subsection{Monadic FuzzBang}
+\section{Monadic FuzzBang}
 \emph{``FuzzBang'' --  monadic inlining. That is:}
 
 > y <- (z <- x; p1)
@@ -282,11 +295,11 @@ or hindered the implementation}
 > y <- p1
 > p2
 
-\subsubsection{Example of Desired Optimization}
-\subsubsection{Implementation}
-\subsubsection{Reflection}
+\subsection{Example of Desired Optimization}
+\subsection{Implementation}
+\subsection{Reflection}
 
-\section{Intermediate Closure Elimimation}
+\chapter{Intermediate Closure Elimimation}
 \emph{Describes our optimization for collapsing intermediate
 closures. Our choice of representation is analyzed to
 show how it facilitates this optimization. We should show one
@@ -294,23 +307,23 @@ closure can be eliminated from a program and how the optimization
 is applied over and over until a fixed point is reached. The format
 for this section will vary from the other two.}
 
-\section{Implementing Lazy Code Motion}
+\chapter{Implementing Lazy Code Motion}
 \emph{Describes our implementation of LCM in terms of the four passes
   used. This section will give an overview of LCM and briefly describe
   each pass. We give a example program which will be used throughout
   the section.}
 
-\subsection{Anticipated Expressions}
+\section{Anticipated Expressions}
 
-\subsection{Available Expressions}
+\section{Available Expressions}
 
-\subsection{Dead-code Elimination}
+\section{Dead-code Elimination}
 
-\subsection{Reflection}
+\section{Reflection}
 
 \emph{Conclusions regarding our implemenation.}
 
-\section{Conclusion \& Future Work}
+\chapter{Conclusion \& Future Work}
 
 \emph{Where we started and where we wished we could have go to.}
 
