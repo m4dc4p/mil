@@ -4,7 +4,7 @@
 \begin{document}
 \ifthenelse{\boolean{standaloneFlag}}
            {\doublespacing}{}
-\chapter{Languages}
+           \chapter{Languages}
 
 \emph{Defines the languages used in the thesis and a simple
   compilation scheme from a \lamA variant to our monadic language. }
@@ -15,6 +15,26 @@
   illustrate interesting programs.}
 
 \section{Monadic Intermediate Language}
+
+%% What does the language support?
+
+%% Syntax
+
+\begin{code}
+data StmtM e x where
+  BlockEntry :: Name -> Label -> [Name] -> StmtM C O
+  CloEntry :: Name -> Label -> [Name] -> Name -> StmtM C O
+  Bind :: Name -> TailM -> StmtM O O
+  CaseM :: Name -> [Alt TailM] -> StmtM O C
+  Done :: TailM -> StmtM O C
+
+data TailM = Return Name 
+  | Enter Name Name
+  | Closure Dest [Name]
+  | Goto Dest [Name] 
+  | ConstrM Constructor [Name]
+  deriving (Eq, Show)
+\end{code}
 
 \emph{Defines our monadic language and explains the terms in
   it. Example programs are given which illustrate closure construction
