@@ -1,5 +1,6 @@
 \documentclass[12pt]{article}
-\include{preamble.f.tex}
+%include polycode.fmt
+\include{preamble.f}
 \begin{document}
 \ifthenelse{\boolean{standaloneFlag}}
            {\doublespacing}{}
@@ -19,6 +20,9 @@
 \title{Using Dataflow Optimization Techniques with a Monadic Intermediate Language}
 
 \maketitle 
+\ifthenelse{\standaloneFlag}
+           {\thispagestyle{empty}}
+           {}
 
 \renewcommand{\abstractnamefont}{\normalfont\small\sffamily\bfseries}
 \begin{abstract}
@@ -31,15 +35,14 @@
   CFGs of basic blocks. Doing so enables us to re-use the rich body of
   dataflow techniques developed for imperative language compilers. We
   first implement dead code elimination, an optimization common to
-  both functional and imperative compilers. We then demonstrate an
-  optimization specific to functional language compilers: elimination
-  of intermediate closures. Next, we show how two optimizations,
-  inlining and copy-propagation, derive from the \emph{monad laws} in
-  our representation. Finally, we implement \emph{Lazy Code Motion}
-  (LCM), one of the most complicated dataflow-based optimizations. To
-  our knowledge this is the first implementation of LCM over a monadic
-  intermediate language. Throughout, we use the \emph{Hoopl} library
-  to implement our optimizations, making our work a case-study for the
-  library as well.
+  both functional and imperative compilers. We then demonstrate
+  \emph{uncurrying}, an optimization specific to functional language
+  compilers. Next, we use the \emph{monad laws} to derive inlining and
+  copy-propagation optimizations. Finally, we implement \emph{Lazy
+    Code Motion} (LCM), one of the most complicated dataflow-based
+  optimizations. To our knowledge this is the first implementation of
+  LCM over a monadic intermediate language. Throughout, we use the
+  \emph{Hoopl} library to implement our optimizations, making our work
+  a case-study for the library as well.
 \end{abstract}
 \end{document}
