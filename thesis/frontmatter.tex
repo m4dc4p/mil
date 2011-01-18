@@ -1,0 +1,82 @@
+\documentclass[12pt]{article}
+\usepackage{standalone}
+\usepackage{comment}
+%include polycode.fmt
+\usepackage{palatino}
+\usepackage[scaled=0.92]{helvet}
+\usepackage{xspace}
+\usepackage{verbatim}
+\renewcommand\ttdefault{cmtt}
+\usepackage{url}
+\usepackage{fancyvrb}
+\usepackage{setspace}
+\usepackage{cmds}
+
+\usepackage{ifthen}
+\newboolean{lhs2tex}
+\setboolean{lhs2tex}{true}
+%if False
+% lhs2tex ignores this section
+\setboolean{lhs2tex}{false}
+\newcommand{\authorEmail}{\url{justinb@cs.pdx.edu}}
+%else
+% LaTeX ignores this section, unless pre-processed with lhs2Text
+\ifthenelse{\boolean{lhs2tex}}%
+           {\newcommand{\authorEmail}{\url{justinb@@cs.pdx.edu}}}%
+           {}
+%endif
+
+% For compiling sub-packages
+\newboolean{standaloneFlag}
+\setboolean{standaloneFlag}{true}
+
+%% GSO margins.
+\usepackage[left=1.5in, right=1in, top=1in, bottom=1in]{geometry}
+\usepackage{abstract}
+
+%% GSO requires 12 pt font for all headings
+\usepackage[sf, bf, tiny]{titlesec}
+\titleformat{\chapter}[hang]{}% format
+ {\sffamily\bfseries\thechapter}
+ {1em}
+ {\sffamily\bfseries}
+\titlespacing{\chapter}{}{}{2ex}
+
+\hyphenation{data-flow}
+\begin{document}
+\ifthenelse{\boolean{standaloneFlag}}
+           {\date{}
+             \author{Justin Bailey \\ \authorEmail}
+             \title{Using Dataflow Optimization Techniques with a Monadic Intermediate Language}
+
+             \VerbatimFootnotes
+             \DefineShortVerb{\#}
+             \doublespacing}{}
+
+\maketitle
+
+\renewcommand{\abstractnamefont}{\normalfont\small\sffamily\bfseries}
+\begin{abstract}
+  Dataflow analysis of programs represented as control-flow graphs
+  (CFGs) of basic blocks underlies many optimizations implemented by
+  imperative language compilers. Functional language compilers, in
+  contrast, traditionally optimize by rewriting programs according to
+  algebraic laws. We show that, by compiling to a \emph{monadic
+    intermediate language}, we can treat our functional programs as
+  CFGs of basic blocks. Doing so enables us to re-use the rich body of
+  dataflow techniques developed for imperative language compilers. We
+  first implement dead code elimination, an optimization common to
+  both functional and imperative compilers. We then demonstrate an
+  optimization specific to functional language compilers: elimination
+  of intermediate closures. Next, we show how two optimizations,
+  inlining and copy-propagation, derive from the \emph{monad laws} in
+  our representation. Finally, we implement \emph{Lazy Code Motion}
+  (LCM), one of the most complicated dataflow-based optimizations. To
+  our knowledge this is the first implementation of LCM over a monadic
+  intermediate language. Throughout, we use the \emph{Hoopl} library
+  to implement our optimizations, making our work a case-study for the
+  library as well.
+\end{abstract}
+
+
+\end{document}

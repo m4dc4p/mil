@@ -618,6 +618,7 @@ printLiveFacts = printFB printFact
 --                       ==> [w/v] c  otherwise
 --     Bind v (Return w) c  ==> c    if v==w
 --                       c  ==> [w/v] c  otherwise
+--
 
 -- | Associates a binding (the key) with the
 -- value that should be substituted for it. Only
