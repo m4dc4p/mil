@@ -32,4 +32,7 @@
 \setboolean{lhs2tex}{false}
 %endif
 
-
+% Used by included files to know they
+% are NOT standalone
+\newboolean{standaloneFlag}
+\setboolean{standaloneFlag}{true}
