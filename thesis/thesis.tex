@@ -1,11 +1,10 @@
 \documentclass[12pt]{report}
 \usepackage{standalone}
-
-\include{preamble.f.tex}
+%include polycode.fmt
+\include{preamble.f}
 
 % Used by included files to know they
 % are NOT standalone
-\newboolean{standaloneFlag}
 \setboolean{standaloneFlag}{false}
 
 \begin{document}
@@ -14,7 +13,7 @@
 \DefineShortVerb{\#}
 \doublespacing
              
-\input{frontmatter.f.tex}
+\input{frontmatter.f}
 
 \chapter{Introduction}
 
@@ -162,31 +161,7 @@ it approaches dataflow analysis. Important concepts
 such as shape, transfer and rewrite functions, facts and
 lattices will be described. }
 
-\chapter{Languages}
-
-\emph{Defines the languages used in the thesis and a simple
-  compilation scheme from a \lamA variant to our monadic language. }
-
-\section{Source Language}
-
-\emph{Defines a \lamA variant with some monadic effects, enough to
-  illustrate interesting programs.}
-
-\section{Monadic Intermediate Language}
-
-\emph{Defines our monadic language and explains the terms in
-  it. Example programs are given which illustrate closure construction
-  and data allocation. The use of ``tail'' vs. statements is motivated
-  and described. }
-
-\emph{Need to talk about the monad we work in as well - what 
-do bind and return mean?}
-
-\section{Compiling to Our MIL}
-\emph{A compilation scheme which uses Hoopls ``shapes'' is
-described. This scheme will give use our initial, unoptimized
-MIL program. An example (possibly |compose|, or |const3|) illustrates 
-our scheme.}
+\include{languages.f}
 
 \chapter{``Traditional'' Optimizations}
 
