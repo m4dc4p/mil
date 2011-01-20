@@ -1,0 +1,41 @@
+\documentclass[12pt]{report}
+%include polycode.fmt
+\include{preamble}
+\begin{document}
+\include{document.preamble}
+
+\chapter{Introduction}
+
+Compilers for imperative languages implement many optimizations using
+\emph{dataflow analysis}. This method treats the program as a graph,
+where edges represent execution paths and nodes represent statements
+in the program. Dataflow analysis computes facts about each node and
+then transforms the graph into an equivalent, yet faster (or smaller,
+or more efficient, etc.) program. Optimizations which use dataflow
+analysis include constant propagation, dead-code elimination,
+common-subexpression elimination and many others.
+
+Dataflow analysis on imperative programs arises naturally due to the
+explicit flow-of-control from statement to statement. For pure
+functional languages, with flow-of-control determined by evaluation
+order, the fit seems more awkward. However, call-by-value, pure,
+\emph{monadic} functional programs embody the best of both
+styles: expression-based evaluation \emph{and} explicit
+control-flow. 
+
+Our work, then, defines a monadic language and optimizes programs in
+it using dataflow analysis. We implement a number of optimizations
+common to imperative and functional languages, including constant
+propagation and dead-code elimination. We implement an optimization
+which eliminates intermediate closure construction, showing that this
+technique can be used for optimizations specific to functional
+languages. Finally, we implement \emph{lazy code motion}, which to our
+knowledge has not been applied to programs in a monadic language
+before.
+
+We use the Hoopl library\rem{reference} to implement our
+optimizations. Besides showing that it is possible (and even
+desirable) to use dataflow analysis in this context, our work also
+serves as a case-study for advanced uses of Hoopl.
+
+\end{document}

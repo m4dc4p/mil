@@ -1,9 +1,8 @@
 \documentclass[12pt]{article}
 %include polycode.fmt
-\include{preamble.f}
+\include{preamble}
 \begin{document}
-\ifthenelse{\boolean{standaloneFlag}}
-           {\doublespacing}{}
+\include{document.preamble}
 
 %if False
 % lhs2tex ignores this section

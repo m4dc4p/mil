@@ -1,7 +1,7 @@
 \documentclass[12pt]{report}
 \usepackage{standalone}
 %include polycode.fmt
-\include{preamble.f}
+\include{preamble}
 
 % Used by included files to know they
 % are NOT standalone
@@ -15,144 +15,9 @@
              
 \input{frontmatter.f}
 
-\chapter{Introduction}
+\input{introduction.f}
 
-Compilers for imperative languages implement many optimizations using
-\emph{dataflow analysis}. This method treats the program as a graph,
-where edges represent execution paths and nodes represent statements
-in the program. Dataflow analysis computes facts about each node and
-then transforms the graph into an equivalent, yet faster (or smaller,
-or more efficient, etc.) program. Optimizations which use dataflow
-analysis include constant propagation, dead-code elimination,
-common-subexpression elimination and many others.
-
-Dataflow analysis on imperative programs arises naturally due to the
-explicit flow-of-control from statement to statement. For pure
-functional languages, with flow-of-control determined by evaluation
-order, the fit seems more awkward. However, call-by-value, pure,
-\emph{monadic} functional programs embody the best of both
-styles: expression-based evaluation \emph{and} explicit
-control-flow. 
-
-Our work, then, defines a monadic language and optimizes programs in
-it using dataflow analysis. We implement a number of optimizations
-common to imperative and functional languages, including constant
-propagation and dead-code elimination. We implement an optimization
-which eliminates intermediate closure construction, showing that this
-technique can be used for optimizations specific to functional
-languages. Finally, we implement \emph{lazy code motion}, which to our
-knowledge has not been applied to programs in a monadic language
-before.
-
-We use the Hoopl library\rem{reference} to implement our
-optimizations. Besides showing that it is possible (and even
-desirable) to use dataflow analysis in this context, our work also
-serves as a case-study for advanced uses of Hoopl.
-
-\chapter{Background}
-
-%% A short section giving the history of dataflow optimization techniques
-%% and basic concepts.
-
-% Describe dataflow analysis in general terms and defines key
-% concepts: basic blocks, control flow, facts, and
-% rewrites. Bind/Return elimination is used as an an example.
-
-\section{Dataflow Optimization}
-
-\citet{SoAndSo} first described dataflow
-analysis. It works by transforming a \emph{control-flow graph} (CFG)
-representation of the program. This section introduces the concepts
-necessary to understand how dataflow optimization works and describes
-how the technique is usually implemented.
-
-\subsection{Basic Blocks and Control-Flow Graphs}
-
-A dataflow optimization operates over a ``control-flow graph'' (CFG)
-of the program -- a directed graph where edges encode branches or
-jumps and nodes represent statements. Programs run by entering a node
-from a predecessor, executing the statements in turn, and exiting the
-node to a successor. Multiple successors imply a conditional branch,
-though the program can only choose one. A special ``entry'' node, with
-no predecssors, exists to give the program a starting point.
-
-The statements in each node must define a ``basic block,'' which means
-there can only be one entry and one exit to the node. Each 
-predeccessor starts at the same statement; execution cannot start in
-the ``middle'' of the statements in the node. Each successor also
-leaves from the same instruction, so only one ``branch'' can exist in
-each node.
-
-For example, consider the ``fall-through'' implied by the use of #case#
-statements in this C-language program fragment:
-
-\begin{verbatim}
-  switch(i) {
-  case 1:
-    printf("1");
-    break;
-  case 2:
-    printf("2");
-  case 3:
-    printf("3");
-  }
-\end{verbatim}
-
-\begin{figure}[h]
-\begin{verbatim}
-   A
-  switch   ----<-
-  | |  |  |      |
-  | |  |  v C    ^
-  | |   ->case 3 |
-  | |     |      |
-  | |      ->----_-- 
-  | | B          |  |
-  |  ->case 2 ->-   v
-  |                 |
-  |   D       ----<-
-   ->case 1  |
-     |       v
-     v       |
-   --+-----<-      
-  |  
-   -> ...
-\end{verbatim}
-\caption{CFG illustrating \emph{fall-through} allowed by the
-  C-language \texttt{switch} statement.}
-\label{switchCfgEg}
-\end{figure}
-
-Figure \ref{switchCfgEg} shows a CFG for this fragment. Execution
-begins at node A. Node C has two predeccessors: A and B. The edge
-between Node B and C represents fall-through from the second to third
-case. They cannot be combined because the node would need two distinct
-entry points. Encoding a program into basic blocks usually involves
-inserting similar branches. The CFG makes explicit control--flow that
-exists by implication in the source program.
-
-\subsection{Direction, Facts and Rewrites}
-
-\subsection{Example: Bind/Return Collapse}
-
-Dataflow optimizations transform the CFG representation of a program,
-with the goal of making a faster (or smaller, or more efficient, etc.)
-program. Dataflow computes a set of ``entry'' assumptions and ``exit''
-facts for each node in the graph. Facts for one node become
-assumptions for the nodes' successors (thus the term
-``dataflow''). The algorithm iteratves over the entire graph until a
-fixed point is reached -- that is, facts and assumptions no longer
-change. The computed facts can then be used to transform the graph.
-
-\emph{Constant propagation example -- or something more functional?}
-
-\emph{Introduce forward and backwards dataflow.}
-
-% What does dataflow mean?
-
-% How do you use it? 
-
-% Example
+\input{background.f}
 
 \chapter{The Hoopl Library}
 
@@ -163,38 +28,9 @@ lattices will be described. }
 
 \include{languages.f}
 
-\chapter{``Traditional'' Optimizations}
+\include{deadcode.f}
 
-\emph{The bulk of our work. Each optimization implemented is
-  described. Each subsection should follow a common recipe: describe
-  the optimization, give an example program and show how we want it
-  changed, show salient points about the optimization (with code
-  snippets and references to the full library), and reflect on the
-  implementation.  Lazy Code Motion may get its own section.}
-
-\emph{One question: should optimizations be categorized by direction? We could
-describe all forward optimizations, then all backward ones. That may help
-set up the concepts necessary to describe LCM.}
-
-\section{Constant-Propagation}
-\emph{This portion gives an overview of the optimization, without
-code or (much) notation.}
-
-\subsection{Example of Desired Optimization}
-\emph{A program is given and we show what we'd like it to be
-transformed to.}
-
-\subsection{Implementation}
-\emph{``Interesting'' pieces of the implementation are described.}
-
-\subsection{Reflection}
-\emph{What was good, what didn't work so well, and how Hoopl helped
-or hindered the implementation}
-
-\section{Dead-code elimination}
-\subsection{Example of Desired Optimization}
-\subsection{Implementation}
-\subsection{Reflection}
+\chapter{Uncurrying}
 
 \chapter{Monadic Optimizations}
 \emph{Describes optimizations based on the monad laws: bind/return collapse and
@@ -207,7 +43,7 @@ or hindered the implementation}
 \subsection{Reflection}
 
 \section{Inlining}
-\emph{``FuzzBang'' --  monadic inlining. That is:}
+\emph{Monadic inlining using the associativity law. That is:}
 
 > y <- (z <- x; p1)
 > p2
@@ -232,7 +68,7 @@ closure can be eliminated from a program and how the optimization
 is applied over and over until a fixed point is reached. The format
 for this section will vary from the other two.}
 
-\chapter{Implementing Lazy Code Motion}
+\chapter{Lazy Code Motion}
 \emph{Describes our implementation of LCM in terms of the four passes
   used. This section will give an overview of LCM and briefly describe
   each pass. We give a example program which will be used throughout

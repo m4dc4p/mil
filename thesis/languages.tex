@@ -1,11 +1,8 @@
 \documentclass[12pt]{report}
 %include polycode.fmt
-\include{preamble.f}
+\include{preamble}
 \begin{document}
-\ifthenelse{\boolean{standaloneFlag}}
-           {\VerbatimFootnotes
-             \DefineShortVerb{\#}
-             \doublespacing}{}
+\include{document.preamble}
 
 \chapter{Languages}
 \label{ref_chapter_languages}
