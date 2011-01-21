@@ -1139,6 +1139,15 @@ origExample2 = [("main", App (App (App composeDef
                  (Var "baz"))
               , compose]
 
+const3 = [("const3", const3Def)
+         , ("main", App (App (App const3Def 
+                                  (Var "1")) 
+                              (Var "2")) 
+                        (Var "3"))]
+  where
+    const3Def = abs "a" $ \_ ->
+                abs "b" $ \_ ->
+                abs "c" $ \c -> c
 mkCons :: Expr -> Expr -> Expr                                        
 mkCons x xs = Constr "Cons" [x, xs]
 

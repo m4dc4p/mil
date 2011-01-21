@@ -19,68 +19,65 @@
 
 %% What does the language support?
 
-Our monadic language makes allocation
-of data structures and closures explicit. Functions in MIL 
-define computations which, when run, can affect heap memory. Figure 
-\ref{figMILDef} gives the syntax of the language. 
+Our monadic language takes its inspiration from Haskell's @do@
+notation. It is a pure functional language, making allocation of data
+structures and closures explicit via monadic syntax. Functions in MIL
+define computations which, when run, can affect heap memory. Figure
+\ref{figMILDef} gives the syntax of the language.
 
 %% TODO: Mention that v restricts the term to variables
 %% only.
 
 \begin{figure}[h]
-\begin{verbatim}
-  progM :: defM1
-           ...
-           defMN
-
-  defM ::= k {v1, ..., vN} v = k1 {v1, ..., vN, v} 
+\begin{code}
+  defM := k {v1, ..., vN} v = k1 {v1, ..., vN, v} 
     | k {v1, ..., vN} v = b(v1, ..., vN, v)
     | b(v1, ..., vN) = bodyM
     | t <- k {}
 
-  bodyM ::= do 
-    stmtM1; 
-    ... ; 
-    stmtMN; 
+  bodyM := do 
+    stmtM1 
+    ... 
+    stmtMN 
     tailM
 
-  stmtM ::= v <- tailM
+  stmtM := v <- tailM
     | case v of [alt1, ..., altN]
 
 
-  tailM ::= return v
+  tailM := return v
     | v1 @ v2
-    | f(v1, ..., v)
+    | k {v1, ..., vN}
+    | f(v1, ..., vN)
     | C v1 ... vN
 
-  alt ::= C v1 ... vN -> b(v1, ..., vM)
-
-\end{verbatim}
+  alt := C v1 ... vN -> b(v1, ..., vM) -- m <= n
+\end{code}
 \caption{Concrete syntax for our monadic intermediate language.}
 \label{figMILDef}
 \end{figure}
 
-MIL programs (#progM#) consist of a series of definitions (#defM#). Each
+MIL programs consist of a series of definitions (@defM@). Each
 definition can be any of the following.
 
 \begin{description}
-  \item[Closure-capturing] (#k {v1, ..., vN} v = k1 {v1, ..., vN, v}#) -- This function
-    expects to find the variables #v1, ..., vN# in its own closure. It constructs
+  \item[Closure-capturing] (@k {v1, ..., vN} v = k1 {v1, ..., vN, v}@) -- This function
+    expects to find the variables @v1, ..., vN@ in its own closure. It constructs
     a new closure containing the existing variables plus the newly captured variable
-    #v#. The new closure refers to #k1#, another closure-capturing function.
-  \item[Block-calling] (#k {v1, ..., vN} v = b(v1, ..., vN, v)#) -- This function immediately
-    jumps to block #b# with arguments #v1, ..., vN# and #v#. No closure value needs to
+    @v@. The new closure refers to @k1@, another closure-capturing function.
+  \item[Block-calling] (@k {v1, ..., vN} v = b(v1, ..., vN, v)@) -- This function immediately
+    jumps to block @b@ with arguments @v1, ..., vN@ and @v@. No closure value needs to
     be constructed. 
-  \item[Function block] (#b(v1, ..., vN) = bodyM#) -- This function executes the statements
+  \item[Function block] (@b(v1, ..., vN) = bodyM@) -- This function executes the statements
     in the body. 
-  \item[Top-level] (#t <- k {}#) -- This special case ensures top-level definitions in the program
-    can be accessed like any other function. The notation indicates that #t# holds a closure
-    structure, referring to the definition #k#. 
+  \item[Top-level] (@t <- k {}@) -- This special case ensures top-level definitions in the program
+    can be accessed like any other function. The notation indicates that @t@ holds a closure
+    structure, referring to the definition @k@. 
 \end{description}
 
 Notice that we can distinguish syntatically between functions that
-merely create a closure (#k { ... }#) and those that do actual work
-(#b(...)#). The body of a #k# functin can only allocate another
+merely create a closure (@k { ... }@) and those that do actual work
+(@b(...)@). The body of a @k@ functin can only allocate another
 closure or jump to a block. A block, on the other hand, can do other
 work, but it cannot directly return a closure. As will be described in
 chapter \ref{ref_chapter_uncurrying} this makes it much easier to
@@ -89,34 +86,41 @@ recognize and elminate intermediate closures.
 The body of each block consists of statements followed by a
 \emph{tail}. Tails can only
 appear as the last statement in a block or on the right-hand side of
-the monadic arrow (``#<-#''). Tail instructions, in other words, cause 
+the monadic arrow (``@<-@''). Tail instructions, in other words, cause 
 effects. The three tail statements follow:
 
 \begin{description}
-\item[Return a computation] (#return v#) -- Returns the result of a computation
+\item[Return a computation] (@return v@) -- Returns the result of a computation
   to the caller.
-\item[Enter a function] (#v1 @@ v2#) -- Enter the closure referred to by #v1#, with
-  argument #v2#. In other words, function application. Note that #v1# represents an
+
+\item[Create a closure] (@k {v1, ..., vN}@) -- Creates a closure pointing to
+  function @k@, capturing variables @v1@ through @vN@.
+
+\item[Enter a function] (@v1 @@ v2@) -- Enter the closure referred to by @v1@, with
+  argument @v2@. In other words, function application. Note that @v1@ represents an
   \emph{unknown} function -- one for which we compute the address at run-time.
-\item[Call a block] (#f(v1, ..., v)#) -- Jump to the block labeled #f# with the arguments
-  given. In this case we know the function #f# refers to and do not need to examine
+
+\item[Call a block] (@f(v1, ..., vN)@) -- Jump to the block labeled @f@ with the arguments
+  given. In this case we know the function @f@ refers to and do not need to examine
   a closure in order to execute it.
-\item[Create a value] (#C v1 ... vN#) -- Create a data value with tag #C#, holding
-  the values found in variables #v1 ... vN#.
+\item[Create a value] (@C v1 ... vN@) -- Create a data value with tag @C@, holding
+  the values found in variables @v1 ... vN@.
 \end{description}
 
+%% TODO: Describe alt syntax.
+
 Statements in a block either bind the result of a tail statement 
-(#v <- tailM#) or branch conditionally (#case v of ... #). Binding ``runs''
-a computatin and ``dereferences'' the address of the result, placing
-the value in a variable (e.g., #v#). That same variable can be bound
-again later, but that does not affect previous uses of #v#. In essence, the old
+(@v <- tailM@) or branch conditionally (@case v of ... @). Binding ``runs''
+a computation and ``dereferences'' the result, placing
+the value in a variable (e.g., @v@). That same variable can be bound
+again later, but that does not affect previous uses of @v@. In essence, the old
 name becomes hidden and its value inaccessible.
 
-Though the syntax allows multiple #case# statements in a function
+Though the syntax allows multiple @case@ statements in a function
 body, only one can appear and it must be the last statement in the
-body. The arms of the #case# statement can only match on constructor
-tags (#C#) and can only bind the constructor arguments to variables
-(#v1 ... vN#). Each arm then jumps to a known block with those
+body. The arms of the @case@ statement can only match on constructor
+tags (@C@) and can only bind the constructor arguments to variables
+(@v1 ... vN@). Each arm then jumps to a known block with those
 variables as arguments. This choice makes compilation simpler.
 
 

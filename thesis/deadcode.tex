@@ -1,10 +1,57 @@
 \documentclass[12pt]{report}
-%include polycode.fmt
+ %include polycode.fmt
 \include{preamble}
 \begin{document}
 \include{document.preamble}
 
 \chapter{Dead-code elimination}
+
+Dead-code elimination seeks to remove program statements that will not
+be executed or which have no visible effect. It can be applied at multiple
+points during compilation, as other transformations frequently introduce 
+dead code. Without dead-code elimination, many other optimizations have
+minimal effect, since they leave behind code which still executes even if
+it is no longer needed.
+
+\emph{Uncurrying} (descrbed in Chapter \ref{ref_chapter_uncurrying}), especially
+when repeatedly applied, can leave behind many unusued bindings. Consider
+this program, which executes @const3@ to return 3:
+
+\begin{code}
+const3 a b c = c
+main = const3 1 2 3
+\end{code}
+
+@main@ compiles to this monadic program:
+
+\begin{code}
+-- Not strictly accurate, main
+-- really is main <- mainK {}
+main = do
+ t1 <- const3 @ 1
+ t2 <- t1 @ 2
+ t3 <- t2 @ 3
+ return t3
+
+const3 <- k1 {}
+k1 {} a = k2 {a} 
+k2 {a} b = k3 {a, b}
+k3 {a, b} c = b(a,b,c)
+b(a,b,c) = return c
+\end{code}
+
+Uncurrying will rewrite @t1 @@ 2@ as @k2 {1} @@ 2@:
+
+\begin{code}
+main = do
+ t1 <- const3 @ 1
+ t2 <- k2 {a} @ 2 -- TODO: Does syntax allow a closure value to be entered here?
+ t3 <- t2 @ 3
+ return t3
+\end{code}
+
+This changes makes @t1@ useless --- it causes an allocation but otherwise 
+has no effect. Our dead-code elimination optimization will remove the binding.
 
 %% \emph{The bulk of our work. Each optimization implemented is
 %%   described. Each subsection should follow a common recipe: describe
@@ -17,12 +64,72 @@
 %% describe all forward optimizations, then all backward ones. That may help
 %% set up the concepts necessary to describe LCM.}
 
-\emph{This portion gives an overview of the optimization, without
-code or (much) notation. We motivate the optimization by 
-showing an example.}
+%% \emph{This portion gives an overview of the optimization, without
+%% code or (much) notation. We motivate the optimization by 
+%% showing an example.}
 
 \section{Implementation}
-\emph{``Interesting'' pieces of the implementation are described.}
+We seek to remove two types of dead code: unused bindings (and,
+therefore, allocation) and unused blocks. Each begins with a
+``liveness'' analysis. Bindings (or blocks) that are referenced are ``live''
+and therefore cannot be eliminated. Everything else is ``dead.'' 
+
+\subsection{Eliminating Bindings}
+
+A binding can be eliminated if no references to the bound variable
+occur except the initial binding. We must travese each block backwards, noting when
+a variable is used. We do not need to worry about \emph{how} the variable is used, so
+we can just maintain a set of variables. When we see a binding, we eliminate the bound
+variable from the set, since variables can be boudn more than once (and they cannot be used before being bound). 
+
+%% TODO - leave out woTops?  
+
+Figure \ref{ref_fig_liveTransfer} shows the algorithm for determining
+liveness.  Top-level definitions are excluded from the set by the
+@woTops@ function and are not considered here. 
+At each statement, we add referenced or remove variables from
+the live set @f@. \emph{Tail} (@Done@) and \emph{case} (@CaseM@)
+statements add all referenced variables. Additionally, case statements
+must inspect all alternatives and add the union of those
+sets. @tailVars@ collects the variables used in a tail expression and
+its definition is not shown here. \emph{Binding} (@Bind@) statements
+remove the bound variable (@v@) and add any variables in the tail
+(@t@).
+
+\begin{figure}[h]
+\begin{code}
+live (Bind v t) f = Set.delete v f  `Set.union` tailVars mapEmpty t
+live (CaseM v alts) f = Set.insert v (Set.unions (map (setAlt f) alts))
+live (Done t) f = tailVars f t
+\end{code}
+\caption{Our transfer function for determing live variables within a block.}
+\label{ref_fig_liveTransfer}
+\end{figure}
+
+With the facts collected by @live@, we can then eliminate useless
+bindngs by looking up the bound variable in the set and removing the
+binding if the variable is not there. The @deadRewrite@ functin,
+shown in Figure \ref{ref_fig_deadRewrite}, gives our implementation
+of this process. Recall that Hoopl interleaves analysis and
+rewriting. %% TODO: Better mention this!  
+Therefore, at each statement
+we know what variables will be live. When a bind is seen, we check if
+the bound variable (@v@) is absent from the live set (@f@). We also
+take a conservative view and make sure the tail portion (@t@) is an
+allocation and not an application ($@@$) or block call. We then eliminate
+the binding when both are true. Otherwise, we leave the program unchanged.
+
+\begin{figure}[h]
+\begin{code}
+rewrite (Bind v t) f 
+  | safeTail t && not (v `Set.member` f) = return (Just emptyGraph)
+rewrite _ _ = return Nothing
+\end{code}
+\caption{Our rewrite function that elminates useless bindings.}
+\label{ref_fig_deadRewrite}
+\end{figure}
+
+%% \emph{``Interesting'' pieces of the implementation are described.}
 
 \section{Reflection}
 \emph{What was good, what didn't work so well, and how Hoopl helped
