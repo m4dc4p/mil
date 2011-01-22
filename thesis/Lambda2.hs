@@ -587,7 +587,7 @@ addLiveRewriter = mkBRewrite rewrite
 --    Bind v a c           ==> c         if a is an allocator and
 --                                          v doesn't appear in c
 --
--- deadRewriter implemented similary, where "safeTail" determines if the
+-- deadRewriter implemented similary, where "safe" determines if the
 -- expression on the right of the array can be elminiated safely.
 -- 
 deadRewriter :: FuelMonad m => BwdRewrite m StmtM LiveFact
@@ -595,16 +595,16 @@ deadRewriter = mkBRewrite rewrite
   where
     rewrite :: FuelMonad m => forall e x. StmtM e x -> Fact x LiveFact -> m (Maybe (ProgM e x))
     rewrite (Bind v t) f 
-            | safeTail t && not (v `Set.member` f) = return (Just emptyGraph)
+            | safe t && not (v `Set.member` f) = return (Just emptyGraph)
     rewrite _ _ = return Nothing
 
     -- Indicates when it is OK to eliminate a tail instruction in a monadic
     -- expression.
-    safeTail :: TailM -> Bool
-    safeTail (Return _) = True
-    safeTail (Closure _ _) = True
-    safeTail (ConstrM _ _) = True
-    safeTail _ = False
+    safe :: TailM -> Bool
+    safe (Return _) = True
+    safe (Closure _ _) = True
+    safe (ConstrM _ _) = True
+    safe _ = False
 
 -- | printing live facts
 printLiveFacts :: FactBase LiveFact -> Doc
@@ -951,14 +951,18 @@ findBlockPreds tops body = runSimple $ do
     topLabels = filter (\(n, l) -> n `elem` tops) . map fst . allBlocks
     
 liveBlockTransfer :: BwdTransfer StmtM LiveBlock
-liveBlockTransfer = mkBTransfer bw
+liveBlockTransfer = mkBTransfer live
   where
-    bw :: StmtM e x -> Fact x LiveBlock -> LiveBlock
-    bw (Bind v tail) live = Set.fromList (tailDest tail) `Set.union` live
-    bw (CaseM _ alts) lives = Set.unions (map (\(Alt _ _ e) -> Set.fromList (tailDest e)) alts ++ mapElems lives)
-    bw (Done tail) lives =  Set.unions (Set.fromList (tailDest tail) : mapElems lives)
-    bw (BlockEntry _ l _) live = live
-    bw (CloEntry _ l _ _) live = live
+    live :: StmtM e x -> Fact x LiveBlock -> LiveBlock
+    live (Bind v tail) blocks = Set.fromList (tailDest tail) `Set.union` blocks
+
+    live (CaseM _ alts) blockSet = Set.unions (map (Set.fromList . tailDest . altExpr) alts ++ mapElems blockSet)
+    live (Done tail) blockSet =  Set.unions (Set.fromList (tailDest tail) : mapElems blockSet)
+
+    live (BlockEntry _ l _) blocks = blocks
+    live (CloEntry _ l _ _) blocks = blocks
+
+    altExpr (Alt _ _ e) = e
 
 deadBlocks :: [Name] -> ProgM C C -> ProgM C C
 deadBlocks tops prog = 
