@@ -17,16 +17,22 @@ it is no longer needed.
 when repeatedly applied, can leave behind many unusued bindings. Consider
 this program, which executes @const3@ to return 3:
 
+%% If only we actually supported local declarations ...
 \begin{code}
-const3 a b c = c
-main = const3 1 2 3
+main = 
+  let const3 a b c = c 
+  in const3 1 2 3
 \end{code}
 
 @main@ compiles to this monadic program:
 
+%% -- Not strictly accurate, main
+%% -- really is main <- mainK {}
+%%
+%% Do I need to implement inter-procedural
+%% optimization since this actually won't 
+%% get reduced?
 \begin{code}
--- Not strictly accurate, main
--- really is main <- mainK {}
 main = do
  t1 <- const3 @ 1
  t2 <- t1 @ 2
@@ -77,10 +83,12 @@ and therefore cannot be eliminated. Everything else is ``dead.''
 \subsection{Eliminating Bindings}
 
 A binding can be eliminated if no references to the bound variable
-occur except the initial binding. We must travese each block backwards, noting when
-a variable is used. We do not need to worry about \emph{how} the variable is used, so
-we can just maintain a set of variables. When we see a binding, we eliminate the bound
-variable from the set, since variables can be boudn more than once (and they cannot be used before being bound). 
+occur except the initial binding. We must travese each block
+backwards, noting when a variable is used. We do not need to worry
+about \emph{how} the variable is used, so we can just maintain a set
+of variables. When we see a binding, we eliminate the bound variable
+from the set, since variables can be bound more than once (and they
+cannot be used before being bound).
 
 %% TODO - leave out woTops?  
 
@@ -108,31 +116,87 @@ live (Done t) f = tailVars f t
 
 With the facts collected by @live@, we can then eliminate useless
 bindngs by looking up the bound variable in the set and removing the
-binding if the variable is not there. The @deadRewrite@ functin,
-shown in Figure \ref{ref_fig_deadRewrite}, gives our implementation
-of this process. Recall that Hoopl interleaves analysis and
-rewriting. %% TODO: Better mention this!  
-Therefore, at each statement
-we know what variables will be live. When a bind is seen, we check if
-the bound variable (@v@) is absent from the live set (@f@). We also
-take a conservative view and make sure the tail portion (@t@) is an
-allocation and not an application ($@@$) or block call. We then eliminate
-the binding when both are true. Otherwise, we leave the program unchanged.
+binding if the variable is not there. The @deadRewrite@ functin, shown
+in Figure \ref{ref_fig_deadRewrite}, gives our implementation of this
+process. Recall that Hoopl interleaves analysis and rewriting.
+Therefore, at each statement we know what variables will be live. When
+a bind is seen, we check if the bound variable (@v@) is absent from
+the live set (@f@). We also take a conservative view and only
+eliminate safe (@safeTail@) operations from the tail @t@: data or closure
+allocation, and @returns@. We then eliminate the binding when both are
+true. Otherwise, we leave the program unchanged.
 
 \begin{figure}[h]
 \begin{code}
 rewrite (Bind v t) f 
-  | safeTail t && not (v `Set.member` f) = return (Just emptyGraph)
+  | safe t && not (v `Set.member` f) = return (Just emptyGraph)
 rewrite _ _ = return Nothing
 \end{code}
 \caption{Our rewrite function that elminates useless bindings.}
 \label{ref_fig_deadRewrite}
 \end{figure}
 
-%% \emph{``Interesting'' pieces of the implementation are described.}
+\subsection{Eliminating Blocks}
+
+Though eliminating blocks which do not execute will not make the
+program run faster, they do increase code size and memory footprint, making
+it worthwhile to eliminate them. In this case, we analyze the program and
+find all @Goto@ and @Closure@ statements, which in turn gives us all
+possible label references. Since we do not have computed labels in our
+language, we know that if a label is never referenced then it will
+never be called. 
+
+Figure \ref{ref_figure_liveBlocks} gives our code that finds all 
+blocks called in the program. Each statement uses @tailDest@ to find
+destination labels for @Goto@ and @Closure@ instructions. Hoopl runs
+this function over the program to find the union of all the labels
+referenced. 
+
+\begin{figure}[h]
+\begin{code}
+live :: StmtM e x -> Fact x LiveBlock -> LiveBlock
+live (Bind v tail) blocks = Set.fromList (tailDest tail) `Set.union` blocks
+
+live (CaseM _ alts) blockSet = Set.unions (map (Set.fromList . tailDest . altExpr) alts 
+  ++ mapElems blockSet)
+live (Done tail) blockSet =  Set.unions (Set.fromList (tailDest tail) : mapElems blockSet)
+
+live (BlockEntry _ l _) blocks = blocks
+live (CloEntry _ l _ _) blocks = blocks
+\end{code}
+\caption{Our transfer function the finds all blocks called by the program.}
+\label{ref_figure_liveBlocks}
+\end{figure}
+
+After collecting this information we look at the set of blocks in the
+program and eliminate any that are not the destination of a @Goto@ or
+@Closure@. Figure \ref{ref_figure_removeOrphan} shows the function
+which we fold over all the blocks in the graph. Any blocks in the
+@live@ set are retained (@blockGraph block |*><*| prog@ keeps them in
+the graph). Otherwise, the block is dropped. The flag returned
+indicates if any blocks were dropped and, if so, we run the dead-block
+elimination again. Otherwise, we terminate.
+
+\begin{figure}[h]
+  \begin{code}
+    removeOrphan :: LiveBlock 
+                 -> (ChangeFlag, ProgM C C) 
+                 -> (Dest, Block StmtM C C) 
+                 -> (ChangeFlag, ProgM C C)
+    removeOrphan live (flag, prog) (dest, block) 
+      | dest `Set.member` live = (flag, blockGraph block |*><*| prog)
+      | otherwise = (SomeChange, prog)
+  \end{code}
+  \caption{Our function which removes any block not referenced elsewhere in the program.}
+  \label{ref_figure_removeOrphan}
+\end{figure}
 
 \section{Reflection}
 \emph{What was good, what didn't work so well, and how Hoopl helped
 or hindered the implementation}
+
+Unfortunately, Hoopl's rewrite capability cannot eliminate
+blocks altogether. 
+
 
 \end{document}
