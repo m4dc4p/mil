@@ -130,6 +130,8 @@ data TailM = Return Name
       [Name]             -- Only variables allowed as arguments to constructor.
   deriving (Eq, Show)
 
+type ProgM = Graph StmtM
+
 -- Compiling from lambda-calculus to the monadic language.
 
 compileM :: [Name] -> Int -> Def -> (Int, ProgM C C)
@@ -210,7 +212,6 @@ data CompS = C { compI :: Int -- ^ counter for fresh variables
                , compG :: (ProgM C C) -- ^ Program control-flow graph.
                , compT :: [Name] } -- ^ top-level function names.
                
-type ProgM = Graph StmtM
 type CompM = State CompS
 
 -- | Add a name to the list of top-level functions.
@@ -954,15 +955,36 @@ liveBlockTransfer :: BwdTransfer StmtM LiveBlock
 liveBlockTransfer = mkBTransfer live
   where
     live :: StmtM e x -> Fact x LiveBlock -> LiveBlock
-    live (Bind v tail) blocks = Set.fromList (tailDest tail) `Set.union` blocks
+    live (Bind v tail) liveBlocks = Set.fromList (tailDest tail) `Set.union` liveBlocks
 
-    live (CaseM _ alts) blockSet = Set.unions (map (Set.fromList . tailDest . altExpr) alts ++ mapElems blockSet)
-    live (Done tail) blockSet =  Set.unions (Set.fromList (tailDest tail) : mapElems blockSet)
+    live (CaseM _ alts) liveBlocks = Set.unions (map (Set.fromList . tailDest . altExpr) alts ++ mapElems liveBlocks)
+    live (Done tail) liveBlocks =  Set.unions (Set.fromList (tailDest tail) : mapElems liveBlocks)
 
-    live (BlockEntry _ l _) blocks = blocks
-    live (CloEntry _ l _ _) blocks = blocks
+    live (BlockEntry _ l _) liveBlocks = liveBlocks
+    live (CloEntry _ l _ _) liveBlocks = liveBlocks
 
     altExpr (Alt _ _ e) = e
+
+-- An (failed) experiment attempting to eliminate dead blocks through
+-- rewriting. Seems too painful to get Hoopl to work over ``Graph
+-- ProgM'' (i.e. graphs of graphs) nodes.
+--
+-- deadBlockRewrite :: FuelMonad m => BwdRewrite m ProgM LiveBlock
+-- deadBlockRewrite = mkBRewrite deadBlocks
+--   where
+--     deadBlocks :: FuelMonad m => forall e x. ProgM e x -> Fact x LiveBlock -> m (Maybe (Graph ProgM e x))
+--     deadBlocks (GMany NothingO blocks _) blockSet = 
+--       let theseBlocks :: LabelMap (Block StmtM C C) -> [(Dest, Block StmtM C C)] 
+--           theseBlocks = map (blockToDest) . mapElems
+--           addBlock :: Dest -> Block ProgM C C -> Graph ProgM C C -> Graph ProgM C C
+--           addBlock (_, label) b prog = (GMany NothingO (mapSingleton label b) NothingO) |*><*| prog
+--           liveBlocks :: [(Dest, Block StmtM C C)] -> Graph ProgM C C
+--           liveBlocks = foldr (\(d,b) -> addBlock d (blockGraph b)) emptyClosedGraph 
+--       in undefined
+
+-- instance NonLocal ProgM where
+--   entryLabel = undefined
+--   successors = undefined
 
 deadBlocks :: [Name] -> ProgM C C -> ProgM C C
 deadBlocks tops prog = 
@@ -975,13 +997,13 @@ deadBlocks tops prog =
     removeOrphans :: LiveBlock 
                   -> ProgM C C 
                   -> (ChangeFlag, ProgM C C)
-    removeOrphans live = foldl (removeOrphan live) (NoChange, emptyClosedGraph) . allBlocks
+    removeOrphans live = foldl (remove live) (NoChange, emptyClosedGraph) . allBlocks
 
-    removeOrphan :: LiveBlock 
+    remove :: LiveBlock 
                  -> (ChangeFlag, ProgM C C) 
                  -> (Dest, Block StmtM C C) 
                  -> (ChangeFlag, ProgM C C)
-    removeOrphan live (flag, prog) (dest, block) 
+    remove live (flag, prog) (dest, block) 
       | dest `Set.member` live = (flag, blockGraph block |*><*| prog)
       | otherwise = (SomeChange, prog)
 

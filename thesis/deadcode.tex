@@ -13,9 +13,9 @@ dead code. Without dead-code elimination, many other optimizations have
 minimal effect, since they leave behind code which still executes even if
 it is no longer needed.
 
-\emph{Uncurrying} (descrbed in Chapter \ref{ref_chapter_uncurrying}), especially
-when repeatedly applied, can leave behind many unusued bindings. Consider
-this program, which executes @const3@ to return 3:
+\emph{Uncurrying} (descrbed in Chapter \ref{ref_chapter_uncurrying}),
+usually produces many unused bindings. For example, consider the
+following program which applies @const3@ to return 3 from @main@:
 
 %% If only we actually supported local declarations ...
 \begin{code}
@@ -24,7 +24,8 @@ main =
   in const3 1 2 3
 \end{code}
 
-@main@ compiles to this monadic program:
+\noindent
+and which compiles (in part) to this monadic program:
 
 %% -- Not strictly accurate, main
 %% -- really is main <- mainK {}
@@ -34,30 +35,29 @@ main =
 %% get reduced?
 \begin{code}
 main = do
- t1 <- const3 @ 1
- t2 <- t1 @ 2
- t3 <- t2 @ 3
- return t3
-
+  t1 <- const3 @ 1
+  t2 <- t1 @ 2
+  ...
+ 
 const3 <- k1 {}
 k1 {} a = k2 {a} 
 k2 {a} b = k3 {a, b}
-k3 {a, b} c = b(a,b,c)
-b(a,b,c) = return c
+...
 \end{code}
 
 Uncurrying will rewrite @t1 @@ 2@ as @k2 {1} @@ 2@:
 
+%% Does syntax allow a closure value to be entered here?
 \begin{code}
 main = do
  t1 <- const3 @ 1
- t2 <- k2 {a} @ 2 -- TODO: Does syntax allow a closure value to be entered here?
+ t2 <- k2 {a} @ 2 
  t3 <- t2 @ 3
  return t3
 \end{code}
 
 This changes makes @t1@ useless --- it causes an allocation but otherwise 
-has no effect. Our dead-code elimination optimization will remove the binding.
+has no effect. Our dead-code elimination optimization should remove that binding.
 
 %% \emph{The bulk of our work. Each optimization implemented is
 %%   described. Each subsection should follow a common recipe: describe
@@ -81,9 +81,10 @@ therefore, allocation) and unused blocks. Each begins with a
 and therefore cannot be eliminated. Everything else is ``dead.'' 
 
 \subsection{Eliminating Bindings}
+\label{ref_sub_elim_bindings}
 
 A binding can be eliminated if no references to the bound variable
-occur except the initial binding. We must travese each block
+occur except the initial binding. We must traverse each block
 backwards, noting when a variable is used. We do not need to worry
 about \emph{how} the variable is used, so we can just maintain a set
 of variables. When we see a binding, we eliminate the bound variable
@@ -93,16 +94,13 @@ cannot be used before being bound).
 %% TODO - leave out woTops?  
 
 Figure \ref{ref_fig_liveTransfer} shows the algorithm for determining
-liveness.  Top-level definitions are excluded from the set by the
-@woTops@ function and are not considered here. 
-At each statement, we add referenced or remove variables from
-the live set @f@. \emph{Tail} (@Done@) and \emph{case} (@CaseM@)
-statements add all referenced variables. Additionally, case statements
-must inspect all alternatives and add the union of those
-sets. @tailVars@ collects the variables used in a tail expression and
-its definition is not shown here. \emph{Binding} (@Bind@) statements
-remove the bound variable (@v@) and add any variables in the tail
-(@t@).
+liveness. We update the live set @f@ as we examine each
+statement. \emph{Tail} (@Done@) and \emph{case} (@CaseM@) statements
+add all referenced variables. Additionally, case statements must
+inspect all alternatives and add the union of those sets (@tailVars@
+collects the all variables used in a tail expression). \emph{Binding}
+(@Bind@) statements remove the bound variable (@v@) and add any
+variables in the tail (@t@).
 
 \begin{figure}[h]
 \begin{code}
@@ -110,21 +108,26 @@ live (Bind v t) f = Set.delete v f  `Set.union` tailVars mapEmpty t
 live (CaseM v alts) f = Set.insert v (Set.unions (map (setAlt f) alts))
 live (Done t) f = tailVars f t
 \end{code}
-\caption{Our transfer function for determing live variables within a block.}
+\caption{Our transfer function for determing live variables within a block. In
+each case @f@ represents the set of live variables. @CaseM@ and @Done@ statements
+add all variables referenced (in @alts@ and @t@, respectively). @Bind@ statements
+eliminate the newly bound variable @v@, while adding all referenced variables on the
+right-hand side of the binding (@t@).}
 \label{ref_fig_liveTransfer}
 \end{figure}
 
 With the facts collected by @live@, we can then eliminate useless
-bindngs by looking up the bound variable in the set and removing the
-binding if the variable is not there. The @deadRewrite@ functin, shown
-in Figure \ref{ref_fig_deadRewrite}, gives our implementation of this
-process. Recall that Hoopl interleaves analysis and rewriting.
+bindings by looking up the bound variable in the set and removing the
+binding if the variable is not there. The @deadRewrite@ function,
+shown in Figure \ref{ref_fig_deadRewrite}, gives our implementation of
+this process. Recall that Hoopl interleaves analysis and rewriting.
 Therefore, at each statement we know what variables will be live. When
 a bind is seen, we check if the bound variable (@v@) is absent from
 the live set (@f@). We also take a conservative view and only
-eliminate safe (@safeTail@) operations from the tail @t@: data or closure
-allocation, and @returns@. We then eliminate the binding when both are
-true. Otherwise, we leave the program unchanged.
+eliminate safe operations from the tail @t@: data allocation, closure
+construction and @returns@ (@safe@ implements these checks). We then
+eliminate the binding when both are true. Otherwise, we leave the
+program unchanged.
 
 \begin{figure}[h]
 \begin{code}
@@ -132,71 +135,102 @@ rewrite (Bind v t) f
   | safe t && not (v `Set.member` f) = return (Just emptyGraph)
 rewrite _ _ = return Nothing
 \end{code}
-\caption{Our rewrite function that elminates useless bindings.}
+\caption{Our rewrite function that elminates useless bindings. We eliminate a
+binding when it does not appear in the live set (@f@) and when the right-hand side
+(@t@) is safe: a data allocation, closure construction or return.}
 \label{ref_fig_deadRewrite}
 \end{figure}
 
 \subsection{Eliminating Blocks}
 
-Though eliminating blocks which do not execute will not make the
-program run faster, they do increase code size and memory footprint, making
-it worthwhile to eliminate them. In this case, we analyze the program and
-find all @Goto@ and @Closure@ statements, which in turn gives us all
-possible label references. Since we do not have computed labels in our
-language, we know that if a label is never referenced then it will
-never be called. 
+%% TODO - talk about direction of analysis, and more about
+%% dataflow analysis.
+We eliminate blocks that will never execute in order to decrease code
+size and memory footprint. We proceed by analyzing the program and
+finding all @Goto@ and @Closure@ statements, which in turn gives us
+all blocks which may be executed. Since we do not have computed
+labels in our language, we know that if a label is never referenced in
+one of these two statements then it will never be called.
 
-Figure \ref{ref_figure_liveBlocks} gives our code that finds all 
-blocks called in the program. Each statement uses @tailDest@ to find
-destination labels for @Goto@ and @Closure@ instructions. Hoopl runs
-this function over the program to find the union of all the labels
-referenced. 
+Figure \ref{ref_figure_liveBlocks} gives our code that finds all
+blocks called in the program. @tailDest@ looks for @Goto@ and
+@Closure@ statements in tail expressions. @Bind@, @CaseM@ and @Done@
+add labels found by @tailDest@ to @liveBlocks@, the set of known live
+blocks. @BlockEntry@ and @CloEntry@ statements do not play a role in
+the analysis, except to pass information about live blocks to their
+predecessors.
 
 \begin{figure}[h]
 \begin{code}
-live :: StmtM e x -> Fact x LiveBlock -> LiveBlock
-live (Bind v tail) blocks = Set.fromList (tailDest tail) `Set.union` blocks
-
-live (CaseM _ alts) blockSet = Set.unions (map (Set.fromList . tailDest . altExpr) alts 
-  ++ mapElems blockSet)
-live (Done tail) blockSet =  Set.unions (Set.fromList (tailDest tail) : mapElems blockSet)
-
-live (BlockEntry _ l _) blocks = blocks
-live (CloEntry _ l _ _) blocks = blocks
+live (Bind v tail) liveBlocks = 
+  Set.fromList (tailDest tail) `Set.union` liveBlocks
+live (CaseM _ alts) liveBlocks = 
+  Set.unions (map (Set.fromList . tailDest . altExpr) alts 
+    ++ mapElems liveBlocks)
+live (Done tail) liveBlocks = 
+  Set.unions (Set.fromList (tailDest tail) 
+    : mapElems liveBlocks)
+live (BlockEntry _ l _) liveBlocks = liveBlocks
+live (CloEntry _ l _ _) liveBlocks = liveBlocks
 \end{code}
-\caption{Our transfer function the finds all blocks called by the program.}
+\caption{Our transfer function the finds all blocks called by the
+  program. @tailDest@ finds referenced blocks in tail
+  expressions. @liveBlocks@ refers to the set of blocks found
+  already. As each statement is examined, we add the blocks found
+  to @liveBlocks@.}
 \label{ref_figure_liveBlocks}
 \end{figure}
 
 After collecting this information we look at the set of blocks in the
-program and eliminate any that are not the destination of a @Goto@ or
-@Closure@. Figure \ref{ref_figure_removeOrphan} shows the function
-which we fold over all the blocks in the graph. Any blocks in the
-@live@ set are retained (@blockGraph block |*><*| prog@ keeps them in
-the graph). Otherwise, the block is dropped. The flag returned
-indicates if any blocks were dropped and, if so, we run the dead-block
-elimination again. Otherwise, we terminate.
+program and eliminate any not in @liveBlocks@. Figure
+\ref{ref_figure_remove} shows the function which we fold over all the
+blocks in the graph. Any blocks in the @live@ set are retained
+(@blockGraph block |*><*| prog@ keeps them in the graph). Otherwise,
+the block is dropped. We continue to run dead-block elimination on the
+altered program until the flag indicates no blocks were dropped. This ensures
+that as we drop blocks, others which now cannot be called will also be dropped.
 
 \begin{figure}[h]
   \begin{code}
-    removeOrphan :: LiveBlock 
-                 -> (ChangeFlag, ProgM C C) 
-                 -> (Dest, Block StmtM C C) 
-                 -> (ChangeFlag, ProgM C C)
-    removeOrphan live (flag, prog) (dest, block) 
-      | dest `Set.member` live = (flag, blockGraph block |*><*| prog)
-      | otherwise = (SomeChange, prog)
+remove live (flag, prog) (dest, block) 
+  | dest `Set.member` live = (flag, blockGraph block |*><*| prog)
+  | otherwise = (SomeChange, prog)
   \end{code}
-  \caption{Our function which removes any block not referenced elsewhere in the program.}
-  \label{ref_figure_removeOrphan}
+  \caption{Our function that removes any block not referenced
+    elsewhere in the program. When a block is dropped, @SomeChange@
+    will be returned. Dead-block elimination will be run until
+    @remove@ returns @NoChange@, the initial value of the flag.}
+  \label{ref_figure_remove}
 \end{figure}
 
 \section{Reflection}
-\emph{What was good, what didn't work so well, and how Hoopl helped
-or hindered the implementation}
+%% \emph{What was good, what didn't work so well, and how Hoopl helped
+%% or hindered the implementation}
 
-Unfortunately, Hoopl's rewrite capability cannot eliminate
-blocks altogether. 
+The Hoopl library made the implementation of dead-code elimination
+(Section \ref{ref_sub_elim_bindings}) straightforward. Because it
+interleaves analysis and rewriting, removing one useless binding 
+can make other bindings useless, which will in turn be removed. 
 
+Unfortunately, the same cannot be said for dead block
+elimination. Hoopl's interface does not allow a block to be removed
+during rewrite, and this limitation comes from the types used by
+the library. We implement Hoopl rewrites over @StatM@ nodes -- i.e., we rewrite
+graphs of StatM values, representing programs. This signature shows the type for all  rewrite functions (using our nodes):
+
+\begin{code}
+(FuelMonad m) => (forall e x.
+  StatM e x
+  -> Fact x f
+  -> m (Maybe (Graph StatM e x)))
+\end{code}
+
+The @Maybe@ value returned tells Hoopl if the statement changed or
+not. @Nothing@ indicates that the statement did not change. A
+@Just@ value can update the graph, it must have at least one
+statement. There isn't a way to express that the block should be
+eliminated altogether. At best, we can replace a block with one that
+immediately returns to the caller or that consists of a special
+``marker'' statement which we eliminate in a second pass.
 
 \end{document}
