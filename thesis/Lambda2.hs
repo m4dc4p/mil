@@ -746,7 +746,16 @@ collapse body = runSimple $ do
   where
     labels = entryLabels body
     destinations = Map.fromList . catMaybes . map (destOf body) 
-    initial = mapFromList (zip labels (repeat Map.empty))
+    initial = mapFromList (zip labels (repeat (topFacts body)))
+    -- We determine if each top-level name only allocates
+    -- a closure or not, and use that as our initial facts.
+    topFacts :: ProgM C C -> CollapseFact
+    topFacts = Map.fromList . map factForBlock . allBlocks
+    factForBlock :: (Dest, Block StmtM C C) -> (Name, WithTop CloVal)
+    factForBlock ((name, _), block) = 
+      case blockToNodeList' block of
+           (_, [], JustC (Done (Closure dest names))) -> (name, (PElem (CloVal dest names)))
+           _ -> (name, Top)
     destOf :: ProgM C C -> Label -> Maybe (Label, DestOf)
     destOf body l = case blockOfLabel body l of
                    Just (_,  block) ->
@@ -770,8 +779,35 @@ collapseTransfer = mkFTransfer fw
     fw (BlockEntry _ _ _) f = f
     fw (CloEntry _ _ _ _) f = f
     
-    addUsed binding used arg = Map.insert arg binding used
 
+{-
+  [("absBody4",T)
+  ,("absBody7",CloVal ("absBody4",L5) [])
+  ,("blockabsBody4",T)
+  ,("const3",CloVal ("absBody7",L8) [])
+  ,("main",T)]
+
+const3 = \a_ {}. \b_ {}. \c_ {}. c_
+[c_] L5_absBody4 (c_) {}: L6_blockabsBody4(c_)
+[c_] L6_blockabsBody4 (c_): return c_
+[nothing live] L8_absBody7 (b_) {}: closure L5_absBody4 {}
+[nothing live] L9_const3 (a_) {}: closure L8_absBody7 {}
+
+main = ((const3 1) 2) 3
+[1,2,3] L2_main (1,2,3):
+          v0 <- const3 @ 1
+          v1 <- v0 @ 2
+          v1 @ 3
+
+L2_main (1,2,3):
+  v1 <- return 2
+  v1 @ 3
+L5_absBody4 (c_) {}: L6_blockabsBody4(c_)
+L6_blockabsBody4 (c_): return c_
+L8_absBody7 (b_) {}: closure L5_absBody4 {}
+L9_const3 (a_) {}: closure L8_absBody7 {}
+
+-}
 collapseRewrite :: FuelMonad m => Map Label DestOf -> FwdRewrite m StmtM CollapseFact
 collapseRewrite blocks = iterFwdRw (mkFRewrite rewriter)
   where
@@ -1030,7 +1066,7 @@ main = progM defs
 progM progs = do
   let tops = map fst progs
 
-      opt1 = fst . usingLive addLiveRewriter tops
+      addLive = fst . usingLive addLiveRewriter tops
       opt2 = bindSubst 
       opt3 = fst . usingLive deadRewriter tops 
       opt4 = fst . usingLive deadRewriter tops . collapse
@@ -1051,19 +1087,28 @@ progM progs = do
         let live = findLive tops comp
         in printDef def $+$
            vcat' (maybeGraphCC empty (printLive live) comp)
-      
-      compileOne opts p (i, ps) = 
-        let (j, p') = compileM tops i p
-        in (j, (opts p') : ps)
 
-      compile opts = snd . foldr (compileOne opts) (0, []) 
+      compileEach :: Def -> (Int, [ProgM C C]) -> (Int, [ProgM C C])
+      compileEach p (i, ps) = 
+        let (j, p') = compileM tops i p
+        in (j, (addLive p') : ps)
+
+      -- Compiles all procedures together so we do get inter-procedure
+      -- optimization.
+      compileAll opts = opts . foldr (|*><*|) emptyClosedGraph . snd . foldr compileEach (0, []) 
+
+      -- Compiles all procedures independently, so 
+      -- we don't get any inter-procedure optimization
+      compileInd opt = map opt . snd . foldr compileEach (0, []) 
 
       printResult defs progs = putStrLn (render (vcat' (map ((text "" $+$) . printWithLive) (zip defs progs))))
                      
-  putStrLn "\n ========= BEFORE ============"
-  printResult (prepareExpr tops progs) (compile opt1 progs)
-  putStrLn "\n ========= AFTER ============="
-  printResult (prepareExpr tops progs) (compile (opt6 . opt5 . opt4 . opt3 . opt2 . opt1) progs)
+  putStrLn "\n ========= Unoptimized ============"
+  printResult (prepareExpr tops progs) (compileInd id progs)
+--  putStrLn "\n ========= Optimized Individually ============="
+--  printResult (prepareExpr tops progs) (compileInd (opt6 . opt5 . opt4 . opt3 . opt2) progs)
+  putStrLn "\n ========= Optimized Together ============="
+  putStrLn (render (printProgM (compileAll (opt6 . opt5 . opt4 . opt3 . opt2) progs)))
            
 abs :: Var -> (Expr -> Expr) -> Expr
 abs v f = Abs v [] (f (Var v))
@@ -1166,7 +1211,7 @@ origExample2 = [("main", App (App (App composeDef
               , compose]
 
 const3 = [("const3", const3Def)
-         , ("main", App (App (App const3Def 
+         , ("main", App (App (App (Var "const3")
                                   (Var "1")) 
                               (Var "2")) 
                         (Var "3"))]
@@ -1174,6 +1219,7 @@ const3 = [("const3", const3Def)
     const3Def = abs "a" $ \_ ->
                 abs "b" $ \_ ->
                 abs "c" $ \c -> c
+
 mkCons :: Expr -> Expr -> Expr                                        
 mkCons x xs = Constr "Cons" [x, xs]
 
