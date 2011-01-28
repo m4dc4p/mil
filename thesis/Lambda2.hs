@@ -752,10 +752,11 @@ collapse body = runSimple $ do
     topFacts :: ProgM C C -> CollapseFact
     topFacts = Map.fromList . map factForBlock . allBlocks
     factForBlock :: (Dest, Block StmtM C C) -> (Name, WithTop CloVal)
-    factForBlock ((name, _), block) = 
-      case blockToNodeList' block of
-           (_, [], JustC (Done (Closure dest names))) -> (name, (PElem (CloVal dest names)))
-           _ -> (name, Top)
+    factForBlock (dest@(name, _), block) = 
+      (name, PElem (CloVal dest [])) 
+      -- case blockToNodeList' block of
+      --      (_, [], JustC (Done (Closure dest names))) -> (name, (PElem (CloVal dest names)))
+      --      _ -> (name, Top)
     destOf :: ProgM C C -> Label -> Maybe (Label, DestOf)
     destOf body l = case blockOfLabel body l of
                    Just (_,  block) ->
@@ -818,7 +819,7 @@ collapseRewrite blocks = iterFwdRw (mkFRewrite rewriter)
 
     collapse col f x =       
       case Map.lookup f col of
-        Just (PElem (CloVal dest@(_, l) vs)) ->
+        Just (PElem (CloVal dest@(_, l) vs)) -> -- Just (Closure dest (vs ++ [x]))
           case l `Map.lookup` blocks of
             Just (Jump dest) -> Just (Goto dest (vs ++ [x]))
             Just (Capture dest usesArg) 
@@ -1054,7 +1055,10 @@ defs = [isnt
        , applyNil
        , funky] ++ kennedy1 ++
        origExample ++
-       origExample2
+       origExample2 ++ 
+       origExampleX ++
+       origExample2X ++
+       const3
        
 
 main = progM defs
@@ -1204,21 +1208,33 @@ origExample = [("main", App (App composeDef
                             (Var "foo")) (Var "bar"))
               , compose]
 
+-- demontrates cross-procedure uncurrying
+origExampleX = [("main", App (App (Var "compose")
+                            (Var "foo")) (Var "bar"))
+              , compose]
+
 origExample2 = [("main", App (App (App composeDef 
                                    (Var "foo")) 
                               (Var "bar"))
                  (Var "baz"))
               , compose]
 
-const3 = [("const3", const3Def)
+-- demontrates cross-procedure uncurrying
+origExample2X = [("main", App (App (App (Var "compose")
+                                   (Var "foo")) 
+                              (Var "bar"))
+                 (Var "baz"))
+              , compose]
+
+const3 = [const3Def
          , ("main", App (App (App (Var "const3")
                                   (Var "1")) 
                               (Var "2")) 
                         (Var "3"))]
   where
-    const3Def = abs "a" $ \_ ->
-                abs "b" $ \_ ->
-                abs "c" $ \c -> c
+    const3Def = ("const3", abs "a" $ \_ ->
+                   abs "b" $ \_ ->
+                   abs "c" $ \c -> c)
 
 mkCons :: Expr -> Expr -> Expr                                        
 mkCons x xs = Constr "Cons" [x, xs]
