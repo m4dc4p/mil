@@ -4,15 +4,7 @@
 \begin{document}
 \include{document.preamble}
 
-%if False
-% lhs2tex ignores this section
-\newcommand{\authorEmail}{\url{justinb@cs.pdx.edu}}
-%else
-% LaTeX ignores this section, unless pre-processed with lhs2Text
-\ifthenelse{\boolean{lhs2tex}}%
-           {\newcommand{\authorEmail}{\url{justinb@@cs.pdx.edu}}}%
-           {}
-%endif
+\newcommand{\authorEmail}{\url{justinb@@cs.pdx.edu}}
 
 \date{}
 \author{Justin Bailey \\ \authorEmail}
