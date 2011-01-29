@@ -751,12 +751,15 @@ collapse body = runSimple $ do
     -- a closure or not, and use that as our initial facts.
     topFacts :: ProgM C C -> CollapseFact
     topFacts = Map.fromList . map factForBlock . allBlocks
+    -- Conceptually, all top-level labels hold a closure pointing to
+    -- the entry point of the procedure. We don't implement it
+    -- that way but the below will fake it for purposes of this
+    -- optimization. 
+    --
+    -- TODO: Filter the initial facts to top-level names only, the below
+    -- will create an entry for all labels.
     factForBlock :: (Dest, Block StmtM C C) -> (Name, WithTop CloVal)
-    factForBlock (dest@(name, _), block) = 
-      (name, PElem (CloVal dest [])) 
-      -- case blockToNodeList' block of
-      --      (_, [], JustC (Done (Closure dest names))) -> (name, (PElem (CloVal dest names)))
-      --      _ -> (name, Top)
+    factForBlock (dest@(name, _), block) = (name, PElem (CloVal dest [])) 
     destOf :: ProgM C C -> Label -> Maybe (Label, DestOf)
     destOf body l = case blockOfLabel body l of
                    Just (_,  block) ->
@@ -922,12 +925,11 @@ inlineRewrite :: FuelMonad m => BlockPredecessors -> ProgM C C -> BwdRewrite m S
 inlineRewrite preds prog = mkBRewrite rewriter
   where
     rewriter :: FuelMonad m => forall e x. StmtM e x -> Fact x InlineFact -> m (Maybe (ProgM e x))
-    rewriter (Bind v (Goto dest vs)) (Just False) = return Nothing
+    rewriter (Bind v (Goto dest vs)) (Just True) = return (inlineBind v dest vs)
     rewriter (Done (Goto dest vs)) _ = 
       case singlePred preds dest Nothing of
         Just True -> return (inlineDone dest vs)
         _ -> return Nothing
-    rewriter (Bind v (Goto dest vs)) _ = return (inlineBind v dest vs)
 
     rewriter _ _ = return Nothing
 
@@ -1074,8 +1076,10 @@ progM progs = do
       opt2 = bindSubst 
       opt3 = fst . usingLive deadRewriter tops 
       opt4 = fst . usingLive deadRewriter tops . collapse
+      -- deadBlocks tends to eliminate entry points
+      -- we would need for separate compilation.
       opt5 = deadBlocks tops
-      opt6 = deadBlocks tops . inlineBlocks tops
+      opt6 = inlineBlocks tops
 
       printLive :: FactBase LiveFact -> Block StmtM C x -> Doc
       printLive live p = 
@@ -1248,4 +1252,18 @@ false = Constr "False" []
 true :: Expr
 true = Constr "True" []
 
-
+foldrX = [("foldr", foldrDef)
+         , ("main", App (App (App (Var "foldr") 
+                                  (Var "add"))
+                             (Constr "Z" []))
+                        (Constr "Cons" [Constr "S" [Constr "Z" []], Constr "Nil" []]))]
+  where
+    foldrDef = abs "f" $ \f ->
+               abs "b" $ \b ->
+               abs "as" $ \as ->
+                 Case as [Alt "Nil" [] b
+                         , Alt "Cons" ["a", "as'"] 
+                                 (App (App (App (Var "foldr") f)
+                                           (App (App f (Var "a")) b))
+                                      (Var "as'"))]
+                                  
