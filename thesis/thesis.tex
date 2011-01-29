@@ -28,9 +28,9 @@ lattices will be described. }
 
 \include{languages.f}
 
-\include{deadcode.f}
+\include{uncurrying.f}
 
-\chapter{Uncurrying}
+\include{deadcode.f}
 
 \chapter{Monadic Optimizations}
 \emph{Describes optimizations based on the monad laws: bind/return collapse and
@@ -58,15 +58,6 @@ lattices will be described. }
 \subsection{Example of Desired Optimization}
 \subsection{Implementation}
 \subsection{Reflection}
-
-\chapter{Uncurrying}
-\label{ref_chapter_uncurrying}
-\emph{Describes our optimization for collapsing intermediate
-closures. Our choice of representation is analyzed to
-show how it facilitates this optimization. We should show one
-closure can be eliminated from a program and how the optimization
-is applied over and over until a fixed point is reached. The format
-for this section will vary from the other two.}
 
 \chapter{Lazy Code Motion}
 \emph{Describes our implementation of LCM in terms of the four passes
