@@ -34,18 +34,11 @@ definitions:
            defN
 -}
 
-type Name = String
-type Var = String
-type Constructor = String
-
 data Expr = Abs Var Free Expr
           | App Expr Expr
           | Var Var
           | Case Expr [Alt Expr]
           | Constr Constructor [Expr]
-  deriving (Show, Eq)
-
-data Alt e = Alt Constructor [Name] e
   deriving (Show, Eq)
 
 type Free = [Name] 

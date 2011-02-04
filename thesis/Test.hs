@@ -8,6 +8,8 @@ import qualified Data.Set as Set
 import Lambda3
 import MIL
 import Util
+import OptMIL
+import L3ToMil
 
 abs :: Var -> (Expr -> Expr) -> Expr
 abs v f = Abs v [] (f (Var v))
@@ -195,7 +197,6 @@ defs = [[isnt
        , origExampleX 
        , origExample2
        , origExample2X]
-       
 
 main = mapM_ progM defs
 
