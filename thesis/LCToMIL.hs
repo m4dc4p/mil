@@ -7,7 +7,7 @@ where
 
 import Control.Monad.State (State, execState, modify, gets)
 import Text.PrettyPrint 
-import Data.List (sort)
+import Data.List (sort, nub)
 import Data.Maybe (fromMaybe, isJust, catMaybes)
 import Data.Map (Map, (!))
 import qualified Data.Map as Map
@@ -23,7 +23,9 @@ import Util
 -- | Compiler state. 
 data CompS = C { compI :: Int -- ^ counter for fresh variables
                , compG :: (ProgM C C) -- ^ Program control-flow graph.
-               , compT :: [Name] } -- ^ top-level function names.
+               , compT :: [Name] -- ^ top-level function names.
+               , monadic :: [()] } -- ^ Allows nested monadic computation. Empty list means no, 
+                                   -- anything else means yes.
                
 type CompM = State CompS
 
@@ -38,7 +40,7 @@ compileStmtM (EVar v) ctx
   = ctx (Return v)
 
 compileStmtM (EPrim _ _) _ 
-  = error "EPrim statement not implemented."
+  = error "EPrim should not appear unevaluated."
 
 compileStmtM (ELit _) _ 
   = error "ELit statement not implemented."
@@ -85,8 +87,18 @@ compileStmtM (EApp e1 e2) ctx
 compileStmtM (EFatbar _ _) _ 
   = error "EFatbar not implemented."
 
-compileStmtM (EBind _ _ _ _) _ 
-  = error "EBind not implemented."
+compileStmtM (EBind v _ b r) ctx = do
+  let fvs = nub (free b [] ++ free r [v])
+  command <- do
+    rest <- compileStmtM r (return . mkLast . Done)
+    prog <- compileStmtM b $ \body -> 
+            return (mkMiddle (v `Bind` body) <*> rest)
+    name <- newTop "monBody"
+    monDefn name fvs prog
+  ctx (Thunk command fvs)
+
+monDefn :: Name -> [Name] -> ProgM O C -> CompM Dest
+monDefn = undefined
 
 compVarM :: Expr 
   -> (Name -> CompM (ProgM O C))
@@ -165,3 +177,21 @@ withNewLabel f = freshLabel >>= f
 -- | Add a name to the list of top-level functions.
 addName :: Name -> CompM ()
 addName name = modify (\s@(C { compT }) -> s { compT = name : compT })
+
+-- | Push monadic compilation "mode" to stack
+pushMonad :: CompM ()
+pushMonad = 
+  let f s@(C { monadic }) = s { monadic = () : monadic }
+  in modify f
+
+-- | Pop monadic compilation "mode" from stack
+popMonad :: CompM ()
+popMonad = 
+  let f s@(C { monadic }) = s { monadic = drop 1 monadic }
+  in modify f
+
+-- | Are we in monadic compilatino mode?
+inMonad :: CompM Bool
+inMonad = 
+  let f s@(C { monadic }) = null monadic
+  in gets f

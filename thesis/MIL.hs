@@ -69,27 +69,32 @@ data StmtM e x where
     -> StmtM O O    -- Open/open since bind does not end an expression
   
   CaseM :: Name      -- Variable to inspect
-      -> [Alt TailM] -- Case arms
-      -> StmtM O C
+    -> [Alt TailM] -- Case arms
+    -> StmtM O C
       
   Done :: TailM  -- Finish a block.
-      -> StmtM O C
+    -> StmtM O C
 
--- | TailM concludes a list of statements. Each
--- block ends with a TailM except when CaseM ends
--- the blocks.
+-- | TailM concludes a list of statements. Each block ends with a
+-- TailM except when CaseM ends the blocks.
 data TailM = Return Name 
-  | Enter Name     -- Variable holding the closure.
-    Name         -- Argument to the function.
-  | Closure Dest   -- The variable holding the address of the function.
-    [Name]               -- List of captured free variables.
-  | Goto Dest         -- Address of the block
-    [Name]       -- Arguments/live variables used in the
-                         -- block. Uses Maybe so arguments can be
-                         -- filled after live variable analysis of
-                         -- the block
-  | ConstrM Constructor  -- Constructor name.
-      [Name]             -- Only variables allowed as arguments to constructor.
+  | Enter -- ^ Enter a closure.
+    Name  -- ^ Variable holding the closure.
+    Name  -- ^ Argument to the function.
+  | Closure -- ^ Create a closure.
+    Dest    -- ^ Label for the function held by the closure.
+    [Name]  -- ^ List of captured free variables.
+  | Goto   -- ^ Jump to a block.
+    Dest   -- ^ Address of the block
+    [Name] -- ^ Arguments/live variables used in the block.
+  | ConstrM     -- ^ Create a data value.
+    Constructor -- ^ Constructor name.
+    [Name]      -- ^ Only variables allowed as arguments to
+                -- constructor.
+  | Thunk  -- ^ Monadic thunk - suspended computation.
+    Dest   -- ^ Label of the computation's body.
+    [Name] -- ^ Free variables in the body.
+
   deriving (Eq, Show)
 
 -- Pretty printing programs
