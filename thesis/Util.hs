@@ -32,6 +32,9 @@ type Constructor = String
 data Alt e = Alt Constructor [Name] e
   deriving (Show, Eq)
 
+altE :: Alt e -> e
+altE (Alt _ _ e) = e
+
 -- Hoopl utilities
 
 maybeC :: a -> (n -> a) -> MaybeC e1 n -> a

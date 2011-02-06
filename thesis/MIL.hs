@@ -94,6 +94,9 @@ data TailM = Return Name
   | Thunk  -- ^ Monadic thunk - suspended computation.
     Dest   -- ^ Label of the computation's body.
     [Name] -- ^ Free variables in the body.
+  | Run  -- ^ Execute a monadic computation.
+    Name  -- ^ Variable holding the thunk
+
 
   deriving (Eq, Show)
 

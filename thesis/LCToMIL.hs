@@ -37,7 +37,7 @@ compileStmtM :: Expr
   -> CompM (ProgM O C)
 
 compileStmtM (EVar v) ctx 
-  = ctx (Return v)
+  = ctx (Return v) `unlessMonad` ctx (Run v)
 
 compileStmtM (EPrim _ _) _ 
   = error "EPrim should not appear unevaluated."
@@ -63,13 +63,16 @@ compileStmtM (ELet _ _) _
   = error "ELet statement not implemented."
 
 compileStmtM (ECase e lcAlts) ctx = do
-  let alts = map (\(LC.Alt cons _ vs expr) -> Alt cons vs expr) lcAlts
+  let alts = map toAlt lcAlts
+      altMonadic = any isMonadic (map altE alts)
+  pushWhen altMonadic
   r <- fresh "result"
   f <- ctx (Return r) >>= callDefn "caseJoin" 
   let compAlt (Alt cons vs body) = do
         body' <- compileStmtM body (mkBind r f) >>= callDefn ("altBody" ++ cons)
         return (Alt cons vs body')
   altsM <- mapM compAlt alts
+  popWhen altMonadic
   compVarM e $ \v -> return (mkLast (CaseM v altsM))
   where
     callDefn :: String -> ProgM O C -> CompM TailM
@@ -80,14 +83,21 @@ compileStmtM (ECase e lcAlts) ctx = do
       return (Goto dest [])
 
 compileStmtM (EApp e1 e2) ctx 
-  = compVarM e1 $ \f ->
-    compVarM e2 $ \g ->
-      ctx (Enter f g)
+  = 
+    let pure ctx = compVarM e1 $ \f ->
+                   compVarM e2 $ \g ->
+                     ctx (Enter f g)
+        monad ctx = pure $ \t -> do
+                  v <- fresh "v"
+                  rest <- ctx (Run v)
+                  return (mkMiddle (v `Bind` t) <*> rest)
+    in pure ctx `unlessMonad` monad ctx
 
 compileStmtM (EFatbar _ _) _ 
   = error "EFatbar not implemented."
 
 compileStmtM (EBind v _ b r) ctx = do
+  pushMonad
   let fvs = nub (free b [] ++ free r [v])
   command <- do
     rest <- compileStmtM r (return . mkLast . Done)
@@ -95,6 +105,7 @@ compileStmtM (EBind v _ b r) ctx = do
             return (mkMiddle (v `Bind` body) <*> rest)
     name <- newTop "monBody"
     monDefn name fvs prog
+  popMonad
   ctx (Thunk command fvs)
 
 monDefn :: Name -> [Name] -> ProgM O C -> CompM Dest
@@ -195,3 +206,29 @@ inMonad :: CompM Bool
 inMonad = 
   let f s@(C { monadic }) = null monadic
   in gets f
+
+-- Run the left compilation, unless we
+-- are compiling monadically. Run the right
+-- in that case.
+unlessMonad :: CompM (ProgM O C)
+        -> CompM (ProgM O C)
+        -> CompM (ProgM O C)
+unlessMonad pure monad = 
+  inMonad >>= \b -> if b then monad else pure
+
+pushWhen :: Bool -> CompM ()
+pushWhen True = pushMonad
+pushWhen _ = return ()
+
+popWhen :: Bool -> CompM ()
+popWhen True = popMonad
+popWhen _ = return ()
+
+isMonadic :: Expr -> Bool
+isMonadic (EBind _ _ _ _) = True
+isMonadic (ELet _ expr) = isMonadic expr
+isMonadic (ECase _ alts) = any isMonadic (map (altE . toAlt) alts)
+isMonadic _ = False
+
+toAlt :: LC.Alt -> Alt Expr
+toAlt (LC.Alt cons _ vs expr) = Alt cons vs expr
