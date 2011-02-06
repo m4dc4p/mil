@@ -1,4 +1,3 @@
-
 import Prelude hiding (abs, succ)
 import Text.PrettyPrint 
 import Compiler.Hoopl

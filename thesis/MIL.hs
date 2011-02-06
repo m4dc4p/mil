@@ -118,10 +118,19 @@ printTailM (Enter f a) = text f <+> text "@" <+> text a
 printTailM (Closure dest vs) = text "closure" <+> printDest dest <+> braces (commaSep text vs)
 printTailM (Goto dest vs) = printDest dest <> parens (commaSep text vs)
 printTailM (ConstrM cons vs) = text cons <+> (hsep $ texts vs)
+printTailM (Thunk dest vs) = text "thunk" <+> printDest dest <+> brackets (commaSep text vs)
+printTailM (Run v) = text "invoke" <+> text v
 
 printDest :: Dest -> Doc
 printDest (name, l) = text (show l ++ "_" ++ name)
 
+printProgM :: ProgM C C -> Doc
+printProgM = vcat' . maybeGraphCC empty printBlockM
+
+printBlockM = p . blockToNodeList'
+  where p (e, bs, x) = hang (maybeC empty printStmtM e) 2
+                       (vcat' (map printStmtM bs) $+$
+                        maybeC empty printStmtM x)
 instance NonLocal StmtM where
   entryLabel (BlockEntry _ l _) = l
   entryLabel (CloEntry _ l _ _) = l

@@ -32,6 +32,27 @@ type CompM = State CompS
 instance UniqueMonad CompM where
   freshUnique = freshVal
 
+type Def = (Name, Expr)
+
+compileM :: [Name] -> Int -> Def -> (Int, ProgM C C)
+compileM tops labelSeed def = 
+  let result = foldr compDef initial [def]
+  in (compI result + 1, compG result)
+  where
+    compDef p = execState (uncurry newDefn p)
+    initial = C labelSeed emptyClosedGraph tops []
+    -- | Creates a new function definition
+    -- using the arguments given and adds it
+    -- to the control flow graph.    
+    newDefn :: Name -> Expr -> CompM ()
+    newDefn name (ELam v _ b) = do
+      let fvs = free b tops
+      prog <- compileStmtM b (return . mkLast . Done)
+      cloDefn name v fvs prog >> return ()
+    newDefn name body = do
+      prog <- compileStmtM body (return . mkLast . Done)
+      blockDefn name [] prog >> return ()
+
 compileStmtM :: Expr 
   -> (TailM -> CompM (ProgM O C))
   -> CompM (ProgM O C)
@@ -104,19 +125,16 @@ compileStmtM (EBind v _ b r) ctx = do
     prog <- compileStmtM b $ \body -> 
             return (mkMiddle (v `Bind` body) <*> rest)
     name <- newTop "monBody"
-    monDefn name fvs prog
+    blockDefn name fvs prog
   popMonad
   ctx (Thunk command fvs)
-
-monDefn :: Name -> [Name] -> ProgM O C -> CompM Dest
-monDefn = undefined
 
 compVarM :: Expr 
   -> (Name -> CompM (ProgM O C))
   -> CompM (ProgM O C)
 compVarM (EVar v) ctx = ctx v
 compVarM (EPrim p _) ctx = ctx p
-compVarM (ELit _) _ = error "ELit not implemented."
+compVarM (ELit (Lit n _)) _ = ctx (show n)
 compVarM e ctx = compileStmtM e $ \t -> do
   v <- fresh "v"
   rest <- ctx v
@@ -125,7 +143,7 @@ compVarM e ctx = compileStmtM e $ \t -> do
 mkBind r f t = return (mkMiddle (Bind r t) <*> mkLast (Done f))
 
 free :: Expr -> [Name] -> [Name]
-free = undefined
+free expr env = []
       
 -- | Create a fresh variable with the given
 -- prefix.

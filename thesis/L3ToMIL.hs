@@ -164,10 +164,3 @@ freshVal = do
   modify (\s@(C { compI }) -> s { compI = compI + 1})
   return (intToUnique i)
 
-printProgM :: ProgM C C -> Doc
-printProgM = vcat' . maybeGraphCC empty printBlockM
-
-printBlockM = p . blockToNodeList'
-  where p (e, bs, x) = hang (maybeC empty printStmtM e) 2
-                       (vcat' (map printStmtM bs) $+$
-                        maybeC empty printStmtM x)
