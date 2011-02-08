@@ -43,6 +43,7 @@ notNil = ("notNil", def)
 
 compose :: Def
 compose = ("compose", composeDef)
+
 composeDef = abs "f" $ \f -> 
               abs "g" $ \g ->
               abs "x" $ \x -> App f (App g x)
@@ -104,7 +105,7 @@ origExample = [("main", App (App composeDef
                             (Var "foo")) (Var "bar"))
               , compose]
 
--- demontrates cross-procedure uncurrying
+-- demonstrates cross-procedure uncurrying
 origExampleX = [("main", App (App (Var "compose")
                             (Var "foo")) (Var "bar"))
               , compose]
@@ -206,15 +207,6 @@ main = mapM_ progM defs
 progM progs = do
   let tops = map fst progs
 
-      addLive = fst . usingLive addLiveRewriter tops
-      opt2 = bindSubst 
-      opt3 = fst . usingLive deadRewriter tops 
-      opt4 = fst . usingLive deadRewriter tops . collapse
-      -- deadBlocks tends to eliminate entry points
-      -- we would need for separate compilation.
-      opt5 = deadBlocks tops
-      opt6 = inlineBlocks tops
-
       printLive :: FactBase LiveFact -> Block StmtM C x -> Doc
       printLive live p = 
         let label = fst (getEntryLabel p)
@@ -237,7 +229,7 @@ progM progs = do
       compileEach :: Def -> (Int, [ProgM C C]) -> (Int, [ProgM C C])
       compileEach p (i, ps) = 
         let (j, p') = compileM tops i p
-        in (j, (addLive p') : ps)
+        in (j, (addLive tops p') : ps)
 
       -- Compiles all procedures together so we do get inter-procedure
       -- optimization.
@@ -252,7 +244,7 @@ progM progs = do
   putStrLn "\n ========= Unoptimized ============"
   printResult (prepareExpr tops progs) (compileInd id progs)
 --  putStrLn "\n ========= Optimized Individually ============="
---  printResult (prepareExpr tops progs) (compileInd (opt6 . opt5 . opt4 . opt3 . opt2) progs)
+--  printResult (prepareExpr tops progs) (compileInd (inlineBlocks . deadBlocks . opt4 . opt3 . bindSubst) progs)
   putStrLn "\n ========= Optimized Together ============="
-  putStrLn (render (printProgM (compileAll (opt6 . opt5 . opt4 . opt3 . opt2) progs)))
+  putStrLn (render (printProgM (compileAll (mostOpt tops) progs)))
            

@@ -118,23 +118,25 @@ liveTransfer tops = mkBTransfer live
     live :: StmtM e x -> Fact x LiveFact -> LiveFact
     live (BlockEntry _ _ _) f = woTops f 
     live (CloEntry _ _ _ _) f = woTops f
-    live (Bind v t) f = woTops (Set.delete v f  `Set.union` tailVars mapEmpty t )
+    live (Bind v t) f = woTops (Set.delete v f  `Set.union` tailVars t )
     live (CaseM v alts) f = woTops (Set.insert v (Set.unions (map (setAlt f) alts)))
-    live (Done t) f = woTops (tailVars f t)
+    live (Done t) f = woTops (tailVars t)
 
     woTops :: LiveFact -> LiveFact
     woTops live = live `Set.difference` tops
     
     setAlt :: FactBase LiveFact -> Alt TailM -> Set Name
-    setAlt f (Alt _ ns e) = Set.difference (tailVars f e) (Set.fromList ns)
+    setAlt f (Alt _ ns e) = Set.difference (tailVars e) (Set.fromList ns)
 
     -- | Returns variables used in a tail expression.
-    tailVars :: FactBase LiveFact -> TailM -> Set Name
-    tailVars f (Closure (_, l) vs) = Set.fromList vs 
-    tailVars f (Goto (_, l) vs) = Set.fromList vs
-    tailVars _ (Enter v1 v2) = Set.fromList [v1, v2]
-    tailVars _ (ConstrM _ vs) = Set.fromList vs
-    tailVars _ (Return n) = Set.singleton n
+    tailVars :: TailM -> Set Name
+    tailVars (Closure _ vs) = Set.fromList vs 
+    tailVars (Goto _ vs) = Set.fromList vs
+    tailVars (Enter v1 v2) = Set.fromList [v1, v2]
+    tailVars (ConstrM _ vs) = Set.fromList vs
+    tailVars (Return n) = Set.singleton n
+    tailVars (Thunk _ vs) = Set.fromList vs
+    tailVars (Run n) = Set.singleton n
 
 -- | Retrieve a fact or the empty set
 liveFact :: FactBase LiveFact -> Label -> Set Name
@@ -613,10 +615,8 @@ liveBlockTransfer = mkBTransfer live
 --           liveBlocks = foldr (\(d,b) -> addBlock d (blockGraph b)) emptyClosedGraph 
 --       in undefined
 
--- instance NonLocal ProgM where
---   entryLabel = undefined
---   successors = undefined
-
+-- | deadBlocks tends to eliminate entry points
+-- we would need for separate compilation.
 deadBlocks :: [Name] -> ProgM C C -> ProgM C C
 deadBlocks tops prog = 
   case removeOrphans (liveSet prog) prog of
@@ -638,3 +638,12 @@ deadBlocks tops prog =
       | dest `Set.member` live = (flag, blockGraph block |*><*| prog)
       | otherwise = (SomeChange, prog)
 
+
+-- Useful combinations of optimizations
+
+addLive tops = fst . usingLive addLiveRewriter tops
+      
+opt3 tops = fst . usingLive deadRewriter tops
+opt4 tops = fst . usingLive deadRewriter tops . collapse
+
+mostOpt tops = inlineBlocks tops . deadBlocks tops . opt4 tops . opt3 tops . bindSubst
