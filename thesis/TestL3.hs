@@ -171,14 +171,13 @@ foldrX = [("foldr", foldrDef)
 -- f g y (x:xs) = (g y) x (f g y xs)
 
 funnyFold = [("funny", 
-             abs "f" $ \f ->
              abs "g" $ \g ->
              abs "y" $ \y ->
              abs "xs" $ \xs ->
                Case xs [Alt "Nil" [] nil
                        , Alt "Cons" ["x", "xs'"]
                              (App (App (App g y) (Var "x"))
-                                 (App (App (App f g)
+                                 (App (App (App (Var "funny") g)
                                            y)
                                       (Var "xs'")))])]
          
@@ -205,46 +204,46 @@ main = mapM_ progM defs
 -- the live variables for each label.
 
 progM progs = do
-  let tops = map fst progs
+    putStrLn "\n ========= Unoptimized ============"
+    printResult (prepareExpr tops progs) (compileInd id progs)
+    --  putStrLn "\n ========= Optimized Individually ============="
+    --  printResult (prepareExpr tops progs) (compileInd (inlineBlocks . deadBlocks . opt4 . opt3 . bindSubst) progs)
+    putStrLn "\n ========= Optimized Together ============="
+    putStrLn (render (printProgM (compileAll (mostOpt tops) progs)))
+  where           
+    tops = map fst progs
 
-      printLive :: FactBase LiveFact -> Block StmtM C x -> Doc
-      printLive live p = 
-        let label = fst (getEntryLabel p)
-            vars = maybe [] Set.elems (lookupFact label live)
-            livePrefix = if null vars
-                         then text "[nothing live]"
-                         else brackets (commaSep text vars) 
-        in livePrefix <+> printBlockM p 
+    printLive :: FactBase LiveFact -> Block StmtM C x -> Doc
+    printLive live p = 
+      let label = fst (getEntryLabel p)
+          vars = maybe [] Set.elems (lookupFact label live)
+          livePrefix = if null vars
+                       then text "[nothing live]"
+                       else brackets (commaSep text vars) 
+      in livePrefix <+> printBlockM p 
 
-      printWithLive :: (Def, ProgM C C) -> Doc
-      printWithLive (def, comp) = 
-        let live = findLive tops comp
-        in printDef def $+$
-           vcat' (maybeGraphCC empty (printLive live) comp)
+    printWithLive :: (Def, ProgM C C) -> Doc
+    printWithLive (def, comp) = 
+      let live = findLive tops comp
+      in printDef def $+$
+         vcat' (maybeGraphCC empty (printLive live) comp)
 
-      printWithDef :: (Def, ProgM C C) -> Doc
-      printWithDef (def, comp) = 
-        printDef def $+$ vcat' (maybeGraphCC empty printBlockM comp)
+    printWithDef :: (Def, ProgM C C) -> Doc
+    printWithDef (def, comp) = 
+      printDef def $+$ vcat' (maybeGraphCC empty printBlockM comp)
 
-      compileEach :: Def -> (Int, [ProgM C C]) -> (Int, [ProgM C C])
-      compileEach p (i, ps) = 
-        let (j, p') = compileM tops i p
-        in (j, (addLive tops p') : ps)
+    compileEach :: Def -> (Int, [ProgM C C]) -> (Int, [ProgM C C])
+    compileEach p (i, ps) = 
+      let (j, p') = compileM tops i p
+      in (j, (addLive tops p') : ps)
 
-      -- Compiles all procedures together so we do get inter-procedure
-      -- optimization.
-      compileAll opts = opts . foldr (|*><*|) emptyClosedGraph . snd . foldr compileEach (0, []) 
+    -- Compiles all procedures together so we do get inter-procedure
+    -- optimization.
+    compileAll opts = opts . foldr (|*><*|) emptyClosedGraph . snd . foldr compileEach (0, []) 
 
-      -- Compiles all procedures independently, so 
-      -- we don't get any inter-procedure optimization
-      compileInd opt = map opt . snd . foldr compileEach (0, []) 
+    -- Compiles all procedures independently, so 
+    -- we don't get any inter-procedure optimization
+    compileInd opt = map opt . snd . foldr compileEach (0, []) 
 
-      printResult defs progs = putStrLn (render (vcat' (map ((text "" $+$) . printWithDef) (zip defs progs))))
+    printResult defs progs = putStrLn (render (vcat' (map ((text "" $+$) . printWithDef) (zip defs progs))))
                      
-  putStrLn "\n ========= Unoptimized ============"
-  printResult (prepareExpr tops progs) (compileInd id progs)
---  putStrLn "\n ========= Optimized Individually ============="
---  printResult (prepareExpr tops progs) (compileInd (inlineBlocks . deadBlocks . opt4 . opt3 . bindSubst) progs)
-  putStrLn "\n ========= Optimized Together ============="
-  putStrLn (render (printProgM (compileAll (mostOpt tops) progs)))
-           
