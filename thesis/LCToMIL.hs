@@ -134,7 +134,7 @@ compVarM :: Expr
   -> CompM (ProgM O C)
 compVarM (EVar v) ctx = ctx v
 compVarM (EPrim p _) ctx = ctx p
-compVarM (ELit (Lit n _)) _ = ctx (show n)
+compVarM (ELit (Lit n _)) ctx = ctx (show n)
 compVarM e ctx = compileStmtM e $ \t -> do
   v <- fresh "v"
   rest <- ctx v
@@ -219,10 +219,10 @@ popMonad =
   let f s@(C { monadic }) = s { monadic = drop 1 monadic }
   in modify f
 
--- | Are we in monadic compilatino mode?
+-- | Are we in monadic compilation mode?
 inMonad :: CompM Bool
 inMonad = 
-  let f s@(C { monadic }) = null monadic
+  let f s@(C { monadic }) = not (null monadic)
   in gets f
 
 -- Run the left compilation, unless we
