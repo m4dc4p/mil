@@ -96,6 +96,9 @@ data TailM = Return Name
     [Name] -- ^ Free variables in the body.
   | Run  -- ^ Execute a monadic computation.
     Name  -- ^ Variable holding the thunk
+  | Prim    -- ^ Execute a primitive block 
+    Name    -- ^ Name of the primitive
+    [Name]  -- ^ Arguments to the primitive
 
 
   deriving (Eq, Show)
@@ -103,9 +106,9 @@ data TailM = Return Name
 -- Pretty printing programs
 printStmtM :: StmtM e x -> Doc
 printStmtM (Bind n b) = text n <+> text "<-" <+> nest 2 (printTailM b)
-printStmtM (BlockEntry f l args) = text (show l ++ "_" ++ f) <+> 
+printStmtM (BlockEntry f _ args) = text f <+> 
                                   parens (commaSep text args) <> text ":" 
-printStmtM (CloEntry f l clos arg) = text (show l ++ "_" ++ f) <+> 
+printStmtM (CloEntry f _ clos arg) = text f <+> 
                                   parens (text arg) <+> braces (commaSep text clos) <> text ":" 
 printStmtM (CaseM v alts) = hang (text "case" <+> text v <+> text "of") 2 (vcat' $ map printAlt alts)
   where
@@ -120,9 +123,10 @@ printTailM (Goto dest vs) = printDest dest <> parens (commaSep text vs)
 printTailM (ConstrM cons vs) = text cons <+> (hsep $ texts vs)
 printTailM (Thunk dest vs) = text "thunk" <+> printDest dest <+> brackets (commaSep text vs)
 printTailM (Run v) = text "invoke" <+> text v
+printTailM (Prim p vs) = text p <> text "*" <> parens (commaSep text vs)
 
 printDest :: Dest -> Doc
-printDest (name, l) = text (show l ++ "_" ++ name)
+printDest (name, _) = text name
 
 printProgM :: ProgM C C -> Doc
 printProgM = vcat' . maybeGraphCC empty printBlockM
@@ -144,3 +148,52 @@ tailDest :: TailM -> [Dest]
 tailDest (Closure dest _) = [dest]
 tailDest (Goto dest _) = [dest]
 tailDest _ = []
+
+-- Primitives
+
+primNames :: [Name]
+primNames = map fst p
+  where
+    p :: [(Name, SimpleUniqueMonad (ProgM C C))]
+    p = prims
+
+prims :: UniqueMonad m => [(Name, m (ProgM C C))]
+prims = [plusPrim
+        , minusPrim
+        , timesPrim
+        , divPrim
+        , ltPrim
+        , gtPrim
+        , ltePrim
+        , gtePrim
+        , eqPrim
+        , neqPrim ]
+
+plusPrim, minusPrim, timesPrim, divPrim, ltPrim, gtPrim, ltePrim, gtePrim, eqPrim, neqPrim :: UniqueMonad m => (Name, m (ProgM C C))
+
+plusPrim = ("plus", binPrim "plus")
+minusPrim = ("minus", binPrim "minus")
+timesPrim = ("times", binPrim "times")
+divPrim = ("div", binPrim "div")
+
+ltPrim = ("lt", binPrim "lt")
+gtPrim = ("gt", binPrim "gt")
+ltePrim = ("lte", binPrim "lte")
+gtePrim = ("gte", binPrim "gte")
+eqPrim = ("eq", binPrim "eq")
+neqPrim = ("neq", binPrim "neq")
+                   
+binPrim :: UniqueMonad m => Name -> m (ProgM C C)
+binPrim name = do
+  bodyLabel <- freshLabel
+  c2Label <- freshLabel
+  c1Label <- freshLabel
+  let bodyName = name ++ "Body" 
+      body = mkFirst (BlockEntry bodyName bodyLabel ["a", "b"]) <*>
+             mkLast (Done $ Prim name ["a", "b"])
+      c2Name = name ++ "Clo2"
+      c2 = mkFirst (CloEntry c2Name c2Label ["a"] "b") <*>
+           mkLast (Done $ Goto (bodyName, bodyLabel) ["a", "b"])
+      c1 = mkFirst (CloEntry name c1Label [] "a") <*>
+           mkLast (Done $ Closure (c2Name, c2Label) ["a"])
+  return (c1 |*><*| c2 |*><*| body)

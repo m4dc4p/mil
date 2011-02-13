@@ -5,9 +5,9 @@ module LCToMIL
 
 where
 
-import Control.Monad.State (State, execState, modify, gets)
+import Control.Monad.State (State, execState, modify, gets, get)
 import Text.PrettyPrint 
-import Data.List (sort, nub)
+import Data.List (sort, nub, delete, (\\))
 import Data.Maybe (fromMaybe, isJust, catMaybes)
 import Data.Map (Map, (!))
 import qualified Data.Map as Map
@@ -22,17 +22,46 @@ import Util
 
 -- | Compiler state. 
 data CompS = C { compI :: Int -- ^ counter for fresh variables
-               , compG :: (ProgM C C) -- ^ Program control-flow graph.
+               , compG :: ProgM C C -- ^ Program control-flow graph.
                , compT :: [Name] -- ^ top-level function names.
                , monadic :: [()] } -- ^ Allows nested monadic computation. Empty list means no, 
                                    -- anything else means yes.
                
 type CompM = State CompS
+type Free = [Name]
 
 instance UniqueMonad CompM where
   freshUnique = freshVal
 
 type Def = (Name, Expr)
+
+type CompP = State ([Name], ProgM C C, Int)
+instance UniqueMonad CompP where
+  freshUnique = do
+    (_, _, i) <- get
+    modify (\(n, g, j) -> (n, g, j + 1))
+    return (intToUnique i)
+
+-- | Pre-compiled primitive functions
+-- supporting monadic actions.
+prelude :: ([Name], ProgM C C)
+prelude = 
+  let comp (name, impl) = do
+        impl' <- impl
+        (names, g, i) <- get
+        modify (\(names, g, i) -> (name : names,  impl' |*><*| g, i))
+        return ()
+      (names, preludeProg, _) = foldr (\prim -> execState (comp prim)) ([], emptyClosedGraph, 0 :: Int) prims
+  in (names, preludeProg)
+
+compile :: [Name] -> [Def] -> ProgM C C
+compile tops defs = 
+    foldr (|*><*|) (snd prelude) . snd . foldr compileEach (100, []) $ defs
+  where
+    compileEach :: Def -> (Int, [ProgM C C]) -> (Int, [ProgM C C])
+    compileEach p (i, ps) = 
+      let (j, p') = compileM tops i p
+      in (j, p' : ps)
 
 compileM :: [Name] -> Int -> Def -> (Int, ProgM C C)
 compileM tops labelSeed def = 
@@ -46,7 +75,7 @@ compileM tops labelSeed def =
     -- to the control flow graph.    
     newDefn :: Name -> Expr -> CompM ()
     newDefn name (ELam v _ b) = do
-      let fvs = free b tops
+      let fvs = v `delete` free b \\ tops
       prog <- compileStmtM b (return . mkLast . Done)
       cloDefn name v fvs prog >> return ()
     newDefn name body = do
@@ -61,7 +90,7 @@ compileStmtM (EVar v) ctx
   = ctx (Return v) `unlessMonad` ctx (Run v)
 
 compileStmtM (EPrim _ _) _ 
-  = error "EPrim should not appear unevaluated."
+  = error "EPrim in compileStmtM."
 
 compileStmtM (ELit _) _ 
   = error "ELit statement not implemented."
@@ -72,8 +101,9 @@ compileStmtM (ECon cons _ exprs) ctx =
                            compExpr (v:vs) es
   in compExpr [] exprs
 
-compileStmtM (ELam v _ b) ctx = do
-  let fvs = free b [v]
+compileStmtM e@(ELam v _ b) ctx = do
+  tops <- gets compT
+  let fvs = free e \\ tops
   f <- do
     prog <- compileStmtM b (return . mkLast . Done)
     name <- newTop "absBody"
@@ -99,7 +129,6 @@ compileStmtM (ECase e lcAlts) ctx = do
     callDefn :: String -> ProgM O C -> CompM TailM
     callDefn name body = do 
       f <- newTop name
-      ts <- gets compT
       dest <- blockDefn f [] body
       return (Goto dest [])
 
@@ -119,7 +148,8 @@ compileStmtM (EFatbar _ _) _
 
 compileStmtM (EBind v _ b r) ctx = do
   pushMonad
-  let fvs = nub (free b [] ++ free r [v])
+  tops <- gets compT
+  let fvs = nub (free b ++ (free r \\ [v])) \\ tops 
   command <- do
     rest <- compileStmtM r (return . mkLast . Done)
     prog <- compileStmtM b $ \body -> 
@@ -129,11 +159,27 @@ compileStmtM (EBind v _ b r) ctx = do
   popMonad
   ctx (Thunk command fvs)
 
+primDefn :: Name 
+         -> Int 
+         -> (Name -> CompM (ProgM O C)) 
+         -> CompM (ProgM O C)
+primDefn p 1 ctx = do 
+  dest <- blockDefn p [] (mkLast . Done $ Prim p [])
+  ctx p
+primDefn p n ctx = do
+  let vs = take (n - 1) $ zipWith (++) (repeat "e") (map show [1..])
+  dest <- blockDefn p vs (mkLast . Done $ Prim p vs)
+  ctx p
+
+  
+primDefined :: Name -> CompM Bool
+primDefined p = return False
+
 compVarM :: Expr 
   -> (Name -> CompM (ProgM O C))
   -> CompM (ProgM O C)
 compVarM (EVar v) ctx = ctx v
-compVarM (EPrim p _) ctx = ctx p
+compVarM (EPrim p vs) ctx = error "EPrim in compVarM"
 compVarM (ELit (Lit n _)) ctx = ctx (show n)
 compVarM e ctx = compileStmtM e $ \t -> do
   v <- fresh "v"
@@ -142,8 +188,20 @@ compVarM e ctx = compileStmtM e $ \t -> do
 
 mkBind r f t = return (mkMiddle (Bind r t) <*> mkLast (Done f))
 
-free :: Expr -> [Name] -> [Name]
-free expr env = []
+free :: Expr -> Free
+free = nub . free'
+  where
+    free' (EVar v) = [v]
+    free' (EPrim v _) = []
+    free' (ELit _) = []
+    free' (ECon _ _ expr) = concatMap free' expr
+    free' (ELam v _ expr) = v `delete` free' expr 
+    free' (ELet _ _) = error "ELet free'."
+    free' (ECase expr alts) = free' expr ++ concatMap (\(LC.Alt _ _ vs e) -> nub (free' e) \\ vs) alts
+    free' (EApp e1 e2) = free' e1 ++ free' e2
+    free' (EFatbar e1 e2) = free' e1 ++ free' e2
+    free' (EBind v _ e1 e2) = free' e1 ++ v `delete` free' e2
+
       
 -- | Create a fresh variable with the given
 -- prefix.
@@ -250,3 +308,18 @@ isMonadic _ = False
 
 toAlt :: LC.Alt -> Alt Expr
 toAlt (LC.Alt cons _ vs expr) = Alt cons vs expr
+
+-- prims :: Expr -> [Name]
+-- prims e = nub (prims' [] e)
+--   where
+--     prims' acc (EVar _) = acc
+--     prims' acc (EPrim p _) = p : acc
+--     prims' acc (ELit _) = acc
+--     prims' acc (ECon _ _ exprs) = concatMap (prims' []) exprs ++ acc
+--     prims' acc (ELam _ _ e) = prims' acc e
+--     prims' acc (ELet _ _) = error "prims ELet"
+--     prims' acc (ECase e alts) = concatMap (prims' []) (map (\(LC.Alt _ _ _ e) -> e) alts) ++ prims' acc e
+--     prims' acc (EApp e1 e2) = prims' acc e1 ++ prims' acc e2
+--     prims' acc (EFatbar e1 e2) = prims' acc e1 ++ prims' acc e2
+--     prims' acc (EBind _ _ e1 e2) = prims' acc e1 ++ prims' acc e2
+                                                                                                                                                                                                                                   

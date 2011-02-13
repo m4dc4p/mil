@@ -7,7 +7,7 @@ where
 
 import Control.Monad.State (State, execState, modify, gets)
 import Text.PrettyPrint 
-import Data.List (sort)
+import Data.List (sort, delete, (\\))
 import Data.Maybe (fromMaybe, isJust, catMaybes)
 import Data.Map (Map, (!))
 import qualified Data.Map as Map

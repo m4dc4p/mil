@@ -1,13 +1,14 @@
 {-# LANGUAGE TypeSynonymInstances, GADTs, RankNTypes
   , NamedFieldPuns, TypeFamilies, ScopedTypeVariables #-}
 
-module OptMIL
+module OptMIL (mostOpt, addLive, LiveFact
+              , getEntryLabel, findLive)
 
 where
 
 import Control.Monad.State (State, execState, modify, gets)
 import Text.PrettyPrint 
-import Data.List (sort)
+import Data.List (sort, (\\))
 import Data.Maybe (fromMaybe, isJust, catMaybes)
 import Data.Map (Map, (!))
 import qualified Data.Map as Map
@@ -137,6 +138,7 @@ liveTransfer tops = mkBTransfer live
     tailVars (Return n) = Set.singleton n
     tailVars (Thunk _ vs) = Set.fromList vs
     tailVars (Run n) = Set.singleton n
+    tailVars (Prim _ vs) = Set.fromList vs
 
 -- | Retrieve a fact or the empty set
 liveFact :: FactBase LiveFact -> Label -> Set Name
@@ -557,6 +559,9 @@ inlineRewrite preds prog = mkBRewrite rewriter
           changeTail env (Closure dest vs) = Closure dest (map (changeVar env) vs)
           changeTail env (Goto dest vs) = Goto dest (map (changeVar env) vs)
           changeTail env (ConstrM c ns) = ConstrM c (map (changeVar env) ns)
+          changeTail env (Thunk dest vs) = Thunk dest (map (changeVar env) vs)
+          changeTail env (Run v) = Run (changeVar env v)
+          changeTail env (Prim p vs) = Prim p (map (changeVar env) vs)
           changeVar env f = Map.findWithDefault f f env
 
 -- | Maps labels to their predecessors. The values
@@ -646,4 +651,10 @@ addLive tops = fst . usingLive addLiveRewriter tops
 opt3 tops = fst . usingLive deadRewriter tops
 opt4 tops = fst . usingLive deadRewriter tops . collapse
 
+-- using (deadBlocks tops \\ primNames) results in an infinite loop, unless
+-- inlineBlocks is taken out. Why?
 mostOpt tops = inlineBlocks tops . deadBlocks tops . opt4 tops . opt3 tops . bindSubst
+
+infiniteLoop tops = inlineBlocks tops . deadBlocks (tops \\ primNames) . opt4 tops . opt3 tops . bindSubst
+
+notInfiniteLoop tops = deadBlocks (tops \\ primNames) . opt4 tops . opt3 tops . bindSubst

@@ -18,46 +18,35 @@ import LCToMIL
 
 progM progs = do
     putStrLn "\n ========= Unoptimized ============"
-    printResult progs (compileInd progs)
+    printResult progs (map (addLive tops) . map (compile tops) . map (: []) $ progs)
     putStrLn "\n ========= Optimized Together ============="
-    putStrLn (render (printProgM (compileAll (mostOpt tops) progs)))
+    putStrLn (render . printProgM . mostOpt tops . addLive tops . (compile tops) $ progs)
   where
-    tops = map fst progs
-
+    tops = map fst progs ++ fst prelude
+    
     printWithDef :: (Def, ProgM C C) -> Doc
     printWithDef (def, comp) = text (show (ppr def)) $+$ 
                                vcat' (maybeGraphCC empty printBlockM comp)
 
     printResult defs progs = putStrLn (render (vcat' (map ((text "" $+$) . printWithDef) (zip defs progs))))
 
-    compileEach :: Def -> (Int, [ProgM C C]) -> (Int, [ProgM C C])
-    compileEach p (i, ps) = 
-      let (j, p') = compileM tops i p
-      in (j,  addLive tops p' : ps)
-
-    -- Compiles all procedures independently, so 
-    -- we don't get any inter-procedure optimization
-    compileInd = snd . foldr compileEach (0, []) 
-
-    -- Compiles all procedures together so we do get inter-procedure
-    -- optimization.
-    compileAll opts = opts . foldr (|*><*|) emptyClosedGraph . snd . foldr compileEach (0, []) 
                      
   
 
 -- f g y [] = []
 -- f g y (x:xs) = (g y) x (f g y xs)
 
-funnyFold = [("funny", 
+funnyFold = ("funny", 
              lam "g" $ \g ->
              lam "y" $ \y ->
              lam "xs" $ \xs ->
-               ECase xs [LC.Alt "Nil" [] [] mkNil
-                       , LC.Alt "Cons" [] ["x", "xs'"]
-                             (((g `app` y) `app` (var "x")) `app`
-                                 ((((var "funny") `app` g) `app`
-                                           y) `app`
-                                      (var "xs'")))])]
+               _case xs (alt "Nil" [] (const mkNil) .
+                         alt "Cons" ["x", "xs'"] 
+                               (\ [x, xs'] ->
+                                  (((g `app` y) `app` x) `app`
+                                   ((((var "funny") `app` g) `app` y) `app`
+                                      xs')))))
+
 compose :: Def
 compose = ("compose", composeDef)
 
@@ -65,11 +54,44 @@ composeDef = lam "f" $ \f ->
               lam "g" $ \g ->
               lam "x" $ \x -> f `app` (g `app` x)
 
-origExample = [("main", var "compose"  `app` var "foo" `app` var "bar")
+origExample = [("main", var "compose" `app` var "foo" `app` var "bar" `app` var "x")
               , compose]
 
-hello = ("hello", bindE "v" 
-                  (EApp mPrint (EVar "p")) $ \v -> mkUnit)
+hello = ("hello", bindE "v" (mPrint `app` var "p") $ 
+                  \v -> mkUnit)
+
+{-
+  if x > 10 
+  then x + 1 + y
+  else x + 1 + z
+-}
+
+lcmTest1 = ("lcmTest1"
+           , lam "x" $ \x ->
+             lam "y" $ \y ->
+             lam "z" $ \z ->
+               _case (x `gt` lit 10) 
+                  (alt "True" [] (const $ x `plus` lit 1 `plus` y) .
+                   alt "False" [] (const $ x `plus` lit 1 `plus` z)))
+
+lcmTest2 = ("lcmTest2"
+           , lam "x" $ \x ->
+             lam "y" $ \y ->
+             lam "z" $ \z ->
+               _case (x `gt` lit 10)
+                  (alt "True" [] (const (var "foo" `app` x `app` y)) .
+                   alt "False" [] (const (var "foo" `app` x `app` z))))
+
+primTest1 = ("primTest"
+            , lam "x" $ \x ->
+              lam "y" $ \y -> plus x y)
+             
+
+_case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
+_case c f = ECase c (f [])
+
+alt :: Name -> [Name] -> ([Expr] -> Expr) -> [LC.Alt] -> [LC.Alt]
+alt cons vs f = (LC.Alt cons [] vs (f (map var vs)) :)
 
 mPrint = EPrim "print" []
 mkUnit = ECon "()" [] []
@@ -83,8 +105,28 @@ bindE v body rest =
   in EBind v typ body (rest var)
 
 lam :: String -> (Expr -> Expr) -> Expr
-lam v body = body (var v)
+lam v body = ELam v typ (body (var v))
 
+plus, minus, times, div :: Expr -> Expr -> Expr
+
+lt, gt, lte, gte, eq, neq :: Expr -> Expr -> Expr
+
+
+infixl 6 `plus`, `minus`
+infixl 7 `times`, `div`
+infix 4 `lt`, `gt`, `lte`, `gte`, `eq`, `neq`
+
+plus a b = var "plus" `app` a `app` b
+minus a b = var "minus" `app` a `app` b
+times a b = var "times" `app` a `app` b
+div a b = var "div" `app` a `app` b
+
+lt a b = var "lt" `app` a `app` b
+gt a b = var "gt" `app` a `app` b
+lte a b = var "lte" `app` a `app` b
+gte a b = var "gte" `app` a `app` b
+neq a b = var "neq" `app` a `app` b
+eq a b = var "eq" `app` a `app` b
 
 infixl 0 `app`
 app :: Expr -> Expr -> Expr
@@ -93,7 +135,14 @@ app f g = EApp f g
 var :: String -> Expr
 var = EVar
 
-typ = error "type"    
+lit :: Integer -> Expr
+lit n = ELit (Lit n typ)
+
+prim :: Name -> Int -> Expr
+-- prim n cnt = EPrim n (take (cnt + 1) $ repeat typ) 
+prim n _ = var n
+
+typ = TyLabel "t"
 
 instance Printable Def where
   ppr (name, body) = PP.text name PP.<+> PP.text "=" PP.<+> ppr body
