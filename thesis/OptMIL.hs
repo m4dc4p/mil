@@ -8,7 +8,7 @@ where
 
 import Control.Monad.State (State, execState, modify, gets)
 import Text.PrettyPrint 
-import Data.List (sort, (\\))
+import Data.List (sort, (\\), elemIndex)
 import Data.Maybe (fromMaybe, isJust, catMaybes)
 import Data.Map (Map, (!))
 import qualified Data.Map as Map
@@ -379,35 +379,6 @@ collapseTransfer = mkFTransfer fw
     fw (BlockEntry _ _ _) f = f
     fw (CloEntry _ _ _ _) f = f
     
-
-{-
-  [("absBody4",T)
-  ,("absBody7",CloVal ("absBody4",L5) [])
-  ,("blockabsBody4",T)
-  ,("const3",CloVal ("absBody7",L8) [])
-  ,("main",T)]
-
-const3 = \a_ {}. \b_ {}. \c_ {}. c_
-[c_] L5_absBody4 (c_) {}: L6_blockabsBody4(c_)
-[c_] L6_blockabsBody4 (c_): return c_
-[nothing live] L8_absBody7 (b_) {}: closure L5_absBody4 {}
-[nothing live] L9_const3 (a_) {}: closure L8_absBody7 {}
-
-main = ((const3 1) 2) 3
-[1,2,3] L2_main (1,2,3):
-          v0 <- const3 @ 1
-          v1 <- v0 @ 2
-          v1 @ 3
-
-L2_main (1,2,3):
-  v1 <- return 2
-  v1 @ 3
-L5_absBody4 (c_) {}: L6_blockabsBody4(c_)
-L6_blockabsBody4 (c_): return c_
-L8_absBody7 (b_) {}: closure L5_absBody4 {}
-L9_const3 (a_) {}: closure L8_absBody7 {}
-
--}
 collapseRewrite :: FuelMonad m => Map Label DestOf -> FwdRewrite m StmtM CollapseFact
 collapseRewrite blocks = iterFwdRw (mkFRewrite rewriter)
   where
@@ -603,23 +574,6 @@ liveBlockTransfer = mkBTransfer live
 
     altExpr (Alt _ _ e) = e
 
--- An (failed) experiment attempting to eliminate dead blocks through
--- rewriting. Seems too painful to get Hoopl to work over ``Graph
--- ProgM'' (i.e. graphs of graphs) nodes.
---
--- deadBlockRewrite :: FuelMonad m => BwdRewrite m ProgM LiveBlock
--- deadBlockRewrite = mkBRewrite deadBlocks
---   where
---     deadBlocks :: FuelMonad m => forall e x. ProgM e x -> Fact x LiveBlock -> m (Maybe (Graph ProgM e x))
---     deadBlocks (GMany NothingO blocks _) blockSet = 
---       let theseBlocks :: LabelMap (Block StmtM C C) -> [(Dest, Block StmtM C C)] 
---           theseBlocks = map (blockToDest) . mapElems
---           addBlock :: Dest -> Block ProgM C C -> Graph ProgM C C -> Graph ProgM C C
---           addBlock (_, label) b prog = (GMany NothingO (mapSingleton label b) NothingO) |*><*| prog
---           liveBlocks :: [(Dest, Block StmtM C C)] -> Graph ProgM C C
---           liveBlocks = foldr (\(d,b) -> addBlock d (blockGraph b)) emptyClosedGraph 
---       in undefined
-
 -- | deadBlocks tends to eliminate entry points
 -- we would need for separate compilation.
 deadBlocks :: [Name] -> ProgM C C -> ProgM C C
@@ -643,7 +597,62 @@ deadBlocks tops prog =
       | dest `Set.member` live = (flag, blockGraph block |*><*| prog)
       | otherwise = (SomeChange, prog)
 
+-- Goto/Return eliminatino
+-- When a Goto immediately returns, we 
+-- inline the return:
+--
+--  L1: return r
+--   ...
+--  L2: v <- goto l1 (x)
+-- ==>
+--  L2: v <- return x
+--
+-- Bind/subst elimination can take care of the return left over.
 
+-- | Defines blocks that only return. The integer tells whihc argument
+-- to the block is returned. The name gives the name of the argument
+-- (which is only useful during analysis).
+type ReturnBlocks = Map Dest (Int, Name)
+
+gotoReturn :: ProgM C C -> ProgM C C
+gotoReturn body = 
+    runSimple $ do
+      (body', f, _) <- analyzeAndRewriteBwd bwd (JustC labels) body initial
+      return body'
+  where              
+    labels = entryLabels body
+    initial = mkFactBase (bp_lattice bwd) (zip labels (repeat Nothing))
+    bwd = BwdPass { bp_lattice = gotoReturnLattice
+                  , bp_transfer = gotoReturnTransfer
+                  , bp_rewrite = gotoReturnRewrite }
+                              
+
+gotoReturnRewrite :: FuelMonad m => BwdRewrite m StmtM ReturnBlocks
+gotoReturnRewrite = iterBwdRw (mkBRewrite rewriter)
+  where
+    rewriter :: FuelMonad m => forall e x. StmtM e x -> Fact x ReturnBlocks -> m (Maybe (ProgM e x))
+    rewriter (Bind v (Goto dest vs)) (Just (i, _)) = bind v (Just . Return $ vs !! i)
+    rewriter _ _ = return Nothing
+
+gotoReturnLattice :: DataflowLattice ReturnBlocks
+gotoReturnLattice = DataflowLattice { fact_name = "Goto/Return"
+                                    , fact_bot = Nothing
+                                    , fact_join = extend }
+  where
+    extend _ (OldFact old) (NewFact new) = (changeIf (old /= new)
+                                           , new)
+
+gotoReturnTransfer :: BwdTransfer StmtM ReturnBlocks
+gotoReturnTransfer = mkBTransfer bw
+  where
+    bw :: StmtM e x -> Fact x ReturnBlocks -> ReturnBlocks
+    bw (Done (Return v)) f = Just (0, v)
+    bw (BlockEntry _ _ args) f = findArg f args
+    bw _ f = Nothing
+
+    findArg :: Maybe (Int, Name) -> [Name] -> Maybe (Int, Name)
+    findArg (Just (_, v)) vs = maybe Nothing (\i -> Just (i, v)) (elemIndex v vs)
+    findArg _ _ = Nothing
 -- Useful combinations of optimizations
 
 addLive tops = fst . usingLive addLiveRewriter tops
@@ -653,7 +662,7 @@ opt4 tops = fst . usingLive deadRewriter tops . collapse
 
 -- using (deadBlocks tops \\ primNames) results in an infinite loop, unless
 -- inlineBlocks is taken out. Why?
-mostOpt tops = inlineBlocks tops . deadBlocks tops . opt4 tops . opt3 tops . bindSubst
+mostOpt tops = gotoReturn . deadBlocks (tops \\ primNames) . inlineBlocks tops . deadBlocks tops . opt4 tops . opt3 tops . bindSubst
 
 infiniteLoop tops = inlineBlocks tops . deadBlocks (tops \\ primNames) . opt4 tops . opt3 tops . bindSubst
 

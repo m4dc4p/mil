@@ -99,8 +99,6 @@ data TailM = Return Name
   | Prim    -- ^ Execute a primitive block 
     Name    -- ^ Name of the primitive
     [Name]  -- ^ Arguments to the primitive
-
-
   deriving (Eq, Show)
 
 -- Pretty printing programs
