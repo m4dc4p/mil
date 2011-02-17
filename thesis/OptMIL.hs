@@ -612,47 +612,48 @@ deadBlocks tops prog =
 -- | Defines blocks that only return. The integer tells whihc argument
 -- to the block is returned. The name gives the name of the argument
 -- (which is only useful during analysis).
-type ReturnBlocks = Map Dest (Int, Name)
+-- type ReturnBlocks = Map Dest (Int, Name)
 
-gotoReturn :: ProgM C C -> ProgM C C
-gotoReturn body = 
-    runSimple $ do
-      (body', f, _) <- analyzeAndRewriteBwd bwd (JustC labels) body initial
-      return body'
-  where              
-    labels = entryLabels body
-    initial = mkFactBase (bp_lattice bwd) (zip labels (repeat Nothing))
-    bwd = BwdPass { bp_lattice = gotoReturnLattice
-                  , bp_transfer = gotoReturnTransfer
-                  , bp_rewrite = gotoReturnRewrite }
+-- gotoReturn :: ProgM C C -> ProgM C C
+-- gotoReturn body = 
+--     runSimple $ do
+--       (body', f, _) <- analyzeAndRewriteBwd bwd (JustC labels) body initial
+--       return body'
+--   where              
+--     labels = entryLabels body
+--     initial = mkFactBase (bp_lattice bwd) (zip labels (repeat Nothing))
+--     bwd = BwdPass { bp_lattice = gotoReturnLattice
+--                   , bp_transfer = gotoReturnTransfer
+--                   , bp_rewrite = gotoReturnRewrite }
                               
 
-gotoReturnRewrite :: FuelMonad m => BwdRewrite m StmtM ReturnBlocks
-gotoReturnRewrite = iterBwdRw (mkBRewrite rewriter)
-  where
-    rewriter :: FuelMonad m => forall e x. StmtM e x -> Fact x ReturnBlocks -> m (Maybe (ProgM e x))
-    rewriter (Bind v (Goto dest vs)) (Just (i, _)) = bind v (Just . Return $ vs !! i)
-    rewriter _ _ = return Nothing
+-- gotoReturnRewrite :: FuelMonad m => BwdRewrite m StmtM ReturnBlocks
+-- gotoReturnRewrite = iterBwdRw (mkBRewrite rewriter)
+--   where
+--     rewriter :: FuelMonad m => forall e x. StmtM e x -> Fact x ReturnBlocks -> m (Maybe (ProgM e x))
+--     rewriter (Bind v (Goto dest vs)) (Just (i, _)) = bind v (Just . Return $ vs !! i)
+--     rewriter _ _ = return Nothing
 
-gotoReturnLattice :: DataflowLattice ReturnBlocks
-gotoReturnLattice = DataflowLattice { fact_name = "Goto/Return"
-                                    , fact_bot = Nothing
-                                    , fact_join = extend }
-  where
-    extend _ (OldFact old) (NewFact new) = (changeIf (old /= new)
-                                           , new)
+-- gotoReturnLattice :: DataflowLattice ReturnBlocks
+-- gotoReturnLattice = DataflowLattice { fact_name = "Goto/Return"
+--                                     , fact_bot = Nothing
+--                                     , fact_join = extend }
+--   where
+--     extend _ (OldFact old) (NewFact new) = (changeIf (old /= new)
+--                                            , new)
 
-gotoReturnTransfer :: BwdTransfer StmtM ReturnBlocks
-gotoReturnTransfer = mkBTransfer bw
-  where
-    bw :: StmtM e x -> Fact x ReturnBlocks -> ReturnBlocks
-    bw (Done (Return v)) f = Just (0, v)
-    bw (BlockEntry _ _ args) f = findArg f args
-    bw _ f = Nothing
+-- gotoReturnTransfer :: BwdTransfer StmtM ReturnBlocks
+-- gotoReturnTransfer = mkBTransfer bw
+--   where
+--     bw :: StmtM e x -> Fact x ReturnBlocks -> ReturnBlocks
+--     bw (Done (Return v)) f = Just (0, v)
+--     bw (BlockEntry _ _ args) f = findArg f args
+--     bw _ f = Nothing
 
-    findArg :: Maybe (Int, Name) -> [Name] -> Maybe (Int, Name)
-    findArg (Just (_, v)) vs = maybe Nothing (\i -> Just (i, v)) (elemIndex v vs)
-    findArg _ _ = Nothing
+--     findArg :: Maybe (Int, Name) -> [Name] -> Maybe (Int, Name)
+--     findArg (Just (_, v)) vs = maybe Nothing (\i -> Just (i, v)) (elemIndex v vs)
+--     findArg _ _ = Nothing
+
 -- Useful combinations of optimizations
 
 addLive tops = fst . usingLive addLiveRewriter tops
@@ -662,7 +663,7 @@ opt4 tops = fst . usingLive deadRewriter tops . collapse
 
 -- using (deadBlocks tops \\ primNames) results in an infinite loop, unless
 -- inlineBlocks is taken out. Why?
-mostOpt tops = gotoReturn . deadBlocks (tops \\ primNames) . inlineBlocks tops . deadBlocks tops . opt4 tops . opt3 tops . bindSubst
+mostOpt tops = deadBlocks (tops \\ primNames) . inlineBlocks tops . deadBlocks tops . opt4 tops . opt3 tops . bindSubst
 
 infiniteLoop tops = inlineBlocks tops . deadBlocks (tops \\ primNames) . opt4 tops . opt3 tops . bindSubst
 

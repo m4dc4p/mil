@@ -82,6 +82,12 @@ lcmTest2 = ("lcmTest2"
                   (alt "True" [] (const (var "foo" `app` x `app` y)) .
                    alt "False" [] (const (var "foo" `app` x `app` z))))
 
+lcmTest3 = ("lcmTest3"
+           , lam "x" $ \x ->
+             lam "f" $ \f ->
+             lam "g" $ \g ->
+             (g `app` (f `app` x) `app` (f `app` x)))
+
 primTest1 = ("primTest"
             , lam "x" $ \x ->
               lam "y" $ \y -> plus x y)
