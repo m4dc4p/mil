@@ -5,9 +5,11 @@ module LCM
 
 where
 
-import Compiler.Hoopl
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Maybe (fromJust)
+
+import Compiler.Hoopl
 
 import Util
 import MIL
@@ -28,6 +30,14 @@ import MIL
 -- but not yet.
 newtype AntFact = AF ((Used, Killed)
                      , Anticipated)
+  deriving (Eq)
+
+instance Show AntFact where
+  show = showAnt
+
+showAnt :: AntFact -> String
+showAnt (AF (_, (env, ant))) = "(" ++ show env ++ ", " ++ 
+                                  show (Set.elems ant) ++ ")"
 
 type Anticipated = (Env, Set TailM)
 
@@ -40,44 +50,96 @@ type Used = Set TailM
 type Killed = Set TailM
 type Env = [Name]
 
+anticipated :: ProgM C C -> [(Dest, AntFact)]
+anticipated body = runSimple $ do
+    (p, f, _) <- analyzeAndRewriteBwd bwd (JustC (entryLabels body)) body mapEmpty
+    return $ map (\(l, fact) -> (fromJust (labelToDest body l), fact)) (mapToList f)
+  where
+    bwd = BwdPass { bp_lattice = antLattice
+                  , bp_transfer = antTransfer 
+                  , bp_rewrite = noBwdRewrite } 
+
+antLattice :: DataflowLattice AntFact
+antLattice = DataflowLattice { fact_name = "Anticipated expressions"
+                             , fact_bot = emptyAntFact 
+                             , fact_join = extend }
+  where
+    extend _ (OldFact old) (NewFact new) = (changeIf (old /= new)
+                                           , new)
+
+-- | Initial fact - no info.
+emptyAntFact :: AntFact
+emptyAntFact = AF ((Set.empty, Set.empty), ([], Set.empty))
+
 -- We will determine available expressions within 
 -- a block by inspecting all tails and tracking the
 -- arguments used. If those arguments are unchanged on
 -- entry to the block, then the expression will be added
 -- to the set of anticipated expressions for that block.
-anticipateTransfer :: BwdTransfer StmtM AntFact
-anticipateTransfer = mkBTransfer anticipate
+--
+-- New expressions defined in the block (which 
+antTransfer :: BwdTransfer StmtM AntFact
+antTransfer = mkBTransfer anticipate
   where
     anticipate :: StmtM e x -> Fact x AntFact -> AntFact
     anticipate (Bind v t) f = kill v (useExpr t f)
     anticipate (BlockEntry _ _ args) f = mkAnticipated f args
     anticipate (CloEntry _ _ args arg) f = mkAnticipated f (args++[arg])
-    anticipate (Done t) f = fromSucc t f (renameExprs t)
-    anticipate (CaseM v alts) f = 
-      let antAlt (Alt _ vs t) = kills (fromSucc t f (useExpr t . renameExprs t)) vs 
+    anticipate (Done t) f = useExpr t emptyAntFact -- fromSucc t f (renameExprs t)
+    anticipate (CaseM v alts) f = emptyAntFact
+{-      let antAlt (Alt _ vs t) = kills (fromSucc t f (useExpr t . renameExprs t)) vs 
       in unionFacts (map antAlt alts)
-
+-}
     -- | Get anticpated expression facts from our successor, if 
     -- there is one.
     fromSucc :: TailM -> FactBase AntFact -> (AntFact -> AntFact) -> AntFact
-    fromSucc t facts f = maybe emptyFact f (lookupTail t facts)
+    fromSucc t facts f = maybe emptyAntFact f (lookupTail t facts)
 
     -- | Kill expressions that use the argument
     kill :: Name -> AntFact -> AntFact
-    kill = undefined
+    kill v (AF ((used, killed), ant)) = 
+      -- "uses" is more general than necessary since not
+      -- all Tail instructions will appear in the
+      -- use/kill sets.
+      let toKill = Set.filter (uses v) used
+      in AF ((used, killed `Set.union` toKill), ant)
 
     kills :: AntFact -> [Name] -> AntFact
     kills = foldr kill
 
+    -- | True if the tail uses the name given.
+    uses :: Name -> TailM -> Bool
+    uses v t = v `elem` names t
+
+    -- | Extract variable names from a tail.
+    names :: TailM -> [Name]
+    names (Enter f x) = [f, x]
+    names (Closure _ vs) = vs
+    names (Goto _ vs) = vs
+    names (ConstrM _ vs) = vs
+    names (Thunk _ vs) = vs
+    names (Run v) = [v]
+    names (Prim _ vs) = vs
+
     -- | Add the tail to the used expression list.
     useExpr :: TailM -> AntFact -> AntFact
-    useExpr = undefined
+    -- The following tails should not be considered
+    -- for LCM, so we don't even add them to the used 
+    -- set.
+    useExpr (Goto _ _) f = f
+    useExpr (Run _) f = f
+    useExpr (Prim _ _) f = f
+    useExpr (Return _) f = f
+    useExpr t (AF ((used, killed), ant)) = 
+      AF ((Set.insert t used, killed), ant)
 
     -- | Fix up final Anticipated value on exit
     -- from the block. Compute (Used `union` Killed) and
     -- add arguments environment for other blocks to rename with.
     mkAnticipated :: AntFact -> Env -> AntFact
-    mkAnticipated = undefined
+    mkAnticipated (AF ((used, killed), _)) env = 
+      let ant = used `Set.difference` killed
+      in AF ((used, killed), (env, ant))
 
     unionFacts :: [AntFact] -> AntFact
     unionFacts = undefined
@@ -89,11 +151,8 @@ anticipateTransfer = mkBTransfer anticipate
     renameExprs :: TailM -> AntFact -> AntFact
     renameExprs = undefined
 
-     -- | Initial fact - no info.
-    emptyFact :: AntFact
-    emptyFact = undefined
-
     -- | Finds the facts for a particular case arm, if the 
     -- tail is a Goto or Closure. 
     lookupTail :: TailM -> FactBase AntFact -> Maybe AntFact
     lookupTail t f = undefined
+

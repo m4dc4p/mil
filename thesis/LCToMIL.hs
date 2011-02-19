@@ -42,6 +42,9 @@ instance UniqueMonad CompP where
     modify (\(n, g, j) -> (n, g, j + 1))
     return (intToUnique i)
 
+emptyPrelude :: ([Name], ProgM C C)
+emptyPrelude = ([], emptyClosedGraph)
+
 -- | Pre-compiled primitive functions
 -- supporting monadic actions.
 prelude :: ([Name], ProgM C C)
@@ -54,9 +57,9 @@ prelude =
       (names, preludeProg, _) = foldr (\prim -> execState (comp prim)) ([], emptyClosedGraph, 0 :: Int) prims
   in (names, preludeProg)
 
-compile :: [Name] -> [Def] -> ProgM C C
-compile tops defs = 
-    foldr (|*><*|) (snd prelude) . snd . foldr compileEach (100, []) $ defs
+compile :: [Name] -> ProgM C C -> [Def] -> ProgM C C
+compile tops predefined defs = 
+    foldr (|*><*|) predefined . snd . foldr compileEach (100, []) $ defs
   where
     compileEach :: Def -> (Int, [ProgM C C]) -> (Int, [ProgM C C])
     compileEach p (i, ps) = 
@@ -194,13 +197,13 @@ free = nub . free'
     free' (EVar v) = [v]
     free' (EPrim v _) = []
     free' (ELit _) = []
-    free' (ECon _ _ expr) = concatMap free' expr
-    free' (ELam v _ expr) = v `delete` free' expr 
+    free' (ECon _ _ expr) = nub (concatMap free' expr)
+    free' (ELam v _ expr) = v `delete` nub (free' expr)
     free' (ELet _ _) = error "ELet free'."
-    free' (ECase expr alts) = free' expr ++ concatMap (\(LC.Alt _ _ vs e) -> nub (free' e) \\ vs) alts
-    free' (EApp e1 e2) = free' e1 ++ free' e2
-    free' (EFatbar e1 e2) = free' e1 ++ free' e2
-    free' (EBind v _ e1 e2) = free' e1 ++ v `delete` free' e2
+    free' (ECase expr alts) = nub (free' expr ++ concatMap (\(LC.Alt _ _ vs e) -> nub (free' e) \\ vs) alts)
+    free' (EApp e1 e2) = nub (free' e1 ++ free' e2)
+    free' (EFatbar e1 e2) = nub (free' e1 ++ free' e2)
+    free' (EBind v _ e1 e2) = nub (free' e1 ++ v `delete` nub (free' e2))
 
       
 -- | Create a fresh variable with the given

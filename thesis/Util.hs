@@ -37,13 +37,23 @@ altE (Alt _ _ e) = e
 
 -- Hoopl utilities
 
+-- | maybe function for closed nodes.
 maybeC :: a -> (n -> a) -> MaybeC e1 n -> a
 maybeC _ f (JustC e) = f e
 maybeC def f _ = def 
 
+-- | maybe functin for open nodes.
 maybeO :: a -> (n -> a) -> MaybeO e1 n -> a
 maybeO def f (JustO b) = f b
 maybeO def f _ = def
 
+-- This function seems badly defined - it doesn't use
+-- the b argument.
 maybeGraphCC :: b -> (block node C C -> b) -> Graph' block node C C -> [b]
 maybeGraphCC b f (GMany _ middles _) = map f . mapElems $ middles
+
+-- | Run a Hoopl optimization pas with infinite fuel,
+-- using the monad Hoopl provides.
+runSimple :: SimpleFuelMonad a -> a
+runSimple p = runSimpleUniqueMonad $ runWithFuel infiniteFuel p
+    

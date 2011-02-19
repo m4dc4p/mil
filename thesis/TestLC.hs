@@ -15,15 +15,28 @@ import MIL
 import Util
 import OptMIL
 import LCToMIL
+import LCM
 
-progM progs = do
+progM progs prelude = do
     putStrLn "\n ========= Unoptimized ============"
-    printResult progs (map (addLive tops) . map (compile tops) . map (: []) $ progs)
+    printResult progs (map (addLive tops) . map (compile tops predefined) . map (: []) $ progs)
+    let optProgs = mostOpt tops . addLive tops . (compile tops predefined) $ progs
     putStrLn "\n ========= Optimized Together ============="
-    putStrLn (render . printProgM . mostOpt tops . addLive tops . (compile tops) $ progs)
+    putStrLn (render $ printProgM optProgs)
+    putStrLn "\n ========= Anticipated Expressions ============="
+    putStrLn (printAnticipated $ anticipated optProgs)
+
   where
+    predefined = snd prelude
     tops = map fst progs ++ fst prelude
-    
+
+    printAnticipated :: [(Dest, AntFact)] -> String
+    printAnticipated [] = "[]"
+    printAnticipated ants = 
+      let printAnt ((n, _), (AF (_, (env, exprs)))) = n ++ " " ++ show env ++ ": [" ++ 
+                                           showTails (Set.elems exprs) ++ "]"
+          showTails = render . commaSep printTailM 
+      in foldr1 (\a b -> a ++ "\n" ++ b) (map printAnt ants)
     printWithDef :: (Def, ProgM C C) -> Doc
     printWithDef (def, comp) = text (show (ppr def)) $+$ 
                                vcat' (maybeGraphCC empty printBlockM comp)
@@ -87,6 +100,12 @@ lcmTest3 = ("lcmTest3"
              lam "f" $ \f ->
              lam "g" $ \g ->
              (g `app` (f `app` x) `app` (f `app` x)))
+
+compose2 = ("compose2"
+           , lam "x" $ \x ->
+             lam "f" $ \f ->
+             lam "g" $ \g ->
+             (g `app` (f `app` x) `app` f))
 
 primTest1 = ("primTest"
             , lam "x" $ \x ->

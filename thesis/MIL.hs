@@ -99,7 +99,7 @@ data TailM = Return Name
   | Prim    -- ^ Execute a primitive block 
     Name    -- ^ Name of the primitive
     [Name]  -- ^ Arguments to the primitive
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 -- Pretty printing programs
 printStmtM :: StmtM e x -> Doc
@@ -146,6 +146,46 @@ tailDest :: TailM -> [Dest]
 tailDest (Closure dest _) = [dest]
 tailDest (Goto dest _) = [dest]
 tailDest _ = []
+
+-- Utility functions
+
+-- | Get all the labels at entry points in 
+-- the program.
+entryPoints :: ProgM C C -> [(Label, StmtM C O)]
+entryPoints (GMany _ blocks _) = map getEntryLabel (mapElems blocks)
+
+-- | Get all entry labels in a program.
+entryLabels :: ProgM C C -> [Label]
+entryLabels = map fst . entryPoints 
+
+-- | Entry label of a block, pllus the entry instruction.
+getEntryLabel :: Block StmtM C x -> (Label, StmtM C O)
+getEntryLabel block = case blockToNodeList' block of
+  (JustC e@(BlockEntry _ l _), _, _) -> (l, e)
+  (JustC e@(CloEntry _ l _ _), _, _) -> (l, e)
+
+-- | Find a block with a given label in the propgram
+-- and return it paired with it's label and name.
+blockOfLabel :: ProgM C C -> Label -> Maybe (Dest, Block StmtM C C)
+blockOfLabel body l = case lookupBlock body l of
+                  BodyBlock block -> Just (blockToDest block)
+                  _ -> Nothing
+
+destOfEntry :: StmtM C O -> Dest
+destOfEntry (BlockEntry n l _) = (n, l)
+destOfEntry (CloEntry n l _ _) = (n, l)
+
+blockToDest :: Block StmtM C C -> (Dest, Block StmtM C C)
+blockToDest block = (destOfEntry (blockEntry block), block)
+
+-- | Get the first instruction in a block.
+blockEntry :: Block StmtM C C -> StmtM C O
+blockEntry b = case blockToNodeList' b of
+                 (JustC entry, _, _) -> entry
+
+
+labelToDest :: ProgM C C -> Label -> Maybe Dest
+labelToDest prog l = maybe Nothing (Just . fst) (blockOfLabel prog l)
 
 -- Primitives
 
