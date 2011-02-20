@@ -35,6 +35,28 @@ data Alt e = Alt Constructor [Name] e
 altE :: Alt e -> e
 altE (Alt _ _ e) = e
 
+-- | Insert the element given at the position
+-- specified in the list. Positoin is 0-based,
+-- with the element inserted BEFORE the corresponding
+-- element in the list. If the index is too high (or too
+-- low), the original list is returned instead. 
+--
+-- Examples: 
+--   insertAt ["a"] 0 "b" == ["b", "a"]
+--   insertAt ["a"] 1 "b" == ["a", "b"]
+--   insertAt ["a"] 2 "b" == ["a"]
+--   insertAt [] 0 "b" == ["b"]
+--   insertAt [] 1 "b" == []
+--   insertAt ["a"] (-1) "b" == ["a"]
+
+insertAt :: [a] -> Int -> a -> [a]
+insertAt elems idx elem = insertAt' elems idx
+  where
+    insertAt' es n 
+      | n == 0 = elem : es
+      | n < 0 = []
+      | null es = []
+    insertAt' (e:es) n = e : insertAt' es (n - 1)
 -- Hoopl utilities
 
 -- | maybe function for closed nodes.

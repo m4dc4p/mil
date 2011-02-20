@@ -274,11 +274,11 @@ printBindFacts = printFB printFact
 --     v1 <- g(x,y,z,w)  
 -- 
 
--- | Associates a label with the destination
--- which it either captures (Closure) or 
--- jumps to (Goto).
+-- | Associates a label with the destination which it either captures
+-- (Closure) or jumps to (Goto). We store the index at which the
+-- argument to a closure will be stored, if it is used.
 data DestOf = Jump Dest 
-            | Capture Dest Bool
+            | Capture Dest (Maybe Int)
               deriving (Eq, Show)
 
 -- | Stores destination and arguments for a 
@@ -323,7 +323,7 @@ collapse body = runSimple $ do
                    Just (_,  block) ->
                      case blockToNodeList' block of
                        (JustC (CloEntry {}), [], JustC (Done (Goto d _))) -> Just (l, Jump d)
-                       (JustC (CloEntry _ _ _ arg), [], JustC (Done (Closure d args))) -> Just (l, Capture d (arg `elem` args))
+                       (JustC (CloEntry _ _ _ arg), [], JustC (Done (Closure d args))) -> Just (l, Capture d (arg `elemIndex` args))
                        _ -> Nothing
                    _ -> Nothing
     fwd = FwdPass { fp_lattice = collapseLattice
@@ -354,9 +354,8 @@ collapseRewrite blocks = iterFwdRw (mkFRewrite rewriter)
         Just (PElem (CloVal dest@(_, l) vs)) -> -- Just (Closure dest (vs ++ [x]))
           case l `Map.lookup` blocks of
             Just (Jump dest) -> Just (Goto dest (vs ++ [x]))
-            Just (Capture dest usesArg) 
-              | usesArg -> Just (Closure dest (vs ++ [x]))
-              | otherwise -> Just (Closure dest vs)
+            Just (Capture dest (Just idx)) -> Just (Closure dest (insertAt vs idx x))
+            Just (Capture dest _) -> Just (Closure dest vs)
             _ -> Nothing
         _ -> Nothing
 
