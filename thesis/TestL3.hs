@@ -182,6 +182,12 @@ funnyFold = [("funny",
                                       (Var "xs'")))])]
          
                              
+lcmTest3 = ("lcmTest3"
+           , abs "x" $ \x ->
+             abs "f" $ \f ->
+             abs "g" $ \g ->
+               (App (App g (App f x)) (App f x)))
+
 defs = [[isnt
         , mapNot
         , notNil

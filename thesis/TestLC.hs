@@ -95,12 +95,21 @@ lcmTest2 = ("lcmTest2"
                   (alt "True" [] (const (var "foo" `app` x `app` y)) .
                    alt "False" [] (const (var "foo" `app` x `app` z))))
 
+-- Test that we recognized (f x) as anticipatable.
 lcmTest3 = ("lcmTest3"
            , lam "x" $ \x ->
              lam "f" $ \f ->
              lam "g" $ \g ->
              (g `app` (f `app` x) `app` (f `app` x)))
 
+-- Test anticipatibility across procedures.
+lcmTest4 = [("main", var "lcmTest3" `app` lit 2 `app` var "plus" `app` var "times")
+           ,("lcmTest3"
+            , lam "x" $ \x ->
+              lam "f" $ \f ->
+                lam "g" $ \g ->
+                  (g `app` (f `app` x) `app` (f `app` x)))]
+            
 compose2 = ("compose2"
            , lam "x" $ \x ->
              lam "f" $ \f ->
