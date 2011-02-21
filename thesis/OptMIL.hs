@@ -9,11 +9,12 @@ where
 import Control.Monad.State (State, execState, modify, gets)
 import Text.PrettyPrint 
 import Data.List (sort, (\\), elemIndex)
-import Data.Maybe (fromMaybe, isJust, catMaybes)
+import Data.Maybe (fromMaybe, isJust, catMaybes, fromJust)
 import Data.Map (Map, (!))
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+
 import Compiler.Hoopl
 
 import Util
@@ -163,6 +164,10 @@ deadRewriter = mkBRewrite rewrite
     safe (Return _) = True
     safe (Closure _ _) = True
     safe (ConstrM _ _) = True
+    -- A little questionable - primitives may have effects. But all of those
+    -- defined so far do not.
+    safe (Prim _ _) = True 
+    safe (Enter _ _) = True
     safe _ = False
 
 -- | printing live facts
@@ -183,7 +188,14 @@ printLiveFacts = printFB printFact
 -- value that should be substituted for it. Only
 -- variables that are bound with the form v <- return w
 -- end up here.
-type BindFact = Map Name Name
+type BindFact = Map Name BindVal
+
+-- | Represents the right side of a bind, for possible
+-- substitution.
+data BindVal = BindName Name -- ^ Return a variable with the given name.
+             | BindPrim Name [Name] -- ^ Primitive call with teh given name and arguments.
+             | BindEnter Name Name -- ^ Enter function with argument.
+  deriving (Eq, Show)
 
 -- | Find "useless" bindings which have no visible
 -- effect other than allocation and remove them.
@@ -210,7 +222,9 @@ bindSubstTransfer :: FwdTransfer StmtM BindFact
 bindSubstTransfer = mkFTransfer fw
   where
     fw :: StmtM e x -> BindFact -> Fact x BindFact
-    fw (Bind v (Return w)) m = Map.insert v w m 
+    fw (Bind v (Return w)) m = Map.insert v (BindName w) m 
+    fw (Bind v (Prim p vs)) m = Map.insert v (BindPrim p vs) m 
+    fw (Bind v (Enter f x)) m = Map.insert v (BindEnter f x) m 
     fw (Bind v _) m = Map.delete v m 
     fw (BlockEntry _ _ _) m = m
     fw (CloEntry _ _ _ _) m = m
@@ -228,37 +242,59 @@ bindSubstRewrite = iterFwdRw (mkFRewrite rewrite) -- deep rewriting used
     rewrite :: FuelMonad m => forall e x. StmtM e x -> BindFact -> m (Maybe (ProgM e x))
     rewrite (Bind v t) f = bind v (rewriteTail f t)
     rewrite (CaseM v alts) f 
-        | Map.member v f = _case (f ! v) Just alts
+        | maybe False isNameBind (Map.lookup v f) = _case (substName f v) Just alts
         | otherwise = _case v (replaceAlt f) alts
         where
           replaceAlt f (Alt c ns t) 
-            | anyIn f ns = Just $ Alt c (map (replace f) ns) t
+            | anyNamesIn f ns = Just $ substNames f ns (\ns -> Alt c ns t)
             | otherwise = maybe Nothing (Just . Alt c ns) (rewriteTail f t)
     rewrite (Done t) f = done (rewriteTail f t)
     rewrite _ _ = return Nothing
 
     rewriteTail :: BindFact -> TailM -> Maybe TailM
-    rewriteTail f (Return v) 
-      | Map.member v f = Just $ Return (f ! v)
-    rewriteTail f (Enter v w)
-      | Map.member v f = Just $ Enter (f ! v) w
-      | Map.member w f = Just $ Enter v (f ! w)
+    rewriteTail f (Return v) = substReturn f v 
+    rewriteTail f (Enter v w) 
+      | anyNamesIn f [v,w] = Just $ substNames f [v, w] (\ [v,w] -> Enter v w)
     rewriteTail f (Closure d ns) 
-      | anyIn f ns = Just $ Closure d (map (replace f) ns)
+      | anyNamesIn f ns = Just $ substNames f ns (\ns -> Closure d ns)
     rewriteTail f (Goto d ns) 
-      | anyIn f ns = Just $ Goto d (map (replace f) ns)
+      | anyNamesIn f ns = Just $ substNames f ns (\ns -> Goto d ns)
     rewriteTail _ _ = Nothing
 
-    anyIn :: BindFact -> [Name] -> Bool
-    anyIn f ns = any (\n -> Map.member n f) ns
+    substReturn :: BindFact -> Name -> Maybe TailM
+    substReturn f v =
+      case Map.lookup v f of
+        (Just (BindName n)) -> Just $ Return n
+        (Just (BindPrim p vs)) -> Just $ substNames f vs (\vs -> Prim p vs)
+        (Just (BindEnter fn x)) -> Just $ substNames f [fn, x] (\ [fn, x] -> Enter fn x)
+        _ -> Nothing
 
-    replace :: BindFact -> Name -> Name
-    replace f n = fromMaybe n (Map.lookup n f)
+    -- | Find the name to substitue for the one
+    -- given, if any. Return the original name
+    -- if no substitution applies.
+    substName :: BindFact -> Name -> Name
+    substName f v = case Map.lookup v f of
+                      (Just (BindName v')) -> v'
+                      _ -> v
+
+    -- | Rewrite the names given according to facts, if those
+    -- facts rewrite names. Otherwise, return original names. Order
+    -- of the names is preserved.
+    substNames :: BindFact -> [Name] -> ([Name] -> a) -> a
+    substNames f ns mkA = mkA (foldr (\v names -> substName f v : names) ns [])
+
+    -- | Indicates if any of the names given
+    -- have BindName substitutions.
+    anyNamesIn :: BindFact -> [Name] -> Bool
+    anyNamesIn f ns = any (\n -> maybe False isNameBind $ Map.lookup n f) ns
+
+    isNameBind (BindName _) = True
+    isNameBind _ = False
 
 printBindFacts :: FactBase BindFact -> Doc
 printBindFacts = printFB printFact
   where
-    printFact :: (Label, Map Name Name) -> Doc
+    printFact :: (Label, Map Name BindVal) -> Doc
     printFact (l, ns) = text (show l) <> text ":" <+> commaSep (text . show) (Map.toList ns)
 
 -- Closure/App collapse (aka "Beta-Fun" from "Compiling with
@@ -559,8 +595,8 @@ deadBlocks tops prog =
       | otherwise = (SomeChange, prog)
 
 -- Goto/Return eliminatino
--- When a Goto immediately returns, we 
--- inline the return:
+-- When a Goto jumps to a block that immediately calls a primitive, or
+-- returns a value, we inline the block:
 --
 --  L1: return r
 --   ...
@@ -570,16 +606,26 @@ deadBlocks tops prog =
 --
 -- Bind/subst elimination can take care of the return left over.
 
--- | Defines blocks that only return. The integer tells which argument
--- to the block is returned. The name gives the name of the argument
--- (which is only useful during analysis).
-type ReturnBlocks = Map Dest ReturnType
+-- | Blocks we can inline will be stored in the map, by 
+-- label/name. 
+type ReturnPrimBlocks = Map Dest ReturnType
 
+-- | Used during analysis - indicates if
+-- a block can be inlined like we want.
+type ReturnPrimBlock = Maybe ReturnType
+
+-- | Doesn't carry any useful information,
+-- used by our rewriter since it calculates no
+-- new facts.
+type EmptyFact = ()
+
+-- | Used to indicate what kind of instruction can be inlined
+-- from a block. 
 data ReturnType = TmpRet Name 
     | TmpPrim Name [Name] 
-    | AReturn Int 
-    | APrim Name [Int]
-  deriving (Eq)
+    | AReturn Name Int 
+    | APrim Name [Name] [Int]
+  deriving (Eq, Show)
 
 -- | Inline blocks that call primitives or
 -- only return a value.
@@ -587,81 +633,90 @@ inlineReturn :: ProgM C C -> ProgM C C
 inlineReturn body = 
     runSimple $ do
       fresh <- freshLabel
-      let marker = ("marker", fresh)
-          bwdPass :: BwdPass SimpleFuelMonad StmtM ReturnBlocks
-          bwdPass = bwd marker
-      (body', f, _) <- analyzeAndRewriteBwd bwdPass (JustC labels) body (initial bwdPass)
+
+      -- First we find all the blocks which we
+      -- could inline
+      (_, f, _) <- analyzeAndRewriteBwd bwdAnalysis (JustC labels) body (initial bwdAnalysis)
+    
+      -- Turn our facts into a proper map of Dest -> Fact, then
+      -- use those facts to rewrite and inline.
+      let returnBlocks = Map.fromList . map toDest . filter (isJust . snd) .  mapToList $ f
+          toDest (l, Just f) = (fromJust (labelToDest body l), f)
+      (body', _, _) <- analyzeAndRewriteBwd (bwdRewrite returnBlocks) (JustC labels) body (initial (bwdRewrite returnBlocks))
       return body'
   where              
     labels = entryLabels body
-    initial bwd = mkFactBase (bp_lattice bwd) (zip labels (repeat Map.empty))
-    bwd dest = BwdPass { bp_lattice = inlineReturnLattice
-                       , bp_transfer = inlineReturnTransfer dest
-                       , bp_rewrite = inlineReturnRewrite }
-                              
-inlineReturnLattice :: DataflowLattice ReturnBlocks
-inlineReturnLattice = DataflowLattice { fact_name = "Goto/Return"
-                                    , fact_bot = Map.empty
-                                    , fact_join = joinMaps extend }
-  where
-    extend _ (OldFact old) (NewFact new) = (changeIf (old /= new)
-                                           , new)
+    initial bwd = mkFactBase (bp_lattice bwd) (zip labels (repeat (fact_bot (bp_lattice bwd))))
+    bwdRewrite :: ReturnPrimBlocks -> BwdPass SimpleFuelMonad StmtM EmptyFact
+    bwdRewrite returnBlocks = BwdPass { bp_lattice = rewriteLattice
+                                      , bp_transfer = mkBTransfer noOpTrans
+                                      , bp_rewrite = inlineReturnRewrite returnBlocks }
+    rewriteLattice :: DataflowLattice EmptyFact
+    rewriteLattice = DataflowLattice { fact_name = "Goto/Return"
+                                     , fact_bot = ()
+                                     , fact_join = extend }
+    bwdAnalysis :: BwdPass SimpleFuelMonad StmtM ReturnPrimBlock
+    bwdAnalysis = BwdPass { bp_lattice = analysisLattice
+                          , bp_transfer = inlineReturnTransfer 
+                          , bp_rewrite = noBwdRewrite }
+    analysisLattice = DataflowLattice { fact_name = "Goto/Return"
+                                      , fact_bot = Nothing
+                                      , fact_join = extend }
+    extend _ (OldFact old) (NewFact new) = (changeIf (old /= new), new)
+    -- A no-op transfer function. Used during rewrite since we 
+    -- don't gather any new facts.
+    noOpTrans :: StmtM e x -> Fact x EmptyFact -> EmptyFact
+    noOpTrans _ _ = ()
 
-inlineReturnTransfer :: Dest -> BwdTransfer StmtM ReturnBlocks
-inlineReturnTransfer mark = mkBTransfer bw
+inlineReturnTransfer :: BwdTransfer StmtM ReturnPrimBlock
+inlineReturnTransfer = mkBTransfer bw
   where
-    bw :: StmtM e x -> Fact x ReturnBlocks -> ReturnBlocks
-    bw (Done (Return v)) f = Map.insert mark (TmpRet v) Map.empty 
-    bw (Done (Prim p vs)) f = Map.insert mark (TmpPrim p vs) Map.empty
-    bw (Done _) f = Map.empty 
-    bw (CaseM _ _) f = Map.empty 
-    bw (CloEntry _ _ _ _) f = Map.delete mark f
-    bw (Bind _ _) f = Map.delete mark f
-    bw (BlockEntry name lab args) f 
-      | mark `Map.member` f = 
-        let dest = (name, lab)
-        in Map.delete mark $ 
-           case f ! mark of
-             TmpRet v -> 
-               case v `elemIndex` args of
-                 Just idx -> Map.insert dest (AReturn idx) f 
-                 _ -> f
-             TmpPrim p vs -> 
-               let vs' = catMaybes $ map (`elemIndex` args) vs
-               in Map.insert dest (APrim p vs') f
-             _ -> f
-      | otherwise = Map.delete mark f 
+    bw :: StmtM e x -> Fact x ReturnPrimBlock -> ReturnPrimBlock
+    bw (Done (Return v)) f = Just (AReturn v (-1))
+    bw (Done (Prim p vs)) f = Just (APrim p vs [])
+    bw (BlockEntry name lab args) (Just (AReturn v _)) =
+      case v `elemIndex` args of
+        Just idx -> Just (AReturn v idx)
+        _ -> Nothing
+    bw (BlockEntry name lab args) (Just (APrim p vs _)) =
+      Just (APrim p vs (catMaybes $ map (`elemIndex` args) vs))
+    bw _ _ = Nothing
 
-inlineReturnRewrite :: FuelMonad m => BwdRewrite m StmtM ReturnBlocks
-inlineReturnRewrite = iterBwdRw (mkBRewrite rewriter)
+inlineReturnRewrite :: FuelMonad m => ReturnPrimBlocks -> BwdRewrite m StmtM EmptyFact
+inlineReturnRewrite blocks = iterBwdRw (mkBRewrite rewriter)
   where
-    rewriter :: FuelMonad m => forall e x. StmtM e x -> Fact x ReturnBlocks -> m (Maybe (ProgM e x))
-    rewriter (Bind v (Goto dest vs)) f =
-      case dest `Map.lookup` f of
+    rewriter :: FuelMonad m => forall e x. StmtM e x -> Fact x EmptyFact -> m (Maybe (ProgM e x))
+    rewriter (Bind v (Goto dest vs)) _ =
+      case dest `Map.lookup` blocks of
         Just at -> return (Just (mkMiddle (Bind v (newTail at vs))))
         _ -> return Nothing
-    rewriter (Done (Goto dest@(_, l) vs)) f =
-      case l `mapLookup` f of
-           Just m ->
-             case dest `Map.lookup` m of
-               Just at -> return (Just (mkLast (Done (newTail at vs))))
-               _ -> return Nothing
-           _ -> return Nothing
+    rewriter (Done (Goto dest@(_, l) vs)) _ =
+      case dest `Map.lookup` blocks of
+        Just at -> return (Just (mkLast (Done (newTail at vs))))
+        _ -> return Nothing
     rewriter _ _ = return Nothing
 
-    newTail (AReturn i) vs = Return (vs !! i)
-    newTail (APrim p idxs) vs = Prim p (map (vs !!) idxs)
+    newTail (AReturn _ i) vs = Return (vs !! i)
+    newTail (APrim p _ idxs) vs = Prim p (map (vs !!) idxs)
 
 -- Useful combinations of optimizations
 
 addLive tops = fst . usingLive addLiveRewriter tops
-      
+    
+-- | Eliminate dead code in blocks.  
 opt3 tops = fst . usingLive deadRewriter tops
+
+-- | Collapse closures, then elminate dead assignments
+-- in blocks.
 opt4 tops = fst . usingLive deadRewriter tops . collapse
+
+-- | Inline blocks which only return or call a primitive, then
+-- eliminate dead code within blocks.
+opt5 tops = opt3 tops . bindSubst . inlineReturn 
 
 -- using (deadBlocks tops \\ primNames) results in an infinite loop, unless
 -- inlineBlocks is taken out. Why?
-mostOpt tops = deadBlocks (tops \\ primNames) . inlineBlocks tops . deadBlocks tops .  opt3 tops . inlineReturn . opt4 tops . opt3 tops . bindSubst
+mostOpt tops = deadBlocks (tops \\ primNames) . inlineBlocks tops . deadBlocks tops .  opt5 tops . opt4 tops . opt3 tops . bindSubst
 
 infiniteLoop tops = inlineBlocks tops . deadBlocks (tops \\ primNames) . opt4 tops . opt3 tops . bindSubst
 
