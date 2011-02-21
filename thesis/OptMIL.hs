@@ -570,50 +570,87 @@ deadBlocks tops prog =
 --
 -- Bind/subst elimination can take care of the return left over.
 
--- | Defines blocks that only return. The integer tells whihc argument
+-- | Defines blocks that only return. The integer tells which argument
 -- to the block is returned. The name gives the name of the argument
 -- (which is only useful during analysis).
--- type ReturnBlocks = Map Dest (Int, Name)
+type ReturnBlocks = Map Dest ReturnType
 
--- gotoReturn :: ProgM C C -> ProgM C C
--- gotoReturn body = 
---     runSimple $ do
---       (body', f, _) <- analyzeAndRewriteBwd bwd (JustC labels) body initial
---       return body'
---   where              
---     labels = entryLabels body
---     initial = mkFactBase (bp_lattice bwd) (zip labels (repeat Nothing))
---     bwd = BwdPass { bp_lattice = gotoReturnLattice
---                   , bp_transfer = gotoReturnTransfer
---                   , bp_rewrite = gotoReturnRewrite }
+data ReturnType = TmpRet Name 
+    | TmpPrim Name [Name] 
+    | AReturn Int 
+    | APrim Name [Int]
+  deriving (Eq)
+
+-- | Inline blocks that call primitives or
+-- only return a value.
+inlineReturn :: ProgM C C -> ProgM C C
+inlineReturn body = 
+    runSimple $ do
+      fresh <- freshLabel
+      let marker = ("marker", fresh)
+          bwdPass :: BwdPass SimpleFuelMonad StmtM ReturnBlocks
+          bwdPass = bwd marker
+      (body', f, _) <- analyzeAndRewriteBwd bwdPass (JustC labels) body (initial bwdPass)
+      return body'
+  where              
+    labels = entryLabels body
+    initial bwd = mkFactBase (bp_lattice bwd) (zip labels (repeat Map.empty))
+    bwd dest = BwdPass { bp_lattice = inlineReturnLattice
+                       , bp_transfer = inlineReturnTransfer dest
+                       , bp_rewrite = inlineReturnRewrite }
                               
+inlineReturnLattice :: DataflowLattice ReturnBlocks
+inlineReturnLattice = DataflowLattice { fact_name = "Goto/Return"
+                                    , fact_bot = Map.empty
+                                    , fact_join = joinMaps extend }
+  where
+    extend _ (OldFact old) (NewFact new) = (changeIf (old /= new)
+                                           , new)
 
--- gotoReturnRewrite :: FuelMonad m => BwdRewrite m StmtM ReturnBlocks
--- gotoReturnRewrite = iterBwdRw (mkBRewrite rewriter)
---   where
---     rewriter :: FuelMonad m => forall e x. StmtM e x -> Fact x ReturnBlocks -> m (Maybe (ProgM e x))
---     rewriter (Bind v (Goto dest vs)) (Just (i, _)) = bind v (Just . Return $ vs !! i)
---     rewriter _ _ = return Nothing
+inlineReturnTransfer :: Dest -> BwdTransfer StmtM ReturnBlocks
+inlineReturnTransfer mark = mkBTransfer bw
+  where
+    bw :: StmtM e x -> Fact x ReturnBlocks -> ReturnBlocks
+    bw (Done (Return v)) f = Map.insert mark (TmpRet v) Map.empty 
+    bw (Done (Prim p vs)) f = Map.insert mark (TmpPrim p vs) Map.empty
+    bw (Done _) f = Map.empty 
+    bw (CaseM _ _) f = Map.empty 
+    bw (CloEntry _ _ _ _) f = Map.delete mark f
+    bw (Bind _ _) f = Map.delete mark f
+    bw (BlockEntry name lab args) f 
+      | mark `Map.member` f = 
+        let dest = (name, lab)
+        in Map.delete mark $ 
+           case f ! mark of
+             TmpRet v -> 
+               case v `elemIndex` args of
+                 Just idx -> Map.insert dest (AReturn idx) f 
+                 _ -> f
+             TmpPrim p vs -> 
+               let vs' = catMaybes $ map (`elemIndex` args) vs
+               in Map.insert dest (APrim p vs') f
+             _ -> f
+      | otherwise = Map.delete mark f 
 
--- gotoReturnLattice :: DataflowLattice ReturnBlocks
--- gotoReturnLattice = DataflowLattice { fact_name = "Goto/Return"
---                                     , fact_bot = Nothing
---                                     , fact_join = extend }
---   where
---     extend _ (OldFact old) (NewFact new) = (changeIf (old /= new)
---                                            , new)
+inlineReturnRewrite :: FuelMonad m => BwdRewrite m StmtM ReturnBlocks
+inlineReturnRewrite = iterBwdRw (mkBRewrite rewriter)
+  where
+    rewriter :: FuelMonad m => forall e x. StmtM e x -> Fact x ReturnBlocks -> m (Maybe (ProgM e x))
+    rewriter (Bind v (Goto dest vs)) f =
+      case dest `Map.lookup` f of
+        Just at -> return (Just (mkMiddle (Bind v (newTail at vs))))
+        _ -> return Nothing
+    rewriter (Done (Goto dest@(_, l) vs)) f =
+      case l `mapLookup` f of
+           Just m ->
+             case dest `Map.lookup` m of
+               Just at -> return (Just (mkLast (Done (newTail at vs))))
+               _ -> return Nothing
+           _ -> return Nothing
+    rewriter _ _ = return Nothing
 
--- gotoReturnTransfer :: BwdTransfer StmtM ReturnBlocks
--- gotoReturnTransfer = mkBTransfer bw
---   where
---     bw :: StmtM e x -> Fact x ReturnBlocks -> ReturnBlocks
---     bw (Done (Return v)) f = Just (0, v)
---     bw (BlockEntry _ _ args) f = findArg f args
---     bw _ f = Nothing
-
---     findArg :: Maybe (Int, Name) -> [Name] -> Maybe (Int, Name)
---     findArg (Just (_, v)) vs = maybe Nothing (\i -> Just (i, v)) (elemIndex v vs)
---     findArg _ _ = Nothing
+    newTail (AReturn i) vs = Return (vs !! i)
+    newTail (APrim p idxs) vs = Prim p (map (vs !!) idxs)
 
 -- Useful combinations of optimizations
 
@@ -624,7 +661,7 @@ opt4 tops = fst . usingLive deadRewriter tops . collapse
 
 -- using (deadBlocks tops \\ primNames) results in an infinite loop, unless
 -- inlineBlocks is taken out. Why?
-mostOpt tops = deadBlocks (tops \\ primNames) . inlineBlocks tops . deadBlocks tops . opt4 tops . opt3 tops . bindSubst
+mostOpt tops = deadBlocks (tops \\ primNames) . inlineBlocks tops . deadBlocks tops .  opt3 tops . inlineReturn . opt4 tops . opt3 tops . bindSubst
 
 infiniteLoop tops = inlineBlocks tops . deadBlocks (tops \\ primNames) . opt4 tops . opt3 tops . bindSubst
 
