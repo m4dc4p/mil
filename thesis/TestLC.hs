@@ -20,11 +20,11 @@ import LCM
 progM progs prelude = do
     putStrLn "\n ========= Unoptimized ============"
     printResult progs (map (addLive tops) . map (compile tops predefined) . map (: []) $ progs)
-    let optProgs = mostOpt tops . addLive tops . (compile tops predefined) $ progs
-    putStrLn "\n ========= Optimized Together ============="
-    putStrLn (render $ printProgM optProgs)
-    putStrLn "\n ========= Anticipated Expressions ============="
-    putStrLn (printAnticipated $ anticipated optProgs)
+    -- let optProgs = mostOpt tops . addLive tops . (compile tops predefined) $ progs
+    -- putStrLn "\n ========= Optimized Together ============="
+    -- putStrLn (render $ printProgM optProgs)
+    -- putStrLn "\n ========= Anticipated Expressions ============="
+    -- putStrLn (printAnticipated $ anticipated optProgs)
 
   where
     predefined = snd prelude
@@ -120,6 +120,13 @@ primTest1 = ("primTest"
             , lam "x" $ \x ->
               lam "y" $ \y -> plus x y)
              
+
+fact = ("fact"
+      , lam "n" $ \n ->
+        lam "a" $ \a ->
+          _case (n `lte` lit 1)
+           (alt "True" [] (const (lit 1)) .
+            alt "False" [] (const (var "fact" `app` (n `minus` lit 1) `app` (n `times` a)))))
 
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])

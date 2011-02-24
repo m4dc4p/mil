@@ -95,8 +95,8 @@ compileStmtM (EVar v) ctx
 compileStmtM (EPrim _ _) _ 
   = error "EPrim in compileStmtM."
 
-compileStmtM (ELit _) _ 
-  = error "ELit statement not implemented."
+compileStmtM (ELit (Lit n _)) ctx
+  = ctx (Return (show n))
 
 compileStmtM (ECon cons _ exprs) ctx = 
   let compExpr vs [] = ctx (ConstrM cons (reverse vs))

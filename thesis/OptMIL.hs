@@ -202,10 +202,12 @@ data BindVal = BindName Name -- ^ Return a variable with the given name.
 bindSubst :: ProgM C C -> ProgM C C
 bindSubst body = runSimple $ do
       let entries = entryLabels body
+          initial :: FactBase BindFact
           initial = mapFromList (zip entries (repeat Map.empty))
       (p, _, _) <- analyzeAndRewriteFwd fwd (JustC entries) body initial
       return p
   where
+    fwd :: FwdPass SimpleFuelMonad StmtM BindFact
     fwd = FwdPass { fp_lattice = bindSubstLattice
                   , fp_transfer = bindSubstTransfer
                   , fp_rewrite = bindSubstRewrite }
@@ -240,14 +242,14 @@ bindSubstRewrite = iterFwdRw (mkFRewrite rewrite) -- deep rewriting used
                                                    -- substitutions occur
   where
     rewrite :: FuelMonad m => forall e x. StmtM e x -> BindFact -> m (Maybe (ProgM e x))
-    rewrite (Bind v t) f = bind v (rewriteTail f t)
-    rewrite (CaseM v alts) f 
-        | maybe False isNameBind (Map.lookup v f) = _case (substName f v) Just alts
-        | otherwise = _case v (replaceAlt f) alts
-        where
-          replaceAlt f (Alt c ns t) 
-            | anyNamesIn f ns = Just $ substNames f ns (\ns -> Alt c ns t)
-            | otherwise = maybe Nothing (Just . Alt c ns) (rewriteTail f t)
+    -- rewrite (Bind v t) f = bind v (rewriteTail f t)
+    -- rewrite (CaseM v alts) f 
+    --     | maybe False isNameBind (Map.lookup v f) = _case (substName f v) Just alts
+    --     | otherwise = _case v (replaceAlt f) alts
+    --     where
+    --       replaceAlt f (Alt c ns t) 
+    --         | anyNamesIn f ns = Just $ substNames f ns (\ns -> Alt c ns t)
+    --         | otherwise = maybe Nothing (Just . Alt c ns) (rewriteTail f t)
     rewrite (Done t) f = done (rewriteTail f t)
     rewrite _ _ = return Nothing
 
@@ -716,7 +718,7 @@ opt5 tops = opt3 tops . bindSubst . inlineReturn
 
 -- using (deadBlocks tops \\ primNames) results in an infinite loop, unless
 -- inlineBlocks is taken out. Why?
-mostOpt tops = deadBlocks (tops \\ primNames) . inlineBlocks tops . deadBlocks tops .  opt5 tops . opt4 tops . opt3 tops . bindSubst
+mostOpt tops = {- deadBlocks (tops \\ primNames) . inlineBlocks tops . deadBlocks tops .  opt5 tops . opt4 tops . opt3 tops . -} bindSubst
 
 infiniteLoop tops = inlineBlocks tops . deadBlocks (tops \\ primNames) . opt4 tops . opt3 tops . bindSubst
 
