@@ -566,6 +566,11 @@ type BlockPredecessors = Map Dest [Dest]
 -- that can be called from elsewhere) in a program.
 type LiveBlock = Set Dest
 
+-- This doesn't find blocks which are passed
+-- as arguments: ((f x) plus) 
+--
+-- It only recognizes blocks that are explicitly targets of 
+-- closure or goto statements.
 findBlockPreds :: [Name] -> ProgM C C -> BlockPredecessors
 findBlockPreds tops body = runSimple $ do
     (_, f, _) <- analyzeAndRewriteBwd bwd (JustC labels) body initial
@@ -740,9 +745,7 @@ opt4 tops = fst . usingLive deadRewriter tops . collapse
 -- eliminate dead code within blocks.
 opt5 tops = deadCode tops . bindSubst . inlineReturn 
 
--- using (deadBlocks tops \\ primNames) results in an infinite loop, unless
--- inlineBlocks is taken out. Why?
-mostOpt tops = deadBlocks (tops \\ primNames) . inlineBlocks tops . deadBlocks tops .  opt5 tops . opt4 tops . deadCode tops . bindSubst
+mostOpt tops = deadBlocks tops . inlineBlocks tops . deadBlocks tops .  opt5 tops . opt4 tops . deadCode tops . bindSubst
 
 infiniteLoop tops = inlineBlocks tops . deadBlocks (tops \\ primNames) . opt4 tops . deadCode tops . bindSubst
 

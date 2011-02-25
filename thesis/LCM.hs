@@ -28,9 +28,6 @@ import MIL
 -- an expression. At the entry point to a block, the anticipated
 -- expressions are all those tails whose arguments were not modified
 -- during the course of the analysis. 
---
--- We will need to deal with how arguments are renamed between blocks
--- but not yet.
 newtype AntFact = AF ((Used, Killed)
                      , Anticipated)
   deriving (Eq)
