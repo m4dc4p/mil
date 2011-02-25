@@ -168,6 +168,7 @@ deadRewriter = mkBRewrite rewrite
     -- defined so far do not.
     safe (Prim _ _) = True 
     safe (Enter _ _) = True
+    safe (Goto _ _) = True -- Only if block called has no side effects
     safe _ = False
 
 -- | printing live facts
@@ -192,13 +193,24 @@ type BindFact = Map Name BindVal
 
 -- | Represents the right side of a bind, for possible
 -- substitution.
-data BindVal = BindName Name -- ^ Return a variable with the given name.
-             | BindPrim Name [Name] -- ^ Primitive call with teh given name and arguments.
+data BindVal = BindReturn Name -- ^ Return a variable with the given name.
              | BindEnter Name Name -- ^ Enter function with argument.
+             | BindClosure Dest [Name] -- ^ Create value.
+             | BindGoto Dest [Name] -- ^ Goto block.
+             | BindConstrM Name [Name] -- ^ Create value.
+             | BindThunk Dest [Name] -- ^ Monadic thunk
+             | BindRun Name -- ^ Run a monadic computatino
+             | BindPrim Name [Name] -- ^ Primitive call with teh given name and arguments.
   deriving (Eq, Show)
 
--- | Find "useless" bindings which have no visible
--- effect other than allocation and remove them.
+-- | Find "useless" bindings and remove them. Useless bindings 
+-- include:
+--
+--   * bindings which return a value (x <- return y)
+--   * bindings which are followed by a return.
+--
+-- This function really does two separate optimizations (eliminating
+-- tails & removing useless binds) that should be separate.
 bindSubst :: ProgM C C -> ProgM C C
 bindSubst body = runSimple $ do
       let entries = entryLabels body
@@ -224,10 +236,14 @@ bindSubstTransfer :: FwdTransfer StmtM BindFact
 bindSubstTransfer = mkFTransfer fw
   where
     fw :: StmtM e x -> BindFact -> Fact x BindFact
-    fw (Bind v (Return w)) m = Map.insert v (BindName w) m 
-    fw (Bind v (Prim p vs)) m = Map.insert v (BindPrim p vs) m 
+    fw (Bind v (Return w)) m = Map.insert v (BindReturn w) m 
     fw (Bind v (Enter f x)) m = Map.insert v (BindEnter f x) m 
-    fw (Bind v _) m = Map.delete v m 
+    fw (Bind v (Closure d ns)) m = Map.insert v (BindClosure d ns) m 
+    fw (Bind v (Goto d ns)) m = Map.insert v (BindGoto d ns) m 
+    fw (Bind v (ConstrM c ns)) m = Map.insert v (BindConstrM c ns) m 
+    fw (Bind v (Thunk d ns)) m = Map.insert v (BindThunk d ns) m 
+    fw (Bind v (Run n)) m = Map.insert v (BindRun n) m 
+    fw (Bind v (Prim p vs)) m = Map.insert v (BindPrim p vs) m 
     fw (BlockEntry _ _ _) m = m
     fw (CloEntry _ _ _ _) m = m
     fw (CaseM _ alts) m = 
@@ -242,14 +258,14 @@ bindSubstRewrite = iterFwdRw (mkFRewrite rewrite) -- deep rewriting used
                                                    -- substitutions occur
   where
     rewrite :: FuelMonad m => forall e x. StmtM e x -> BindFact -> m (Maybe (ProgM e x))
-    -- rewrite (Bind v t) f = bind v (rewriteTail f t)
-    -- rewrite (CaseM v alts) f 
-    --     | maybe False isNameBind (Map.lookup v f) = _case (substName f v) Just alts
-    --     | otherwise = _case v (replaceAlt f) alts
-    --     where
-    --       replaceAlt f (Alt c ns t) 
-    --         | anyNamesIn f ns = Just $ substNames f ns (\ns -> Alt c ns t)
-    --         | otherwise = maybe Nothing (Just . Alt c ns) (rewriteTail f t)
+    rewrite (Bind v t) f = bind v (rewriteTail f t)
+    rewrite (CaseM v alts) f 
+        | maybe False isNameBind (Map.lookup v f) = _case (substName f v) Just alts
+        | otherwise = _case v (replaceAlt f) alts
+        where
+          replaceAlt f (Alt c ns t) 
+            | anyNamesIn f ns = Just $ substNames f ns (\ns -> Alt c ns t)
+            | otherwise = maybe Nothing (Just . Alt c ns) (rewriteTail f t)
     rewrite (Done t) f = done (rewriteTail f t)
     rewrite _ _ = return Nothing
 
@@ -266,9 +282,14 @@ bindSubstRewrite = iterFwdRw (mkFRewrite rewrite) -- deep rewriting used
     substReturn :: BindFact -> Name -> Maybe TailM
     substReturn f v =
       case Map.lookup v f of
-        (Just (BindName n)) -> Just $ Return n
-        (Just (BindPrim p vs)) -> Just $ substNames f vs (\vs -> Prim p vs)
+        (Just (BindReturn n)) -> Just $ Return n
         (Just (BindEnter fn x)) -> Just $ substNames f [fn, x] (\ [fn, x] -> Enter fn x)
+        (Just (BindClosure d ns)) -> Just $ substNames f ns (\ns -> Closure d ns)
+        (Just (BindGoto d ns)) -> Just $ substNames f ns (\ns -> Goto d ns)
+        (Just (BindConstrM c ns)) -> Just $ substNames f ns (\vs -> ConstrM c ns)
+        (Just (BindThunk d ns)) -> Just $ substNames f ns (\ns -> Thunk d ns)
+        (Just (BindRun n)) -> Just $ substNames f [n] (\ [n] -> Run n)
+        (Just (BindPrim p vs)) -> Just $ substNames f vs (\vs -> Prim p vs)
         _ -> Nothing
 
     -- | Find the name to substitue for the one
@@ -276,21 +297,23 @@ bindSubstRewrite = iterFwdRw (mkFRewrite rewrite) -- deep rewriting used
     -- if no substitution applies.
     substName :: BindFact -> Name -> Name
     substName f v = case Map.lookup v f of
-                      (Just (BindName v')) -> v'
+                      (Just (BindReturn v')) -> v'
                       _ -> v
 
     -- | Rewrite the names given according to facts, if those
     -- facts rewrite names. Otherwise, return original names. Order
     -- of the names is preserved.
     substNames :: BindFact -> [Name] -> ([Name] -> a) -> a
-    substNames f ns mkA = mkA (foldr (\v names -> substName f v : names) ns [])
+    substNames f ns mkA = mkA (foldr doSubst [] ns)
+      where
+        doSubst v names = substName f v : names
 
     -- | Indicates if any of the names given
-    -- have BindName substitutions.
+    -- have BindReturn substitutions.
     anyNamesIn :: BindFact -> [Name] -> Bool
     anyNamesIn f ns = any (\n -> maybe False isNameBind $ Map.lookup n f) ns
 
-    isNameBind (BindName _) = True
+    isNameBind (BindReturn _) = True
     isNameBind _ = False
 
 printBindFacts :: FactBase BindFact -> Doc
@@ -706,7 +729,8 @@ inlineReturnRewrite blocks = iterBwdRw (mkBRewrite rewriter)
 addLive tops = fst . usingLive addLiveRewriter tops
     
 -- | Eliminate dead code in blocks.  
-opt3 tops = fst . usingLive deadRewriter tops
+deadCode :: [Name] -> ProgM C C -> ProgM C C
+deadCode tops = fst . usingLive deadRewriter tops
 
 -- | Collapse closures, then elminate dead assignments
 -- in blocks.
@@ -714,12 +738,12 @@ opt4 tops = fst . usingLive deadRewriter tops . collapse
 
 -- | Inline blocks which only return or call a primitive, then
 -- eliminate dead code within blocks.
-opt5 tops = opt3 tops . bindSubst . inlineReturn 
+opt5 tops = deadCode tops . bindSubst . inlineReturn 
 
 -- using (deadBlocks tops \\ primNames) results in an infinite loop, unless
 -- inlineBlocks is taken out. Why?
-mostOpt tops = {- deadBlocks (tops \\ primNames) . inlineBlocks tops . deadBlocks tops .  opt5 tops . opt4 tops . opt3 tops . -} bindSubst
+mostOpt tops = deadBlocks (tops \\ primNames) . inlineBlocks tops . deadBlocks tops .  opt5 tops . opt4 tops . deadCode tops . bindSubst
 
-infiniteLoop tops = inlineBlocks tops . deadBlocks (tops \\ primNames) . opt4 tops . opt3 tops . bindSubst
+infiniteLoop tops = inlineBlocks tops . deadBlocks (tops \\ primNames) . opt4 tops . deadCode tops . bindSubst
 
-notInfiniteLoop tops = deadBlocks (tops \\ primNames) . opt4 tops . opt3 tops . bindSubst
+notInfiniteLoop tops = deadBlocks (tops \\ primNames) . opt4 tops . deadCode tops . bindSubst
