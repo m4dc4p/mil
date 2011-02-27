@@ -10,7 +10,7 @@ import Compiler.Hoopl
 vcat' :: [Doc] -> Doc
 vcat' = foldl ($+$) empty
 
-commaSep = punctuated comma 
+commaSep = punctuated (comma <> space)
 spaced = punctuated space 
 texts = map text
 

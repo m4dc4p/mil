@@ -5,6 +5,7 @@ import Text.PrettyPrint
 import Compiler.Hoopl
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.Map as Map
 
 import qualified Printer.Common as PP
 
@@ -20,26 +21,38 @@ import LCM
 progM progs prelude = do
     putStrLn "\n ========= Unoptimized ============"
     printResult progs (map (addLive tops) . map (compile tops predefined) . map (: []) $ progs)
+
     let optProgs = mostOpt tops . addLive tops . (compile tops predefined) $ progs
+
     putStrLn "\n ========= Optimized Together ============="
     putStrLn (render $ printProgM optProgs)
+
+    let (used, killed, ant) = anticipated optProgs
+        avail = available ant killed optProgs
     putStrLn "\n ========= Anticipated Expressions ============="
-    putStrLn (printAnticipated $ anticipated optProgs)
+    putStrLn (render $ printExprs ant)
+
+    putStrLn "\n ========= Used Expressions ============="
+    putStrLn (render $ printExprs used)
+
+    putStrLn "\n ========= Killed Expressions ============="
+    putStrLn (render $ printExprs killed)
+
+    putStrLn "\n ========= Available Expressions ============="
+    putStrLn (render $ printExprs avail)
 
   where
     predefined = snd prelude
     tops = map fst progs ++ fst prelude
 
-    printAnticipated :: [(Dest, AntFact)] -> String
-    printAnticipated [] = "[]"
-    printAnticipated ants = 
-      let printAnt ((n, _), (AF (_, (env, exprs)))) = n ++ " " ++ show env ++ ": [" ++ 
-                                           showTails (Set.elems exprs) ++ "]"
-          showTails = render . commaSep printTailM 
-      in foldr1 (\a b -> a ++ "\n" ++ b) (map printAnt ants)
+    printExprs = vcat . map printExprMap . Map.toList 
+
     printWithDef :: (Def, ProgM C C) -> Doc
     printWithDef (def, comp) = text (show (ppr def)) $+$ 
                                vcat' (maybeGraphCC empty printBlockM comp)
+                                     
+    printExprMap ((n, _), exprs) = brackets $ text n <> colon <+> commaSep printTailM (Set.elems exprs)
+    showTails = commaSep printTailM 
 
     printResult defs progs = putStrLn (render (vcat' (map ((text "" $+$) . printWithDef) (zip defs progs))))
 
@@ -126,9 +139,24 @@ primTest1 = ("primTest"
 fact = ("fact"
       , lam "n" $ \n ->
         lam "a" $ \a ->
-          _case (n `lte` lit 1)
+          _case (n `lt` lit 1)
            (alt "True" [] (const a) .
             alt "False" [] (const (var "fact" `app` (n `minus` lit 1) `app` (n `times` a)))))
+         
+
+factCPS = [("factCPS"
+          , lam "n" $ \n ->
+            lam "k" $ \k ->
+              _case (n `lt` lit 1)
+                 (alt "True" [] (const (k `app` lit 1)) .
+                  alt "False" [] (const (var "factCPS" `app` 
+                                         (n `minus` lit 1) `app` 
+                                         (lam "a" $ \a -> 
+                                          k `app` (n `times` a))))))
+          ,("main"
+           , var "factCPS" `app` lit 4 `app` var "id")
+          ,("id"
+           , lam "x" $ \x -> x)]
 
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])

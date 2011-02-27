@@ -17,6 +17,22 @@ import Compiler.Hoopl
 import Util
 import MIL
 
+-- | Used expressions appear in the block but
+-- their operands are not defined there.
+type Used = Map Dest Exprs
+
+-- | Killed expressions are defined in the block
+-- or have operands defined there.
+type Killed = Map Dest Exprs
+
+-- | Anticipated expressions will be calculated
+-- on all subsequent execution paths.
+type Anticipated = Map Dest Exprs
+
+-- | Available expressions are anticipated 
+-- or defined in the block and not killed.
+type Available = Map Dest Exprs
+
 -- | Anticipated expressions will always be some sort of tail: Enter,
 -- Closure, Thunk, ConstrM or Return.  
 --
@@ -28,49 +44,103 @@ import MIL
 -- an expression. At the entry point to a block, the anticipated
 -- expressions are all those tails whose arguments were not modified
 -- during the course of the analysis. 
-newtype AntFact = AF ((Used, Killed)
-                     , Anticipated)
+--
+-- Environment helps with renaming across blocks but
+-- is not used after the analysis has finished.
+newtype AntFact = AF ((Exprs {- used -}, Exprs {- killed -})
+                     , (Env, Exprs {- anticipated -}))
   deriving (Eq)
 
-type Anticipated = (Env, Set TailM)
+-- | Expressions which are used in a block but
+-- not killed. 
+newtype AvailFact = AV (Exprs {- killed -} 
+                       , Exprs {- available -})
+  deriving (Eq, Show)
 
--- | Used expressions appear in the block but
--- their operands are not defined there.
-type Used = Set TailM
-
--- | Killed expressions are defined in the block
--- or have operands defined there.
-type Killed = Set TailM
 type Env = [Name]
+type Exprs = Set TailM
 
-anticipated :: ProgM C C -> [(Dest, AntFact)]
-anticipated body = runSimple $ do
-    (p, f, _) <- analyzeAndRewriteBwd bwd (JustC (entryLabels body)) body mapEmpty
-    return $ map (\(l, fact) -> (fromJust (labelToDest body l), fact)) (mapToList f)
+lcm :: ProgM C C -> ProgM C C
+lcm body = undefined
   where
-    bwd = BwdPass { bp_lattice = antLattice
+    (used, killed, ant) = anticipated body
+    
+available :: Anticipated -> Killed -> ProgM C C -> Available
+available antp killed body = runSimple $ do
+    (_, f, _) <- analyzeAndRewriteFwd fwd (JustC entryPoints) body (mapFromList $ zip entryPoints (repeat emptyAvailFact))
+    return $ foldr mk Map.empty (mapToList f)
+  where
+    entryPoints = entryLabels body
+    mk (l, AV (_, av)) available = 
+      let d = fromJust (labelToDest body l)
+      in Map.insert d av available
+    fwd = FwdPass { fp_lattice = antLattice emptyAvailFact
+                  , fp_transfer = availTransfer antp killed
+                  , fp_rewrite = noFwdRewrite }
+
+availTransfer :: Anticipated -> Killed -> FwdTransfer StmtM AvailFact
+availTransfer antp killed = mkFTransfer fw
+  where
+    fw :: StmtM e x -> AvailFact -> Fact x AvailFact
+    fw (BlockEntry n l _) av = mkInitial (n, l) av
+    fw (CloEntry n l _ _) av = mkInitial (n, l) av
+    fw (Bind _ t) av@(AV (kill, avail))
+      | useable t && not (t `Set.member` kill) = AV (kill, Set.insert t avail)
+      | otherwise = av
+    fw (CaseM _ alts) av = 
+      let altE (Alt _ _ t) = tailSucc t av
+      in foldr mapUnion mapEmpty (map altE alts)
+    fw (Done t) av@(AV (kill, avail)) = tailSucc t av
+
+    tailSucc :: TailM -> AvailFact -> FactBase AvailFact
+    tailSucc t av@(AV (kill, avail)) =
+      let labels = map snd (tailDest t)
+          facts = zip labels $
+                  if useable t && not (t `Set.member` kill) 
+                  then repeat (AV (kill, Set.insert t avail))
+                  else repeat av
+      in mkFactBase (antLattice emptyAvailFact) facts
+
+    mkInitial :: Dest -> AvailFact -> AvailFact
+    mkInitial dest (AV (_, avail)) = 
+      let kill = maybe Set.empty id (Map.lookup dest killed)
+          ant = maybe Set.empty id (Map.lookup dest antp)
+      in AV (kill, Set.difference (ant `Set.union` avail) kill)
+
+anticipated :: ProgM C C -> (Used, Killed, Anticipated)
+anticipated body = runSimple $ do
+    (_, f, _) <- analyzeAndRewriteBwd bwd (JustC (entryLabels body)) body mapEmpty
+    return $ foldr mk (Map.empty, Map.empty, Map.empty) (mapToList f)
+  where
+    mk (l, AF ((u, k), (_, a))) (used, killed, ant) = 
+      let d = fromJust (labelToDest body l)
+      in (Map.insert d u used
+         , Map.insert d k killed
+         , Map.insert d a ant)
+    bwd = BwdPass { bp_lattice = antLattice emptyAntFact
                   , bp_transfer = antTransfer 
                   , bp_rewrite = noBwdRewrite } 
 
-antLattice :: DataflowLattice AntFact
-antLattice = DataflowLattice { fact_name = "Anticipated expressions"
-                             , fact_bot = emptyAntFact 
-                             , fact_join = extend }
+antLattice :: Eq a => a -> DataflowLattice a
+antLattice empty = DataflowLattice { fact_name = "Anticipated/available expressions"
+                                   , fact_bot = empty
+                                   , fact_join = extend }
   where
     extend _ (OldFact old) (NewFact new) = (changeIf (old /= new)
                                            , new)
 
--- | Initial fact - no info.
+-- | Initial anticipated expressions. 
 emptyAntFact :: AntFact
 emptyAntFact = AF ((Set.empty, Set.empty), ([], Set.empty))
+
+emptyAvailFact :: AvailFact
+emptyAvailFact = AV (Set.empty, Set.empty)
 
 -- We will determine available expressions within 
 -- a block by inspecting all tails and tracking the
 -- arguments used. If those arguments are unchanged on
 -- entry to the block, then the expression will be added
 -- to the set of anticipated expressions for that block.
---
--- New expressions defined in the block (which 
 antTransfer :: BwdTransfer StmtM AntFact
 antTransfer = mkBTransfer anticipate
   where
@@ -119,14 +189,9 @@ antTransfer = mkBTransfer anticipate
 
     -- | Add the tail to the used expression list.
     use :: TailM -> AntFact -> AntFact
-    -- The following tails should not be considered
-    -- for LCM, so we don't even add them to the used 
-    -- set.
-    use (Goto _ _) f = f
-    use (Run _) f = f
-    use (Return _) f = f
-    use t (AF ((used, killed), ant)) = 
-      AF ((Set.insert t used, killed), ant)
+    use t f@(AF ((used, killed), ant)) 
+      | useable t = AF ((Set.insert t used, killed), ant)
+      | otherwise = f
 
     -- | Fix up final Anticipated value on exit from the
     -- block. Compute (Used `union` Killed), union with any existing
@@ -178,6 +243,8 @@ antTransfer = mkBTransfer anticipate
     -- in the anticipated set we are renaming anyways.
     renameTail r t = t
 
+-- | Availability -- find 
+
 instance Show AntFact where
   show = showAnt
 
@@ -185,3 +252,10 @@ showAnt :: AntFact -> String
 showAnt (AF (_, (env, ant))) = "(" ++ show env ++ ", " ++ 
                                   show (Set.elems ant) ++ ")"
 
+-- | This defines the expressions we consider for LCM.
+useable (Enter {}) = True
+useable (Closure {}) = True
+useable (ConstrM {}) = True
+useable (Thunk {}) = True
+useable (Prim {}) = True
+useable _ = False

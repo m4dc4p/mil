@@ -94,14 +94,21 @@ liveTransfer tops = mkBTransfer live
 
     -- | Returns variables used in a tail expression.
     tailVars :: TailM -> Set Name
-    tailVars (Closure _ vs) = Set.fromList vs 
-    tailVars (Goto _ vs) = Set.fromList vs
-    tailVars (Enter v1 v2) = Set.fromList [v1, v2]
-    tailVars (ConstrM _ vs) = Set.fromList vs
-    tailVars (Return n) = Set.singleton n
-    tailVars (Thunk _ vs) = Set.fromList vs
-    tailVars (Run n) = Set.singleton n
-    tailVars (Prim _ vs) = Set.fromList vs
+    tailVars t = Set.fold removeNum Set.empty (tailVars' t)
+      where
+        -- a hack to ensure numbers don't show upas "live"
+        -- variables.
+        removeNum n s 
+          | null (reads n :: [(Int, String)]) = Set.insert n s
+          | otherwise = s
+        tailVars' (Closure _ vs) = Set.fromList vs 
+        tailVars' (Goto _ vs) = Set.fromList vs
+        tailVars' (Enter v1 v2) = Set.fromList [v1, v2]
+        tailVars' (ConstrM _ vs) = Set.fromList vs
+        tailVars' (Return n) = Set.singleton n
+        tailVars' (Thunk _ vs) = Set.fromList vs
+        tailVars' (Run n) = Set.singleton n
+        tailVars' (Prim _ vs) = Set.fromList vs
 
 -- | Retrieve a fact or the empty set
 liveFact :: FactBase LiveFact -> Label -> Set Name
@@ -351,8 +358,8 @@ data CloVal = CloVal Dest [Name]
 -- | Indicates if the given name holds an allocated
 -- closure or an unknown value.
 type CollapseFact = Map Name (WithTop CloVal) -- Need to track
-                                             -- variables stored in a
-                                             -- closure as well
+                                              -- variables stored in a
+                                              -- closure as well
 
 -- | Collapse closure allocations - when we can tell a variable holds
 -- a closure, and that closure only allocates another closure or jumps
