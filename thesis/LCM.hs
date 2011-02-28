@@ -90,7 +90,7 @@ availTransfer antp killed = mkFTransfer fw
     fw (CaseM _ alts) av = 
       let altE (Alt _ _ t) = tailSucc t av
       in foldr mapUnion mapEmpty (map altE alts)
-    fw (Done t) av@(AV (kill, avail)) = tailSucc t av
+    fw (Done t) av = tailSucc t av
 
     tailSucc :: TailM -> AvailFact -> FactBase AvailFact
     tailSucc t av@(AV (kill, avail)) =
@@ -105,7 +105,7 @@ availTransfer antp killed = mkFTransfer fw
     mkInitial dest (AV (_, avail)) = 
       let kill = maybe Set.empty id (Map.lookup dest killed)
           ant = maybe Set.empty id (Map.lookup dest antp)
-      in AV (kill, Set.difference (ant `Set.union` avail) kill)
+      in AV (kill, Set.difference (ant) kill)
 
 anticipated :: ProgM C C -> (Used, Killed, Anticipated)
 anticipated body = runSimple $ do

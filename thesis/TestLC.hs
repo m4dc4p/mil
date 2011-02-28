@@ -158,6 +158,16 @@ factCPS = [("factCPS"
           ,("id"
            , lam "x" $ \x -> x)]
 
+factCP2S = [("factCPS"
+          , lam "n" $ \n ->
+            lam "k" $ \k ->
+              _case n 
+                 (alt "False" [] (const (var "factCPS" `app` 
+                                         (n `minus` lit 1) `app` 
+                                         (lam "a" $ \a -> k)))))
+          ,("main"
+           , var "factCPS" `app` var "id")]
+
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
 
