@@ -94,22 +94,16 @@ liveTransfer tops = mkBTransfer live
 
     -- | Returns variables used in a tail expression.
     tailVars :: TailM -> Set Name
-    tailVars t = Set.fold removeNum Set.empty (tailVars' t)
-      where
-        -- a hack to ensure numbers don't show upas "live"
-        -- variables.
-        removeNum n s 
-          | null (reads n :: [(Int, String)]) = Set.insert n s
-          | otherwise = s
-        tailVars' (Closure _ vs) = Set.fromList vs 
-        tailVars' (Goto _ vs) = Set.fromList vs
-        tailVars' (Enter v1 v2) = Set.fromList [v1, v2]
-        tailVars' (ConstrM _ vs) = Set.fromList vs
-        tailVars' (Return n) = Set.singleton n
-        tailVars' (Thunk _ vs) = Set.fromList vs
-        tailVars' (Run n) = Set.singleton n
-        tailVars' (Prim _ vs) = Set.fromList vs
-
+    tailVars (Closure _ vs) = Set.fromList vs 
+    tailVars (Goto _ vs) = Set.fromList vs
+    tailVars (Enter v1 v2) = Set.fromList [v1, v2]
+    tailVars (ConstrM _ vs) = Set.fromList vs
+    tailVars (Return n) = Set.singleton n
+    tailVars (Thunk _ vs) = Set.fromList vs
+    tailVars (Run n) = Set.singleton n
+    tailVars (Prim _ vs) = Set.fromList vs
+    tailVars (LitM _) = Set.empty
+                        
 -- | Retrieve a fact or the empty set
 liveFact :: FactBase LiveFact -> Label -> Set Name
 liveFact f l = fromMaybe Set.empty $ lookupFact l f
@@ -176,6 +170,7 @@ deadRewriter = mkBRewrite rewrite
     safe (Prim _ _) = True 
     safe (Enter _ _) = True
     safe (Goto _ _) = True -- Only if block called has no side effects
+    safe (LitM _) = True
     safe _ = False
 
 -- | printing live facts
@@ -251,6 +246,7 @@ bindSubstTransfer = mkFTransfer fw
     fw (Bind v (Thunk d ns)) m = Map.insert v (BindThunk d ns) m 
     fw (Bind v (Run n)) m = Map.insert v (BindRun n) m 
     fw (Bind v (Prim p vs)) m = Map.insert v (BindPrim p vs) m 
+    fw (Bind v (LitM _)) m = m 
     fw (BlockEntry _ _ _) m = m
     fw (CloEntry _ _ _ _) m = m
     fw (CaseM _ alts) m = 
@@ -559,6 +555,7 @@ inlineRewrite preds prog = mkBRewrite rewriter
           changeTail env (Closure dest vs) = Closure dest (map (changeVar env) vs)
           changeTail env (Goto dest vs) = Goto dest (map (changeVar env) vs)
           changeTail env (ConstrM c ns) = ConstrM c (map (changeVar env) ns)
+          changeTail env (LitM i) = LitM i
           changeTail env (Thunk dest vs) = Thunk dest (map (changeVar env) vs)
           changeTail env (Run v) = Run (changeVar env v)
           changeTail env (Prim p vs) = Prim p (map (changeVar env) vs)

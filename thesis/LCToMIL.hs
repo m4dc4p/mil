@@ -96,7 +96,7 @@ compileStmtM (EPrim _ _) _
   = error "EPrim in compileStmtM."
 
 compileStmtM (ELit (Lit n _)) ctx
-  = ctx (Return (show n))
+  = ctx (LitM n)
 
 compileStmtM (ECon cons _ exprs) ctx = 
   let compExpr vs [] = ctx (ConstrM cons (reverse vs))
@@ -182,8 +182,6 @@ compVarM :: Expr
   -> (Name -> CompM (ProgM O C))
   -> CompM (ProgM O C)
 compVarM (EVar v) ctx = ctx v
-compVarM (EPrim p vs) ctx = error "EPrim in compVarM"
-compVarM (ELit (Lit n _)) ctx = ctx (show n)
 compVarM e ctx = compileStmtM e $ \t -> do
   v <- fresh "v"
   rest <- ctx v
