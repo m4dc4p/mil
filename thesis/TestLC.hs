@@ -29,6 +29,7 @@ progM progs prelude = do
 
     let (used, killed, ant) = anticipated optProgs
         avail = available ant killed optProgs
+        early = earliest ant avail
 
     putStrLn "\n ========= Anticipated Expressions ============="
     putStrLn (render $ printExprs ant)
@@ -41,6 +42,9 @@ progM progs prelude = do
 
     putStrLn "\n ========= Available Expressions ============="
     putStrLn (render $ printExprs avail)
+
+    putStrLn "\n ========= Earliest Expressions ============="
+    putStrLn (render $ printExprs early)
 
   where
     predefined = snd prelude

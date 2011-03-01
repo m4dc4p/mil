@@ -29,6 +29,10 @@ type Killed = Map Dest Exprs
 -- on all subsequent execution paths.
 type Anticipated = Map Dest Exprs
 
+-- | The entries for each destination are the earliest
+-- points at which those expressions are available.
+type Earliest = Map Dest Exprs
+
 -- | Available expressions are anticipated 
 -- or defined in the block and not killed.
 type Available = Map Dest Exprs
@@ -46,7 +50,16 @@ lcm :: ProgM C C -> ProgM C C
 lcm body = undefined
   where
     (used, killed, ant) = anticipated body
-    
+
+earliest :: Anticipated -> Available -> Earliest
+earliest antp avail = 
+  let f :: Dest -> Exprs -> Exprs
+      f dest antExprs = 
+        case Map.lookup dest avail of
+          Just availExprs -> Set.difference antExprs availExprs
+          Nothing -> antExprs
+  in Map.mapWithKey f antp
+
 available :: Anticipated -> Killed -> ProgM C C -> Available
 available antp killed body = runSimple $ do
     (_, f, _) <- analyzeAndRewriteFwd fwd (JustC entryPoints) body (mapFromList $ zip entryPoints (repeat emptyAvailFact))
