@@ -33,32 +33,14 @@ type Anticipated = Map Dest Exprs
 -- or defined in the block and not killed.
 type Available = Map Dest Exprs
 
--- | Anticipated expressions will always be some sort of tail: Enter,
--- Closure, Thunk, ConstrM or Return.  
---
--- Prim cannot be anticipated because we don't konw what side-effect
--- one might have. It doesn't make sense to anticipate Goto or Run
--- because they may also have side effects.
---
--- We index by the arguments used so we can tell when to remove
--- an expression. At the entry point to a block, the anticipated
--- expressions are all those tails whose arguments were not modified
--- during the course of the analysis. 
---
--- Environment helps with renaming across blocks but
--- is not used after the analysis has finished.
-newtype AntFact = AF ((Exprs {- used -}, Exprs {- killed -})
-                     , (Env, Exprs {- anticipated -}))
-  deriving (Eq)
+type Env = [Name]
+type Exprs = Set TailM
 
 -- | Expressions which are used in a block but
 -- not killed. 
 newtype AvailFact = AV (Exprs {- killed -} 
                        , Exprs {- available -})
   deriving (Eq, Show)
-
-type Env = [Name]
-type Exprs = Set TailM
 
 lcm :: ProgM C C -> ProgM C C
 lcm body = undefined
@@ -74,9 +56,21 @@ available antp killed body = runSimple $ do
     mk (l, AV (_, av)) available = 
       let d = fromJust (labelToDest body l)
       in Map.insert d av available
-    fwd = FwdPass { fp_lattice = antLattice emptyAvailFact
+    fwd = FwdPass { fp_lattice = availLattice
                   , fp_transfer = availTransfer antp killed
                   , fp_rewrite = noFwdRewrite }
+
+-- | Initial available expression fact.
+emptyAvailFact :: AvailFact
+emptyAvailFact = AV (Set.empty, Set.empty)
+
+availLattice :: DataflowLattice AvailFact
+availLattice =  DataflowLattice { fact_name = "Available expressions"
+                                , fact_bot = emptyAvailFact 
+                                , fact_join = extend }
+  where
+    extend _ (OldFact old@(AV (_, oldAv))) (NewFact new@(AV (_, newAv))) = 
+      (changeIf (oldAv `Set.isProperSubsetOf` newAv), new)
 
 availTransfer :: Anticipated -> Killed -> FwdTransfer StmtM AvailFact
 availTransfer antp killed = mkFTransfer fw
@@ -99,13 +93,31 @@ availTransfer antp killed = mkFTransfer fw
                   if useable t && not (t `Set.member` kill) 
                   then repeat (AV (kill, Set.insert t avail))
                   else repeat av
-      in mkFactBase (antLattice emptyAvailFact) facts
+      in mkFactBase availLattice facts
 
     mkInitial :: Dest -> AvailFact -> AvailFact
     mkInitial dest (AV (_, avail)) = 
       let kill = maybe Set.empty id (Map.lookup dest killed)
           ant = maybe Set.empty id (Map.lookup dest antp)
       in AV (kill, Set.difference (ant) kill)
+
+-- | Anticipated expressions will always be some sort of tail: Enter,
+-- Closure, Thunk, ConstrM or Return.  
+--
+-- Prim cannot be anticipated because we don't konw what side-effect
+-- one might have. It doesn't make sense to anticipate Goto or Run
+-- because they may also have side effects.
+--
+-- We index by the arguments used so we can tell when to remove
+-- an expression. At the entry point to a block, the anticipated
+-- expressions are all those tails whose arguments were not modified
+-- during the course of the analysis. 
+--
+-- Environment helps with renaming across blocks but
+-- is not used after the analysis has finished.
+newtype AntFact = AF ((Exprs {- used -}, Exprs {- killed -})
+                     , (Env, Exprs {- anticipated -}))
+  deriving (Eq)
 
 anticipated :: ProgM C C -> (Used, Killed, Anticipated)
 anticipated body = runSimple $ do
@@ -117,24 +129,20 @@ anticipated body = runSimple $ do
       in (Map.insert d u used
          , Map.insert d k killed
          , Map.insert d a ant)
-    bwd = BwdPass { bp_lattice = antLattice emptyAntFact
+    bwd = BwdPass { bp_lattice = antLattice
                   , bp_transfer = antTransfer 
                   , bp_rewrite = noBwdRewrite } 
 
-antLattice :: Eq a => a -> DataflowLattice a
-antLattice empty = DataflowLattice { fact_name = "Anticipated/available expressions"
-                                   , fact_bot = empty
-                                   , fact_join = extend }
+antLattice :: DataflowLattice AntFact
+antLattice = DataflowLattice { fact_name = "Anticipated/available expressions"
+                             , fact_bot = emptyAntFact
+                             , fact_join = extend }
   where
-    extend _ (OldFact old) (NewFact new) = (changeIf (old /= new)
-                                           , new)
+    extend _ (OldFact old) (NewFact new) = (changeIf (old /= new), new)
 
 -- | Initial anticipated expressions. 
 emptyAntFact :: AntFact
 emptyAntFact = AF ((Set.empty, Set.empty), ([], Set.empty))
-
-emptyAvailFact :: AvailFact
-emptyAvailFact = AV (Set.empty, Set.empty)
 
 -- We will determine available expressions within 
 -- a block by inspecting all tails and tracking the
@@ -186,6 +194,7 @@ antTransfer = mkBTransfer anticipate
     names (Thunk _ vs) = vs
     names (Run v) = [v]
     names (Prim _ vs) = vs
+    names _ = []
 
     -- | Add the tail to the used expression list.
     use :: TailM -> AntFact -> AntFact
@@ -258,4 +267,5 @@ useable (Closure {}) = True
 useable (ConstrM {}) = True
 useable (Thunk {}) = True
 useable (Prim {}) = True
+useable (LitM {}) = True
 useable _ = False

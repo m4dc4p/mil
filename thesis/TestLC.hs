@@ -29,14 +29,15 @@ progM progs prelude = do
 
     let (used, killed, ant) = anticipated optProgs
         avail = available ant killed optProgs
+
     putStrLn "\n ========= Anticipated Expressions ============="
     putStrLn (render $ printExprs ant)
 
-    putStrLn "\n ========= Used Expressions ============="
-    putStrLn (render $ printExprs used)
+    -- putStrLn "\n ========= Used Expressions ============="
+    -- putStrLn (render $ printExprs used)
 
-    putStrLn "\n ========= Killed Expressions ============="
-    putStrLn (render $ printExprs killed)
+    -- putStrLn "\n ========= Killed Expressions ============="
+    -- putStrLn (render $ printExprs killed)
 
     putStrLn "\n ========= Available Expressions ============="
     putStrLn (render $ printExprs avail)
@@ -136,12 +137,14 @@ primTest1 = ("primTest"
               lam "y" $ \y -> plus x y)
              
 
-fact = ("fact"
-      , lam "n" $ \n ->
-        lam "a" $ \a ->
-          _case (n `lt` lit 1)
-           (alt "True" [] (const a) .
-            alt "False" [] (const (var "fact" `app` (n `minus` lit 1) `app` (n `times` a)))))
+fact = [("fact"
+        , lam "n" $ \n ->
+          lam "a" $ \a ->
+            _case (n `lt` lit 1)
+               (alt "True" [] (const a) .
+                    alt "False" [] (const (var "fact" `app` (n `minus` lit 1) `app` (n `times` a)))))
+       ,("main"
+        , var "fact" `app` lit 4 `app` lit 1)]
          
 
 factCPS = [("factCPS"

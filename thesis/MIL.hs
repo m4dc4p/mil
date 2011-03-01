@@ -99,6 +99,8 @@ data TailM = Return Name
   | Prim    -- ^ Execute a primitive block 
     Name    -- ^ Name of the primitive
     [Name]  -- ^ Arguments to the primitive
+  | LitM    -- ^ Numeric value
+    Integer 
   deriving (Eq, Ord, Show)
 
 -- Pretty printing programs
@@ -122,6 +124,7 @@ printTailM (ConstrM cons vs) = text cons <+> (hsep $ texts vs)
 printTailM (Thunk dest vs) = text "thunk" <+> printDest dest <+> brackets (commaSep text vs)
 printTailM (Run v) = text "invoke" <+> text v
 printTailM (Prim p vs) = text p <> text "*" <> parens (commaSep text vs)
+printTailM (LitM n) = text ("num " ++ show n)
 
 printDest :: Dest -> Doc
 printDest (name, _) = text name
