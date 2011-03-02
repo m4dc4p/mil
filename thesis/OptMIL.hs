@@ -400,8 +400,8 @@ collapseTransfer = mkFTransfer fw
     fw :: StmtM e x -> CollapseFact -> Fact x CollapseFact
     fw (Bind v (Closure dest args)) bound = Map.insert v (PElem (CloVal dest args)) bound
     fw (Bind v _) bound = Map.insert v Top bound
-    fw (CaseM _ _) _ = mkFactBase collapseLattice []
-    fw (Done _) _ = mkFactBase collapseLattice []
+    fw s@(CaseM _ alts) bound = mkFactBase collapseLattice (zip (stmtSuccessors s) (repeat bound))
+    fw s@(Done _) bound = mkFactBase collapseLattice  (zip (stmtSuccessors s) (repeat bound))
     fw (BlockEntry _ _ _) f = f
     fw (CloEntry _ _ _ _) f = f
     
@@ -743,14 +743,27 @@ deadCode tops = fst . usingLive deadRewriter tops
 
 -- | Collapse closures, then elminate dead assignments
 -- in blocks.
-opt4 tops = fst . usingLive deadRewriter tops . collapse
+optCollapse tops = fst . usingLive deadRewriter tops . collapse
 
 -- | Inline blocks which only return or call a primitive, then
 -- eliminate dead code within blocks.
-opt5 tops = deadCode tops . bindSubst . inlineReturn 
+inlineSimple tops = deadCode tops . bindSubst . inlineReturn 
 
-mostOpt tops = deadBlocks tops . inlineBlocks tops . deadBlocks tops .  opt5 tops . opt4 tops . deadCode tops . bindSubst
-
-infiniteLoop tops = inlineBlocks tops . deadBlocks (tops \\ primNames) . opt4 tops . deadCode tops . bindSubst
-
-notInfiniteLoop tops = deadBlocks (tops \\ primNames) . opt4 tops . deadCode tops . bindSubst
+mostOpt :: [Name] -> ([Name], ProgM C C) -> ProgM C C -> ProgM C C
+mostOpt userTops prelude@(prims, _) body = 
+    newTops deadBlocks . 
+    inlineBlocks tops . 
+    newTops deadBlocks .  
+    inlineSimple tops . 
+    newTops optCollapse . 
+    deadCode tops . 
+    bindSubst .
+    addLive tops $ body
+  where
+    newTops :: ([Name] -> ProgM C C -> ProgM C C) -> ProgM C C -> ProgM C C
+    newTops f b = f (userTops ++ primTops b) b
+    tops = userTops ++ primTops body
+    primTops :: ProgM C C -> [Name]
+    primTops body = 
+      let allLive = Set.unions . mapElems $ findLive [] body
+      in filter (`Set.member` allLive) prims

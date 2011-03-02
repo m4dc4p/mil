@@ -57,10 +57,11 @@ prelude =
       (names, preludeProg, _) = foldr (\prim -> execState (comp prim)) ([], emptyClosedGraph, 0 :: Int) prims
   in (names, preludeProg)
 
-compile :: [Name] -> ProgM C C -> [Def] -> ProgM C C
-compile tops predefined defs = 
+compile :: [Name] -> ([Name], ProgM C C) -> [Def] -> ProgM C C
+compile userTops (primNames, predefined) defs = 
     foldr (|*><*|) predefined . snd . foldr compileEach (100, []) $ defs
   where
+    tops = primNames  ++ userTops
     compileEach :: Def -> (Int, [ProgM C C]) -> (Int, [ProgM C C])
     compileEach p (i, ps) = 
       let (j, p') = compileM tops i p

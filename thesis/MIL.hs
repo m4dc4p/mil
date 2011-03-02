@@ -142,8 +142,9 @@ instance NonLocal StmtM where
   successors = stmtSuccessors
                         
 stmtSuccessors :: StmtM e C -> [Label]
-stmtSuccessors (CaseM _ alts) = map snd (concatMap (\(Alt _ _ t) -> tailDest t) alts)
-stmtSuccessors (Done t) = map snd (tailDest t)
+stmtSuccessors (CaseM _ alts) = [l | (Alt _ _ (Goto (_, l) _)) <- alts]
+stmtSuccessors (Done (Goto (_, l) _)) = [l]
+stmtSuccessors _ = []
 
 tailDest :: TailM -> [Dest]
 tailDest (Closure dest _) = [dest]

@@ -20,19 +20,19 @@ import LCM
 
 progM progs prelude = do
     putStrLn "\n ========= Unoptimized ============"
-    printResult progs (map (addLive tops) . map (compile tops predefined) . map (: []) $ progs)
+    printResult progs (map (addLive tops) . map (compile tops prelude) . map (: []) $ progs)
 
-    let optProgs = mostOpt tops . addLive tops . (compile tops predefined) $ progs
+    let optProgs = mostOpt tops prelude . (compile tops prelude) $ progs
 
     putStrLn "\n ========= Optimized Together ============="
     putStrLn (render $ printProgM optProgs)
 
-    let (used, killed, ant) = anticipated optProgs
-        avail = available ant killed optProgs
-        early = earliest ant avail
+    -- let (used, killed, ant) = anticipated optProgs
+    --     avail = available ant killed optProgs
+    --     early = earliest ant avail
 
-    putStrLn "\n ========= Anticipated Expressions ============="
-    putStrLn (render $ printExprs ant)
+    -- putStrLn "\n ========= Anticipated Expressions ============="
+    -- putStrLn (render $ printExprs ant)
 
     -- putStrLn "\n ========= Used Expressions ============="
     -- putStrLn (render $ printExprs used)
@@ -40,15 +40,14 @@ progM progs prelude = do
     -- putStrLn "\n ========= Killed Expressions ============="
     -- putStrLn (render $ printExprs killed)
 
-    putStrLn "\n ========= Available Expressions ============="
-    putStrLn (render $ printExprs avail)
+    -- putStrLn "\n ========= Available Expressions ============="
+    -- putStrLn (render $ printExprs avail)
 
-    putStrLn "\n ========= Earliest Expressions ============="
-    putStrLn (render $ printExprs early)
+    -- putStrLn "\n ========= Earliest Expressions ============="
+    -- putStrLn (render $ printExprs early)
 
   where
-    predefined = snd prelude
-    tops = map fst progs ++ fst prelude
+    tops = map fst progs
 
     printExprs = vcat . map printExprMap . Map.toList 
 
@@ -136,9 +135,14 @@ compose2 = ("compose2"
              lam "g" $ \g ->
              (g `app` (f `app` x) `app` f))
 
+-- Fully applied primitive
 primTest1 = ("primTest"
             , lam "x" $ \x ->
               lam "y" $ \y -> plus x y)
+         
+-- Partially apply primitive    
+primTest2 = ("primTest"
+            , lam "x" $ \x -> var "plus" `app` x)
              
 
 fact = [("fact"
