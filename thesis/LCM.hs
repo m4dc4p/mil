@@ -9,7 +9,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, catMaybes, maybeToList)
 import Data.List (nub)
 
 import Compiler.Hoopl
@@ -152,7 +152,7 @@ available antp killed body = runSimple $ do
       let d = fromJust (labelToDest body l)
       in Map.insert d av available
     fwd = FwdPass { fp_lattice = availLattice
-                  , fp_transfer = availTransfer antp killed
+                  , fp_transfer = availTransfer 
                   , fp_rewrite = noFwdRewrite }
 
 -- | Initial available expression fact.
@@ -167,28 +167,33 @@ availLattice =  DataflowLattice { fact_name = "Available expressions"
     extend _ (OldFact old@(AV (_, oldAv))) (NewFact new@(AV (_, newAv))) = 
       (changeIf (oldAv `Set.isProperSubsetOf` newAv), new)
 
-availTransfer :: Anticipated -> Killed -> FwdTransfer StmtM AvailFact
-availTransfer antp killed = mkFTransfer fw
+availTransfer :: FwdTransfer StmtM AvailFact
+availTransfer = mkFTransfer fw
   where
     fw :: StmtM e x -> AvailFact -> Fact x AvailFact
     fw (BlockEntry n l _) av = av
     fw (CloEntry n l _ _) av = av
-    fw (Bind _ t) av@(AV (kill, avail))
-      | useable t && not (t `Set.member` kill) = AV (kill, Set.insert t avail)
-      | otherwise = av
-    fw (CaseM _ alts) av = 
-      let altE (Alt _ _ t) = tailSucc t av
-      in foldr mapUnion mapEmpty (map altE alts)
-    fw (Done t) av = tailSucc t av
+    fw (Bind _ t) av = mkAvailable av t
+    fw (CaseM _ alts) av@(AV (kill, _)) = 
+      let altT (Alt _ _ t) = tailSucc t av
+          (labels, avail) = unzip . catMaybes $ map altT alts
+          intersections [] = Set.empty
+          intersections [x] = x
+          intersections xs = foldr1 Set.intersection xs
+          fact = AV (kill, intersections $ map (\(AV (_, a)) -> a) avail)
+      in mapFromList (zip labels (repeat fact))
+    fw (Done t) av = mapFromList . maybeToList $ tailSucc t av
 
-    tailSucc :: TailM -> AvailFact -> FactBase AvailFact
-    tailSucc t av@(AV (kill, avail)) =
-      let labels = map snd (tailSuccessors t)
-          facts = zip labels $
-                  if useable t && not (t `Set.member` kill) 
-                  then repeat (AV (kill, Set.insert t avail))
-                  else repeat av
-      in mkFactBase availLattice facts
+    mkAvailable :: AvailFact -> TailM -> AvailFact
+    mkAvailable av@(AV (kill, avail)) t 
+      | not (useable t) = av
+      | otherwise = if t `Set.member` kill
+                    then AV (kill, Set.delete t avail)
+                    else AV (kill, Set.insert t avail)
+
+    tailSucc :: TailM -> AvailFact -> Maybe (Label, AvailFact)
+    tailSucc t@(Goto (n, l) _) av = Just (l, mkAvailable av t)
+    tailSucc _ _ = Nothing
 
 -- | Anticipated expressions will always be some sort of tail: Enter,
 -- Closure, Thunk, ConstrM or Return.  
