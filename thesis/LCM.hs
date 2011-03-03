@@ -17,6 +17,11 @@ import Compiler.Hoopl
 import Util
 import MIL
 
+lcm :: ProgM C C -> ProgM C C
+lcm body = undefined
+  where
+    (used, killed, ant) = anticipated body
+
 -- | Used expressions appear in the block but
 -- their operands are not defined there.
 type Used = Map Dest Exprs
@@ -37,19 +42,84 @@ type Earliest = Map Dest Exprs
 -- or defined in the block and not killed.
 type Available = Map Dest Exprs
 
+-- | For each block, gives the expressions which
+-- can be postponed to the entry of the block.
+type Postponable = Map Dest Exprs
+
 type Env = [Name]
 type Exprs = Set TailM
+
+newtype PostFact = PP (Exprs {- used -}
+                      , Exprs {- postponable -})
+  deriving (Eq, Show)
+
+postponable :: Earliest -> Used -> ProgM C C -> Postponable
+postponable early used body = runSimple $ do
+    (_, f, _) <- analyzeAndRewriteFwd fwd (JustC entryPoints) body initial
+    return $ foldr mk Map.empty (mapToList f)
+  where
+    entryPoints = entryLabels body
+    initial = mapFromList $ map mkInitialFact entryPoints 
+    mkInitialFact l = 
+      let dest = fromJust (labelToDest body l)
+          fact = case (Map.lookup dest used, Map.lookup dest early) of
+                   (Just use, Just ea) -> PP (use, Set.difference ea use)
+                   (Just use, _) -> PP (use, Set.empty)
+                   (_, Just ea) -> PP (Set.empty, ea)
+                   _ -> emptyPostFact
+      in (l, fact)
+    mk (l, PP (_, pp)) postponable = 
+      let d = fromJust (labelToDest body l)
+      in Map.insert d pp postponable
+    fwd = FwdPass { fp_lattice = postLattice
+                  , fp_transfer = postTransfer early used
+                  , fp_rewrite = noFwdRewrite }
+
+emptyPostFact :: PostFact
+emptyPostFact = PP (Set.empty, Set.empty)
+
+postLattice :: DataflowLattice PostFact
+postLattice = DataflowLattice { fact_name = "Postponable expressions"
+                              , fact_bot = emptyPostFact
+                              , fact_join = extend }
+  where
+    extend _ (OldFact old@(PP (_, oldPp))) (NewFact new@(PP (_, newPp))) = 
+      (changeIf (oldPp `Set.isProperSubsetOf` newPp), new)
+
+postTransfer :: Earliest -> Used -> FwdTransfer StmtM PostFact
+postTransfer early used = mkFTransfer fw
+  where
+    fw :: StmtM e x -> PostFact -> Fact x PostFact
+    fw (BlockEntry n l _) pp = mkInitial (n, l) pp
+    fw (CloEntry n l _ _) pp = mkInitial (n, l) pp
+    fw (Bind _ t) pp@(PP (use, ea)) 
+       | useable t && not (t `Set.member` use) = PP (use, Set.insert t ea)
+       | otherwise = pp
+    fw (CaseM _ alts) pp = 
+      let altE (Alt _ _ t) = tailSucc t pp
+      in foldr mapUnion mapEmpty (map altE alts)
+    fw (Done t) pp = tailSucc t pp
+
+    mkInitial :: Dest -> PostFact -> PostFact
+    mkInitial dest (PP (_, post)) =
+      let use = maybe Set.empty id (Map.lookup dest used)
+          ea = maybe Set.empty id (Map.lookup dest early)
+      in PP (use, Set.difference ea use)
+
+    tailSucc :: TailM -> PostFact -> FactBase PostFact
+    tailSucc t pp@(PP (use, ea)) =
+      let labels = map snd (tailSuccessors t)
+          facts = zip labels $
+                  if useable t && not (t `Set.member` use) 
+                  then repeat (PP (use, Set.insert t ea))
+                  else repeat pp
+      in mkFactBase postLattice facts
 
 -- | Expressions which are used in a block but
 -- not killed. 
 newtype AvailFact = AV (Exprs {- killed -} 
                        , Exprs {- available -})
   deriving (Eq, Show)
-
-lcm :: ProgM C C -> ProgM C C
-lcm body = undefined
-  where
-    (used, killed, ant) = anticipated body
 
 earliest :: Anticipated -> Available -> Earliest
 earliest antp avail = 
@@ -62,10 +132,22 @@ earliest antp avail =
 
 available :: Anticipated -> Killed -> ProgM C C -> Available
 available antp killed body = runSimple $ do
-    (_, f, _) <- analyzeAndRewriteFwd fwd (JustC entryPoints) body (mapFromList $ zip entryPoints (repeat emptyAvailFact))
+    (_, f, _) <- analyzeAndRewriteFwd fwd (JustC entryPoints) body initial
     return $ foldr mk Map.empty (mapToList f)
   where
     entryPoints = entryLabels body
+    initial = mapFromList $ map mkInitialFact entryPoints 
+    -- Compute initial available expressions for each block. Our
+    -- initial fact is the anticipated expressions in the block, minus
+    -- any killed expressions.
+    mkInitialFact l = 
+      let dest = fromJust (labelToDest body l)
+          fact = case (Map.lookup dest killed, Map.lookup dest antp)  of
+                   (Just k, Just a) -> AV (k, Set.difference a k)
+                   (Just k, _) -> AV (k, Set.empty)
+                   (_, Just a) -> AV (Set.empty, a)
+                   _ -> emptyAvailFact
+      in (l, fact)
     mk (l, AV (_, av)) available = 
       let d = fromJust (labelToDest body l)
       in Map.insert d av available
@@ -89,8 +171,8 @@ availTransfer :: Anticipated -> Killed -> FwdTransfer StmtM AvailFact
 availTransfer antp killed = mkFTransfer fw
   where
     fw :: StmtM e x -> AvailFact -> Fact x AvailFact
-    fw (BlockEntry n l _) av = mkInitial (n, l) av
-    fw (CloEntry n l _ _) av = mkInitial (n, l) av
+    fw (BlockEntry n l _) av = av
+    fw (CloEntry n l _ _) av = av
     fw (Bind _ t) av@(AV (kill, avail))
       | useable t && not (t `Set.member` kill) = AV (kill, Set.insert t avail)
       | otherwise = av
@@ -101,18 +183,12 @@ availTransfer antp killed = mkFTransfer fw
 
     tailSucc :: TailM -> AvailFact -> FactBase AvailFact
     tailSucc t av@(AV (kill, avail)) =
-      let labels = map snd (tailDest t)
+      let labels = map snd (tailSuccessors t)
           facts = zip labels $
                   if useable t && not (t `Set.member` kill) 
                   then repeat (AV (kill, Set.insert t avail))
                   else repeat av
       in mkFactBase availLattice facts
-
-    mkInitial :: Dest -> AvailFact -> AvailFact
-    mkInitial dest (AV (_, avail)) = 
-      let kill = maybe Set.empty id (Map.lookup dest killed)
-          ant = maybe Set.empty id (Map.lookup dest antp)
-      in AV (kill, Set.difference (ant) kill)
 
 -- | Anticipated expressions will always be some sort of tail: Enter,
 -- Closure, Thunk, ConstrM or Return.  
@@ -222,7 +298,7 @@ antTransfer = mkBTransfer anticipate
     mkAnticipated :: AntFact -> Env -> AntFact
     mkAnticipated (AF ((used, killed), (_, ant))) env = 
       AF ((used, killed)
-         , (env, Set.union ant (used `Set.difference` killed)))
+         , (env, Set.union ant (Set.difference used killed)))
 
     unionFacts :: [AntFact] -> AntFact
     unionFacts [] = emptyAntFact

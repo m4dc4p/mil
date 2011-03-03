@@ -146,6 +146,10 @@ stmtSuccessors (CaseM _ alts) = [l | (Alt _ _ (Goto (_, l) _)) <- alts]
 stmtSuccessors (Done (Goto (_, l) _)) = [l]
 stmtSuccessors _ = []
 
+tailSuccessors :: TailM -> [Dest]
+tailSuccessors (Goto dest _) = [dest]
+tailSuccessors _ = []
+
 tailDest :: TailM -> [Dest]
 tailDest (Closure dest _) = [dest]
 tailDest (Goto dest _) = [dest]

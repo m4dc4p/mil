@@ -27,24 +27,28 @@ progM progs prelude = do
     putStrLn "\n ========= Optimized Together ============="
     putStrLn (render $ printProgM optProgs)
 
-    -- let (used, killed, ant) = anticipated optProgs
-    --     avail = available ant killed optProgs
-    --     early = earliest ant avail
+    let (used, killed, ant) = anticipated optProgs
+        avail = available ant killed optProgs
+        early = earliest ant avail
+        postpone = postponable early used optProgs
 
-    -- putStrLn "\n ========= Anticipated Expressions ============="
-    -- putStrLn (render $ printExprs ant)
+    putStrLn "\n ========= Used Expressions ============="
+    putStrLn (render $ printExprs used)
 
-    -- putStrLn "\n ========= Used Expressions ============="
-    -- putStrLn (render $ printExprs used)
+    putStrLn "\n ========= Killed Expressions ============="
+    putStrLn (render $ printExprs killed)
 
-    -- putStrLn "\n ========= Killed Expressions ============="
-    -- putStrLn (render $ printExprs killed)
+    putStrLn "\n ========= Anticipated Expressions ============="
+    putStrLn (render $ printExprs ant)
 
-    -- putStrLn "\n ========= Available Expressions ============="
-    -- putStrLn (render $ printExprs avail)
+    putStrLn "\n ========= Available Expressions ============="
+    putStrLn (render $ printExprs avail)
 
-    -- putStrLn "\n ========= Earliest Expressions ============="
-    -- putStrLn (render $ printExprs early)
+    putStrLn "\n ========= Earliest Expressions ============="
+    putStrLn (render $ printExprs early)
+
+    putStrLn "\n ========= Postponable Expressions ============="
+    putStrLn (render $ printExprs postpone)
 
   where
     tops = map fst progs
@@ -129,6 +133,16 @@ lcmTest4 = [("main", var "lcmTest3" `app` lit 2 `app` var "plus" `app` var "time
                 lam "g" $ \g ->
                   (g `app` (f `app` x `app` x) `app` (f `app` x `app` x)))]
             
+lcmTest5 = ("lcmTest5"
+           , lam "x" $ \x ->
+             lam "y" $ \y ->
+             lam "z" $ \z ->
+               _case (y `gt` z)
+                (alt "True" [] (const (var "x")) .
+                 (alt "False" [] (const (_case (x `gt` z)
+                                            (alt "True" [] (const (var "foo" `app` x `app` y)) .
+                                             alt "False" [] (const (var "foo" `app` x `app` z))))))))
+
 compose2 = ("compose2"
            , lam "x" $ \x ->
              lam "f" $ \f ->
