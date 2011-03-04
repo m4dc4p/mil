@@ -2,4 +2,25 @@
 :def st (\args -> return $ ":step " ++ args)
 :def sm (\ _ -> return ":stepmodule")
 :set stop :list
-
+:{
+:def disable  
+     (\args -> do {
+     putStrLn $ "Disabling breakpoint " ++ args;
+     return $ ":set stop " ++ args ++ " :cont"; })
+:}
+:{
+:def enable (\args -> do {
+     putStrLn $ "Enabling breakpoint " ++ args;
+     return $ ":set stop " ++ args})
+:}
+:{
+:def watch (\text -> do {
+     let { 
+       vars = drop 1 (words text);
+       bp = head (words text);                             
+       forces = concatMap (\v -> ":force " ++ v ++ "\\n") vars;
+       defName = "stop" ++ bp;
+       defStop = ":def! " ++ defName ++ " (\\_ -> return \"" ++ forces ++ ":show bindings\")"; 
+     };
+     return (defStop ++ "\n" ++ ":set stop " ++ bp ++ " :" ++ defName ++ "\n"); })
+:}

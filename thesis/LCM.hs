@@ -142,10 +142,8 @@ available antp killed body = runSimple $ do
     -- any killed expressions.
     mkInitialFact l = 
       let dest = fromJust (labelToDest body l)
-          fact = case (Map.lookup dest killed, Map.lookup dest antp)  of
-                   (Just k, Just a) -> AV (k, Set.difference a k)
-                   (Just k, _) -> AV (k, Set.empty)
-                   (_, Just a) -> AV (Set.empty, a)
+          fact = case Map.lookup dest killed  of
+                   Just k -> AV (k, Set.empty)
                    _ -> emptyAvailFact
       in (l, fact)
     mk (l, AV (_, av)) available = 
@@ -178,7 +176,6 @@ availTransfer = mkFTransfer fw
       let altT (Alt _ _ t) = tailSucc t av
           (labels, avail) = unzip . catMaybes $ map altT alts
           intersections [] = Set.empty
-          intersections [x] = x
           intersections xs = foldr1 Set.intersection xs
           fact = AV (kill, intersections $ map (\(AV (_, a)) -> a) avail)
       in mapFromList (zip labels (repeat fact))
@@ -192,7 +189,7 @@ availTransfer = mkFTransfer fw
                     else AV (kill, Set.insert t avail)
 
     tailSucc :: TailM -> AvailFact -> Maybe (Label, AvailFact)
-    tailSucc t@(Goto (n, l) _) av = Just (l, mkAvailable av t)
+    tailSucc t@(Goto (n, l) _) av = Just (l, av)
     tailSucc _ _ = Nothing
 
 -- | Anticipated expressions will always be some sort of tail: Enter,
@@ -236,7 +233,10 @@ antLattice = DataflowLattice { fact_name = "Anticipated/available expressions"
 
 -- | Initial anticipated expressions. 
 emptyAntFact :: AntFact
-emptyAntFact = AF ((Set.empty, Set.empty), ([], Set.empty))
+emptyAntFact = AF ((Set.empty {- used -}
+                   , Set.empty {- killed -})
+                  ,([] {- args passed to block -}
+                   , Set.empty {- anticipated exprs -}))
 
 -- We will determine available expressions within 
 -- a block by inspecting all tails and tracking the
@@ -253,7 +253,7 @@ antTransfer = mkBTransfer anticipate
     anticipate (Done t) f = use t (fromSucc t f)
     anticipate (CaseM v alts) f =
       let antAlt (Alt _ vs t) = kills (use t (fromSucc t f)) vs
-      in unionFacts (map antAlt alts)
+      in intersectFacts (map antAlt alts)
 
     -- | Get anticpated expression facts from our successor, if 
     -- any. Rename those facts to match local names as well.
@@ -305,15 +305,12 @@ antTransfer = mkBTransfer anticipate
       AF ((used, killed)
          , (env, Set.union ant (Set.difference used killed)))
 
-    unionFacts :: [AntFact] -> AntFact
-    unionFacts [] = emptyAntFact
-    unionFacts facts = foldr1 addFact facts
+    intersectFacts :: [AntFact] -> AntFact
+    intersectFacts [] = emptyAntFact
+    intersectFacts fs = foldr1 intersect fs
       where
-        addFact :: AntFact -> AntFact -> AntFact
-        addFact (AF ((uses1, kills1), (env1, ant1))) 
-          (AF ((uses2, kills2), (env2, ant2))) = 
-            AF ((uses1 `Set.union` uses2, kills1 `Set.union` kills2)
-               ,([], ant1 `Set.intersection` ant2))
+        intersect (AF ((_, _), (_, ant1))) (AF ((_, _), (_, ant2))) =
+          AF ((Set.empty, Set.empty), ([], ant1 `Set.intersection` ant2))
 
     -- | Create a function which will rename
     -- successor expressions and facts with

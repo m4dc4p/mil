@@ -125,7 +125,6 @@ lcmTest3 = ("lcmTest3"
 
 
 -- Test anticipatibility across procedures.
--- Definition of plus and times gets eliminatd below - why?
 lcmTest4 = [("main", var "lcmTest3" `app` lit 2 `app` var "plus" `app` var "times")
            ,("lcmTest3"
             , lam "x" $ \x ->
@@ -138,11 +137,26 @@ lcmTest5 = ("lcmTest5"
              lam "y" $ \y ->
              lam "z" $ \z ->
                _case (y `gt` z)
-                (alt "True" [] (const (var "x")) .
+                (alt "True" [] (const (var "foo" `app` x)) .
                  (alt "False" [] (const (_case (x `gt` z)
-                                            (alt "True" [] (const (var "foo" `app` x `app` y)) .
-                                             alt "False" [] (const (var "foo" `app` x `app` z))))))))
+                                         (alt "True" [] (const (var "foo" `app` x `app` y)) .
+                                          (alt "False" [] (const (var "foo" `app` x `app` z)))))))))
 
+-- A program where anticipatability of "foo @ a" oscillates
+-- throughout. It is anticipated after ``lam "a" $ \a ->''
+-- not anticipated after ``_case (var "foo" `app` a)'', and
+-- anticipated again ``alt "D" ''.
+lcmTest6 = ("lcmTest6"
+            , lam "a" $ \a ->
+              _case (var "foo" `app` a)
+                 (alt "A" [] 
+                  (const 
+                   (_case a 
+                    (alt "C" [] 
+                     (const a) .
+                     (alt "D" [] 
+                      (const (var "foo" `app` a))))))))
+                
 compose2 = ("compose2"
            , lam "x" $ \x ->
              lam "f" $ \f ->
