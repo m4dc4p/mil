@@ -156,6 +156,17 @@ lcmTest6 = ("lcmTest6"
                      (const a) .
                      (alt "D" [] 
                       (const (var "foo" `app` a))))))))
+
+lcmTest7 = ("lcmTest6"
+            , lam "a" $ \a ->
+              _case a
+                 (alt "A" [] 
+                  (const 
+                   (_case (var "foo" `app` a)
+                    (alt "C" [] 
+                     (const a) .
+                     (alt "D" [] 
+                      (const (var "foo" `app` a))))))))
                 
 compose2 = ("compose2"
            , lam "x" $ \x ->

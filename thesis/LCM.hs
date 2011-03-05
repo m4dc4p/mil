@@ -9,7 +9,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Maybe (fromJust, catMaybes, maybeToList)
+import Data.Maybe
 import Data.List (nub)
 
 import Compiler.Hoopl
@@ -30,16 +30,22 @@ type Used = Map Dest Exprs
 -- or have operands defined there.
 type Killed = Map Dest Exprs
 
--- | Anticipated expressions will be calculated
--- on all subsequent execution paths.
+-- | Anticipated expressions will be calculated on all subsequent
+-- execution paths. Expressions here will be anticipated on entry to
+-- the block (which also implies on exit).
 type Anticipated = Map Dest Exprs
 
--- | The entries for each destination are the earliest
--- points at which those expressions are available.
+-- | Shows which expressions would be placed at the 
+-- beginning of each block, if expressions were computed
+-- as early as possible (i.e,  the "earliest placement"
+-- strategy).
 type Earliest = Map Dest Exprs
 
--- | Available expressions are anticipated 
--- or defined in the block and not killed.
+-- | Expressions available on entry
+-- to the destination. These expressions will have
+-- been computed when the block is entered. Expressions
+-- computed IN the block are available to its successors,
+-- but are not available in the block itself.
 type Available = Map Dest Exprs
 
 -- | For each block, gives the expressions which
@@ -62,12 +68,8 @@ postponable early used body = runSimple $ do
     initial = mapFromList $ map mkInitialFact entryPoints 
     mkInitialFact l = 
       let dest = fromJust (labelToDest body l)
-          fact = case (Map.lookup dest used, Map.lookup dest early) of
-                   (Just use, Just ea) -> PP (use, Set.difference ea use)
-                   (Just use, _) -> PP (use, Set.empty)
-                   (_, Just ea) -> PP (Set.empty, ea)
-                   _ -> emptyPostFact
-      in (l, fact)
+          use = fromMaybe Set.empty (Map.lookup dest used)
+      in (l, PP (use, Set.empty))
     mk (l, PP (_, pp)) postponable = 
       let d = fromJust (labelToDest body l)
       in Map.insert d pp postponable
@@ -95,32 +97,30 @@ postTransfer early used = mkFTransfer fw
     fw (Bind _ t) pp@(PP (use, ea)) 
        | useable t && not (t `Set.member` use) = PP (use, Set.insert t ea)
        | otherwise = pp
-    fw (CaseM _ alts) pp = 
-      let altE (Alt _ _ t) = tailSucc t pp
-      in foldr mapUnion mapEmpty (map altE alts)
-    fw (Done t) pp = tailSucc t pp
+    fw (CaseM _ alts) (PP (use, post)) = 
+      let altT (Alt _ _ t) = tailSucc t post
+          (labels, posts) = unzip . catMaybes $ map altT alts
+          fact = PP (Set.empty, intersections posts)
+      in mapFromList (zip labels (repeat fact))
+    fw (Done t) (PP (use, post)) = 
+      let (labels, facts) = unzip $ maybeToList (tailSucc t post)
+      in mapFromList (zip labels (map (\f -> PP (Set.empty, f)) facts))
 
     mkInitial :: Dest -> PostFact -> PostFact
-    mkInitial dest (PP (_, post)) =
-      let use = maybe Set.empty id (Map.lookup dest used)
-          ea = maybe Set.empty id (Map.lookup dest early)
-      in PP (use, Set.difference ea use)
+    mkInitial dest (PP (use, post)) =
+      let use = fromMaybe Set.empty (Map.lookup dest used)
+          ea = fromMaybe Set.empty (Map.lookup dest early)
+      in PP (use, Set.difference (Set.union ea post) use)
 
-    tailSucc :: TailM -> PostFact -> FactBase PostFact
-    tailSucc t pp@(PP (use, ea)) =
-      let labels = map snd (tailSuccessors t)
-          facts = zip labels $
-                  if useable t && not (t `Set.member` use) 
-                  then repeat (PP (use, Set.insert t ea))
-                  else repeat pp
-      in mkFactBase postLattice facts
 
 -- | Expressions which are used in a block but
 -- not killed. 
-newtype AvailFact = AV (Exprs {- killed -} 
+newtype AvailFact = AV (Exprs {- killed in this block. Used only during transfer analysis. -}
                        , Exprs {- available -})
   deriving (Eq, Show)
 
+-- | Calculate earliest placement for each expression, if
+-- there is an earlier placement.
 earliest :: Anticipated -> Available -> Earliest
 earliest antp avail = 
   let f :: Dest -> Exprs -> Exprs
@@ -150,7 +150,7 @@ available antp killed body = runSimple $ do
       let d = fromJust (labelToDest body l)
       in Map.insert d av available
     fwd = FwdPass { fp_lattice = availLattice
-                  , fp_transfer = availTransfer 
+                  , fp_transfer = availTransfer antp
                   , fp_rewrite = noFwdRewrite }
 
 -- | Initial available expression fact.
@@ -165,21 +165,24 @@ availLattice =  DataflowLattice { fact_name = "Available expressions"
     extend _ (OldFact old@(AV (_, oldAv))) (NewFact new@(AV (_, newAv))) = 
       (changeIf (oldAv `Set.isProperSubsetOf` newAv), new)
 
-availTransfer :: FwdTransfer StmtM AvailFact
-availTransfer = mkFTransfer fw
+availTransfer :: Anticipated -> FwdTransfer StmtM AvailFact
+availTransfer ant = mkFTransfer fw
   where
     fw :: StmtM e x -> AvailFact -> Fact x AvailFact
-    fw (BlockEntry n l _) av = av
-    fw (CloEntry n l _ _) av = av
+    fw (BlockEntry n l _) av = mkInitial (n,l) av
+    fw (CloEntry n l _ _) av = mkInitial (n,l) av
     fw (Bind _ t) av = mkAvailable av t
-    fw (CaseM _ alts) av@(AV (kill, _)) = 
-      let altT (Alt _ _ t) = tailSucc t av
-          (labels, avail) = unzip . catMaybes $ map altT alts
-          intersections [] = Set.empty
-          intersections xs = foldr1 Set.intersection xs
-          fact = AV (kill, intersections $ map (\(AV (_, a)) -> a) avail)
+    fw (CaseM _ alts) (AV (kill, avail)) = 
+      let altT (Alt _ _ t) = tailSucc t avail
+          (labels, avails) = unzip . catMaybes $ map altT alts
+          fact = AV (kill, intersections avails)
       in mapFromList (zip labels (repeat fact))
     fw (Done t) av = mapFromList . maybeToList $ tailSucc t av
+                     
+    mkInitial :: Dest -> AvailFact -> AvailFact
+    mkInitial (n, l) (AV (k, avIn)) = 
+      let antIn = fromMaybe Set.empty (Map.lookup (n,l) ant)
+      in AV (k, Set.difference (Set.union avIn antIn) k)
 
     mkAvailable :: AvailFact -> TailM -> AvailFact
     mkAvailable av@(AV (kill, avail)) t 
@@ -188,16 +191,8 @@ availTransfer = mkFTransfer fw
                     then AV (kill, Set.delete t avail)
                     else AV (kill, Set.insert t avail)
 
-    tailSucc :: TailM -> AvailFact -> Maybe (Label, AvailFact)
-    tailSucc t@(Goto (n, l) _) av = Just (l, av)
-    tailSucc _ _ = Nothing
-
 -- | Anticipated expressions will always be some sort of tail: Enter,
--- Closure, Thunk, ConstrM or Return.  
---
--- Prim cannot be anticipated because we don't konw what side-effect
--- one might have. It doesn't make sense to anticipate Goto or Run
--- because they may also have side effects.
+-- Closure, ConstrM, Thunk, Prim or LitM.  
 --
 -- We index by the arguments used so we can tell when to remove
 -- an expression. At the entry point to a block, the anticipated
@@ -343,7 +338,16 @@ antTransfer = mkBTransfer anticipate
     -- in the anticipated set we are renaming anyways.
     renameTail r t = t
 
--- | Availability -- find 
+-- | If the tail gives a successor (i.e., a goto),
+-- pair the destination with the value given. Otherwise,
+-- return Nothing.
+tailSucc :: TailM -> a -> Maybe (Label, a)
+tailSucc t@(Goto (n, l) _) v = Just (l, v)
+tailSucc _ _ = Nothing
+
+intersections :: Ord a => [Set a] -> Set a
+intersections [] = Set.empty
+intersections xs = foldr1 Set.intersection xs
 
 instance Show AntFact where
   show = showAnt
