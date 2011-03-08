@@ -20,16 +20,6 @@ import Compiler.Hoopl
 import Util
 import MIL
 
-allBlocks :: ProgM C C -> [(Dest, Block StmtM C C)]
-allBlocks (GMany _ blocks _) = map blockToDest (mapElems blocks)
-
--- | Get the tail of a block. Will exclude
--- the entry instruction (if C C) or the
--- first instruction in the block (O C)
-blockTail :: Block StmtM x C -> ProgM O C
-blockTail b = case blockToNodeList' b of
-                (_, mid, JustC end) -> mkMiddles mid <*> mkLast end
-
 done :: FuelMonad m => Maybe TailM -> m (Maybe (ProgM O C))
 done = return . maybe Nothing (Just . mkLast . Done)
 

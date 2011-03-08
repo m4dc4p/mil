@@ -31,6 +31,7 @@ progM progs prelude = do
         avail = available ant killed optProgs
         early = earliest ant avail
         postpone = postponable early used optProgs
+        late = latest early postpone used (allSuccessors optProgs)
 
     putStrLn "\n ========= Used Expressions ============="
     putStrLn (render $ printExprs used)
@@ -49,6 +50,9 @@ progM progs prelude = do
 
     putStrLn "\n ========= Postponable Expressions ============="
     putStrLn (render $ printExprs postpone)
+
+    putStrLn "\n ========= Latest Expressions ============="
+    putStrLn (render $ printExprs late)
 
   where
     tops = map fst progs

@@ -52,12 +52,54 @@ type Available = Map Dest Exprs
 -- can be postponed to the entry of the block.
 type Postponable = Map Dest Exprs
 
+-- | Gives the expressions that can be placed 
+-- in each block using the "latest" (laziest) placement
+-- strategy.
+type Latest = Map Dest Exprs
+
+-- | Gives all successors (immediate and beyond)
+-- for each block.
+type Successors = Map Dest (Set Dest)
+
 type Env = [Name]
 type Exprs = Set TailM
 
 newtype PostFact = PP (Exprs {- used -}
                       , Exprs {- postponable -})
   deriving (Eq, Show)
+
+latest :: Earliest -> Postponable -> Used -> Successors -> Latest
+latest early post used succ =
+    let -- Get the set of expressions to consider. By definition of
+        -- latest, expression must be a member of earliest or postponable
+        -- for the block, so we collect all those up.
+        candidates :: [(Dest, Exprs)]
+        candidates = filter (not . Set.null . snd) . map (\d -> (d, ep d)) $ nub (Map.keys early ++ Map.keys post)
+    in Map.fromList $ map mkLatest candidates
+  where
+    -- | Create the latest set for the given block. The map returned
+    -- always has one key but this makes it easier to combine all the
+    -- maps above.
+    mkLatest :: (Dest, Exprs) -> (Dest, Exprs)
+    mkLatest (block, exprs) = 
+      let qualifies expr = expr `Set.member` ep block && 
+                           (expr `Set.member` usedBy block || 
+                                 not (expr `Set.member` allSucc block))
+      in (block, Set.filter qualifies exprs)
+    -- | Expressions in earliest and postponable sets for
+    -- the block.
+    ep :: Dest -> Exprs
+    ep block = lk early block `Set.union` lk post block
+    -- | Expressions used by the given block.
+    usedBy :: Dest -> Exprs
+    usedBy block = lk used block
+    -- | Lookup a set in the map. If the destination given
+    -- is not in the map, return the empty set.
+    lk :: Map Dest (Set a) -> Dest -> Set a 
+    lk m d = fromMaybe Set.empty (Map.lookup d m) 
+    -- | Return all expressions in all successors of the block
+    allSucc :: Dest -> Exprs
+    allSucc block = Set.unions (Set.elems (Set.map ep (lk succ block)))
 
 postponable :: Earliest -> Used -> ProgM C C -> Postponable
 postponable early used body = runSimple $ do

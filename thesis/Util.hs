@@ -78,4 +78,4 @@ maybeGraphCC b f (GMany _ middles _) = map f . mapElems $ middles
 -- using the monad Hoopl provides.
 runSimple :: SimpleFuelMonad a -> a
 runSimple p = runSimpleUniqueMonad $ runWithFuel infiniteFuel p
-    
+

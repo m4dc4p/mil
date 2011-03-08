@@ -9,7 +9,7 @@ import Prelude hiding (abs)
 import Control.Monad.State (State, execState, modify, gets)
 import Text.PrettyPrint 
 import Data.List (sort)
-import Data.Maybe (fromMaybe, isJust, catMaybes)
+import Data.Maybe (fromMaybe, isJust, catMaybes, fromJust)
 import Data.Map (Map, (!))
 import qualified Data.Map as Map
 import Data.Set (Set)
@@ -183,6 +183,7 @@ destOfEntry :: StmtM C O -> Dest
 destOfEntry (BlockEntry n l _) = (n, l)
 destOfEntry (CloEntry n l _ _) = (n, l)
 
+-- | Constructin destination label for a given block.
 blockToDest :: Block StmtM C C -> (Dest, Block StmtM C C)
 blockToDest block = (destOfEntry (blockEntry block), block)
 
@@ -192,8 +193,42 @@ blockEntry b = case blockToNodeList' b of
                  (JustC entry, _, _) -> entry
 
 
+-- | Find destinatino for a given label, if
+-- it exists.
 labelToDest :: ProgM C C -> Label -> Maybe Dest
 labelToDest prog l = maybe Nothing (Just . fst) (blockOfLabel prog l)
+
+-- | Pair all blocks with their destination.    
+allBlocks :: ProgM C C -> [(Dest, Block StmtM C C)]
+allBlocks (GMany _ blocks _) = map blockToDest (mapElems blocks)
+
+-- | Get the tail of a block. Will exclude
+-- the entry instruction (if C C) or the
+-- first instruction in the block (O C)
+blockTail :: Block StmtM x C -> ProgM O C
+blockTail b = case blockToNodeList' b of
+                (_, mid, JustC end) -> mkMiddles mid <*> mkLast end
+
+
+-- | Find all successors (to all possible depths) for
+-- each block in the program.
+allSuccessors :: ProgM C C -> Map Dest (Set Dest)
+allSuccessors prog = 
+    Map.fromList . 
+    map (\(d, ds) -> (d, allSucc ds Set.empty)) $
+    blocksToDests 
+  where
+    -- | Map each block to its immediate successors, if any.
+    destToSucc :: Map Dest [Dest]
+    destToSucc = Map.fromList blocksToDests
+    blocksToDests = map f (allBlocks prog)
+    f (dest, block) = (dest, map (fromJust . labelToDest prog) (successors block))
+    -- | Find all successors starting with a given list of 
+    -- blocks.
+    allSucc [] s = s
+    allSucc (d:ds) s 
+      | not (d `Set.member` s) = allSucc (fromMaybe [] (Map.lookup d destToSucc) ++ ds) (Set.insert d s)
+      | otherwise = allSucc ds s
 
 -- Primitives
 
@@ -243,3 +278,4 @@ binPrim name = do
       c1 = mkFirst (CloEntry name c1Label [] "a") <*>
            mkLast (Done $ Closure (c2Name, c2Label) ["a"])
   return (c1 |*><*| c2 |*><*| body)
+
