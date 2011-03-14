@@ -7,91 +7,116 @@
 \chapter{Dead-code elimination}
 
 Dead-code elimination seeks to remove program statements that will not
-be executed or which have no visible effect. It can be applied at multiple
-points during compilation, as other transformations frequently introduce 
-dead code. Without dead-code elimination, many other optimizations have
-minimal effect, since they leave behind code which still executes even if
-it is no longer needed.
+be executed or which have no visible effect. It can be applied at
+multiple points during compilation, as other transformations
+frequently introduce dead code. Without dead-code elimination, many
+other optimizations have minimal effect, since they leave behind code
+which still executes even if it is no longer needed.
 
-\emph{Uncurrying} (descrbed in Chapter \ref{ref_chapter_uncurrying}),
-usually produces many unused bindings. For example, consider the
-following program which applies @const3@ to return 3 from @main@:
+For our MIL, we want to eliminate two types of dead code: bindings and
+blocks. Dead bindings represent allocations we do not need to
+make. Dead blocks increase the size of our program without providing
+any benefit.To illustrate these two types of dead code, consider
+the following program:
 
-%% If only we actually supported local declarations ...
-\begin{code}
-main = 
-  let const3 a b c = c 
-  in const3 1 2 3
-\end{code}
-
-\noindent
-and which compiles (in part) to this monadic program:
-
-%% -- Not strictly accurate, main
-%% -- really is main <- mainK {}
-%%
-%% Do I need to implement inter-procedural
-%% optimization since this actually won't 
-%% get reduced?
 \begin{code}
 main = do
-  t1 <- const3 @ 1
-  t2 <- t1 @ 2
-  ...
- 
-const3 <- k1 {}
-k1 {} a = k2 {a} 
-k2 {a} b = k3 {a, b}
-...
+  a <- 1 + 2
+  b <- block1(a)
+  c <- a + a
+  return c
+
+block1 (a) = do
+  v1 <- a + a
+  return v1
 \end{code}
 
-Uncurrying will rewrite @t1 @@ 2@ as @k2 {1} @@ 2@:
+In @main2, for @a@ and @c@ will be used, but @b@ will
+not. The binding to @b@ is therefore dead and can be eliminated.\footnote{If @block1@ had a
+side effect this would not be the case, but we assume it is does not for now} With
+@b@ gone, our program becomes:
 
-%% Does syntax allow a closure value to be entered here?
 \begin{code}
 main = do
- t1 <- const3 @ 1
- t2 <- k2 {a} @ 2 
- t3 <- t2 @ 3
- return t3
+  a <- 1 + 2
+  c <- a + a
+  return c
+
+block1 (a) = do
+  v1 <- a + a
+  return v1
 \end{code}
 
-This changes makes @t1@ useless --- it causes an allocation but otherwise 
-has no effect. Our dead-code elimination optimization should remove that binding.
-
-%% \emph{The bulk of our work. Each optimization implemented is
-%%   described. Each subsection should follow a common recipe: describe
-%%   the optimization, give an example program and show how we want it
-%%   changed, show salient points about the optimization (with code
-%%   snippets and references to the full library), and reflect on the
-%%   implementation.  Lazy Code Motion may get its own section.}
-
-%% \emph{One question: should optimizations be categorized by direction? We could
-%% describe all forward optimizations, then all backward ones. That may help
-%% set up the concepts necessary to describe LCM.}
-
-%% \emph{This portion gives an overview of the optimization, without
-%% code or (much) notation. We motivate the optimization by 
-%% showing an example.}
+Now we can see that @block1@ is not used and can also be
+eliminated. This not only demonstrates how dead-code can be removed,
+it also shows that iteratively applying the optimization can result in
+multiple eliminations.
 
 \section{Implementation}
 We seek to remove two types of dead code: unused bindings (and,
 therefore, allocation) and unused blocks. Each begins with a
 ``liveness'' analysis. Bindings (or blocks) that are referenced are ``live''
-and therefore cannot be eliminated. Everything else is ``dead.'' 
+and therefore cannot be eliminated. Everything else is ``dead.''
 
 \subsection{Eliminating Bindings}
 \label{ref_sub_elim_bindings}
 
 A binding can be eliminated if no references to the bound variable
-occur except the initial binding. We must traverse each block
+occur after the initial binding. Within each block, we find all the
+variables which are ``live'' (i.e., used after being bound) and then
+eliminate any binding which is not in the live set. Table
+\ref{ref_tbl_liveBindings} summarizes the facts, transfer function
+and rewriting used to elminate bindings.
+
+\begin{figure}{h}
+\begin{verbatim}
+
+---------|
+Facts    | type LiveFact = Set Name
+---------
+Transfer |
+(Hoopl)  | BwdTransfer StmtM LiveFact
+         |
+---------|
+         | live :: StmtM e x -> Fact x LiveFact -> LiveFact
+Transfer | live (BlockEntry _ _ _) f = woTops f
+         | live (CloEntry _ _ _ _) f = woTops f
+         | live (Bind v t) f = woTops
+         |   (Set.delete v f  `Set.union` tailVars t )
+         | live (CaseM v alts) f =
+         |   woTops (Set.insert v
+         |     (Set.unions (map (setAlt f) alts)))
+         | live (Done t) f = woTops (tailVars t)
+---------|
+Rewrite  |
+(Hoopl)  | FuelMonad m => BwdRewrite m StmtM LiveFact
+         |
+---------|
+         |
+         | rewrite :: FuelMonad m => forall e x. StmtM e x ->
+         |            Fact x LiveFact ->
+Rewrite  |
+(Impl)   |            m (Maybe (ProgM e x))
+         | rewrite (Bind v t) f
+         |  | safe t && not (v `Set.member` f) = return (Just emptyGraph)
+         | rewrite _ _ = return Nothing
+         |
+---------
+\end{verbatim}
+\caption{The facts, transfer function and rewrite function
+implemented for eliminating useless bindings within blocks.}
+\end{figure}
+
+We analyze each block independently, as
+bindings in one block cannot affect another. We the block
 backwards, noting when a variable is used. We do not need to worry
 about \emph{how} the variable is used, so we can just maintain a set
-of variables. When we see a binding, we eliminate the bound variable
+of variables. Any appearance of a variable in @Tail@ expressions constitues
+use. When we see a binding, we eliminate the bound variable
 from the set, since variables can be bound more than once (and they
 cannot be used before being bound).
 
-%% TODO - leave out woTops?  
+%% TODO - leave out woTops?
 
 Figure \ref{ref_fig_liveTransfer} shows the algorithm for determining
 liveness. We update the live set @f@ as we examine each
@@ -131,7 +156,7 @@ program unchanged.
 
 \begin{figure}[h]
 \begin{code}
-rewrite (Bind v t) f 
+rewrite (Bind v t) f
   | safe t && not (v `Set.member` f) = return (Just emptyGraph)
 rewrite _ _ = return Nothing
 \end{code}
@@ -162,13 +187,13 @@ predecessors.
 
 \begin{figure}[h]
 \begin{code}
-live (Bind v tail) liveBlocks = 
+live (Bind v tail) liveBlocks =
   Set.fromList (tailDest tail) `Set.union` liveBlocks
-live (CaseM _ alts) liveBlocks = 
-  Set.unions (map (Set.fromList . tailDest . altExpr) alts 
+live (CaseM _ alts) liveBlocks =
+  Set.unions (map (Set.fromList . tailDest . altExpr) alts
     ++ mapElems liveBlocks)
-live (Done tail) liveBlocks = 
-  Set.unions (Set.fromList (tailDest tail) 
+live (Done tail) liveBlocks =
+  Set.unions (Set.fromList (tailDest tail)
     : mapElems liveBlocks)
 live (BlockEntry _ l _) liveBlocks = liveBlocks
 live (CloEntry _ l _ _) liveBlocks = liveBlocks
@@ -192,7 +217,7 @@ that as we drop blocks, others which now cannot be called will also be dropped.
 
 \begin{figure}[h]
   \begin{code}
-remove live (flag, prog) (dest, block) 
+remove live (flag, prog) (dest, block)
   | dest `Set.member` live = (flag, blockGraph block |*><*| prog)
   | otherwise = (SomeChange, prog)
   \end{code}
@@ -209,8 +234,8 @@ remove live (flag, prog) (dest, block)
 
 The Hoopl library made the implementation of dead-code elimination
 (Section \ref{ref_sub_elim_bindings}) straightforward. Because it
-interleaves analysis and rewriting, removing one useless binding 
-can make other bindings useless, which will in turn be removed. 
+interleaves analysis and rewriting, removing one useless binding
+can make other bindings useless, which will in turn be removed.
 
 Unfortunately, the same cannot be said for dead block
 elimination. Hoopl's interface does not allow a block to be removed
