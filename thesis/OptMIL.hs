@@ -19,156 +19,8 @@ import Compiler.Hoopl
 
 import Util
 import MIL
-
-done :: FuelMonad m => Maybe TailM -> m (Maybe (ProgM O C))
-done = return . maybe Nothing (Just . mkLast . Done)
-
-bind :: FuelMonad m => Name -> Maybe TailM -> m (Maybe (ProgM O O))
-bind v = return . maybe Nothing (Just . mkMiddle . Bind v)
-
-_case :: FuelMonad m => Name -> (Alt TailM -> Maybe (Alt TailM)) -> [Alt TailM] -> m (Maybe (ProgM O C))
-_case v f alts  
-  | any isJust alts' = return $ Just $ mkLast $ CaseM v (zipWith altZip alts alts')
-  | otherwise = return $ Nothing
-  where
-    alts' = map f alts
-    altZip _ (Just a) = a
-    altZip a _ = a
-
-nameOfEntry :: StmtM C O -> Name
-nameOfEntry = fst . destOfEntry
-
--- Determining liveness in StmtM
-
-type LiveFact = Set Name
-
--- | Used to apply different rewriters which all require 
--- live variable analysis.
-usingLive :: (forall m. FuelMonad m => BwdRewrite m StmtM LiveFact) -- ^ Rewrite to use
-          -> [Name] -- ^ Top-level variables
-          -> ProgM C C -- ^ Program to rewrite
-          -> (ProgM C C, FactBase LiveFact) -- Results
-usingLive rewriter tops body = runSimple $ do
-      (p, f, _) <- analyzeAndRewriteBwd bwd (JustC (entryLabels body)) body mapEmpty
-      return (p, f)
-  where
-    bwd = BwdPass { bp_lattice = liveLattice "live statements" :: DataflowLattice LiveFact
-                  , bp_transfer = liveTransfer (Set.fromList tops)
-                  , bp_rewrite = rewriter } 
-
--- | Initial setup for liveness analysis.
-liveLattice :: Ord a => String -> DataflowLattice (Set a)
-liveLattice name = DataflowLattice { fact_name = name
-                              , fact_bot = Set.empty
-                              , fact_join = extend }
-  where
-    extend _ (OldFact old) (NewFact new) = (changeIf (not (Set.null (Set.difference new old)))
-                                           , new)
-
--- | Transfer liveness backwards across nodes.                                         
-liveTransfer :: Set Name -> BwdTransfer StmtM LiveFact
-liveTransfer tops = mkBTransfer live
-  where
-    live :: StmtM e x -> Fact x LiveFact -> LiveFact
-    live (BlockEntry _ _ _) f = woTops f 
-    live (CloEntry _ _ _ _) f = woTops f
-    live (Bind v t) f = woTops (Set.delete v f  `Set.union` tailVars t )
-    live (CaseM v alts) f = woTops (Set.insert v (Set.unions (map (setAlt f) alts)))
-    live (Done t) f = woTops (tailVars t)
-
-    woTops :: LiveFact -> LiveFact
-    woTops live = live `Set.difference` tops
-    
-    setAlt :: FactBase LiveFact -> Alt TailM -> Set Name
-    setAlt f (Alt _ ns e) = Set.difference (tailVars e) (Set.fromList ns)
-
-    -- | Returns variables used in a tail expression.
-    tailVars :: TailM -> Set Name
-    tailVars (Closure _ vs) = Set.fromList vs 
-    tailVars (Goto _ vs) = Set.fromList vs
-    tailVars (Enter v1 v2) = Set.fromList [v1, v2]
-    tailVars (ConstrM _ vs) = Set.fromList vs
-    tailVars (Return n) = Set.singleton n
-    tailVars (Thunk _ vs) = Set.fromList vs
-    tailVars (Run n) = Set.singleton n
-    tailVars (Prim _ vs) = Set.fromList vs
-    tailVars (LitM _) = Set.empty
-                        
--- | Retrieve a fact or the empty set
-liveFact :: FactBase LiveFact -> Label -> Set Name
-liveFact f l = fromMaybe Set.empty $ lookupFact l f
-
--- | Returns live variables associated with each
--- label in the program.
-findLive :: [Name] -- ^ Top-level variables
-         -> ProgM C C -- ^ Program to analyze
-         -> FactBase LiveFact -- Results
-findLive tops = snd . usingLive noBwdRewrite tops 
-
--- | Adds live variables to Goto and BlockEntry instructions. Not
--- filled in by the compiler - added in this pass instead.
-addLiveRewriter :: FuelMonad m => BwdRewrite m StmtM LiveFact
-addLiveRewriter = mkBRewrite rewrite
-  where
-    rewrite :: FuelMonad m => forall e x. StmtM e x -> Fact x LiveFact -> m (Maybe (ProgM e x))
-    rewrite (Done t) f = done (rewriteTail f t)
-    rewrite (BlockEntry n l args) live 
-      | live /= Set.fromList args = blockEntry n l (sort (Set.toList live))
-    rewrite (CaseM n alts) f = _case n (rewriteAlt f) alts
-    -- Why do I not need to worry about Bind here? What shows I can't have a 
-    -- Goto in the tail?
-    rewrite _ _ = return Nothing
-    
-    rewriteAlt f (Alt c ns t) = maybe Nothing (Just . Alt c ns) (rewriteTail f t)
-
-    rewriteTail :: FactBase LiveFact -> TailM -> Maybe TailM
-    rewriteTail f (Goto (n, l) vs) = 
-      case l `mapLookup` f of
-        Just vs' 
-          | vs' /= Set.fromList vs -> Just (Goto (n,l) (sort (Set.toList vs')))
-        _ -> Nothing
-    rewriteTail _ _ = Nothing
-    
-    blockEntry :: FuelMonad m => Name -> Label -> [Name] -> m (Maybe (ProgM C O))
-    blockEntry n l args = return $ Just $ mkFirst $ BlockEntry n l args
-
--- | From mon5.lhs
---
---   Compile-time garbage collection:
---    Bind v a c           ==> c         if a is an allocator and
---                                          v doesn't appear in c
---
--- deadRewriter implemented similary, where "safe" determines if the
--- expression on the right of the array can be elminiated safely.
--- 
-deadRewriter :: FuelMonad m => BwdRewrite m StmtM LiveFact
-deadRewriter = mkBRewrite rewrite
-  where
-    rewrite :: FuelMonad m => forall e x. StmtM e x -> Fact x LiveFact -> m (Maybe (ProgM e x))
-    rewrite (Bind v t) f 
-            | safe t && not (v `Set.member` f) = return (Just emptyGraph)
-    rewrite _ _ = return Nothing
-
-    -- Indicates when it is OK to eliminate a tail instruction in a monadic
-    -- expression.
-    safe :: TailM -> Bool
-    safe (Return _) = True
-    safe (Closure _ _) = True
-    safe (ConstrM _ _) = True
-    -- A little questionable - primitives may have effects. But all of those
-    -- defined so far do not.
-    safe (Prim _ _) = True 
-    safe (Enter _ _) = True
-    safe (Goto _ _) = True -- Only if block called has no side effects
-    safe (LitM _) = True
-    safe _ = False
-
--- | printing live facts
-printLiveFacts :: FactBase LiveFact -> Doc
-printLiveFacts = printFB printFact
-  where
-    printFact :: (Label, Set Name) -> Doc
-    printFact (l, ns) = text (show l) <> text ":" <+> commaSep text (Set.elems ns)
+import Live
+import DeadBlocks
 
 -- From mon5.lhs
 --     v <- return w; c  ==>  c       if v == w
@@ -551,74 +403,7 @@ inlineRewrite preds prog = mkBRewrite rewriter
           changeTail env (Prim p vs) = Prim p (map (changeVar env) vs)
           changeVar env f = Map.findWithDefault f f env
 
--- | Maps labels to their predecessors. The values
--- for a given key represent predecessors for that
--- block.
-type BlockPredecessors = Map Dest [Dest]
-
--- | Names the set of live blocks (i.e., those
--- that can be called from elsewhere) in a program.
-type LiveBlock = Set Dest
-
--- This doesn't find blocks which are passed
--- as arguments: ((f x) plus) 
---
--- It only recognizes blocks that are explicitly targets of 
--- closure or goto statements.
-findBlockPreds :: [Name] -> ProgM C C -> BlockPredecessors
-findBlockPreds tops body = runSimple $ do
-    (_, f, _) <- analyzeAndRewriteBwd bwd (JustC labels) body initial
-    return $ Map.fromList (catMaybes (map convert (mapToList f)))
-  where
-    convert (label, set) = case blockOfLabel body label of
-                                 Just (dest, _) -> Just (dest, Set.toList set)
-                                 _ -> Nothing
-    labels = entryLabels body
-    initial = mkFactBase (bp_lattice bwd) (zip labels (repeat (Set.fromList (topLabels body))))
-    bwd = BwdPass { bp_lattice = liveLattice "Live blocks" :: DataflowLattice LiveBlock
-                  , bp_transfer = liveBlockTransfer
-                  , bp_rewrite = noBwdRewrite }
-    topLabels :: ProgM C C -> [Dest]
-    topLabels = filter (\(n, l) -> n `elem` tops) . map fst . allBlocks
-    
-liveBlockTransfer :: BwdTransfer StmtM LiveBlock
-liveBlockTransfer = mkBTransfer live
-  where
-    live :: StmtM e x -> Fact x LiveBlock -> LiveBlock
-    live (Bind v tail) liveBlocks = Set.fromList (tailDest tail) `Set.union` liveBlocks
-
-    live (CaseM _ alts) liveBlocks = Set.unions (map (Set.fromList . tailDest . altExpr) alts ++ mapElems liveBlocks)
-    live (Done tail) liveBlocks =  Set.unions (Set.fromList (tailDest tail) : mapElems liveBlocks)
-
-    live (BlockEntry _ l _) liveBlocks = liveBlocks
-    live (CloEntry _ l _ _) liveBlocks = liveBlocks
-
-    altExpr (Alt _ _ e) = e
-
--- | deadBlocks tends to eliminate entry points
--- we would need for separate compilation.
-deadBlocks :: [Name] -> ProgM C C -> ProgM C C
-deadBlocks tops prog = 
-  case removeOrphans (liveSet prog) prog of
-    (SomeChange, prog') -> deadBlocks tops prog'
-    _ -> prog
-  where
-    liveSet = Set.fromList . concat . Map.elems . findBlockPreds tops
-
-    removeOrphans :: LiveBlock 
-                  -> ProgM C C 
-                  -> (ChangeFlag, ProgM C C)
-    removeOrphans live = foldl (remove live) (NoChange, emptyClosedGraph) . allBlocks
-
-    remove :: LiveBlock 
-                 -> (ChangeFlag, ProgM C C) 
-                 -> (Dest, Block StmtM C C) 
-                 -> (ChangeFlag, ProgM C C)
-    remove live (flag, prog) (dest, block) 
-      | dest `Set.member` live = (flag, blockGraph block |*><*| prog)
-      | otherwise = (SomeChange, prog)
-
--- Goto/Return eliminatino
+-- Goto/Return elimination
 -- When a Goto jumps to a block that immediately calls a primitive, or
 -- returns a value, we inline the block:
 --
@@ -723,21 +508,13 @@ inlineReturnRewrite blocks = iterBwdRw (mkBRewrite rewriter)
     newTail (AReturn _ i) vs = Return (vs !! i)
     newTail (APrim p _ idxs) vs = Prim p (map (vs !!) idxs)
 
--- Useful combinations of optimizations
-
-addLive tops = fst . usingLive addLiveRewriter tops
-    
--- | Eliminate dead code in blocks.  
-deadCode :: [Name] -> ProgM C C -> ProgM C C
-deadCode tops = fst . usingLive deadRewriter tops
-
 -- | Collapse closures, then elminate dead assignments
 -- in blocks.
-optCollapse tops = fst . usingLive deadRewriter tops . collapse
+optCollapse tops = deadCode . collapse
 
 -- | Inline blocks which only return or call a primitive, then
 -- eliminate dead code within blocks.
-inlineSimple tops = deadCode tops . bindSubst . inlineReturn 
+inlineSimple tops = deadCode . bindSubst . inlineReturn 
 
 mostOpt :: [Name] -> ([Name], ProgM C C) -> ProgM C C -> ProgM C C
 mostOpt userTops prelude@(prims, _) body = 
@@ -746,7 +523,7 @@ mostOpt userTops prelude@(prims, _) body =
     newTops deadBlocks .  
     inlineSimple tops . 
     newTops optCollapse . 
-    deadCode tops . 
+    deadCode . 
     bindSubst .
     addLive tops $ body
   where

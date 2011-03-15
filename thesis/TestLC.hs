@@ -12,7 +12,7 @@ import qualified Printer.Common as PP
 import Printer.LambdaCase
 import Syntax.LambdaCase hiding (Alt)
 import qualified Syntax.LambdaCase as LC
-import MIL
+import MIL hiding (_case)
 import Util
 import OptMIL
 import LCToMIL
@@ -27,32 +27,32 @@ progM progs prelude = do
     putStrLn "\n ========= Optimized Together ============="
     putStrLn (render $ printProgM optProgs)
 
-    let (used, killed, ant) = anticipated optProgs
-        avail = available ant killed optProgs
-        early = earliest ant avail
-        postpone = postponable early used optProgs
-        late = latest early postpone used (allSuccessors optProgs)
+    -- let (used, killed, ant) = anticipated optProgs
+    --     avail = available ant killed optProgs
+    --     early = earliest ant avail
+    --     postpone = postponable early used optProgs
+    --     late = latest early postpone used (allSuccessors optProgs)
 
-    putStrLn "\n ========= Used Expressions ============="
-    putStrLn (render $ printExprs used)
+    -- putStrLn "\n ========= Used Expressions ============="
+    -- putStrLn (render $ printExprs used)
 
-    putStrLn "\n ========= Killed Expressions ============="
-    putStrLn (render $ printExprs killed)
+    -- putStrLn "\n ========= Killed Expressions ============="
+    -- putStrLn (render $ printExprs killed)
 
-    putStrLn "\n ========= Anticipated Expressions ============="
-    putStrLn (render $ printExprs ant)
+    -- putStrLn "\n ========= Anticipated Expressions ============="
+    -- putStrLn (render $ printExprs ant)
 
-    putStrLn "\n ========= Available Expressions ============="
-    putStrLn (render $ printExprs avail)
+    -- putStrLn "\n ========= Available Expressions ============="
+    -- putStrLn (render $ printExprs avail)
 
-    putStrLn "\n ========= Earliest Expressions ============="
-    putStrLn (render $ printExprs early)
+    -- putStrLn "\n ========= Earliest Expressions ============="
+    -- putStrLn (render $ printExprs early)
 
-    putStrLn "\n ========= Postponable Expressions ============="
-    putStrLn (render $ printExprs postpone)
+    -- putStrLn "\n ========= Postponable Expressions ============="
+    -- putStrLn (render $ printExprs postpone)
 
-    putStrLn "\n ========= Latest Expressions ============="
-    putStrLn (render $ printExprs late)
+    -- putStrLn "\n ========= Latest Expressions ============="
+    -- putStrLn (render $ printExprs late)
 
   where
     tops = map fst progs
@@ -223,7 +223,7 @@ factCP2S = [("factCPS"
            , var "factCPS" `app` var "id")]
 
 -- Test that multiple bindings within a block are elminiated correctly.
-multBindTest prog = render . printProgM . deadCode [] . addLive [] $ runSimple prog
+multBindTest prog = render . printProgM . deadCode . addLive [] $ runSimple prog
 
 testProg :: UniqueMonad m => m (ProgM C C)
 testProg = do

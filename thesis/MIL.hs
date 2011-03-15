@@ -40,6 +40,7 @@ Our monadic language:
     | v1 @ v2         -- Call an unknown function.
     | f(v1, ..., v)  -- Goto a known block.
     | closure f {v1, ..., vN} -- Create closure pointing to a function.
+    | ... undocumented statements ...
 
   alt ::= C v1 ... vN -> call f(u1, ..., uM)
 
@@ -229,6 +230,27 @@ allSuccessors prog =
     allSucc (d:ds) s 
       | not (d `Set.member` s) = allSucc (fromMaybe [] (Map.lookup d destToSucc) ++ ds) (Set.insert d s)
       | otherwise = allSucc ds s
+
+-- | Create a Done statement if a Tail is given.
+done :: FuelMonad m => Maybe TailM -> m (Maybe (ProgM O C))
+done = return . maybe Nothing (Just . mkLast . Done)
+
+-- | Create a Bind statement if a Tail is given.
+bind :: FuelMonad m => Name -> Maybe TailM -> m (Maybe (ProgM O O))
+bind v = return . maybe Nothing (Just . mkMiddle . Bind v)
+
+-- | Create a case statement if alts are given.
+_case :: FuelMonad m => Name -> (Alt TailM -> Maybe (Alt TailM)) -> [Alt TailM] -> m (Maybe (ProgM O C))
+_case v f alts  
+  | any isJust alts' = return $ Just $ mkLast $ CaseM v (zipWith altZip alts alts')
+  | otherwise = return $ Nothing
+  where
+    alts' = map f alts
+    altZip _ (Just a) = a
+    altZip a _ = a
+
+nameOfEntry :: StmtM C O -> Name
+nameOfEntry = fst . destOfEntry
 
 -- Primitives
 
