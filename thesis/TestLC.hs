@@ -222,6 +222,34 @@ factCP2S = [("factCPS"
           ,("main"
            , var "factCPS" `app` var "id")]
 
+-- Test that multiple bindings within a block are elminiated correctly.
+multBindTest prog = render . printProgM . deadCode [] . addLive [] $ runSimple prog
+
+testProg :: UniqueMonad m => m (ProgM C C)
+testProg = do
+  -- blockX:
+  --  a <- block1(c)
+  --  b <- block1(a)
+  --  a <- block1(c)
+  --  return a
+  --
+  -- becomes
+  --
+  -- block1 (b, c):
+  --  a <- block1(c)
+  --  return a
+  --
+  -- Notice that the live variables in the block are not
+  -- correctly updated -- oops.
+  l1 <- freshLabel 
+  l2 <- freshLabel
+  let bl l = BlockEntry "block1" l []
+      bind (v, t) = Bind v (Goto ("block1", l2) [t])
+      done v = Done (Return v)
+  return $ mkFirst (bl l1) <*>
+         mkMiddles (map bind [("a", "c"), ("b", "a"), ("a", "c")]) <*>
+         mkLast (done "a")
+
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
 

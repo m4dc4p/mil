@@ -2,7 +2,7 @@
   , NamedFieldPuns, TypeFamilies, ScopedTypeVariables #-}
 
 module OptMIL (mostOpt, addLive, LiveFact
-              , getEntryLabel, findLive)
+              , getEntryLabel, findLive, deadCode)
 
 where
 

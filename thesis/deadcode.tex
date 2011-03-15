@@ -16,7 +16,7 @@ which still executes even if it is no longer needed.
 For our MIL, we want to eliminate two types of dead code: bindings and
 blocks. Dead bindings represent allocations we do not need to
 make. Dead blocks increase the size of our program without providing
-any benefit.To illustrate these two types of dead code, consider
+any benefit. To illustrate these two types of dead code, consider
 the following program:
 
 \begin{code}
@@ -31,10 +31,10 @@ block1 (a) = do
   return v1
 \end{code}
 
-In @main2, for @a@ and @c@ will be used, but @b@ will
-not. The binding to @b@ is therefore dead and can be eliminated.\footnote{If @block1@ had a
-side effect this would not be the case, but we assume it is does not for now} With
-@b@ gone, our program becomes:
+In @main2@, @a@ and @c@ will be used, but @b@ will not. The binding to
+@b@ is therefore dead and can be eliminated.\footnote{If @block1@ had
+  a side effect this would not be the case, but we assume it is does
+  not for now} With @b@ gone, our program becomes:
 
 \begin{code}
 main = do
@@ -64,48 +64,85 @@ and therefore cannot be eliminated. Everything else is ``dead.''
 A binding can be eliminated if no references to the bound variable
 occur after the initial binding. Within each block, we find all the
 variables which are ``live'' (i.e., used after being bound) and then
-eliminate any binding which is not in the live set. Table
-\ref{ref_tbl_liveBindings} summarizes the facts, transfer function
-and rewriting used to elminate bindings.
+eliminate any binding which is not in the live set. 
+Hoopl applies the transfer function in turn to each statement
+in the block. Variables used are collected in the set of live
+variables, while new bindings remove variables from the set. 
+
+To illustrate, consider the program fragement in Figure
+\ref{ref_table_liveAnn}, where the live set is annotated between each
+statement. At the end of the block (where analysis begins), no
+variables are live (#5). After @return a@, ``a'' is in live set
+(#4). However, the next statement, @a <- block3(c)@, \emph{removes}
+@a@ from the live set and adds @c@ (#3). At point #2, a new @a@ (different than
+the one at point 4) is added. That @a@ is removed by the next statement, leaving 
+only @c@ in the live set (#1). 
 
 \begin{figure}{h}
-\begin{verbatim}
+  \begin{code}
+    -- 1. live: [c] 
+    a <- block1(c)
+    -- 2. live: [c, a]
+    b <- block2(a)
+    -- 3. live: [c]
+    a <- block3(c)
+    -- 4. live: [a] 
+    return a
+    -- 5. live: []
+  \end{code}
+  \caption{A program fragment with the ``live'' variable set annoted between each fragment.}
+  \label{ref_fig_liveAnn}
+\end{figure}
 
----------|
-Facts    | type LiveFact = Set Name
----------
-Transfer |
-(Hoopl)  | BwdTransfer StmtM LiveFact
-         |
----------|
-         | live :: StmtM e x -> Fact x LiveFact -> LiveFact
-Transfer | live (BlockEntry _ _ _) f = woTops f
-         | live (CloEntry _ _ _ _) f = woTops f
-         | live (Bind v t) f = woTops
-         |   (Set.delete v f  `Set.union` tailVars t )
-         | live (CaseM v alts) f =
-         |   woTops (Set.insert v
-         |     (Set.unions (map (setAlt f) alts)))
-         | live (Done t) f = woTops (tailVars t)
----------|
-Rewrite  |
-(Hoopl)  | FuelMonad m => BwdRewrite m StmtM LiveFact
-         |
----------|
-         |
-         | rewrite :: FuelMonad m => forall e x. StmtM e x ->
-         |            Fact x LiveFact ->
-Rewrite  |
-(Impl)   |            m (Maybe (ProgM e x))
-         | rewrite (Bind v t) f
-         |  | safe t && not (v `Set.member` f) = return (Just emptyGraph)
-         | rewrite _ _ = return Nothing
-         |
----------
-\end{verbatim}
+Table
+\ref{ref_tbl_liveBindings} summarizes the facts, transfer function
+and rewriting used to elminate bindings.
+\begin{figure}
+\begin{tabular}{ll}
+
+Facts & 
+\begin{code}
+  type LiveFact = Set Name
+\end{code}
+\\
+
+Direction & \emph{Backwards} \\
+
+Transfer & 
+\begin{minipage}{3in}
+\begin{code}
+live :: StmtM e x -> Fact x LiveFact -> LiveFact
+live (BlockEntry _ _ _) f = woTops f
+live (CloEntry _ _ _ _) f = woTops f
+live (Bind v t) f = woTops
+    (Set.delete v f  `Set.union` tailVars t )
+live (CaseM v alts) f =
+  woTops (Set.insert v
+    (Set.unions (map (setAlt f) alts)))
+live (Done t) f = woTops (tailVars t) 
+\end{code} 
+\end{minipage} \\
+
+Rewrite & 
+\begin{minipage}{3in}
+\begin{code}
+rewrite :: FuelMonad m => forall e x. StmtM e x -> 
+           Fact x LiveFact ->
+           m (Maybe (ProgM e x))
+rewrite (Bind v t) f
+  | safe t && not (v `Set.member` f) = return (Just emptyGraph)
+rewrite _ _ = return Nothing 
+\end{code} 
+\end{minipage}
+\\
+
+\end{tabular}
 \caption{The facts, transfer function and rewrite function
 implemented for eliminating useless bindings within blocks.}
+\label{ref_tbl_liveBindings}
 \end{figure}
+
+% \setlength\leftskip{\oldleftskip}
 
 We analyze each block independently, as
 bindings in one block cannot affect another. We the block
