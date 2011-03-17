@@ -15,6 +15,77 @@
 
 \section{Dataflow Optimization}
 
+The term ``program optimization'' generally refers to the idea of
+transforming a program with some undesirable property to one with the
+same semantics (i.e., result ) but without the unwanted property.  For
+example, an optimized program may run faster, use less memory, consume
+less power, or by whatever measure perform ``better'' than the
+unoptimized program. Optimizations can be performed by the programmer
+as part of writing a given program or they can be applied
+automatically by analyzing the program and transforming it according
+to an algorithm.
+
+``Dataflow analysis'' (or ``dataflow optimization''), first introduced
+by Gary Kildall \citep{Kildall1973}, refers to an algorithm for
+applying an ``optimizing function'' to a given program. In itself it
+does not give a specific optimization; rather, it gives a technique
+for applying many different optimizations. In today's terms, dataflow
+analysis treats a program as a ``control-flow'' graph, applies a
+``transfer'' function to compute ``facts'' about the execution of the
+program, and then applies a ``rewriting'' function to transform the
+program based on those facts. Dataflow analysis is now considered
+standard technique and can be found in most compilere textbooks.
+
+Figure \ref{fig_back1} gives the control-flow graph (CFG) for a C
+language program fragment. Each node is one statement that will be
+executed. Program execution enters the graph from some entry point
+(``#O#'' in the diagram). Edges between nodes represent
+possible execution paths; the arrows show how statements are executed
+in time. Necessarily, the CFG must show \emph{all} possible execution
+paths. Each specific run of the program may depend on specific inputs,
+which we cannot predict. For that reason we say the CFG approximates
+the program's execution. The edges from ``#a > b#'' to
+both ``#c = a#'' and ``#c = b#'' show that the program may go to either
+statement. Finally, program execution can exit through multiple
+nodes, indicated by ``#X#'' in the diagram. 
+
+\begin{figure}[t]
+\begin{Verbatim}
+if(a > b)
+  c = a;
+else
+  c = b;
+\end{Verbatim}
+\begin{Verbatim}
+    O
+    |
+    v
+ -------   -------
+ |a > b|-->|c = a|--X
+ -------   -------
+    |         
+    V         
+ -------
+ |c = b|
+ -------
+    |
+    X
+\end{Verbatim}
+\caption{A C-language program fragement and its associated
+  control-flow graph. Notice that all possible paths are shown. Each
+  specific execution of the program will depend on the values of #a#
+  and #b#.
+\end{figure}
+
+\begin{enumerate}
+\item Control-flow Graph
+\item Facts
+\item Transfer Function
+\item Rewrite Function
+\item Direction
+\item Meet/join operator (check reference)
+\end{enumerate}
+
 \citet{SoAndSo} first described dataflow
 analysis. It works by transforming a \emph{control-flow graph} (CFG)
 representation of the program. This section introduces the concepts
@@ -32,7 +103,7 @@ though the program can only choose one. A special ``entry'' node, with
 no predecssors, exists to give the program a starting point.
 
 The statements in each node must define a ``basic block,'' which means
-there can only be one entry and one exit to the node. Each 
+there can only be one entry and one exit to the node. Each
 predeccessor starts at the same statement; execution cannot start in
 the ``middle'' of the statements in the node. Each successor also
 leaves from the same instruction, so only one ``branch'' can exist in
@@ -61,7 +132,7 @@ statements in this C-language program fragment:
   | |  |  v C    ^
   | |   ->case 3 |
   | |     |      |
-  | |      ->----_-- 
+  | |      ->----_--
   | | B          |  |
   |  ->case 2 ->-   v
   |                 |
@@ -69,8 +140,8 @@ statements in this C-language program fragment:
    ->case 1  |
      |       v
      v       |
-   --+-----<-      
-  |  
+   --+-----<-
+  |
    -> ...
 \end{verbatim}
 \caption{CFG illustrating \emph{fall-through} allowed by the
@@ -105,7 +176,7 @@ change. The computed facts can then be used to transform the graph.
 
 % What does dataflow mean?
 
-% How do you use it? 
+% How do you use it?
 
 % Example
 
