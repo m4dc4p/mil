@@ -30,24 +30,24 @@ by Gary Kildall \citep{Kildall1973}, refers to an algorithm for
 applying an ``optimizing function'' to a given program. In itself it
 does not give a specific optimization; rather, it gives a technique
 for applying many different optimizations. In today's terms, dataflow
-analysis treats a program as a ``control-flow'' graph, applies a
+analysis treats a program as a ``control-flow graph'' (CFG), applies a
 ``transfer'' function to compute ``facts'' about the execution of the
 program, and then applies a ``rewriting'' function to transform the
 program based on those facts. Dataflow analysis is now considered
 standard technique and can be found in most compilere textbooks.
 
-Figure \ref{fig_back1} gives the control-flow graph (CFG) for a C
-language program fragment. Each node is one statement that will be
-executed. Program execution enters the graph from some entry point
-(``#O#'' in the diagram). Edges between nodes represent
-possible execution paths; the arrows show how statements are executed
-in time. Necessarily, the CFG must show \emph{all} possible execution
-paths. Each specific run of the program may depend on specific inputs,
-which we cannot predict. For that reason we say the CFG approximates
-the program's execution. The edges from ``#a > b#'' to
-both ``#c = a#'' and ``#c = b#'' show that the program may go to either
-statement. Finally, program execution can exit through multiple
-nodes, indicated by ``#X#'' in the diagram. 
+The CFG for a program shows all possible execution ``paths'' that may
+occur when the program runs. Nodes represent statements, while
+directed edges show the order that statements may be executed.
+Program execution enters the graph from one or more entry points and
+leaves the graph through one or exit points.  
+
+Figure \ref{fig_back1} gives the CFG for a C-language program
+fragment.  ``#O#'' represents the entry point for the program. The
+conditional statement #if(a > b)# will be executed first. Execution
+can then move to either of the two following nodes, depending on the
+values of #a# and #b#. Finally, execution leaves the graph through one of
+the exit nodes, indicated by ``#X#'' in the diagram.
 
 \begin{figure}[t]
 \begin{Verbatim}
@@ -60,22 +60,80 @@ else
     O
     |
     v
- -------   -------
- |a > b|-->|c = a|--X
- -------   -------
-    |         
-    V         
- -------
+  ---------     -----
+ |if(a > b)|-->|c = a|--X
+  ---------     -----
+    |
+    V
+  -----
  |c = b|
- -------
+  -----
     |
     X
 \end{Verbatim}
 \caption{A C-language program fragement and its associated
   control-flow graph. Notice that all possible paths are shown. Each
   specific execution of the program will depend on the values of #a#
-  and #b#.
+  and #b#.}
+\label{fig_back1}
 \end{figure}
+
+Dataflow analysis applies a ``transfer function'' to each node in the
+CFG to compute ``facts'' about the program's state before and after
+the execution of each node. The facts computed and the transfer
+function used depend on the specific optimization, but dataflow
+analysis always applies them in the same way. Each node has two sets
+of facts -- ``in'' and ``out.'' The transfer function uses the ``in''
+facts to compute ``out'' facts for a node. ``Out'' facts on a node
+become ``in'' facts on its successors.  If the CFG for a program
+contains loops, then ``in'' facts for a node may change based on later
+``out'' facts. The transfer function will be applied repeatedly until
+the facts stop changing -- they reach a ``fixed point.''
+
+Consider Figure \ref{fig_back2}, an elaboration of Figure
+\ref{fig_back1}. The program fragment now assigns values to #a# and #b#
+before the condition is tested. 
+
+\begin{figure}[t]
+\begin{Verbatim}
+a = 1; b = 2;
+
+if(a > b)
+  c = a;
+else
+  c = b;
+\end{Verbatim}
+\begin{Verbatim}
+    O
+    |
+    v
+  ---------
+ |a = b + 1|
+  ---------
+    |
+    V
+  ---------     -----
+ |if(a > b)|-->|c = a|--X
+  ---------     -----
+    |
+    V
+  -----
+ |c = b|
+  -----
+    |
+    X
+\end{Verbatim}
+\caption{}
+\label{fig_back2}
+\end{figure}
+
+A CFG approximates execution because the graph shows \emph{all}
+possible execution paths. Each specific run of the program may depend
+on specific inputs, which we cannot predict. Figure \ref{fig_Back1}
+shows that either the statement #c = a# or #c = b# will be
+executed, but we cannot say which without knowing the values of #a# and
+#b#. 
+
 
 \begin{enumerate}
 \item Control-flow Graph
@@ -85,12 +143,6 @@ else
 \item Direction
 \item Meet/join operator (check reference)
 \end{enumerate}
-
-\citet{SoAndSo} first described dataflow
-analysis. It works by transforming a \emph{control-flow graph} (CFG)
-representation of the program. This section introduces the concepts
-necessary to understand how dataflow optimization works and describes
-how the technique is usually implemented.
 
 \subsection{Basic Blocks and Control-Flow Graphs}
 
