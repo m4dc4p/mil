@@ -1,4 +1,11 @@
 \ifthenelse{\boolean{standaloneFlag}}
            {\VerbatimFootnotes
              \DefineShortVerb{\#}
-             \doublespacing}{}
+             \doublespacing
+             \setcounter{chapter}{0}}{}
+
+%% Default float parameters. For case when
+%% multiple chapters are included and
+%% only one needs custom float settings.
+\renewcommand{\textfraction}{0.2}
+\renewcommand{\topfraction}{0.9}
