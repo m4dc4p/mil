@@ -54,10 +54,7 @@ can then move to either of the two following nodes, depending on the
 values of #a# and #b#. Finally, execution leaves the graph through one of
 the exit nodes, indicated by ``#X#'' in the diagram.
 
-\begin{figure}[th]
-\centering
-\figbegin
-
+\begin{myfig}[th]
 \begin{tabular}{cc}
 \begin{minipage}[t]{1in}
 \begin{Verbatim}[numbers=left]
@@ -91,8 +88,7 @@ else
   shown in the CFG. Each specific execution of the program will
   depend on the values of \verb=a= and \verb=b=.}
 \label{fig_back1}
-\figend
-\end{figure}
+\end{myfig}
 
 Dataflow analysis applies a ``transfer function'' to each node in the
 CFG to compute ``facts'' about the program's state before and after
@@ -140,8 +136,7 @@ if nothing else, will reduce the size of the program. It may even make
 it run faster or use less memory. We call this optimization
 \emph{dead-code elimination}.
 
-\begin{figure}[ht]\centering
-\figbegin
+\begin{myfig}[ht]
 \begin{minipage}{1in}
   \begin{Verbatim}[numbers=left,commandchars=\\\{\}]
     a = 1;
@@ -153,8 +148,7 @@ it run faster or use less memory. We call this optimization
 assignment on line \ref{fig_back2_dead_line}, \verb=b= is not used
 and can be considered ``dead.''}
 \label{fig_back2}
-\figend
-\end{figure}
+\end{myfig}
 
 Of course, people do not normally write programs with such obviously
 useless statements, but other compiler optimizations can produce (or
@@ -180,8 +174,7 @@ a variable \emph{not} in our live set, we know it will not be
 referenced afterwards. Therefore we compute ``liveness'' using a
 backwards travesal over the CFG.
 
-\begin{figure}[th]\centering
-\figbegin
+\begin{myfig}[th]
 \begin{minipage}{2in}
 \begin{Verbatim}[commandchars=\\\{\}]
        E
@@ -207,8 +200,7 @@ backwards travesal over the CFG.
 \caption{The CFG for our example program, annotated with the live
 set for each node.}
 \label{fig_back3}
-\figend
-\end{figure}
+\end{myfig}
 
 Figure \ref{fig_back3} shows the CFG for this example, with annotations
 between each statement showing the live set. Though
