@@ -44,7 +44,7 @@ The CFG for a program shows all possible execution ``paths'' that may
 occur when the program runs. Nodes represent statements, while
 directed edges show the order that statements may be executed.
 Program execution enters the graph from one or more entry points and
-leaves the graph through one or exit points.  
+leaves the graph through one or exit points.
 
 Figure \ref{fig_back1} gives the CFG for a C-language program
 fragment.  ``#E#'' represents the entry point for the program. The
@@ -53,34 +53,44 @@ can then move to either of the two following nodes, depending on the
 values of #a# and #b#. Finally, execution leaves the graph through one of
 the exit nodes, indicated by ``#X#'' in the diagram.
 
-\begin{figure}[th]\centering
-\rule{\linewidth-\rulefigmargin}{0.4pt}
-\begin{Verbatim}
+\begin{figure}[th]
+\centering
+\figbegin
+
+\begin{tabular}{cc}
+\begin{minipage}[t]{1in}
+\begin{Verbatim}[numbers=left]
 if(a > b)
-  c = a;
-else
-  c = b;
+  c = a; 
+else     
+  c = b; 
 \end{Verbatim}
-\begin{Verbatim}
-    E
-    ||
-    v
-  ---------     -----
- ||if(a > b)||-->||c = a||--X
-  ---------     -----
-    ||
-    V
-  -----
- ||c = b||
-  -----
-    ||
-    X
-\end{Verbatim}
-\caption{A C-language program fragement and its associated
-  control-flow graph. Notice that all possible paths are shown. Each
-  specific execution of the program will depend on the values of \verb=a=
-  and \verb=b=.}
+\end{minipage} \vline & 
+\begin{minipage}[t]{1in}
+  \begin{Verbatim}[gobble=2]
+      E
+      ||
+      V
+    ---------        ------
+    ||if(a > b)||-->||c = a||-->X
+    ---------        ------
+      ||
+      V
+     ------
+    ||c = b||
+     ------
+      ||
+      X
+  \end{Verbatim}
+\end{minipage} \\
+ (a) & (b) \rule{0pt}{24pt}
+\end{tabular}
+\caption{A C-language program fragment (\emph{a}) and its associated
+  control-flow graph (\emph{b}). Notice that all possible paths are
+  shown in the CFG. Each specific execution of the program will
+  depend on the values of \verb=a= and \verb=b=.}
 \label{fig_back1}
+\figend
 \end{figure}
 
 Dataflow analysis applies a ``transfer function'' to each node in the
@@ -98,8 +108,8 @@ point.''
 
 If the CFG for a program contains nodes with multiple predecessors,
 ``in'' facts must be combined in some way. The ``meet'' operator for
-each optimization combines facts. Usually, the operator takes the 
-intersection or union of all the facts. Intersection implies the 
+each optimization combines facts. Usually, the operator takes the
+intersection or union of all the facts. Intersection implies the
 analysis computes something is true for \emph{all} incoming paths. Union
 implies computing something for \emph{any} incoming path.
 
@@ -127,25 +137,28 @@ After assignment on line \ref{fig_back2_dead_line}, #b# is not
 referenced. Removing the #b# will not affect the program and,
 if nothing else, will reduce the size of the program. It may even make
 it run faster or use less memory. We call this optimization
-\emph{dead-code elimination}. 
+\emph{dead-code elimination}.
 
 \begin{figure}[ht]\centering
-\rule{\linewidth-\rulefigmargin}{0.4pt}
-\begin{Verbatim}[numbers=left,commandchars=\\\{\}]
-a = 1; 
-b = a + 1;\label{fig_back2_dead_line}
-return a + 1;
-\end{Verbatim}
-\caption{A C-language fragment illustrating \emph{dead code}. After 
+\figbegin
+\begin{minipage}{1in}
+  \begin{Verbatim}[numbers=left,commandchars=\\\{\}]
+    a = 1;
+    b = a + 1;\label{fig_back2_dead_line}
+    return a + 1;
+  \end{Verbatim}
+\end{minipage}
+\caption{A C-language fragment illustrating \emph{dead code}. After
 assignment on line \ref{fig_back2_dead_line}, \verb=b= is not used
 and can be considered ``dead.''}
 \label{fig_back2}
+\figend
 \end{figure}
 
 Of course, people do not normally write programs with such obviously
 useless statements, but other compiler optimizations can produce (or
 leave behind) many such statements. \emph{Uncurrying}, described in
-chapter \ref{chap_uncurrying}, in fact depends on dead-code elmination. 
+chapter \ref{chap_uncurrying}, in fact depends on dead-code elmination.
 
 To eliminate the assignment like that on line
 \ref{fig_back2_dead_line}, we really need to determine which variables
@@ -165,31 +178,35 @@ need to note any reference to a variable. When we see an assignment to
 a variable \emph{not} in our live set, we know it will not be
 referenced afterwards. Therefore we compute ``liveness'' using a
 backwards travesal over the CFG.
- 
+
 \begin{figure}[th]\centering
-\rule{\linewidth-\rulefigmargin}{0.4pt}
+\figbegin
+\begin{minipage}{2in}
 \begin{Verbatim}[commandchars=\\\{\}]
        E
-       ||      \emph{live:}  \ensuremath{\emptyset}
+       ||      
        v
      -----
-    ||a = 1||    (Node 1)
+    ||a = 1||    \emph{live:}  \ensuremath{\emptyset}
      -----
-       ||      \emph{live:} \{a\}
+       ||      
        V
    ---------
-  ||b = a + 1||  (Node 2)
+  ||b = a + 1||  \emph{live:} \{a\}  
    ---------
-       ||      \emph{live:} \{a\}
+       ||      
        V
   ------------
- ||return a + 1|| (Node 3)
+ ||return a + 1|| \emph{live:} \{a\}
   ------------
-       ||      \emph{live:}  \ensuremath{\emptyset}
-       X
+       ||      
+       X          \emph{live:}  \ensuremath{\emptyset}
 \end{Verbatim}
-\caption{}
+\end{minipage}
+\caption{The CFG for our example program, annotated with the live
+set for each node.}
 \label{fig_back3}
+\figend
 \end{figure}
 
 Figure \ref{fig_back3} shows the CFG for this example, with annotations
@@ -215,20 +232,19 @@ function, $live$, for a statement as:
 
 Table \ref{tbl_back1} shows the $use$ and $def$ sets for each
 statement. The live set computed, $live$, becomes the input, $in$, for
-the statement's predecessor. We include the exit node (``$X$'') in the
+the statement's predecessor. We include the exit node (``#X#'') in the
 table to show the initial value of $in$ for the last statement --
 $\emptyset$, the empty set. Our analysis then works backwards through the
 program. If our program (and its CFG) contained any loops, we would
 need to run this algorithm multiple times, until the live set for each
 statement reached a fixed point.
 
-\begin{table}  
+\begin{table}
   \centering
   \begin{tabular}{lcccc}
-
-    & $use(s)$ & $def(s)$ & $in(s)$ &  $live(s)$ \\
-    \cmidrule(r){2-2}\cmidrule(r){3-3}\cmidrule(r){4-4}\cmidrule(r){5-5}
-    $X$ & & & & $\emptyset$ \\
+    $s$ & $use(s)$ & $def(s)$ & $in(s)$ &  $live(s)$ \\
+    \cmidrule(r){1-1}\cmidrule(r){2-2}\cmidrule(r){3-3}\cmidrule(r){4-4}\cmidrule(r){5-5}
+    #X# & & & & $\emptyset$ \\
     #return a + 1# & $\{a\}$ & $\emptyset$ & $\emptyset$ & $\{a\}$ \\
     #b = a + 1# & $\{a\}$ & $\{b\}$ & $\{a\}$ & $\{a\}$ \\
     #a = 1# & $\emptyset$ & $\{a\}$ & $\{a\}$ & $\emptyset$ \\
@@ -240,13 +256,13 @@ statement reached a fixed point.
 
 With the live set computed for each statement, our analysis can now
 determine which statements to eliminate. Only nodes 1 and 2 in Figure
-\ref{fig_back3} perform an assignment. The live set for node 1 (``#a = 1#'') 
-contains #a#, so we do not eliminate it. In node 2 (``#b = a + 1#''), 
+\ref{fig_back3} perform an assignment. The live set for node 1 (``#a = 1#'')
+contains #a#, so we do not eliminate it. In node 2 (``#b = a + 1#''),
 the live set does \emph{not} contain #b#. Therefore, we can eliminate
 node 2, giving us a new program without any dead code:
 
 \begin{Verbatim}
-a = 1; 
+a = 1;
 return a + 1;
 \end{Verbatim}
 
