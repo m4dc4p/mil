@@ -8,7 +8,6 @@
 \usepackage{url}
 \usepackage{fancyvrb}
 \usepackage{setspace}
-\usepackage{cmds}
 \usepackage{amsmath}
 \usepackage{booktabs}
 \usepackage[margin=\parindent, format=hang,labelfont=bf]{caption}
@@ -41,3 +40,21 @@
 
 \newcommand\figbegin{\rule{\linewidth-\rulefigmargin}{0.4pt}\\\vspace{12pt}}
 \newcommand\figend{\rule{\linewidth-\rulefigmargin}{0.4pt}}
+
+\newcommand{\lamA}{\ensuremath{\lambda}-calculus\xspace}
+\newcommand{\LamA}{\ensuremath{\lambda}-Calculus\xspace}
+
+\newcommand{\citep}[1]{(\emph{#1})\xspace}
+\newcommand{\lamAbs}[2]{\ensuremath{\lambda#1.\ #2}}
+\newcommand{\lamApp}[2]{\ensuremath{#1\ #2}}
+\newcommand{\lamPApp}[2]{\ensuremath{(#1\ #2)}}
+
+\newenvironment{myfig}[1][h]{\begin{figure}[#1]%%
+\centering%%
+\figbegin}{\figend%%
+\end{figure}}
+
+% single-argument comment. Do not put
+% a space before the command when used
+% or the file will have two spaces.
+\newcommand{\rem}[1]{}

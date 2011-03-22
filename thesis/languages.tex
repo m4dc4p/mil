@@ -7,12 +7,12 @@
 \chapter{Functional Languages}
 \label{ref_chapter_languages}
 
-\emph{Brief definitino of ``functional languages.'' Introduce our
-  lambda calculus variant. Shows a compilation scheme from the variant
-  to Caffeine's RTL as an example}
+%% \emph{Brief definitino of ``functional languages.'' Introduce our
+%%   lambda calculus variant. Shows a compilation scheme from the variant
+%%   to Caffeine's RTL as an example}
 
 \section{The \LamA}
-\emph{Why is it important}
+%%\emph{Why is it important}
 
 In mathematics, a ``function'' takes one or more arguments and
 produces some value. ``Functional programming languages'' are based
@@ -22,7 +22,7 @@ during execution; that is, they are not limited to executing only the
 function definitions specified by the programmer -- they can define
 new functions as part of a computation.
 
-\emph{What is the \lamA}
+%%\emph{What is the \lamA}
 
 Alonzo Church defined his \lamA (``lambda calculus'') in 19XX
 \citep{ChurchXX} to study systems of recursive equations. Being
@@ -30,52 +30,99 @@ Turing-complete, it can be used to model the behavior of any
 computational system. However, it is particularly useful for modeling
 functional programming languages. %% why?
 
-Figure \ref{fig_lang1}, part \emph{a}, gives a syntax for the ``pure''
+Figure \ref{fig_lang1} gives a syntax for the ``pure''
 \lamA. ``Abstraction'' defines a new function, while ``application''
 gives a particular argument to a function. ``Variables'' are defined
 when mentioned. 
 
-Using this syntax, we can define the identity function (which
-just returns its argument) as:
-\[
-\lambda x. x.
-\]
-A few other examples include \emph{composition}, where the first
-argument takes the result of applying the second argument to the
-third:
-  & \lambda f. \lambda g. \lambda x. (f (g x)), \\
-\intertext{\emph{const}, where the first argument is always returned:}
-  & \lambda a. \lambda b. a, \\
-\intertext{and \emph{flip}, which reverses the arguments given to a function:}
-  & \lambda f. \lambda a. \lambda b. (f b a).
-\end{align}
-
-This form is the simplest version of the \lamA, and it
-does not much resemble a programming language. In part \emph{b} 
-we extend it to include integers and top-level definitions. The first
-allows us to easily represent numbers, while the second lets us define
-re-usable definitions. 
-
-\begin{figure}[ht]
-  \begin{Verbatim}
+\begin{myfig}[ht]
+\begin{minipage}{3in}
+\begin{Verbatim}
 ##                 ##      ##       
  #                  #       #       
  #  ###  ########   ###   ###  ###  
  #  ###   #  #  #   #  # #  #  ###  
  #  # #   #  #  #   #  # #  #  # #  
 ### ## # #########  ###   #### ## # 
-  \end{Verbatim}
-  \caption{The \lamA's syntax and evaulation rules.}
+\end{Verbatim}
+\end{minipage}
+  \caption{The \lamA' syntax.}
   \label{fig_lang1}
-\end{figure}
+\end{myfig}
 
+%%\emph{What does it look like?}
 
-\emph{What does it look like?}
+Using this syntax, we can define some common functions. \emph{Identity} 
+returns its argument:
+\begin{align}
+  & \lamAbs{x}{x}. \\
+\intertext{\emph{Compose} takes two functions and an argument. The result of
+applying the second function to the argument is passed to the first:}
+  & \lamAbs{f}{\lamAbs{g}{\lamAbs}{x}{\lamApp{f}{\lamPApp{g}{x}}}}. \\
+\intertext{\emph{Const} takes two arguments but always returns the first:}
+  & \lamAbs{f}{\lamAbs{a}{\lamAbs{b}{a}}}.
+\end{align}
 
+\begin{myfig}[bt]
+\begin{minipage}{2in}
+\begin{Verbatim}
+                ##  
+                 #  
+ ##  ## ## ###   #  
+####  # ## ###   #  
+#     ###  # #   #  
+ ###   #   ## # ### 
+\end{Verbatim}
+\end{minipage}
+  \caption{Evaluation rules for \lamA. These rules show 
+    \emph{call-by-value}, where arguments are evaluated
+    before functions.}
+  \label{fig_lang2}
+\end{myfig}
 
+A \lamA term executes by rewriting the expression according to the
+rules in Figure \ref{fig_lang2}. We match our term to each of the
+patterns above the line. If we hav a match, we rewrite according to
+the pattern below the line. When no more matches can be made, we say
+the term is in \emph{normal form}: we have finished executing.
+
+The rules given implement \emph{call-by-value} evaluation order,
+meaning arguments to a function are evaluated before the function
+itself. Other variants include \emph{call-by-need} and
+\emph{call-by-name}, where arguments are not evaluated until
+needed. We do not considers those variants further, however.
 
 \emph{A few sample programs in \lamA -- natural numbers \& arithmetic, booleans
 \& logic functions}
+
+This form is the simplest version of the \lamA, and it
+does not much resemble a programming language. However, we can 
+quickly build some interesting programs with it. Consider the 
+natural numbers (0, 1, 2, \ellipsis, etc.). We can define 0 as
+the function that just returns its argument, $z$:
+\begin{align}
+  0 &= \lamAbs{z}{z}. \\
+  \intertext{Similarly, we can define 1 as the function that returns $s$ applied
+    to $z$ once:}
+  1 &= \lamAbs{s}{\lamAbs{z}{\lamApp{s}{z}}}. \\
+    \intertext{In fact, all the naturals can be defined in the same way. The next few are:}
+    2 &= \lamAbs{s}{\lamAbs{s}{\lamAbs{z}{\lamApp{s}{\lamPApp{s}{z}}}}}. \\
+    3 &= \lamAbs{s}{\lamAbs{s}{\lamAbs{s}{\lamAbs{z}{\lamApp{s}{\lamPApp{s}{\lamPApp{s}{z}}}}}}}.
+    \intertext{}
+    
+\end{align}
+
+We can interpret the number of $s$ terms as the natural represented by
+these functions. Given that, we can define arithmetic functions
+in terms of $s$ and $z$.  $succ$, the successor function, 
+which always returns the successor the the natural given:
+\begin{align}
+  succ &= \lamAbs{n}{\lamAbs{s}{\lamApp{s}{n}}.} \text{(\bf{verify!})} 
+  \intertext{We can find the sum of two numbers with $add$:}
+  add &= \lamAbs{m}{\lamAbs{n}{\lamApp{m}{n}}}.
+  \intertext{We multiply by adding $m$ to $n$ over and over, $m$ times:}
+  mult &= \lamAbs{m}{\lamAbs{n}{\lamApp{m}{\lamPApp{\lamPApp{add}{n}}}{m}}}.
+\end{align}
 
 \emph{Compiling to RTL}
 
