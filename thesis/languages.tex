@@ -4,138 +4,207 @@
 \begin{document}
 \include{document.preamble}
 
-\chapter{Languages}
+\chapter{Functional Languages}
 \label{ref_chapter_languages}
 
-\emph{Defines the languages used in the thesis and a simple
-  compilation scheme from a \lamA variant to our monadic language. }
+\emph{Brief definitino of ``functional languages.'' Introduce our
+  lambda calculus variant. Shows a compilation scheme from the variant
+  to Caffeine's RTL as an example}
 
-\section{Source Language}
+\section{The \LamA}
+\emph{Why is it important}
 
-\emph{Defines a \lamA variant with some monadic effects, enough to
-  illustrate interesting programs.}
+In mathematics, a ``function'' takes one or more arguments and
+produces some value. ``Functional programming languages'' are based
+around the same idea -- the definition and evaluation of
+functions. They all share share the ability to manipulate functions
+during execution; that is, they are not limited to executing only the
+function definitions specified by the programmer -- they can define
+new functions as part of a computation.
 
-\section{Monadic Intermediate Language}
+\emph{What is the \lamA}
 
-%% What does the language support?
+Alonzo Church defined his \lamA (``lambda calculus'') in 19XX
+\citep{ChurchXX} to study systems of recursive equations. Being
+Turing-complete, it can be used to model the behavior of any
+computational system. However, it is particularly useful for modeling
+functional programming languages. %% why?
 
-Our monadic language takes its inspiration from Haskell's @do@
-notation. It is a pure functional language, making allocation of data
-structures and closures explicit via monadic syntax. Functions in MIL
-define computations which, when run, can affect heap memory. Figure
-\ref{figMILDef} gives the syntax of the language.
+Figure \ref{fig_lang1}, part \emph{a}, gives a syntax for the ``pure''
+\lamA. ``Abstraction'' defines a new function, while ``application''
+gives a particular argument to a function. ``Variables'' are defined
+when mentioned. 
 
-%% TODO: Mention that v restricts the term to variables
-%% only.
+Using this syntax, we can define the identity function (which
+just returns its argument) as:
+\[
+\lambda x. x.
+\]
+A few other examples include \emph{composition}, where the first
+argument takes the result of applying the second argument to the
+third:
+  & \lambda f. \lambda g. \lambda x. (f (g x)), \\
+\intertext{\emph{const}, where the first argument is always returned:}
+  & \lambda a. \lambda b. a, \\
+\intertext{and \emph{flip}, which reverses the arguments given to a function:}
+  & \lambda f. \lambda a. \lambda b. (f b a).
+\end{align}
 
-\begin{figure}[h]
-\begin{code}
-  defM := k {v1, ..., vN} v = k1 {v1, ..., vN, v} 
-    | k {v1, ..., vN} v = b(v1, ..., vN, v)
-    | b(v1, ..., vN) = bodyM
-    | t <- k {}
+This form is the simplest version of the \lamA, and it
+does not much resemble a programming language. In part \emph{b} 
+we extend it to include integers and top-level definitions. The first
+allows us to easily represent numbers, while the second lets us define
+re-usable definitions. 
 
-  bodyM := do 
-    stmtM1 
-    ... 
-    stmtMN 
-    tailM
-
-  stmtM := v <- tailM
-    | case v of [alt1, ..., altN]
-
-
-  tailM := return v
-    | v1 @ v2
-    | k {v1, ..., vN}
-    | f(v1, ..., vN)
-    | C v1 ... vN
-
-  alt := C v1 ... vN -> b(v1, ..., vM) -- m <= n
-\end{code}
-\caption{Concrete syntax for our monadic intermediate language.}
-\label{figMILDef}
+\begin{figure}[ht]
+  \begin{Verbatim}
+##                 ##      ##       
+ #                  #       #       
+ #  ###  ########   ###   ###  ###  
+ #  ###   #  #  #   #  # #  #  ###  
+ #  # #   #  #  #   #  # #  #  # #  
+### ## # #########  ###   #### ## # 
+  \end{Verbatim}
+  \caption{The \lamA's syntax and evaulation rules.}
+  \label{fig_lang1}
 \end{figure}
 
-MIL programs consist of a series of definitions (@defM@). Each
-definition can be any of the following.
 
-\begin{description}
-  \item[Closure-capturing] (@k {v1, ..., vN} v = k1 {v1, ..., vN, v}@) -- This function
-    expects to find the variables @v1, ..., vN@ in its own closure. It constructs
-    a new closure containing the existing variables plus the newly captured variable
-    @v@. The new closure refers to @k1@, another closure-capturing function.
-  \item[Block-calling] (@k {v1, ..., vN} v = b(v1, ..., vN, v)@) -- This function immediately
-    jumps to block @b@ with arguments @v1, ..., vN@ and @v@. No closure value needs to
-    be constructed. 
-  \item[Function block] (@b(v1, ..., vN) = bodyM@) -- This function executes the statements
-    in the body. 
-  \item[Top-level] (@t <- k {}@) -- This special case ensures top-level definitions in the program
-    can be accessed like any other function. The notation indicates that @t@ holds a closure
-    structure, referring to the definition @k@. 
-\end{description}
-
-Notice that we can distinguish syntatically between functions that
-merely create a closure (@k { ... }@) and those that do actual work
-(@b(...)@). The body of a @k@ functin can only allocate another
-closure or jump to a block. A block, on the other hand, can do other
-work, but it cannot directly return a closure. As will be described in
-chapter \ref{ref_chapter_uncurrying} this makes it much easier to
-recognize and elminate intermediate closures.
-
-The body of each block consists of statements followed by a
-\emph{tail}. Tails can only
-appear as the last statement in a block or on the right-hand side of
-the monadic arrow (``@<-@''). Tail instructions, in other words, cause 
-effects. The three tail statements follow:
-
-\begin{description}
-\item[Return a computation] (@return v@) -- Returns the result of a computation
-  to the caller.
-
-\item[Create a closure] (@k {v1, ..., vN}@) -- Creates a closure pointing to
-  function @k@, capturing variables @v1@ through @vN@.
-
-\item[Enter a function] (@v1 @@ v2@) -- Enter the closure referred to by @v1@, with
-  argument @v2@. In other words, function application. Note that @v1@ represents an
-  \emph{unknown} function -- one for which we compute the address at run-time.
-
-\item[Call a block] (@f(v1, ..., vN)@) -- Jump to the block labeled @f@ with the arguments
-  given. In this case we know the function @f@ refers to and do not need to examine
-  a closure in order to execute it.
-\item[Create a value] (@C v1 ... vN@) -- Create a data value with tag @C@, holding
-  the values found in variables @v1 ... vN@.
-\end{description}
-
-%% TODO: Describe alt syntax.
-
-Statements in a block either bind the result of a tail statement 
-(@v <- tailM@) or branch conditionally (@case v of ... @). Binding ``runs''
-a computation and ``dereferences'' the result, placing
-the value in a variable (e.g., @v@). That same variable can be bound
-again later, but that does not affect previous uses of @v@. In essence, the old
-name becomes hidden and its value inaccessible.
-
-Though the syntax allows multiple @case@ statements in a function
-body, only one can appear and it must be the last statement in the
-body. The arms of the @case@ statement can only match on constructor
-tags (@C@) and can only bind the constructor arguments to variables
-(@v1 ... vN@). Each arm then jumps to a known block with those
-variables as arguments. This choice makes compilation simpler.
+\emph{What does it look like?}
 
 
-%% \emph{Defines our monadic language and explains the terms in
-%%   it. Example programs are given which illustrate closure construction
-%%   and data allocation. The use of ``tail'' vs. statements is motivated
-%%   and described. }
 
-\emph{Need to talk about the monad we work in as well - what 
-do bind and return mean?}
+\emph{A few sample programs in \lamA -- natural numbers \& arithmetic, booleans
+\& logic functions}
 
-\section{Compiling to Our MIL}
-\emph{A compilation scheme which uses Hoopls ``shapes'' is
-described. This scheme will give use our initial, unoptimized
-MIL program. An example (possibly |compose|, or |const3|) illustrates 
-our scheme.}
+\emph{Compiling to RTL}
+
+%% \section{Source Language}
+
+%% \emph{Defines11 a \lamA variant with some monadic effects, enough to
+%%   illustrate interesting programs.}
+
+%% \section{Monadic Intermediate Language}
+
+%% %% What does the language support?
+
+%% Our monadic language takes its inspiration from Haskell's @do@
+%% notation. It is a pure functional language, making allocation of data
+%% structures and closures explicit via monadic syntax. Functions in MIL
+%% define computations which, when run, can affect heap memory. Figure
+%% \ref{figMILDef} gives the syntax of the language.
+
+%% %% TODO: Mention that v restricts the term to variables
+%% %% only.
+
+%% \begin{figure}[h]
+%% \begin{code}
+%%   defM := k {v1, ..., vN} v = k1 {v1, ..., vN, v} 
+%%     | k {v1, ..., vN} v = b(v1, ..., vN, v)
+%%     | b(v1, ..., vN) = bodyM
+%%     | t <- k {}
+
+%%   bodyM := do 
+%%     stmtM1 
+%%     ... 
+%%     stmtMN 
+%%     tailM
+
+%%   stmtM := v <- tailM
+%%     | case v of [alt1, ..., altN]
+
+
+%%   tailM := return v
+%%     | v1 @ v2
+%%     | k {v1, ..., vN}
+%%     | f(v1, ..., vN)
+%%     | C v1 ... vN
+
+%%   alt := C v1 ... vN -> b(v1, ..., vM) -- m <= n
+%% \end{code}
+%% \caption{Concrete syntax for our monadic intermediate language.}
+%% \label{figMILDef}
+%% \end{figure}
+
+%% MIL programs consist of a series of definitions (@defM@). Each
+%% definition can be any of the following.
+
+%% \begin{description}
+%%   \item[Closure-capturing] (@k {v1, ..., vN} v = k1 {v1, ..., vN, v}@) -- This function
+%%     expects to find the variables @v1, ..., vN@ in its own closure. It constructs
+%%     a new closure containing the existing variables plus the newly captured variable
+%%     @v@. The new closure refers to @k1@, another closure-capturing function.
+%%   \item[Block-calling] (@k {v1, ..., vN} v = b(v1, ..., vN, v)@) -- This function immediately
+%%     jumps to block @b@ with arguments @v1, ..., vN@ and @v@. No closure value needs to
+%%     be constructed. 
+%%   \item[Function block] (@b(v1, ..., vN) = bodyM@) -- This function executes the statements
+%%     in the body. 
+%%   \item[Top-level] (@t <- k {}@) -- This special case ensures top-level definitions in the program
+%%     can be accessed like any other function. The notation indicates that @t@ holds a closure
+%%     structure, referring to the definition @k@. 
+%% \end{description}
+
+%% Notice that we can distinguish syntatically between functions that
+%% merely create a closure (@k { ... }@) and those that do actual work
+%% (@b(...)@). The body of a @k@ functin can only allocate another
+%% closure or jump to a block. A block, on the other hand, can do other
+%% work, but it cannot directly return a closure. As will be described in
+%% chapter \ref{ref_chapter_uncurrying} this makes it much easier to
+%% recognize and elminate intermediate closures.
+
+%% The body of each block consists of statements followed by a
+%% \emph{tail}. Tails can only
+%% appear as the last statement in a block or on the right-hand side of
+%% the monadic arrow (``@<-@''). Tail instructions, in other words, cause 
+%% effects. The three tail statements follow:
+
+%% \begin{description}
+%% \item[Return a computation] (@return v@) -- Returns the result of a computation
+%%   to the caller.
+
+%% \item[Create a closure] (@k {v1, ..., vN}@) -- Creates a closure pointing to
+%%   function @k@, capturing variables @v1@ through @vN@.
+
+%% \item[Enter a function] (@v1 @@ v2@) -- Enter the closure referred to by @v1@, with
+%%   argument @v2@. In other words, function application. Note that @v1@ represents an
+%%   \emph{unknown} function -- one for which we compute the address at run-time.
+
+%% \item[Call a block] (@f(v1, ..., vN)@) -- Jump to the block labeled @f@ with the arguments
+%%   given. In this case we know the function @f@ refers to and do not need to examine
+%%   a closure in order to execute it.
+%% \item[Create a value] (@C v1 ... vN@) -- Create a data value with tag @C@, holding
+%%   the values found in variables @v1 ... vN@.
+%% \end{description}
+
+%% %% TODO: Describe alt syntax.
+
+%% Statements in a block either bind the result of a tail statement 
+%% (@v <- tailM@) or branch conditionally (@case v of ... @). Binding ``runs''
+%% a computation and ``dereferences'' the result, placing
+%% the value in a variable (e.g., @v@). That same variable can be bound
+%% again later, but that does not affect previous uses of @v@. In essence, the old
+%% name becomes hidden and its value inaccessible.
+
+%% Though the syntax allows multiple @case@ statements in a function
+%% body, only one can appear and it must be the last statement in the
+%% body. The arms of the @case@ statement can only match on constructor
+%% tags (@C@) and can only bind the constructor arguments to variables
+%% (@v1 ... vN@). Each arm then jumps to a known block with those
+%% variables as arguments. This choice makes compilation simpler.
+
+
+%% %% \emph{Defines our monadic language and explains the terms in
+%% %%   it. Example programs are given which illustrate closure construction
+%% %%   and data allocation. The use of ``tail'' vs. statements is motivated
+%% %%   and described. }
+
+%% \emph{Need to talk about the monad we work in as well - what 
+%% do bind and return mean?}
+
+%% \section{Compiling to Our MIL}
+%% \emph{A compilation scheme which uses Hoopls ``shapes'' is
+%% described. This scheme will give use our initial, unoptimized
+%% MIL program. An example (possibly |compose|, or |const3|) illustrates 
+%% our scheme.}
 
 \end{document}
