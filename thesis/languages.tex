@@ -82,7 +82,7 @@ applying the second function to the argument is passed to the first:}
 
 A \lamA term executes by rewriting the expression according to the
 rules in Figure \ref{fig_lang2}. We match our term to each of the
-patterns above the line. If we hav a match, we rewrite according to
+patterns above the line. If we have a match, we rewrite according to
 the pattern below the line. When no more matches can be made, we say
 the term is in \emph{normal form}: we have finished executing.
 
@@ -92,39 +92,121 @@ itself. Other variants include \emph{call-by-need} and
 \emph{call-by-name}, where arguments are not evaluated until
 needed. We do not considers those variants further, however.
 
-\emph{A few sample programs in \lamA -- natural numbers \& arithmetic, booleans
-\& logic functions}
+%\emph{A few sample programs in \lamA -- natural numbers \& arithmetic, booleans
+%\& logic functions}
 
-This form is the simplest version of the \lamA, and it
-does not much resemble a programming language. However, we can 
-quickly build some interesting programs with it. Consider the 
-natural numbers (0, 1, 2, \ellipsis, etc.). We can define 0 as
-the function that just returns its argument, $z$:
-\begin{align}
-  0 &= \lamAbs{z}{z}. \\
-  \intertext{Similarly, we can define 1 as the function that returns $s$ applied
-    to $z$ once:}
-  1 &= \lamAbs{s}{\lamAbs{z}{\lamApp{s}{z}}}. \\
-    \intertext{In fact, all the naturals can be defined in the same way. The next few are:}
-    2 &= \lamAbs{s}{\lamAbs{s}{\lamAbs{z}{\lamApp{s}{\lamPApp{s}{z}}}}}. \\
-    3 &= \lamAbs{s}{\lamAbs{s}{\lamAbs{s}{\lamAbs{z}{\lamApp{s}{\lamPApp{s}{\lamPApp{s}{z}}}}}}}.
-    \intertext{}
-    
-\end{align}
+%%%
+%%% Presentation below due to Pierce ``Types and Programming Languages.''
+%%%
 
-We can interpret the number of $s$ terms as the natural represented by
-these functions. Given that, we can define arithmetic functions
-in terms of $s$ and $z$.  $succ$, the successor function, 
-which always returns the successor the the natural given:
-\begin{align}
-  succ &= \lamAbs{n}{\lamAbs{s}{\lamApp{s}{n}}.} \text{(\bf{verify!})} 
-  \intertext{We can find the sum of two numbers with $add$:}
-  add &= \lamAbs{m}{\lamAbs{n}{\lamApp{m}{n}}}.
-  \intertext{We multiply by adding $m$ to $n$ over and over, $m$ times:}
-  mult &= \lamAbs{m}{\lamAbs{n}{\lamApp{m}{\lamPApp{\lamPApp{add}{n}}}{m}}}.
-\end{align}
+%% This form is the simplest version of the \lamA, and it
+%% does not much resemble a programming language. However, we can 
+%% quickly build some interesting programs with it. Consider the 
+%% natural numbers (0, 1, 2, \ellipsis, etc.). We can define 0 as
+%% the function that just returns its argument, $z$:
+%% \begin{align}
+%%   0 &= \lamAbs{s}{\lamAbs{z}{z}}. \\
+%%   \intertext{Similarly, we can define 1 as the function that returns $s$ applied
+%%     to $z$ once:}
+%%   1 &= \lamAbs{s}{\lamAbs{z}{\lamApp{s}{z}}}. \\
+%%     \intertext{In fact, all the naturals can be defined in the same way. The next few are:}
+%%     2 &= \lamAbs{s}{\lamAbs{z}{\lamApp{s}{\lamPApp{s}{z}}}}. \\
+%%     3 &= {\lamAbs{s}{\lamAbs{z}{\lamApp{s}{\lamPApp{s}{\lamPApp{s}{z}}}}}}}.
+%%     \intertext{}
+%% \end{align}
 
-\emph{Compiling to RTL}
+%% We can interpret the number of $s$' as the natural represented by
+%% these functions. Given that, we can define arithmetic functions
+%% in terms of $s$ and $z$.  $succ$, the successor function, 
+%% which always returns the successor the the natural given:
+%% \begin{align}
+%%   succ &= \lamAbs{n}{\lamAbs{s}{\lamAbs{z}{\lamApp{s}{\lamPApp{n}{\lamPApp{s}{z}}}}}}. 
+%%   \intertext{We can find the sum of two numbers with $add$:}
+%%   add &= \lamAbs{m}{\lamAbs{n}{\lamAbs{s}{\lamAbs{z}{\lamApp{m}{\lamPApp{s}{n}}}}}.
+%%   \intertext{We multiply by adding $m$ to $n$ over and over, $m$ times:}
+%%   mult &= \lamAbs{m}{\lamAbs{n}{\lamApp{m}{\lamPApp{\lamPApp{add}{n}}}{m}}}.
+%% \end{align}
+
+\section{Compiling the \LamA}
+
+%% Define which steps in compilation we're going to worry about
+Compiling even a language as simple as the \lamA involves a number of
+steps, such as defining a concrete syntax, parsing source programs
+into an \emph{abstract syntax tree} (AST), and producing an executable
+program from the AST. For our purposes, however, we just focus on the
+\lamA' three fundamental operations:
+\begin{description}
+\item Find a value by name(\emph{variables}).
+\item Apply a function to an argument (\emph{application}).
+\item Create a new function (\emph{abstraction}). 
+\end{description}
+Any compiler for the \lamA must be able to produce executable programs
+which implement these operations. 
+
+%% Free variables and environment
+Before discussing our compiler, let us first consider how to find
+a value by its name. For example, in the following program fragment
+\begin{equation}
+  \lamAbs{x}{\lamApp{f}{\lamPApp{g}{x}}}.
+  \label{eq_lang1}
+\end{equation}
+we see three variables: $f$, $g$, and $x$. We say $x$ is \emph{bound},
+because it is given as an argument, and that $f$ and $g$ are
+\emph{free} because, in this context, they are not bound by a
+$\lambda$-abstraction. To evaluate this expression, though, we need
+a way to find the values of these terms.  
+
+We can describe where to find $f$, $g$ and $x$ in terms of memory
+locations. We can say that $x$ will appear in a special location,
+$arg$, because it is the argument to the function and we will always
+put arguments in the same place. We can further say that another
+special location, $clo$, will have two
+slots. The first will contain $g$ and the second will contain
+$f$. Conceptually, then, our expression can be represented as:
+\begin{equation}
+  \begin{split}
+    arg &= x, \\
+    clo[0] &= g, \\
+    clo[1] &= f \text{in} \\
+    \lamAbs{_}{\lamApp{clo[1]}{\lamPApp{clo[0]}{arg}}}.
+  \end{split}
+\end{equation}
+
+In general, the $clo$ location holds the \emph{environment} for our
+expression. For any given expression, we will be able to find all the
+free variables (i.e., all those except the argument) in the
+environment. The compiler will be responsible for ensuring the correct
+environment is available whenever a given expression is evaluated.
+
+%% Application & closures
+Associating location with names is not enough, however. Looking again
+at Equation \ref{eq_lang1}, it is clear $g$ represents a function, to
+which we are passing the argument $x$. To compute the value of
+$\lamPApp{g}{x}$, we must be able to execute the code representing
+$g$. Because we have a storage location for $g$ alread, we can
+say that the value in $clo[0]$ holds a \emph{label} that tells us
+where to find the code representing $g$. 
+
+We begin by defining a \emph{target machine} for our compiler. To
+reduce complexity we do not target an actual computer, but one of our
+own design. Our machine will have an infinite number of
+\emph{registers} (i.e., storage locations) that we can refer to by
+name. It will have an unlimited supply of memory (called the
+\emph{heap}) in which we can allocate structured values. However, we
+will not refer to memory locations directly. Instead, we will always
+store references to heap values in registers. Finally, the machine
+will execute a list of instructions (our \emph{program}), starting at
+the beginning and proceeding in sequential order (unless otherwise
+instructed), until reaching the end of the list. Each instruction will
+have a definite location, but we will only refer to certain special
+locations using named labels. 
+
+
+%% Essence of compiling lambda-calculus
+
+%% Define our intermediate language
+
+%% Show compilation scheme
 
 %% \section{Source Language}
 
