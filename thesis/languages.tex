@@ -143,6 +143,28 @@ program from the AST. For our purposes, however, we just focus on the
 Any compiler for the \lamA must be able to produce executable programs
 which implement these operations. 
 
+\subsection{The Target Machine}
+We begin by defining a \emph{target machine}, $M_\lambda$, for our compiler. To
+reduce complexity we do not target an actual computer, but one of our
+own design. Our machine will have an infinite number of
+\emph{registers} (i.e., storage locations) that we can refer to by
+name. It will have an unlimited supply of memory (called the
+\emph{heap}) in which we can allocate structured values. However, we
+will not refer to memory locations directly. Instead, we will always
+store references to heap values in registers. Finally, the machine
+will execute a list of instructions (our \emph{program}), starting at
+the beginning and proceeding in sequential order (unless otherwise
+instructed), until reaching the end of the list. Each instruction will
+have a definite location, but we will only refer to certain special
+locations using named labels.
+
+A benefit of defining our own machine is that we can also define the
+language it executes -- and the language we need to compile to! We
+cannot make it too dissimimlar from a ``real'' machine, but at this
+stage it helps to keep things simple. 
+
+\subsection{Variables}
+
 %% Free variables and environment
 Before discussing our compiler, let us first consider how to find
 a value by its name. For example, in the following program fragment
@@ -178,29 +200,42 @@ free variables (i.e., all those except the argument) in the
 environment. The compiler will be responsible for ensuring the correct
 environment is available whenever a given expression is evaluated.
 
+Our machine, then, must have instructions for storing and retrieving
+values. We define two instructions for this purpose:
+\begin{center}
+  \begin{tabular}{ll}
+    #Store R (F, M)# & Store the value found in register #R# to field %%
+    #F# of the value in register #M#. \\
+    #Load (F, M) R# & Load field #F# of the value in register #M# to register #R#. \\
+  \end{tabular}
+\end{center}
+
+#R#, the register name, can be anything, including ``arg'' and ``clo'', for the special locations named above.
+
+\subsection{Function Application}
+
 %% Application & closures
 Associating location with names is not enough, however. Looking again
 at Equation \ref{eq_lang1}, it is clear $g$ represents a function, to
 which we are passing the argument $x$. To compute the value of
 $\lamPApp{g}{x}$, we must be able to execute the code representing
-$g$. Because we have a storage location for $g$ alread, we can
+$g$. Because we have a storage location for $g$ already, we can
 say that the value in $clo[0]$ holds a \emph{label} that tells us
 where to find the code representing $g$. 
 
-We begin by defining a \emph{target machine} for our compiler. To
-reduce complexity we do not target an actual computer, but one of our
-own design. Our machine will have an infinite number of
-\emph{registers} (i.e., storage locations) that we can refer to by
-name. It will have an unlimited supply of memory (called the
-\emph{heap}) in which we can allocate structured values. However, we
-will not refer to memory locations directly. Instead, we will always
-store references to heap values in registers. Finally, the machine
-will execute a list of instructions (our \emph{program}), starting at
-the beginning and proceeding in sequential order (unless otherwise
-instructed), until reaching the end of the list. Each instruction will
-have a definite location, but we will only refer to certain special
-locations using named labels. 
+We now have two different types of values: an environment which tells
+the currently evaluating function where to find its free variables;
+and labels which tells us where to find the code representing a
+function. However, $g$ may refer to any number of free variables, so
+it makes sense to pair the label in $clo[0]$ with $g$'s environment. We call
+this data structure a \emph{closure}.
 
+Closures are the fundamental data structures used to compile functional
+languages. They may not have the exact form described here but they always
+have the same purpose: they pair a label with the free variables used in the
+function represented. 
+
+\subsection{Abstraction}
 
 %% Essence of compiling lambda-calculus
 
