@@ -144,7 +144,7 @@ Any compiler for the \lamA must be able to produce executable programs
 which implement these operations. 
 
 \subsection{The Target Machine}
-We begin by defining a \emph{target machine}, $M_\lambda$, for our compiler. To
+We begin by defining a \emph{target machine}, \machLam, for our compiler. To
 reduce complexity we do not target an actual computer, but one of our
 own design. Our machine will have an infinite number of
 \emph{registers} (i.e., storage locations) that we can refer to by
@@ -185,15 +185,22 @@ put arguments in the same place. We can further say that another
 special location, $clo$, will have two
 slots. The first will contain $g$ and the second will contain
 $f$. Conceptually, then, our expression can be represented as:
-\begin{equation}
-  \begin{split}
-    arg &= x, \\
-    clo[0] &= g, \\
-    clo[1] &= f \text{in} \\
-    \lamAbs{_}{\lamApp{clo[1]}{\lamPApp{clo[0]}{arg}}}.
-  \end{split}
-\end{equation}
 
+\begin{center}
+  \begin{tabular}{c}
+    \begin{equation*}
+      \begin{aligned}[b]
+        arg &= x, \\
+        clo[0] &= g, \\
+        clo[1] &= f 
+      \end{aligned}
+    \end{equation*}\ in \\
+    \begin{equation*}
+      \lamAbs{\_}{\lamApp{clo[1]}{\lamPApp{clo[0]}{arg}}}.
+    \end{equation*}
+  \end{tabular}
+\end{center}
+\bigskip
 In general, the $clo$ location holds the \emph{environment} for our
 expression. For any given expression, we will be able to find all the
 free variables (i.e., all those except the argument) in the
@@ -203,7 +210,7 @@ environment is available whenever a given expression is evaluated.
 Our machine, then, must have instructions for storing and retrieving
 values. We define two instructions for this purpose:
 \begin{center}
-  \begin{tabular}{ll}
+  \begin{tabular}{lp{4in}}
     #Store R (F, M)# & Store the value found in register #R# to field %%
     #F# of the value in register #M#. \\
     #Load (F, M) R# & Load field #F# of the value in register #M# to register #R#. \\
@@ -227,13 +234,31 @@ We now have two different types of values: an environment which tells
 the currently evaluating function where to find its free variables;
 and labels which tells us where to find the code representing a
 function. However, $g$ may refer to any number of free variables, so
-it makes sense to pair the label in $clo[0]$ with $g$'s environment. We call
-this data structure a \emph{closure}.
+it makes sense to pair the label in $clo[0]$ with $g$'s
+environment. We call this data structure a \emph{closure}. Closures
+are the fundamental data structures used to compile functional
+languages. They may not have the exact form described here but they
+always have the same purpose: they pair a label with the free
+variables used in the function represented.
 
-Closures are the fundamental data structures used to compile functional
-languages. They may not have the exact form described here but they always
-have the same purpose: they pair a label with the free variables used in the
-function represented. 
+We require two new instructions to implement function application:
+#Enter# and #Return#. #Enter# expects to find a closure in register
+#clo# and will cause the machine to start executing the code at the
+label given in the closure. A #Return# instruction will cause the machine
+to jump back to the instruction following the most recently executed 
+#Enter# instruction. The machine will maintain a stack of return locatins
+so that #Enter# instructions can be nested. The exact syntax of the
+instructions are:
+\begin{center}
+  \begin{tabular}{lp{4in}}
+    #Enter# & Jump to the location indicated by the closure in
+    register #clo#, assuming an argument in register #arg#. Return to
+    this location when finished, with the result of the function in
+    register #result#. \\
+    #Return# & Jump to the instruction following the most recently 
+    executed #Enter# instruction and begin executing. 
+  \end{tabular}
+\end{center}
 
 \subsection{Abstraction}
 
