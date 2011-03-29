@@ -181,6 +181,7 @@ The following sections describe each aspect in detail.
     #Enter# & Jump to the location indicated by the closure in
     register #clo#, assuming an argument in register #arg#. The next #Return# executed
     will return to this location, with a result in register #res#.\\
+    \texttt{Copy \emph{R} \emph{M}} & Copies the contents of register #R# to register #M#. \\
     #Return# & Jump to the instruction following the most recently 
     executed #Enter# instruction and begin executing.  \\
     \texttt{MkClo \emph{L} [\emph{R}, \emph{S}, ...]} &  Create a closure pointing to the 
@@ -263,7 +264,10 @@ function application. #Enter# expects to find a closure in register
 label given in the closure. A #Return# instruction will cause the
 machine to jump back to the instruction following the most recently
 executed #Enter# instruction. The machine will maintain a stack of
-return locations so that #Enter# instructions can be nested
+return locations so that #Enter# instructions can be nested.
+
+We also use the #Copy# instruction to save and restore registers before
+and after an #Enter# instruction. 
 
 \subsection{Abstraction}
 The \lamA lets us define functions which return new functions. We have
@@ -289,17 +293,114 @@ variables found in the body of the expression.
 
 \subsection{Compiling from \lamA to \machLam}
 
+Figure \ref{fig_lang3} gives our algorithm to compile from \lamA to
+\machLam. We present it in cases, according to the syntax of \lamA
+terms given in Figure \ref{fig_lang1}. The ``fat brackets,''
+\compMach{t}, represent our compiler, with the term being
+compiled given as the argument, $t$.  Each term compiles to a given
+sequence of instructions. We also assume a function $\rho$, maintained
+by the compiler, that knows which register holds a given variable.
+
+Case \ref{eqn_lang3} shows the compilation
+scheme for variables. Variable refrences that are not used
+in function application can only be the body of an expression, so we
+just copy the value found in the variable's register to the #res#
+register and return.
+
+Function application, \lamPApp{f}{g}, is shown in case
+\ref{eqn_lang4}. To apply a function, we must save the current #clo#
+and #arg# registers. The compiler creates \emph{fresh} registers,
+guaranteed to be unused anywhere else in the program, to store #clo#
+and #arg#. We then use $\rho$ to find the registers holding $f$ and
+$g$. Remember that $f$ will be a closure, while $g$ will be some
+value. We copy those values into #clo# and #arg#. The #Enter#
+instruction will execute the code pointed to by #clo#. When that
+function returns, we restore #clo# and #arg# from the fresh registers
+created earlier.
+
+Abstractions, such as \lamAbs{x}{t}, return a closure pointing to the
+code implementing $t$. Therefore, our compiler needs to generate code
+that returns a closure, which in turn points to the code generated for
+the body of the abstraction. To accomplish this, our compiler
+recursively calls itself on the body. We get a label back, which is the
+location of the just compiled code. In cases \ref{eqn_lang5} and
+\ref{eqn_lang6} the expression $l = \compMach{\lamAbs{y}{t}}$ shows this
+recursive call, and the label that results. That label can then be used in the 
+closure returned by the abstraction.
+
+We separate compilation of abstractions into two cases, depending if
+the body is an abstraction or not. In the first case, as shown in case
+\ref{eqn_lang5}, we ultimately return a new closure. The closure
+points to the body of our abstraction, contains all the values found
+in the current closure, and ``captures'' our argument in the new
+closure. 
+
+For example, consider compiling this expression:
+
+\begin{equation}
+  \lamAbs{x}{\lamAbs{y}{\lamApp{f}{\lamPApp{y}{x}}}}. 
+\end{equation}
+
+$f$ and $x$ must be available when the body
+\lamPApp{f}{\lamPApp{y}{x}} executes. Therefore, the closure returned
+by \lamAbs{x}{(\mathellipsis)} must copy all values in the existing
+closure as well as add the argument, $x$.
+
+Case \ref{eqn_lang6} shows the code generated when the body of
+an abstraction is \emph{not} another abstraction. In this case
+we just compile the body like any other term. However, we also
+mark the location of the start of the body with a  new label, \emph{l}. This
+label will be used by the compiler when compiling terms that match
+case \ref{eqn_lang5}.
+
+\begin{myfig}[th]
+\begin{minipage}{4in}
 \begin{Verbatim}[commandchars=\\\{\}]
-  [ v ] = Load ``r_V'' ``res'', r_v the register holding v.
-  [ f g ] = Copy ``arg'' r1
-            Copy ``clo'' r2
-            Copy ``r_g'' arg
-            Copy ``r_f'' clo
-            Enter
-            Copy r1 ``arg''
-            Copy r2 ``clo''
- [\ensuremath{\lambda} x . t] = MkClo l fvs(t)
+  \compMach{v} = 
+    \emph{\ensuremath{\rho} associates variables to the register that}
+    \emph{they will be found in. This lookup occurs during}
+    \emph{compilation, not while the program executes.}
+    Copy \ensuremath{\rho}(v) ``res''
+    Return
+  \compMach{\lamApp{f}{g}} = 
+    \emph{r1 and r2 are ``fresh'' registers.} 
+    Copy ``arg'' r1
+    Copy ``clo'' r2
+    \emph{Set up the} clo \emph{and} arg \emph{registers for}
+    \emph{the function being called.}
+    Copy \ensuremath{\rho}(g) arg
+    Copy \ensuremath{\rho}(f) clo
+    Enter
+    \emph{Restore the previous} arg \emph{and} clo 
+    \emph{registers.}
+    Copy r1 ``arg''
+    Copy r2 ``clo''
+ \compMach{\lamAbs{x}{\lamAbs{y}{\texttt{t}}}} = 
+   \emph{Compile the body of our function.} l 
+   \emph{is the label giving the location of the compiled code.}
+   \emph{Notice this is a recursive call to our compiliation}
+   \emph{function.}
+   l = \compMach{\lamAbs{y}{t}}
+   ...
+   \emph{Copy current values out of the closure;} N
+   \emph{is the number of fields in the closure.}
+   Store r1 (``clo'', 0) 
+   Store r2 (``clo'', 1) 
+   ...
+   Store rN (``clo'', N)
+   
+   \emph{Create a new closure holding the previous values}
+   \emph{the argument} x, \emph{and pointing to the}
+   \emph{compiled body of our function.}
+   MkClo l [r1, r2, ..., rN, \ensuremath{\rho}(x)]
+   Return
+ \compMach{\lamAbs{x}{\texttt{t}}} = 
+   l : \compMach{t}
 \end{Verbatim}
+\end{minipage}
+\caption{Compilation rules from \lamA to \machLam.}
+\label{tbl_lang2}
+\end{myfig}
 
 %% Essence of compiling lambda-calculus
 
