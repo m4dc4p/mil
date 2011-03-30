@@ -1,0 +1,140 @@
+%% Used in the languages chapter, this
+%% table is placed in its own file so we can use
+%% it with the afterpage command.
+\begin{singlespace}
+  \begin{longtable}{p{2in}p{3.5in}}
+    \caption{Compilation rules from \lamA to \machLam.} \\
+    \hline \\
+    \endfirsthead
+    \caption{Compilation rules from \lamA to \machLam \emph{(cont'd)}} \\
+    \hline \\
+    \endhead
+    \\ \hline \multicolumn{2}{r}{\emph{Continued on next page}}
+    \endfoot 
+    \\ \hline
+    \endlastfoot
+    %% Variables
+    \multicolumn{2}{c}{\emph{(a) Variable Reference}} \\ 
+    \begin{minipage}[t]{2in}
+      \begin{Verbatim}[commandchars=\\\{\}]
+\compMach{v} = 
+      \end{Verbatim}
+    \end{minipage} \\
+
+    \begin{minipage}[t]{2in}
+      \begin{Verbatim}[commandchars=\\\{\}]
+  Set ``v'' ``res''
+  Return
+      \end{Verbatim}
+    \end{minipage} &  Because our \lamA does not have any real ``values'', we just
+    set the #res# register to the variable name. \\ \\
+
+    %% Application
+    \multicolumn{2}{c}{\emph{(b) Function Application}} \\ 
+    \begin{minipage}[t]{2in}
+      \begin{Verbatim}[commandchars=\\\{\}]
+\compMach{\lamApp{f}{g}} = 
+      \end{Verbatim}
+    \end{minipage} \\
+
+    \begin{minipage}[t]{2in}
+      \begin{Verbatim}[commandchars=\\\{\}, codes={\catcode`\_8\catcode`\$3}]
+  Copy ``arg'' $r$
+  Copy ``clo'' $s$
+      \end{Verbatim}
+    \end{minipage} & $r$ and $s$ are ``fresh'' registers. \\ \\[-.5em]
+
+    \begin{minipage}[t]{2in}
+      \begin{Verbatim}[commandchars=\\\{\}]
+  Copy \compRho{g} arg
+  Copy \compRho{f} clo
+  Enter
+      \end{Verbatim}
+    \end{minipage} & $\rho$ associates variables
+    to the register that they will be found in. This lookup occurs
+    during compilation, not while the program executes. Here we copy
+    $f$ and $g$ to the #clo# and #arg# registers, respectively. \\ \\[-.5em]
+
+    \begin{minipage}[t]{2in}
+      \begin{Verbatim}[commandchars=\\\{\}, codes={\catcode`\_8\catcode`\$3}]
+  Copy $r$ ``arg''
+  Copy $s$ ``clo''
+      \end{Verbatim}
+    \end{minipage} & Restore the previous #arg# and #clo# registers. \\ \\
+
+    %% Abstraction
+    \multicolumn{2}{c}{\emph{(c) Abstraction with an Abstraction}} \\ 
+    \begin{minipage}[t]{2in}
+      \begin{Verbatim}[commandchars=\\\{\}]
+\compMach{\lamAbs{x}{\lamAbs{y}{t}}} = 
+      \end{Verbatim}
+    \end{minipage} \\
+
+    \begin{minipage}[t]{2in}
+      \begin{Verbatim}[commandchars=\\\{\}]
+m : 
+      \end{Verbatim}
+    \end{minipage} & We mark the function body with a fresh label, #m#. \\ \\[-.5em]
+    
+    \begin{minipage}[t]{2in}
+      \begin{Verbatim}[commandchars=\\\{\}, codes={\catcode`\_8\catcode`\$3}]
+  Store r1 (``clo'', 0) 
+  Store r2 (``clo'', 1) 
+  \dots
+  Store r$N$ (``clo'', 
+            $N$)
+      \end{Verbatim}
+    \end{minipage} & Copy current values out of the closure. $N$
+    equals the number of fields in the closure. \\ \\[-.5em]
+
+    \begin{minipage}[t]{2in}
+      \begin{Verbatim}[commandchars=\\\{\}, codes={\catcode`\_8\catcode`\$3}]
+  MkClo l [r1, \dots, r$N$, 
+           arg]
+  Return
+      \end{Verbatim}
+    \end{minipage} & We call ourselves recursively and 
+    retrieve a label, #l#, holding the location of the compiled body:
+    \[ l = \compMach{\lamAbs{y}{t}} \].
+    We then create a new closure which points to #l#. We put
+    all values from the current closure into the new, and add our 
+    argument, $x$, using the #arg# register. Because #MkClo# puts
+    the closure created in #res#, we can immediately return. \\ \\
+
+    %% Abstraction 2
+    \multicolumn{2}{c}{\emph{(d) Abstraction with a Term}} \\* 
+    \begin{minipage}[t]{2in}
+      \begin{Verbatim}[commandchars=\\\{\}]
+\compMach{\lamAbs{x}{t}} = 
+      \end{Verbatim}
+    \end{minipage} \\*
+
+    \begin{minipage}[t]{2in}
+      \begin{Verbatim}[commandchars=\\\{\}]
+m : 
+      \end{Verbatim}
+    \end{minipage} & Again, we mark the function body with a fresh label, #m#. \\* \\*[-.5em]
+
+    \begin{minipage}[t]{2in}
+      \begin{Verbatim}[commandchars=\\\{\}, codes={\catcode`\_8\catcode`\$3}]
+  Load \compRho{v_1} (0, ``clo'')
+  Load \compRho{v_2} (1, ``clo'')
+  \dots
+  Load \compRho{v_n} ($N$, 
+             ``clo'')
+  Copy ``arg'' \compRho{x} 
+      \end{Verbatim}
+    \end{minipage} & We load all free variables $v_1, \dots, v_n$ from our
+    closure into the appropriate registers, using the $\rho$ function. We also
+    copy the argument $x$ from the #arg# register to the location given by
+    $\rho$. \\ \\[-.5em]
+
+    \begin{minipage}[t]{2in}
+      \begin{Verbatim}[commandchars=\\\{\}]
+  \compMach{t}
+      \end{Verbatim}
+    \end{minipage} & Now that variables are set up correctly, we compile the body
+    of the abstraction and place it inline here.
+  \label{tbl_lang2}
+  \end{longtable}
+\end{singlespace}

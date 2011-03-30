@@ -26,7 +26,7 @@ main = do
   c <- a + a
   return c
 
-block1 (a) = {-"\mathellipsis \emph{elided} \mathellipsis"-}
+block1 (a) = {-"\dots \emph{elided} \dots"-}
 \end{code}
 
 In |main2|, |a| and |c| will be used, but |b| will not. The binding to
@@ -40,7 +40,7 @@ main = do
   c <- a + a
   return c
 
-block1 (a) = {-"\mathellipsis \emph{elided} \mathellipsis"-}
+block1 (a) = {-"\dots \emph{elided} \dots"-}
 \end{code}
 
 In the new program, |block1| is not called and can be eliminated. This

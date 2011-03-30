@@ -92,41 +92,6 @@ itself. Other variants include \emph{call-by-need} and
 \emph{call-by-name}, where arguments are not evaluated until
 needed. We do not considers those variants further, however.
 
-%\emph{A few sample programs in \lamA -- natural numbers \& arithmetic, booleans
-%\& logic functions}
-
-%%%
-%%% Presentation below due to Pierce ``Types and Programming Languages.''
-%%%
-
-%% This form is the simplest version of the \lamA, and it
-%% does not much resemble a programming language. However, we can 
-%% quickly build some interesting programs with it. Consider the 
-%% natural numbers (0, 1, 2, \ellipsis, etc.). We can define 0 as
-%% the function that just returns its argument, $z$:
-%% \begin{align}
-%%   0 &= \lamAbs{s}{\lamAbs{z}{z}}. \\
-%%   \intertext{Similarly, we can define 1 as the function that returns $s$ applied
-%%     to $z$ once:}
-%%   1 &= \lamAbs{s}{\lamAbs{z}{\lamApp{s}{z}}}. \\
-%%     \intertext{In fact, all the naturals can be defined in the same way. The next few are:}
-%%     2 &= \lamAbs{s}{\lamAbs{z}{\lamApp{s}{\lamPApp{s}{z}}}}. \\
-%%     3 &= {\lamAbs{s}{\lamAbs{z}{\lamApp{s}{\lamPApp{s}{\lamPApp{s}{z}}}}}}}.
-%%     \intertext{}
-%% \end{align}
-
-%% We can interpret the number of $s$' as the natural represented by
-%% these functions. Given that, we can define arithmetic functions
-%% in terms of $s$ and $z$.  $succ$, the successor function, 
-%% which always returns the successor the the natural given:
-%% \begin{align}
-%%   succ &= \lamAbs{n}{\lamAbs{s}{\lamAbs{z}{\lamApp{s}{\lamPApp{n}{\lamPApp{s}{z}}}}}}. 
-%%   \intertext{We can find the sum of two numbers with $add$:}
-%%   add &= \lamAbs{m}{\lamAbs{n}{\lamAbs{s}{\lamAbs{z}{\lamApp{m}{\lamPApp{s}{n}}}}}.
-%%   \intertext{We multiply by adding $m$ to $n$ over and over, $m$ times:}
-%%   mult &= \lamAbs{m}{\lamAbs{n}{\lamApp{m}{\lamPApp{\lamPApp{add}{n}}}{m}}}.
-%% \end{align}
-
 \section{Compiling the \LamA}
 
 %% Define which steps in compilation we're going to worry about
@@ -135,11 +100,13 @@ steps, such as defining a concrete syntax, parsing source programs
 into an \emph{abstract syntax tree} (AST), and producing an executable
 program from the AST. For our purposes, however, we just focus on the
 \lamA' three fundamental operations:
-\begin{description}
+
+\begin{itemize}
 \item Find a value by name (\emph{variables}).
 \item Apply a function to an argument (\emph{application}).
 \item Create a new function (\emph{abstraction}). 
-\end{description}
+\end{itemize}
+
 Any compiler for the \lamA must be able to produce executable programs
 which implement these operations. 
 
@@ -163,8 +130,33 @@ Table \ref{tbl_lang1} gives the language that our machine will
 execute, \machLam. A benefit of defining our own machine is that we
 can also define the language it executes -- and the language we need
 to compile to! We cannot make it too dissimilar from a ``real''
-machine, but at this stage it helps to keep things simple. Each
-instruction supports an some aspect of the \lamA. In brief:
+machine, but at this stage it helps to keep things simple. 
+
+\begin{table}[th]
+  \centering
+  \begin{tabular}{lp{3.5in}}
+    \emph{Instruction} & \emph{Description} \\
+    \cmidrule(r){1-1}\cmidrule(r){2-2}
+    \texttt{Store \emph{R} (\emph{F}, \emph{M})} & Store the value found in register #R# to field %%
+    #F# of the value in register #M#. \\
+    \texttt{Load (\emph{F}, \emph{M}) \emph{R}} & Load field #F# of the value in register #M# to register #R#. \\
+    \texttt{Set \emph{v} \emph{R}} & Sets the register #R# to name of the variable $v$. \\
+    \texttt{Copy \emph{R} \emph{M}} & Copies the contents of register #R# to register #M#. \\
+    #Enter# & Jump to the location indicated by the closure in
+    register #clo#, assuming an argument in register #arg#. The next #Return# executed
+    will return to this location, with a result in register #res#.\\
+    #Return# & Jump to the instruction following the most recently 
+    executed #Enter# instruction and begin executing.  \\
+    \texttt{MkClo \emph{L} [\emph{R}, \emph{S}, \dots]} &  Create a closure pointing to the 
+    label #L# and holding the values in registers #R#, #S#, etc. The closure will be stored in 
+    the #res# register.
+  \end{tabular}
+  \caption{\machLam, the ``machine language'' executed by our machine |M|.}
+  \label{tbl_lang1}
+  \figend
+\end{table}
+
+Each instruction supports an some aspect of the \lamA. In brief:
 \begin{description}
 \item[Variables] -- #Store# and #Load# help access variables and
   function arguments.
@@ -172,25 +164,6 @@ instruction supports an some aspect of the \lamA. In brief:
 \item[Abstraction] -- #MkClo# lets us create functions as values.
 \end{description}
 The following sections describe each aspect in detail.
-
-\begin{table}[ht]
-  \begin{tabular}{lp{4in}}
-    \texttt{Store \emph{R} (\emph{F}, \emph{M})} & Store the value found in register #R# to field %%
-    #F# of the value in register #M#. \\
-    \texttt{Load (\emph{F}, \emph{M}) \emph{R}} & Load field #F# of the value in register #M# to register #R#. \\
-    #Enter# & Jump to the location indicated by the closure in
-    register #clo#, assuming an argument in register #arg#. The next #Return# executed
-    will return to this location, with a result in register #res#.\\
-    \texttt{Copy \emph{R} \emph{M}} & Copies the contents of register #R# to register #M#. \\
-    #Return# & Jump to the instruction following the most recently 
-    executed #Enter# instruction and begin executing.  \\
-    \texttt{MkClo \emph{L} [\emph{R}, \emph{S}, ...]} &  Create a closure pointing to the 
-    label #L# and holding the values in registers #R#, #S#, etc. The closure will be stored in 
-    the #res# register.
-  \end{tabular}
-  \caption{\machLam, the ``machine language'' executed by our machine |M|.}
-  \label{tbl_lang1}
-\end{table}
 
 \subsection{Variables}
 
@@ -293,22 +266,26 @@ variables found in the body of the expression.
 
 \subsection{Compiling from \lamA to \machLam}
 
-Figure \ref{fig_lang3} gives our algorithm to compile from \lamA to
-\machLam. We present it in cases, according to the syntax of \lamA
-terms given in Figure \ref{fig_lang1}. The ``fat brackets,''
-\compMach{t}, represent our compiler, with the term being
-compiled given as the argument, $t$.  Each term compiles to a given
-sequence of instructions. We also assume a function $\rho$, maintained
-by the compiler, that knows which register holds a given variable.
+Table \ref{tbl_lang2} gives our algorithm to compile from \lamA to
+\machLam. We present it in in four parts, \emph{a} - \emph{d},
+corresponding to the syntax of \lamA terms given in Figure
+\ref{fig_lang1}. The ``fat brackets,'' \compMach{t}, represent our
+compiler, with the term being compiled given as the argument, $t$.
+Each term compiles to a given sequence of instructions. We also assume
+a function $\rho$, maintained by the compiler, that knows which
+register holds a given variable.
 
-Case \ref{eqn_lang3} shows the compilation
+%% Compilation rules ...
+\afterpage{\clearpage{\input{machLamComp}}\clearpage}
+
+Table \ref{tbl_lang2}, part \emph{a}, shows the compilation
 scheme for variables. Variable refrences that are not used
 in function application can only be the body of an expression, so we
-just copy the value found in the variable's register to the #res#
+just copy the variable's name to the #res#
 register and return.
 
-Function application, \lamPApp{f}{g}, is shown in case
-\ref{eqn_lang4}. To apply a function, we must save the current #clo#
+Function application, \lamPApp{f}{g}, is shown in part
+\emph{b}. To apply a function, we must save the current #clo#
 and #arg# registers. The compiler creates \emph{fresh} registers,
 guaranteed to be unused anywhere else in the program, to store #clo#
 and #arg#. We then use $\rho$ to find the registers holding $f$ and
@@ -323,14 +300,16 @@ code implementing $t$. Therefore, our compiler needs to generate code
 that returns a closure, which in turn points to the code generated for
 the body of the abstraction. To accomplish this, our compiler
 recursively calls itself on the body. We get a label back, which is the
-location of the just compiled code. In cases \ref{eqn_lang5} and
-\ref{eqn_lang6} the expression $l = \compMach{\lamAbs{y}{t}}$ shows this
+location of the just compiled code. In parts \emph{c} and \emph{d}
+the expression $l = \compMach{\lamAbs{y}{t}}$ shows this
 recursive call, and the label that results. That label can then be used in the 
 closure returned by the abstraction.
 
 We separate compilation of abstractions into two cases, depending if
-the body is an abstraction or not. In the first case, as shown in case
-\ref{eqn_lang5}, we ultimately return a new closure. The closure
+the body is an abstraction or not. In the first case, as shown in part
+\emph{c}, we begin by marking the location of this code with a new label,
+#m#. We prepare to create a new closure by copying all values out of
+the current closure into fresh registers. We then create a closure that
 points to the body of our abstraction, contains all the values found
 in the current closure, and ``captures'' our argument in the new
 closure. 
@@ -343,64 +322,22 @@ For example, consider compiling this expression:
 
 $f$ and $x$ must be available when the body
 \lamPApp{f}{\lamPApp{y}{x}} executes. Therefore, the closure returned
-by \lamAbs{x}{(\mathellipsis)} must copy all values in the existing
+by \lamAbs{x}{(\dots)} must copy all values in the existing
 closure as well as add the argument, $x$.
 
-Case \ref{eqn_lang6} shows the code generated when the body of
-an abstraction is \emph{not} another abstraction. In this case
-we just compile the body like any other term. However, we also
-mark the location of the start of the body with a  new label, \emph{l}. This
-label will be used by the compiler when compiling terms that match
-case \ref{eqn_lang5}.
+Part \emph{d} shows the code generated when the body of an abstraction
+is \emph{not} another abstraction. We first mark the location of the
+start of the body with a new label, #m#.  We then find the free
+variables in the body, calling them $v_1, \dots, v_n$. This is a
+compile-time operation, not something the program will do when
+executing.  We assume that value of each free variables can be found
+in the corresponding closure slot. For example, $v_0$ will be found in
+$clo[0]$, $v_1$ in $clo[1]$, and so on. We also copy the $arg$
+register to the corresponding register for our argument, as determined
+by the $\rho$ function. Now that we have placed all variables in the
+registers expected by our function, we generate the code for our body
+and place it inline.
 
-\begin{myfig}[th]
-\begin{minipage}{4in}
-\begin{Verbatim}[commandchars=\\\{\}]
-  \compMach{v} = 
-    \emph{\ensuremath{\rho} associates variables to the register that}
-    \emph{they will be found in. This lookup occurs during}
-    \emph{compilation, not while the program executes.}
-    Copy \ensuremath{\rho}(v) ``res''
-    Return
-  \compMach{\lamApp{f}{g}} = 
-    \emph{r1 and r2 are ``fresh'' registers.} 
-    Copy ``arg'' r1
-    Copy ``clo'' r2
-    \emph{Set up the} clo \emph{and} arg \emph{registers for}
-    \emph{the function being called.}
-    Copy \ensuremath{\rho}(g) arg
-    Copy \ensuremath{\rho}(f) clo
-    Enter
-    \emph{Restore the previous} arg \emph{and} clo 
-    \emph{registers.}
-    Copy r1 ``arg''
-    Copy r2 ``clo''
- \compMach{\lamAbs{x}{\lamAbs{y}{\texttt{t}}}} = 
-   \emph{Compile the body of our function.} l 
-   \emph{is the label giving the location of the compiled code.}
-   \emph{Notice this is a recursive call to our compiliation}
-   \emph{function.}
-   l = \compMach{\lamAbs{y}{t}}
-   ...
-   \emph{Copy current values out of the closure;} N
-   \emph{is the number of fields in the closure.}
-   Store r1 (``clo'', 0) 
-   Store r2 (``clo'', 1) 
-   ...
-   Store rN (``clo'', N)
-   
-   \emph{Create a new closure holding the previous values}
-   \emph{the argument} x, \emph{and pointing to the}
-   \emph{compiled body of our function.}
-   MkClo l [r1, r2, ..., rN, \ensuremath{\rho}(x)]
-   Return
- \compMach{\lamAbs{x}{\texttt{t}}} = 
-   l : \compMach{t}
-\end{Verbatim}
-\end{minipage}
-\caption{Compilation rules from \lamA to \machLam.}
-\label{tbl_lang2}
-\end{myfig}
 
 %% Essence of compiling lambda-calculus
 
