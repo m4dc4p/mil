@@ -66,3 +66,7 @@
 % a space before the command when used
 % or the file will have two spaces.
 \newcommand{\rem}[1]{}
+
+%% A verbatim environment with active charactesr
+%% so we can use math shortcuts and macros
+\DefineVerbatimEnvironment{AVerb}{Verbatim}{commandchars=\\\{\}, codes={\catcode`\_8\catcode`\$3\catcode`\^7}}
