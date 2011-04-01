@@ -16,7 +16,18 @@ lower-level) representation. Frequently these intermediate forms are
 also languages, with their own syntax, semantics, type-systems,
 and more. 
 
-Intermediate languages' 
+\emph{Three-address code}, one such intermediate form, translates the
+program into assembly-language like form, using \emph{registers} to
+hold values. Infinitely many registers can be named, making registers
+more like memory locations than registers in real hardware. Each
+instruction in the translated program has two operand and one
+destination register, thus the name ``three-address.'' For example,
+the add instruction might be written as:
+\begin{Verbatim}
+  add source1, source2, dest1
+\end{Verbatim}
+
+
 
 %% Motivation for MIL
 
