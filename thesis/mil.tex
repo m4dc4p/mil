@@ -16,6 +16,8 @@ lower-level) representation. Frequently these intermediate forms are
 also languages, with their own syntax, semantics, type-systems,
 and more. 
 
+\section{Three-address Code}
+
 Intermediate forms typically expose more detail about the
 implementation of a program, while at the same time making some
 optimization or transformation easier or even possible. 
@@ -23,17 +25,65 @@ optimization or transformation easier or even possible.
 program into assembly-language like form, using \emph{registers} to
 hold values. Infinitely many registers can be named, making registers
 more like memory locations than registers in real hardware. Each
-instruction in the translated program has two operand and one
+instruction in the translated program has two operand registers and one
 destination register, thus the name ``three-address.'' 
 
-For example,
-the add instruction might be written as:
+Three-address code makes all intermediate expression values explicit, 
+by reducing complicated expressions to a series of assignments. 
+For example, the expression:
+\[a = \frac{(b * c + d)}{2},\]
+would be expressed in three-address code as:
 \begin{AVerb}
-  add \emph{r}, \emph{s}, \emph{d}
+  s = b * c;
+  t = s + d;
+  a  = t / 2;
 \end{AVerb}
-where $r$ and $s$ are source registers and $d$ the destination. When
-executed, the instruction would place the sum of $r$ and $s$ in $d$.
+where #s# and #t# are new temporaries created by the compiler. This 
+representation makes it easier for the compiler to re-order expressions,
+unravel complex control-flow, and manipulate intermediate values. 
 
+\section{Monadic Intermediate Language}
+
+Our intermediate language, MIL, serves the same purpose as 
+three-address code and other intermediate forms: it exposes
+more detail about the implementation of a program, while
+making some optimizations simpler or even possible. In contrast to
+three-address code, however, our language supports features 
+unique to functional languages -- namely, treating functions as
+first-class values. 
+
+A MIL program consists of a number of \emph{basic blocks}, sequences
+of instructions which execute in order, terminated by a return or
+branch. Each sequence ends with a eithe a return (jump back to the
+calling block) or a branch to another block (though there may be many
+possible choices). Conditional branches are allowed at the end of a
+block, where one (of many) destinations can be selected based on some
+condition.
+
+To give a sense of MIL, consider the definition of $compose$ given in
+Figure \ref{fig_mil1a}. Figure \ref{fig_mil1b} shows a fragment of this 
+expression in MIL. The \emph{block declaration}
+on line \ref{fig_mil1b_block_decl} gives the name of
+the block (#compose#) and arguments that will be passed in (#f#, #g#,
+and #x#). Line \ref{fig_mil1b_gofx} applies #g# to #x# and assigns
+the result to #t1#. The #@@# operator represents function application. 
+Of course, we assume #g# refers to a function (or, more precisely, a 
+\emph{closure}). The #<-# operator assigns the result of the operation
+on its right-hand side to the locatin on the left. In turn, line 
+\ref{fig_mil1b_fofx} applies #f# to #t1# and assigns the result
+to #t2#. The last line returns #t2#. Thus, the #compose# block returns
+the value of \lamPApp{f}{\lamPApp{g}{x}}, just as in our original \lamA
+expression.
+
+\begin{myfig}[t]
+  \subfloat[]{$compose = \lamAbs{f}{\lamAbs{g}{\lamAbs{x}{\lamApp{f}{\lamPApp{g}{x}}}}}$%%
+      \label{fig_mil1a}}
+  \subfloat[]{\input{lst_mil1}\label{fig_mil1b}}
+  \caption{\subref{fig_mil1a} gives a \lamA definition of the composition
+    function; \subref{fig_mil1b} shows a fragment of the MIL program
+    for $compose$.}
+  \label{fig_mil1}
+\end{myfig}
 
 
 %% Motivation for MIL
