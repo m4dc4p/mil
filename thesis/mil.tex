@@ -69,7 +69,7 @@ and #x#). Line \ref{fig_mil1b_gofx} applies #g# to #x# and assigns
 the result to #t1#. The #@@# operator represents function application. 
 Of course, we assume #g# refers to a function (or, more precisely, a 
 \emph{closure}). The #<-# operator assigns the result of the operation
-on its right-hand side to the locatin on the left. In turn, line 
+on its right-hand side to the location on the left. In turn, line 
 \ref{fig_mil1b_fofx} applies #f# to #t1# and assigns the result
 to #t2#. The last line returns #t2#. Thus, the #compose# block returns
 the value of \lamPApp{f}{\lamPApp{g}{x}}, just as in our original \lamA
@@ -85,6 +85,51 @@ expression.
   \label{fig_mil1}
 \end{myfig}
 
+%% Closures
+
+%% TODO: Introduce closures under evaluation rules
+%% in chapter \ref{ref_chapter_languages}.
+However, according to rules in Figure \ref{fig_lang2}, Chapter
+\ref{ref_chapter_languages} on page \pageref{fig_lang2}, evaluating an
+expression which applies $compose$ actually involves the creation of
+several intermediate values. Consider the expression 
+\begin{equation}
+  main = \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}, \label{eqn_mil4}
+\end{equation}
+where $a$, $b$ and $c$ are previously given values. We can
+capture each intermediate value created when evaluating this 
+expression by using the rules from Figure \ref{fig_lang2} and assigning
+each result to a new variable. First, recall the definition of $compose$:
+\begin{equation}
+  compose = \lamAbs{f}{\lamAbs{g}{\lamAbs{x}{\lamApp{f}{\lamPApp{g}{x}}}}}. 
+\end{equation}
+We create our first intermediate value by applying $compose$ to $a$:
+\begin{equation}
+  t_1 = \lamApp{compose}{a} = \lamAbs{g}{\lamAbs{x}{\lamApp{a}{\lamPApp{g}{x}}}}. \label{eqn_mil1}
+\end{equation}
+We apply $t_1$ to $b$ to create our next intermediate value:
+\begin{equation}
+  t_2 = \lamApp{t_1}{b} = \lamAbs{x}{\lamApp{a}{\lamPApp{b}{x}}}. \label{eqn_mil2}
+\end{equation}
+Finally, we compute our final value, $main$, by applying $t_2$ to $c$:
+\begin{equation}
+  main = \lamApp{t_2}{c} = \lamApp{a}{\lamPApp{b}{c}}. \label{eqn_mil3}  
+\end{equation}
+
+Both $t_1$ and $t_2$ will hold \emph{closures} when evaluating
+Equation \eqref{eqn_mil4}. As detailed in Section \ref{sec_lang1}, a closure
+holds a pointer to a body of code and any \emph{free variables}. In this case,
+$t_1$ holds $a$ and points to the code that evaulates to $t_2$. In turn, $t_2$
+holds $a$ and $b$, and points to the code which evaluates to $main$. The
+\lamA does not make this explicit, but our MIL does. Figure \ref{fig_mil2} shows
+the complete program for $main = \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}$.
+
+\begin{myfig}[t]
+  \input{lst_mil2}
+  \caption{The MIL program which computes $main = \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}$. Note that $a$, $b$, and $c$ are assumed to be arguments given
+    outside the program.}
+  \label{fig_mil2}
+\end{myfig}
 
 %% Motivation for MIL
 
