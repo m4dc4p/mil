@@ -2,15 +2,15 @@
 \begin{center}%%
 \begin{minipage}{4in}%%
 \begin{AVerb}[numbers=left]
-main(a,b,c) = 
-  t1 <- k1 @ a
-  t2 <- t1 @ b
-  t3 <- t2 @ c
+main(a,b,c) = \label{fig_mil2_main}
+  t1 <- k1 @ a \label{fig_mil2_t1}
+  t2 <- t1 @ b \label{fig_mil2_t2}
+  t3 <- t2 @ c \label{fig_mil2_t3}
   return t3
 
-k1 \{\} (f) = k2 \{f\}
-k2 \{f\} (g) = k3 \{f,g\}
-k3 \{f,g\} (x) = compose(f,g,x)
+k1 \{\} f = k2 \{f\} \label{fig_mil2_k1}
+k2 \{f\} g = k3 \{f,g\} \label{fig_mil2_k2}
+k3 \{f,g\} x = compose(f,g,x) \label{fig_mil2_k3}
 
 compose(f,g,x) = \dots \emph{as in Figure \ref{fig_mil1b}} \dots 
 \end{AVerb}

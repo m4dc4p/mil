@@ -58,7 +58,7 @@ returns its argument:
   & \lamAbs{x}{x}. \\
 \intertext{\emph{Compose} takes two functions and an argument. The result of
 applying the second function to the argument is passed to the first:}
-  & \lamAbs{f}{\lamAbs{g}{\lamAbs}{x}{\lamApp{f}{\lamPApp{g}{x}}}}. \\
+  & \lamCompose. \\
 \intertext{\emph{Const} takes two arguments but always returns the first:}
   & \lamAbs{f}{\lamAbs{a}{\lamAbs{b}{a}}}.
 \end{align}

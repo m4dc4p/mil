@@ -31,12 +31,14 @@ destination register, thus the name ``three-address.''
 Three-address code makes all intermediate expression values explicit, 
 by reducing complicated expressions to a series of assignments. 
 For example, the expression:
-\[a = \frac{(b * c + d)}{2},\]
+\begin{equation}
+  a = \frac{(b * c + d)}{2},
+\end{equation}
 would be expressed in three-address code as:
 \begin{AVerb}
   s = b * c;
   t = s + d;
-  a  = t / 2;
+  a = t / 2;
 \end{AVerb}
 where #s# and #t# are new temporaries created by the compiler. This 
 representation makes it easier for the compiler to re-order expressions,
@@ -66,17 +68,18 @@ expression in MIL. The \emph{block declaration}
 on line \ref{fig_mil1b_block_decl} gives the name of
 the block (#compose#) and arguments that will be passed in (#f#, #g#,
 and #x#). Line \ref{fig_mil1b_gofx} applies #g# to #x# and assigns
-the result to #t1#. The #@@# operator represents function application. 
+the result to #t1#. The ``Enter'' operator (#@@#), represents function application.
+\footnote{So called because inn the expression #g @@ x#, we ``enter'' function #f# with the argument #x#.}
 Of course, we assume #g# refers to a function (or, more precisely, a 
 \emph{closure}). The #<-# operator assigns the result of the operation
 on its right-hand side to the location on the left. In turn, line 
 \ref{fig_mil1b_fofx} applies #f# to #t1# and assigns the result
 to #t2#. The last line returns #t2#. Thus, the #compose# block returns
-the value of \lamPApp{f}{\lamPApp{g}{x}}, just as in our original \lamA
+the value of \lamPApp{f}{\lamApp{g}{x}}, just as in our original \lamA
 expression.
 
 \begin{myfig}[t]
-  \subfloat[]{$compose = \lamAbs{f}{\lamAbs{g}{\lamAbs{x}{\lamApp{f}{\lamPApp{g}{x}}}}}$%%
+  \subfloat[]{$compose = \lamCompose$%%
       \label{fig_mil1a}}
   \subfloat[]{\input{lst_mil1}\label{fig_mil1b}}
   \caption{\subref{fig_mil1a} gives a \lamA definition of the composition
@@ -96,33 +99,39 @@ several intermediate values. Consider the expression
 \begin{equation}
   main = \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}, \label{eqn_mil4}
 \end{equation}
-where $a$, $b$ and $c$ are previously given values. We can
-capture each intermediate value created when evaluating this 
-expression by using the rules from Figure \ref{fig_lang2} and assigning
-each result to a new variable. First, recall the definition of $compose$:
+where $a$, $b$ and $c$ are previously given values. Using the
+rules for call-by-value evaluation order from Figure \ref{fig_lang2} in 
+Chapter \ref{ref_chapter_languages}, we can compute the value of the expression
+as follows:
+\begin{align}
+  main &= \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c} \\
+  &= \lamApp{\lamApp{\lamAppP{\lamCompose}{a}}{b}}{c} & \text{\emph{(Definition of compose)}} \\
+  &= \lamApp{\lamAppP{\lamAbs{g}{\lamAbs{x}{\lamApp{a}{\lamApp{g}{x}}}}}{b}}{c} & \text{\emph{(E-App)}} \\
+  &= \lamAppP{\lamAbs{x}{\lamApp{a}{\lamApp{b}{x}}}}{c} & \text{\emph{(E-App)}} \\
+  &= \lamApp{a}{\lamApp{b}{c}} & \text{\emph{(E-App)}} 
+\end{align}
+
+We can capture each intermediate value created when evaluating this
+expression by assigning each result to a new variable. 
+We create our first intermediate value, $t_1$, by applying $compose$ to $a$:
 \begin{equation}
-  compose = \lamAbs{f}{\lamAbs{g}{\lamAbs{x}{\lamApp{f}{\lamPApp{g}{x}}}}}. 
+  t_1 = \lamApp{compose}{a} = \lamAbs{g}{\lamAbs{x}{\lamApp{a}{\lamApp{g}{x}}}}. \label{eqn_mil1}
 \end{equation}
-We create our first intermediate value by applying $compose$ to $a$:
+We apply $t_1$ to $b$ to create our next intermediate value, $t_2$:
 \begin{equation}
-  t_1 = \lamApp{compose}{a} = \lamAbs{g}{\lamAbs{x}{\lamApp{a}{\lamPApp{g}{x}}}}. \label{eqn_mil1}
-\end{equation}
-We apply $t_1$ to $b$ to create our next intermediate value:
-\begin{equation}
-  t_2 = \lamApp{t_1}{b} = \lamAbs{x}{\lamApp{a}{\lamPApp{b}{x}}}. \label{eqn_mil2}
+  t_2 = \lamApp{t_1}{b} = \lamAbs{x}{\lamApp{a}{\lamApp{b}{x}}}. \label{eqn_mil2}
 \end{equation}
 Finally, we compute our final value, $main$, by applying $t_2$ to $c$:
 \begin{equation}
-  main = \lamApp{t_2}{c} = \lamApp{a}{\lamPApp{b}{c}}. \label{eqn_mil3}  
+  main = \lamApp{t_2}{c} = \lamApp{a}{\lamApp{b}{c}}. \label{eqn_mil3}  
 \end{equation}
 
 Both $t_1$ and $t_2$ will hold \emph{closures} when evaluating
-Equation \eqref{eqn_mil4}. As detailed in Section \ref{sec_lang1}, a closure
+expression \eqref{eqn_mil4}. As detailed in Section \ref{sec_lang1}, a closure
 holds a pointer to a body of code and any \emph{free variables}. In this case,
 $t_1$ holds $a$ and points to the code that evaulates to $t_2$. In turn, $t_2$
 holds $a$ and $b$, and points to the code which evaluates to $main$. The
-\lamA does not make this explicit, but our MIL does. Figure \ref{fig_mil2} shows
-the complete program for $main = \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}$.
+\lamA does not make this explicit, but our MIL does. 
 
 \begin{myfig}[t]
   \input{lst_mil2}
@@ -130,6 +139,40 @@ the complete program for $main = \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}$.
     outside the program.}
   \label{fig_mil2}
 \end{myfig}
+
+Figure \ref{fig_mil2} shows the complete MIL program for $main =
+\lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}$. #k1#, #k2# and #k3#
+(lines \ref{fig_mil2_k1} -- \ref{fig_mil2_k3}) represent
+\emph{closure-capturing} blocks. As opposed to #main#, these blocks
+create new closures. In the definition #k1 {} f = k2 {f}#, the braces
+on the left-hand side represent variables expected in the closure
+given to this function. In this case, #k1# does not expect to find any
+variables. #f# names the argument given to #k1#. The right-hand side,
+#k2 {f}#, shows the creation of a new closure. The closure points to
+#k2# and captures the value of #f#. In other words, evaluating #k1#
+returns a closure which can be used to execute #k2#. #k2# behaves
+similarly. It expects to find one value in its closure (#{f}#) and
+returns a closure pointing to #k3# that copies the value #f# from the
+existing closure and adds the argument, #g# (#k3 {f,g}#). #k3#,
+however, does something new. Instead of returning a closure, it
+executes the #compose# block (defined in Figure \ref{fig_mil1b}) with
+three arguments: #f#, #g#, and #x#. This does \emph{not} return a
+closure or ``enter'' a function. Instead, we jump directly to the
+block. The value returned by #k3# will be the value computed by
+#compose# with the arguments given.
+
+Returning to #main# on line \ref{fig_mil2_main} in Figure
+\ref{fig_mil2}, we can now see how MIL makes explicit the intemediate
+closures created while evaluating
+\lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}. On line
+\ref{fig_mil2_t1}, we enter #k1# with the first argument, #a#. #t1#
+holds the closure returned. On the next line, we enter #t1# (which
+will point to #k2#) with the second argument, #b#. #t2# then holds the
+closure returned. Finally, on line \ref{fig_mil2_t3}, we enter #t2#
+(which will point to #k3#) with the final argument, #c#. #k3# will directly
+execute #compose# with our specific arguments. #t3# holds the result returned
+by #compose#. On the last line of #main# we return the value computed, #t3#.
+
 
 %% Motivation for MIL
 

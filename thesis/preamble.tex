@@ -52,6 +52,8 @@
 \newcommand{\lamAbs}[2]{\ensuremath{\lambda#1.\ #2}}
 \newcommand{\lamApp}[2]{\ensuremath{#1\ #2}}
 \newcommand{\lamPApp}[2]{\ensuremath{(#1\ #2)}}
+\newcommand{\lamAppP}[2]{\ensuremath{(#1)\ #2}}
+\newcommand{\lamCompose}{\lamAbs{f}{\lamAbs{g}{\lamAbs{x}{\lamApp{f}{\lamApp{g}{x}}}}}}
 \newcommand{\machLam}{\ensuremath{M_\lambda}\xspace}
 \newcommand{\compMach}[1]{\ensuremath{\llbracket #1 \rrbracket}}
 \newcommand{\compRho}[1]{\ensuremath{\rho(#1)}}
@@ -70,4 +72,6 @@
 
 %% A verbatim environment with active charactesr
 %% so we can use math shortcuts and macros
-\DefineVerbatimEnvironment{AVerb}{Verbatim}{commandchars=\\\{\}, codes={\catcode`\_8\catcode`\$3\catcode`\^7}}
+\DefineVerbatimEnvironment{AVerb}{Verbatim}{commandchars=\\\{\},%% 
+  codes={\catcode`\_8\catcode`\$3\catcode`\^7},%%
+  numberblanklines=false}
