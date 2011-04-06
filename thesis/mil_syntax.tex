@@ -1,0 +1,40 @@
+\begin{myfig}[th]
+\begin{tabular}{p{5in}}
+\begin{center}
+\begin{minipage}{4in}
+\begin{AVerb}[numbers=left]
+  $block$ := k \{$v_1$, \dots, $v_N$\} $v$ = $tail$ \label{fig_mil3_k1} 
+    | b($v_1$, \dots, $v_N$) = $body$ \label{fig_mil3_b} 
+    | t <- k \{\} \label{fig_mil3_t}  \label{fig_mil3_t} 
+
+  $body$ := do \label{fig_mil3_body}
+    $stmt$ 
+    \dots 
+    $stmt$
+
+  $stmt$ := $v$ <- $tail$ \label{fig_mil3_stmt}  \label{fig_mil3_bind}
+    | case $v$ of \label{fig_mil3_case}
+        $alt$
+        \dots
+        $alt$
+    | done $tail$ \label{fig_mil3_done}
+
+  $tail$ := return $v$ \label{fig_mil3_return}
+    | $v_1$ @ $v_2$ \label{fig_mil3_enter}
+    | k b \{$v_1$, \dots, $v_N$\} \label{fig_mil3_capture}
+    | b($v_1$, \dots, $v_N$) \label{fig_mil3_goto}
+    | C $v_1$ \dots $v_N$ \label{fig_mil3_const}
+
+  $alt$ := C $v_1$ \dots $v_N$ -> b(\dots) 
+\end{AVerb}
+\end{minipage}
+\end{center} \\ \\
+  $v$ represents a variable, and only a variable. Expressions
+  cannot be used where $v$ appears. \\ 
+
+  \texttt{C $v_1$ \dots $v_N$} represents a constructor, for creating
+  values in $tail$ expressions and inspecting values in $alt$ arms. \\
+\end{tabular}
+\caption{MIL syntax.}
+\label{fig_mil3}
+\end{myfig}

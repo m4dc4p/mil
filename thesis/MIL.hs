@@ -34,7 +34,7 @@ Our monadic language:
 
   stmtM ::= v <- tailM
     | case v of [alt1, ..., altN]
-    | tailM
+    | return tailM
 
   tailM ::= return v
     | v1 @ v2         -- Call an unknown function.

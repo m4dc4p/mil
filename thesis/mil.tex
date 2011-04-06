@@ -46,21 +46,47 @@ unravel complex control-flow, and manipulate intermediate values.
 
 \section{Monadic Intermediate Language}
 
-Our intermediate language, MIL, serves the same purpose as 
-three-address code and other intermediate forms: it exposes
-more detail about the implementation of a program, while
-making some optimizations simpler or even possible. In contrast to
-three-address code, however, our language supports features 
-unique to functional languages -- namely, treating functions as
-first-class values. 
+Our intermediate language, MIL, serves the same purpose as
+three-address code and other intermediate forms: it exposes more
+detail about the implementation of a program, while making some
+optimizations simpler or even possible. In contrast to three-address
+code, however, our language supports features unique to functional
+languages: the ability to treat functions as first-class values, and
+the representation of stateful computations in a monad.
 
-A MIL program consists of a number of \emph{basic blocks}, sequences
-of instructions which execute in order, terminated by a return or
-branch. Each sequence ends with a eithe a return (jump back to the
-calling block) or a branch to another block (though there may be many
-possible choices). Conditional branches are allowed at the end of a
-block, where one (of many) destinations can be selected based on some
-condition.
+\subsection{Monads \& Functional Programming}
+Originally described by Moggi \citep{MoggiXX},
+and further developed by Wadler \citep{WaddlerXX}, \emph{monads} can be used
+distinguish \emph{pure} and \emph{impure} functions. A \emph{pure}
+function has no side-effects: it will not print to the screen, throw an
+exception, write to disk, or in any other way change the state of the
+machine. An \emph{impure} function may change the machine's state. 
+
+%% Motivate monads ... too much?
+For example, consider the function @readInt@, which asks the user to
+enter an integer. 
+\emph{\dots Show difference between @readInt :: Int@ and
+  @readInt :: IO Int@ \dots}.
+
+%% Presentation drawn from http://en.wikipedia.org/wiki/Monad_%28functional_programming%29, 
+%% accessed April 6 2010.
+A \emph{monad} provides the abstraction that separates pure and impure
+functions. Impure (or ``monadic'') functions execute ``inside'' the
+monad. Values returned from a monadic function are not directly
+accessible -- they are ``wrapped'' in the monad. The only way
+to ``unwrap'' a monadic value is to execute the computation -- inside
+the monad! 
+
+\subsection{The Monad in MIL}
+
+When designing MIL we wished to make all memory allocation
+explicit. Besides the obvious effect of reducing free memory
+available, allocation can also cause two other effects: the allocation
+may fail, or a garbage-collection may occur. A monad allows us to
+separate computations which (potentially) allocate memory from those
+that do not.
+
+\subsection{MIL Example: $compose$}
 
 To give a sense of MIL, consider the definition of $compose$ given in
 Figure \ref{fig_mil1a}. Figure \ref{fig_mil1b} shows a fragment of this 
@@ -69,9 +95,9 @@ on line \ref{fig_mil1b_block_decl} gives the name of
 the block (#compose#) and arguments that will be passed in (#f#, #g#,
 and #x#). Line \ref{fig_mil1b_gofx} applies #g# to #x# and assigns
 the result to #t1#. The ``Enter'' operator (#@@#), represents function application.
-\footnote{So called because inn the expression #g @@ x#, we ``enter'' function #f# with the argument #x#.}
+\footnote{So called because in the expression #g @@ x#, we ``enter'' function #g# with the argument #x#.}
 Of course, we assume #g# refers to a function (or, more precisely, a 
-\emph{closure}). The #<-# operator assigns the result of the operation
+\emph{closure}). The #<-# (``bind'') operator assigns the result of the operation
 on its right-hand side to the location on the left. In turn, line 
 \ref{fig_mil1b_fofx} applies #f# to #t1# and assigns the result
 to #t2#. The last line returns #t2#. Thus, the #compose# block returns
@@ -90,8 +116,6 @@ expression.
 
 %% Closures
 
-%% TODO: Introduce closures under evaluation rules
-%% in chapter \ref{ref_chapter_languages}.
 However, according to rules in Figure \ref{fig_lang2}, Chapter
 \ref{ref_chapter_languages} on page \pageref{fig_lang2}, evaluating an
 expression which applies $compose$ actually involves the creation of
@@ -99,7 +123,7 @@ several intermediate values. Consider the expression
 \begin{equation}
   main = \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}, \label{eqn_mil4}
 \end{equation}
-where $a$, $b$ and $c$ are previously given values. Using the
+where $a$, $b$ and $c$ are given values elsewhere. Using the
 rules for call-by-value evaluation order from Figure \ref{fig_lang2} in 
 Chapter \ref{ref_chapter_languages}, we can compute the value of the expression
 as follows:
@@ -108,7 +132,7 @@ as follows:
   &= \lamApp{\lamApp{\lamAppP{\lamCompose}{a}}{b}}{c} & \text{\emph{(Definition of compose)}} \\
   &= \lamApp{\lamAppP{\lamAbs{g}{\lamAbs{x}{\lamApp{a}{\lamApp{g}{x}}}}}{b}}{c} & \text{\emph{(E-App)}} \\
   &= \lamAppP{\lamAbs{x}{\lamApp{a}{\lamApp{b}{x}}}}{c} & \text{\emph{(E-App)}} \\
-  &= \lamApp{a}{\lamApp{b}{c}} & \text{\emph{(E-App)}} 
+  &= \lamApp{a}{\lamApp{b}{c}}. & \text{\emph{(E-App)}} 
 \end{align}
 
 We can capture each intermediate value created when evaluating this
@@ -173,10 +197,91 @@ closure returned. Finally, on line \ref{fig_mil2_t3}, we enter #t2#
 execute #compose# with our specific arguments. #t3# holds the result returned
 by #compose#. On the last line of #main# we return the value computed, #t3#.
 
-
-%% Motivation for MIL
-
 %% Syntax of MIL
+\subsection{MIL Syntax}
+
+Figure \ref{fig_mil3} gives the syntax for MIL.  A MIL program
+consists of a number of \emph{blocks}: \emph{closure} blocks
+(line \ref{fig_mil3_k1}), basic blocks (line \ref{fig_mil3_b}) and top-level
+blocks (line \ref{fig_mil3_t}). Though the syntax for closure blocks seems to allow any tail,
+in practice they can only do one of two things: either return a
+closure (\texttt{k \{\dots\}}) or jump to a basic block
+(\texttt{b(\dots)}). Top-level blocks (line \ref{fig_mil3_t}) provide an
+entry point for top-level functions -- they provide a closure which
+can be used to initially ``enter'' the function.
+
+\afterpage{\clearpage{\input{mil_syntax}}\clearpage}
+
+Basic blocks (line \ref{fig_mil3_body}) consist of a sequence of statements that
+execute in order without any intra-block jumps or conditional
+branches. Each basic block ends with a branch: either they return a
+value (#done#) or take conditional branch (#case#). Conditional
+branches can specify multiple destinations, though at any given time
+only one will be taken.
+
+The #case# statement (line \ref{fig_mil3_case}) specifies a list of
+\emph{alternatives}, each of which matches a \emph{constructor} and
+binds new variables to the values held by the constructor. #case#
+examines the variable given (note, this cannot be an expression) and
+selects the alternative that matches the constructor
+found. Alternatives always branch immediately to some block -- they do
+not allow any other statement. The result of block called becomes the
+result of the #case#, which in turn becomese the result of the calling
+block.
+
+Only the binding statement (line \ref{fig_mil3_bind}) can appear multiple
+times in a block. Each binding assigns the result of the \emph{tail}
+on the right-hand side to a variable on the left. If a variable is
+bound more than once, later bindings will ``shadow'' previous
+bindings.
+
+The #done# statement (line \ref{fig_mil3_done}) ends a block and returns
+the value of tail expression specified.
+
+\emph{Tail} expressions represent effects -- they create monadic
+values. #return# (line \ref{fig_mil3_return}) takes a variable and
+makes its value monadic. Notice it can only take a variable, not an
+expression.  The enter operator, #@@#, expects a closure on its left
+and some value on the right. It will enter the function pointed to by
+the closure, with the argument given, and will evaluate to the result
+of that function. #k#, the ``capture'' operator, creates a closure
+from a block name and a list of variables. The name given is not an
+arbitrary code pointer -- it is a location determined during
+compilation. The ``goto'' operator, \texttt{b(\dots)}, jumps to the
+particular block with the arguments given. Again, this is not a
+computed value -- #b# represents a known location for the
+block. The variables mentioned in the #goto# do not have to have the
+same names as those given in the block's declaration. Finally, the
+constructor operator, ``C'', will create a data value with the given
+tag (``C'') and variables.
+
+\section{Compiling \lamA to MIL}
+
+\emph{\dots Lots of text \dots}
+
+\section{Intermediate Languages, MIL, and Three-Address Code}
+
+Intermediate langauges, and three-address code in particular, have at
+least two purposes: making certain optimizations simpler, and exposing
+more details about implementation. The intermediate language does
+\emph{not} expose all details about implementation -- only those the
+designers considered relevant. Three-address code accomplishes this
+first goal by reducing the complexity of expresssions that need to be
+analyzed. The second goal is achieved by deferring decisions about the
+actual location of values to some later stage of compilation.
+Finally, while not required, three-address code also easily adapts to
+organizing code into basic blocks, which makes control-flow analysis
+much simpler.
+
+Our MIL shares some of the same goals as three-address code, and
+accomplishes them in similar ways. Blocks do not have complex
+structure -- they either return a closure, jump to another block, or
+execute a series of statements followed by a return or branch. Tail
+expressions ensure that all intermediate values are named, and also 
+isolate monadic effects to one area of the language. Finally, the limited
+number of statements ensure control-flow is straightforward.
+
+\section{Conclusion}
 
 %% Compiling the lambda-calculus to MIL
 
@@ -192,35 +297,6 @@ by #compose#. On the last line of #main# we return the value computed, #t3#.
 
 %% %% TODO: Mention that v restricts the term to variables
 %% %% only.
-
-%% \begin{figure}[h]
-%% \begin{code}
-%%   defM := k {v1, ..., vN} v = k1 {v1, ..., vN, v} 
-%%     | k {v1, ..., vN} v = b(v1, ..., vN, v)
-%%     | b(v1, ..., vN) = bodyM
-%%     | t <- k {}
-
-%%   bodyM := do 
-%%     stmtM1 
-%%     ... 
-%%     stmtMN 
-%%     tailM
-
-%%   stmtM := v <- tailM
-%%     | case v of [alt1, ..., altN]
-
-
-%%   tailM := return v
-%%     | v1 @ v2
-%%     | k {v1, ..., vN}
-%%     | f(v1, ..., vN)
-%%     | C v1 ... vN
-
-%%   alt := C v1 ... vN -> b(v1, ..., vM) -- m <= n
-%% \end{code}
-%% \caption{Concrete syntax for our monadic intermediate language.}
-%% \label{figMILDef}
-%% \end{figure}
 
 %% MIL programs consist of a series of definitions (@defM@). Each
 %% definition can be any of the following.
