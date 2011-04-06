@@ -256,7 +256,7 @@ function to an argument:
 From the previous section, we know #Enter# and #Return# are used to
 implement the application of \lamAbs{x}{x} to $s$. It follows that
 \lamAbs{x}{x} must create a closure which #Enter# will then use to
-execute the body of the $\lambda$-abstraction. In fact, Each
+execute the body of the $\lambda$-abstraction. In fact, each
 $\lambda$ in our source program returns a closure and that closure
 points to code that implements the body of the $\lambda$ term.
 
@@ -268,7 +268,7 @@ variables found in the body of the expression.
 \subsection{Compiling from \lamA to \machLam}
 
 Table \ref{tbl_lang2} gives our algorithm to compile from \lamA to
-\machLam. We present it in in four parts, \emph{a} - \emph{d},
+\machLam. We present it in in three parts, \emph{a} - \emph{c},
 corresponding to the syntax of \lamA terms given in Figure
 \ref{fig_lang1}. The ``fat brackets,'' \compMach{t}, represent our
 compiler, with the term being compiled given as the argument, $t$.
@@ -338,5 +338,7 @@ register to the corresponding register for our argument, as determined
 by the $\rho$ function. Now that we have placed all variables in the
 registers expected by our function, we generate the code for our body
 and place it inline.
+
+\section{Conclusion}
 
 \end{document}

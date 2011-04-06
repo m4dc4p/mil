@@ -37,7 +37,7 @@ analysis treats a program as a ``control-flow graph'' (CFG), applies a
 ``transfer'' function to compute ``facts'' about the execution of the
 program, and then applies a ``rewriting'' function to transform the
 program based on those facts. Dataflow analysis is now considered
-standard technique and can be found in most compilere textbooks.
+standard technique and can be found in most compiler textbooks.
 
 \section{Dataflow Concepts}
 
@@ -66,17 +66,17 @@ else
 \end{minipage} \vline & 
 \begin{minipage}[t]{1in}
   \begin{Verbatim}[gobble=2]
-      E
-      ||
-      V
-    ---------        ------
+       E
+       ||
+       V
+     ---------     ------
     ||if(a > b)||-->||c = a||-->X
-    ---------        ------
-      ||
-      V
-     ------
+     ---------     ------
+       ||
+       V
+     -----
     ||c = b||
-     ------
+     -----
       ||
       X
   \end{Verbatim}
@@ -153,7 +153,7 @@ and can be considered ``dead.''}
 Of course, people do not normally write programs with such obviously
 useless statements, but other compiler optimizations can produce (or
 leave behind) many such statements. \emph{Uncurrying}, described in
-chapter \ref{chap_uncurrying}, in fact depends on dead-code elmination.
+Chapter \ref{ref_chapter_uncurrying}, in fact depends on dead-code elmination.
 
 To eliminate the assignment like that on line
 \ref{fig_back2_dead_line}, we really need to determine which variables
