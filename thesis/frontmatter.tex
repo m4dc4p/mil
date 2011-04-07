@@ -2,7 +2,7 @@
 %include polycode.fmt
 \include{preamble}
 \begin{document}
-\include{document.preamble}
+\input{document.preamble}
 
 \newcommand{\authorEmail}{\url{justinb@@cs.pdx.edu}}
 
@@ -11,7 +11,7 @@
 \title{Using Dataflow Optimization Techniques with a Monadic Intermediate Language}
 
 \maketitle 
-\ifthenelse{\standaloneFlag}
+\ifthenelse{\boolean{standaloneFlag}}
            {\thispagestyle{empty}}
            {}
 
@@ -36,4 +36,10 @@
   \emph{Hoopl} library to implement our optimizations, making our work
   a case-study for the library as well.
 \end{abstract}
+
+\ifthenelse{\boolean{standaloneFlag}}{}{\newpage%%
+\begin{singlespace}%%
+\tableofcontents%%
+\end{singlespace}\newpage}
+
 \end{document}
