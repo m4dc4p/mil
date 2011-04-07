@@ -2,7 +2,7 @@
 %include polycode.fmt
 \include{preamble}
 \begin{document}
-\include{document.preamble}
+\input{document.preamble}
 
 \chapter{A Monadic Intermediate Language}
 \label{ref_chapter_mil}
@@ -151,7 +151,7 @@ Finally, we compute our final value, $main$, by applying $t_2$ to $c$:
 \end{equation}
 
 Both $t_1$ and $t_2$ will hold \emph{closures} when evaluating
-expression \eqref{eqn_mil4}. As detailed in Section \ref{sec_lang1}, a closure
+expression \eqref{eqn_mil4}. As detailed in Section \ref{subsec_lang2}, a closure
 holds a pointer to a body of code and any \emph{free variables}. In this case,
 $t_1$ holds $a$ and points to the code that evaulates to $t_2$. In turn, $t_2$
 holds $a$ and $b$, and points to the code which evaluates to $main$. The
