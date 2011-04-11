@@ -18,15 +18,13 @@
 % concepts: basic blocks, control flow, facts, and
 % rewrites. Bind/Return elimination is used as an an example.
 
-The term ``program optimization'' generally refers to the idea of
-transforming a program with some undesirable property to one with the
-same semantics (i.e., result ) but without the unwanted property.  For
-example, an optimized program may run faster, use less memory, consume
-less power, or by whatever measure perform ``better'' than the
-unoptimized program. Optimizations can be performed by the programmer
-as part of writing a given program or they can be applied
-automatically by analyzing the program and transforming it according
-to an algorithm.
+The term ``program optimization'' refers to the process of
+transforming a program without changing its semantics (i.e., meaning),
+while at the same time ``improving'' its behavior.  For example, an
+optimized program may run faster, use less memory, consume less power,
+or some sense perform ``better'' than the unoptimized
+program. Optimizations can be performed ``by hand,'' while writing
+the program, or automatically by a compiler. 
 
 ``Dataflow analysis'' (or ``dataflow optimization''), first introduced
 by Gary Kildall \citep{Kildall1973}, refers to an algorithm for
@@ -212,21 +210,21 @@ Our transfer function computes the live set based on \emph{uses} and
 \emph{definitions} in a statement. Any reference (or use) of a
 variable goes into the live set. Any assignment (or definition) of a
 variable removes it from the live set. We can then define our transfer
-function, $live$, for a statement as:
+function, |live|, for a statement as:
 
 \begin{align}
-  & live(s) = (in(s) \cup use(s)) - def(s), \label{eqn_back1} \\
+  & |live|(s) = (\Varid{in}(s) \cup |use|(s)) - |def|(s), \label{eqn_back1} \\
 \intertext{where}
   & s     & \text{Statement considered.} \notag\\
-  & use(s) &  \text{Set of variables used in $s$}. \notag\\
-  & def(s) & \text{Variable assigned to in $s$ (a singleton set)}. \notag\\
-  & in(s) & \text{Live variables computed for $s$' successor}. \notag
+  & |use|(s) &  \text{Set of variables used in $s$}. \notag\\
+  & |def|(s) & \text{Variable assigned to in $s$ (a singleton set)}. \notag\\
+  & |in|(s) & \text{Live variables computed for $s$' successor}. \notag
 \end{align}
 
-Table \ref{tbl_back1} shows the $use$ and $def$ sets for each
-statement. The live set computed, $live$, becomes the input, $in$, for
+Table \ref{tbl_back1} shows the |use| and |def| sets for each
+statement. The live set computed, |live|, becomes the input, |in|, for
 the statement's predecessor. We include the exit node (``#X#'') in the
-table to show the initial value of $in$ for the last statement --
+table to show the initial value of |in| for the last statement --
 $\emptyset$, the empty set. Our analysis then works backwards through the
 program. If our program (and its CFG) contained any loops, we would
 need to run this algorithm multiple times, until the live set for each
@@ -235,7 +233,7 @@ statement reached a fixed point.
 \begin{table}
   \centering
   \begin{tabular}{lcccc}
-    $s$ & $use(s)$ & $def(s)$ & $in(s)$ &  $live(s)$ \\
+    $s$ & $|use|(s)$ & $|def|(s)$ & $|in|(s)$ &  $|live|(s)$ \\
     \cmidrule(r){1-1}\cmidrule(r){2-2}\cmidrule(r){3-3}\cmidrule(r){4-4}\cmidrule(r){5-5}
     #X# & & & & $\emptyset$ \\
     #return a + 1# & $\{a\}$ & $\emptyset$ & $\emptyset$ & $\{a\}$ \\
@@ -243,7 +241,7 @@ statement reached a fixed point.
     #a = 1# & $\emptyset$ & $\{a\}$ & $\{a\}$ & $\emptyset$ \\
     \bottomrule
   \end{tabular}
-  \caption{The $use$, $def$ and $live$ sets computed using equation \ref{eqn_back1} for our example program.}
+  \caption{The $|use|$, $|def|$ and $|live|$ sets computed using equation \ref{eqn_back1} for our example program.}
   \label{tbl_back1}
 \end{table}
 

@@ -10,25 +10,25 @@ Informally, a \emph{function} is a mathematical definition that takes
 arguments and computes some result. For example, \emph{plus1} just adds 1 
 to its argument, using the normal rules of arithmetic:
 \begin{equation}
-  {plus1}\ x = x + 1.
+  |plus1|\ x = x + 1.
 \end{equation}
 We are not limited to defining functions that add 1. Functions can
 also be \emph{values} -- just as 1 or $x$ are in the expression
 above. Here, we define a function, that returns a function, that always
 adds 1:
 \begin{equation}
-  adder1 = \lambda\ x = x + 1.
+  |adder1| = \lambda\ x = x + 1.
 \end{equation}
-In $adder1$, ``$\lambda\ x$'' indicates we return a function that takes one
+In |adder1|, ``$\lambda\ x$'' indicates we return a function that takes one
 argument. We can go further and define a function that, given an
 argument, returns a function which always adds that amount:
 \begin{equation}
-  {adder}\ n = \lambda\ x = x + n.
+  |adder|\ n = \lambda\ x = x + n.
 \end{equation}
 Notice how the outer argument $n$ gets ``captured'' by the body $x +
-n$. Using $adder$, we can now re-define $adder1$ above:
+n$. Using $|adder|$, we can now re-define $|adder1|$ above:
 \begin{equation}
-  adder1 = adder\ 1.
+  |adder1| = |adder|\ 1.
 \end{equation}
 
 John McCarthy created LISP, the first functional language, in 196X
@@ -70,15 +70,15 @@ when mentioned.
 
 %%\emph{What does it look like?}
 
-Using this syntax, we can define some common functions. \emph{Identity} 
+Using this syntax, we can define some common functions. |Identity|
 returns its argument:
 \begin{align}
-  identity &= \lamAbs{x}{x}. \label{eq_lang2} \\
-  \intertext{\emph{Const} takes two arguments but always returns the first:}
-  const &= \lamAbs{a}{\lamAbs{b}{a}}. \label{eq_lang4} \\
-  \intertext{\emph{Compose} takes two functions and an argument. The result of
+  |identity| &= \lamAbs{x}{x}. \label{eq_lang2} \\
+  \intertext{|Const| takes two arguments but always returns the first:}
+  |const| &= \lamAbs{a}{\lamAbs{b}{a}}. \label{eq_lang4} \\
+  \intertext{|Compose| takes two functions and an argument. The result of
     applying the second function to the argument is passed to the first:}
-  compose &= \lamCompose. \label{eq_lang3} 
+  |compose| &= \lamCompose. \label{eq_lang3} 
 \end{align}
 Note that function application is right-associative, meaning
 \lamPApp{f}{\lamPApp{g}{x}} is the same as \lamApp{\lamApp{f}{g}}{x},
@@ -192,7 +192,7 @@ which implement these operations.
 
 %% Free variables and environment
 Consider how to find a value by its name. For example, consider
-the $compose$ function (expression \ref{eq_lang3}):
+the |compose| function (expression \ref{eq_lang3}):
 \begin{equation}
   \lamCompose.  \label{eq_lang1}
 \end{equation}
@@ -204,24 +204,24 @@ a way to find the values of these terms.
 
 We can describe where to find $f, g$ and $x$ in terms of memory
 locations. We can say that $x$ will appear in a special location,
-$arg$, because it is the argument to the function and we will always
+|arg|, because it is the argument to the function and we will always
 put arguments in the same place. We can further say that another
-special location, $clo$, will have two
+special location, |clo|, will have two
 slots. The first will contain $g$ and the second will contain
 $f$. Conceptually, then, our expression can be represented as:
 \begin{center}
   \begin{tabular}{c}
     \begin{math}\begin{aligned}[b]
-      arg &= x, \\
-      clo[0] &= g, \\
-      clo[1] &= f 
+      |arg| &= x, \\
+      |clo|[0] &= g, \\
+      |clo|[1] &= f 
     \end{aligned}\text{\ in}\end{math} \\
-    \lamAbs{arg}{\lamApp{clo[1]}{\lamPApp{clo[0]}{arg}}}.
+    \lamAbs{|arg|}{\lamApp{|clo|[1]}{\lamPApp{|clo|[0]}{arg}}}.
   \end{tabular}
 \end{center}
 
 \par
-In general, the $clo$ location holds the \emph{environment} for our
+In general, the $|clo|$ location holds the \emph{environment} for our
 expression. For any given expression, we will be able to find all the
 free variables (i.e., all those except the argument) in the
 environment. The compiler will be responsible for ensuring the correct
@@ -239,8 +239,8 @@ Associating locations with names is not enough, however. Looking again
 at expression \ref{eq_lang1}, $g$ clearly represents a function to
 which we pass the argument $x$. To compute the value of
 $\lamPApp{g}{x}$, we must be able to execute the code representing
-$g$. We already assigned a storage location for $g$ ($clo[0]$) -- now
-we just say that the value in $clo[0]$ is a \emph{label} that tells
+$g$. We already assigned a storage location for $g$ ($|clo|[0]$) -- now
+we just say that the value in $|clo|[0]$ is a \emph{label} that tells
 us where to find the code representing $g$. However, $g$ will need
 an environment of its own, to hold any free variables for $g$. Therefore,
 we pair the label indicating where to find $g$ with a list of free
@@ -258,15 +258,15 @@ seen how to access variables in the environment and how to execute
 unknown functions using closures. Now we come to the final element
 needed to compile the \lamA\ -- creating closures.
 
-Consider the following expression, where we apply the $const$ function (expression 
+Consider the following expression, where we apply the $|const|$ function (expression 
 \ref{eq_lang4}) to an argument:
 \begin{equation}
   \begin{split}
-    main &= \lamApp{const}{s} \\
+    |main| &= \lamApp{|const|}{s} \\
          &= \lamAppP{\lamAbs{a}{\lamAbs{b}{a}}}{s}.
   \end{split}
 \end{equation}
-In order to evaluate $main$, we need to apply the $const$ function
+In order to evaluate $|main|$, we need to apply the $|const|$ function
 to $s$. From the previous section we know that a closure is required to
 implement function application. It follows that
 \lamAbs{a}{\lamAbs{b}{a}} must create a closure which will
