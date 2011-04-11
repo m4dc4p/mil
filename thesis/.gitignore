@@ -6,3 +6,5 @@
 *.d
 *.temp
 *.fls
+*.run.cookie
+*.f.tex
