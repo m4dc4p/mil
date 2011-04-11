@@ -3,8 +3,8 @@
 \begin{center}
 \begin{minipage}{4in}
 \begin{AVerb}[numbers=left]
-  $block$ := k \{$v_1$, \dots, $v_N$\} $v$ = $tail$ \label{fig_mil3_k1} 
-    | b($v_1$, \dots, $v_N$) = $body$ \label{fig_mil3_b} 
+  $block$ := k \{$v_1$, \dots, $v_n$\} $v$ = $tail$ \label{fig_mil3_k1} 
+    | b($v_1$, \dots, $v_n$) = $body$ \label{fig_mil3_b} 
     | t <- k \{\}  \label{fig_mil3_t} 
 
   $body$ := do \label{fig_mil3_body}
@@ -21,18 +21,19 @@
 
   $tail$ := return $v$ \label{fig_mil3_return}
     | $v_1$ @ $v_2$ \label{fig_mil3_enter}
-    | k b \{$v_1$, \dots, $v_N$\} \label{fig_mil3_capture}
-    | b($v_1$, \dots, $v_N$) \label{fig_mil3_goto}
-    | C $v_1$ \dots $v_N$ \label{fig_mil3_const}
+    | k b \{$v_1$, \dots, $v_n$\} \label{fig_mil3_capture}
+    | b($v_1$, \dots, $v_n$) \label{fig_mil3_goto}
+    | C $v_1$ \dots $v_n$ \label{fig_mil3_const}
+    | p*($v_1$, \dots, $v_n$) \label{fig_mil3_prim}
 
-  $alt$ := C $v_1$ \dots $v_N$ -> b(\dots) 
+  $alt$ := C $v_1$ \dots $v_n$ -> b(\dots) 
 \end{AVerb}
 \end{minipage}
 \end{center} \\ \\
   $v$ represents a variable, and only a variable. Expressions
   cannot be used where $v$ appears. \\ 
 
-  \texttt{C $v_1$ \dots $v_N$} represents a constructor, for creating
+  \texttt{C $v_1$ \dots $v_n$} represents a constructor, for creating
   values in $tail$ expressions and inspecting values in $alt$ arms. \\
 \end{tabular}
 \caption{MIL syntax.}

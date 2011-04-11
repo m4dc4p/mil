@@ -201,14 +201,15 @@ by #compose#. On the last line of #main# we return the value computed, #t3#.
 \subsection{MIL Syntax}
 
 Figure \ref{fig_mil3} gives the syntax for MIL.  A MIL program
-consists of a number of \emph{blocks}: \emph{closure} blocks
-(line \ref{fig_mil3_k1}), basic blocks (line \ref{fig_mil3_b}) and top-level
-blocks (line \ref{fig_mil3_t}). Though the syntax for closure blocks seems to allow any tail,
-in practice they can only do one of two things: either return a
-closure (\texttt{k \{\dots\}}) or jump to a basic block
-(\texttt{b(\dots)}). Top-level blocks (line \ref{fig_mil3_t}) provide an
-entry point for top-level functions -- they provide a closure which
-can be used to initially ``enter'' the function.
+consists of a number of \emph{blocks}: \emph{closure} blocks (line
+\ref{fig_mil3_k1}), basic blocks (line \ref{fig_mil3_b}) and top-level
+blocks (line \ref{fig_mil3_t}). Though the syntax for closure blocks
+seems to allow any tail, in practice they can only do one of two
+things: either return a closure (\texttt{k \{\dots\}}) or jump to a
+basic block (\texttt{b(\dots)}). Top-level blocks (line
+\ref{fig_mil3_t}) provide an entry point for top-level functions --
+they provide a closure which can be used to initially ``enter'' the
+function.
 
 \afterpage{\clearpage{\input{mil_syntax}}\clearpage}
 
@@ -241,19 +242,21 @@ the value of tail expression specified.
 \emph{Tail} expressions represent effects -- they create monadic
 values. #return# (line \ref{fig_mil3_return}) takes a variable and
 makes its value monadic. Notice it can only take a variable, not an
-expression.  The enter operator, #@@#, expects a closure on its left
-and some value on the right. It will enter the function pointed to by
-the closure, with the argument given, and will evaluate to the result
-of that function. #k#, the ``capture'' operator, creates a closure
-from a block name and a list of variables. The name given is not an
-arbitrary code pointer -- it is a location determined during
-compilation. The ``goto'' operator, \texttt{b(\dots)}, jumps to the
+expression.  The ``enter'' operator, #@@#, expects a closure on its
+left and some value on the right. It will enter the function pointed
+to by the closure, with the argument given, and will evaluate to the
+result of that function. #k#, the ``capture'' operator, creates a
+closure from a block name and a list of variables. The name given is
+not an arbitrary code pointer -- it is a location determined during
+compilation. The ``goto'' expression, \texttt{b(\dots)}, jumps to the
 particular block with the arguments given. Again, this is not a
-computed value -- #b# represents a known location for the
-block. The variables mentioned in the #goto# do not have to have the
-same names as those given in the block's declaration. Finally, the
-constructor operator, ``C'', will create a data value with the given
-tag (``C'') and variables.
+computed value -- #b# represents a known location for the block. The
+variables mentioned in the #goto# do not have to have the same names
+as those given in the block's declaration. The constructor expression,
+``C'', will create a data value with the given tag (``C'') and
+variables. Primitives, which are not implemented in MIL, have the form
+#p*# and are treated the same as ``goto'' expressions. They are not 
+implemented in MIL, however. 
 
 \section{Compiling \lamA to MIL}
 
@@ -282,6 +285,16 @@ isolate monadic effects to one area of the language. Finally, the limited
 number of statements ensure control-flow is straightforward.
 
 \section{Conclusion}
+
+This chapter presented our Monadic Intermediate Language (MIL). Our
+MIL resembles three-address code in sevarl ways: infinitely many
+registers can be named, nested expressions are not allowed, and
+implementatino details are made explicit. The MIL's unique features
+include separate representations for \emph{closure-capturing} and
+basic blocks, and the use of monadic \emph{tail} expressions. We 
+presented a simple scheme for compiling the \lamA given in
+Chapter \ref{ref_chapter_languages} to our MIL. Later will be devoted
+to optimizing those MIL programs using dataflow techniques.
 
 %% Compiling the lambda-calculus to MIL
 
