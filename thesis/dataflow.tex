@@ -3,7 +3,7 @@
 \include{preamble}
 \begin{document}
 \include{document.preamble}
-
+\newcounter{nodeCounter}[subfigure]
 %% Float parameters
 \renewcommand{\textfraction}{0.1}
 \renewcommand{\topfraction}{0.9}
@@ -35,9 +35,9 @@ analysis treats a program as a ``control-flow graph'', applies a
 ``transfer'' function to compute ``facts'' about the execution of the
 program, and then applies a ``rewriting'' function to transform the
 program based on those facts. Dataflow analysis is now considered
-standard technique and can be found in most compiler textbooks.
+standard technique and can be found in most compiler textbooks. 
 
-\section{Dataflow Concepts}
+\section{Control-Flow Graphs}
 
 %% Control-flow graph
 
@@ -59,44 +59,51 @@ can terminate.
 \label{fig_back1}
 \end{myfig}
 
-Figure \ref{fig_back1} shows a simple C program and the associated
-CFG. Each \emph{node} in the graph represents a statement in the
-original program. In
-the figure, node 7 represents the #print# statement at line
-\ref{lst_back1_print}. Node 1, the \emph{entry point}, designates
-where program execution begins. Nothing precedes the entry point, and
-only one entry point exists in the graph.\footnote{Multiple entry
-  points can be defined but it only complicates later
+Figure \ref{fig_back1} shows a simple C program and its CFG. Each
+\emph{node} in the graph represents a statement in the original
+program. For example, nodes \ref{lst_back2_assigna} and \ref{lst_back2_assignb}
+ represent the assignment statements on
+line \ref{lst_back1_assign}. Node \ref{lst_back2_entry}, the \emph{entry point},
+designates where program execution begins. Nothing precedes the entry
+point, and only one entry point exists in the graph.\footnote{Multiple
+  entry points can be defined but it only complicates later
   analysis. Instead, we can always transform a graph with multiple
   entry points into one with a single entry point by creating one node
   that precedes all existing entry points. That node can then
   determine which entry point to execute, based on whatever conditions
-  were orignally used to select the individual entry point.} 
+  were orignally used to select the individual entry point.} After
+line \ref{lst_back1_print}, the program ends. Node \ref{lst_back2_exit}, an \emph{exit
+  point}, shows where execution terminates. Unlike entry points,
+multiple exit points can exist in a graph.
 
-The \emph{directed edge} from node 2 to node 3 shows how the
+The \emph{directed edge} from node \ref{lst_back2_assigna}, to node
+\ref{lst_back2_assignb}, to node \ref{lst_back2_test} shows how the
 assignments on line \ref{lst_back1_assign} precede the test on line
 \ref{lst_back1_test}. Edges show the order in which nodes
 execute. \emph{Predecessor} nodes always execute before
-\emph{successor} nodes, except in the presence of loops.
+\emph{successor} nodes (except in the presence of loops).
 
-A node followed by multiple successors (i.e., where multiple edges
-leave the node) represents a \emph{branch} or \emph{conditional}. Node
-3 represents the test on line \ref{lst_back1_test}, which can branch to
-line \ref{lst_back1_test_true} or line \ref{lst_back1_test_false}. The
-edges leaving node 3 show that execution can branch to either node 4
-or node 5.
+The test on line \ref{lst_back1_test} can branch to line
+\ref{lst_back1_test_true} or line \ref{lst_back1_test_false}. The
+edges leaving node \ref{lst_back2_test} (representing the test ``if(#a > b#)'') 
+show that execution can branch to either node
+\ref{lst_back2_true} ($a > b$) or node \ref{lst_back2_false} ($a \leq
+b$). A node followed by multiple successors (i.e., where multiple
+edges leave the node) represents a \emph{branch} or \emph{conditional}
+statement. Any one of the successor nodes may execute following the
+conditional statement, depending on the condition tested.
 
-The #printf# statement on line \ref{lst_back1_print} executes
-regardless of the result of the test on \ref{lst_back1_test}, which
-the graph shows by making both nodes 4 and 5 predecessors of node
-6. After line \ref{lst_back1_print}, the program ends. Node 7, an
-\emph{exit point}, shows where execution terminates. Unlike entry
-points, multiple exit points can exist in a graph.
+Conversly, a node with multiple predecessors represents the
+destination of multiple execution paths. The #printf# statement on
+line \ref{lst_back1_print} always executes, regardless of the result
+of the test on \ref{lst_back1_test}. Our CFG represents this by making
+nodes \ref{lst_back2_true} and \ref{lst_back2_false} predecessors of
+node \ref{lst_back2_print}.
 
-%% Basic blocks
-
+\section{Facts}
 %% In & Out facts
 
+\section{Direction \& The Transfer Function}
 %% Direction & Transfer Function
 
 Dataflow analysis applies a ``transfer function'' to each node in the
@@ -112,6 +119,7 @@ on later ``out'' facts. The transfer function will be applied
 repeatedly until the facts stop changing -- they reach a ``fixed
 point.''
 
+\section{The Meet Operator}
 %% Meet operator
 If the CFG for a program contains nodes with multiple predecessors,
 ``in'' facts must be combined in some way. The ``meet'' operator for
@@ -129,8 +137,10 @@ change?); a backwards analysis computes facts up to a certain point
 statement?). Where a forwards analysis begins at the entry point(s)
 for the CFG, a backwards analysis begins at the exit points.
 
-
+\section{Iterative Analysis}
 %% Iterative Analysis & Fixed points
+
+\section{Rewriting}
 
 %% Rewrite based on analysis
 Direction, the meet operator, facts, and the transfer function
@@ -140,6 +150,45 @@ to alter, or ``rewrite,'' the CFG. The meaning of the new program will
 not be different than the old, but it will behave differently: execute
 faster, use less memory, or whatever characteristic the optimization
 should improve.
+
+\section{Basic Blocks}
+%% Basic blocks
+Consider the C-language fragment and CFGs in Figure
+\ref{fig_back4}. Part \subref{fig_back4_b} shows the CFG for lines
+\ref{lst_back3_start} -- \ref{lst_back3_end} in part
+\subref{fig_back4_a}: a long, straight sequence of nodes, one after
+another. Collapsing those nodes into one, as in part
+\subref{fig_back4_c}, does not lose information and gives a more
+compact representation. 
+
+\begin{myfig}[th]
+\begin{tabular}{ccc}
+\subfloat{\input{lst_back3}\label{fig_back4_a}} \vline & %%
+\subfloat{\input{lst_back4}\label{fig_back4_b}} \vline & %%
+\subfloat{\input{lst_back5}\label{fig_back4_c}} \\
+\subref{fig_back4_a} & \subref{fig_back4_b} & \subref{fig_back4_c} \\\\\rule{0pt}{24pt}
+\end{tabular}
+\caption{\subref{fig_back4_a}: A C-language fragment to illustrate
+  \emph{basic blocks}.  \subref{fig_back4_b}: The CFG for
+  \subref{fig_back4_a} without basic blocks. \subref{fig_back4_c}: The
+  CFG for \subref{fig_back4_c} using basic blocks.}
+\label{fig_back4}
+\end{myfig}
+
+Each node in Figure \ref{fig_back3_c} represents a \emph{basic block}:
+a sequence of statements with one entry, one exit, and no branches
+in-between. Execution cannot start in the ``middle'' of the block, nor
+can it branch anywhere but at the end of the block. Basic blocks are a
+widely used representation for programs, found in standard compiler
+textbooks (\citep{AhoXX}, \citep{MunchXX}, \citep{AppelXX}).
+
+Dataflow optimization works as well with the ``collapsed'' nodes in
+part \subref{lst_back3_c} as those in Figure \subref{lst_back3_b}. In
+fact, a basic block can consist of one statement -- a \emph{trivial}
+block. For example, the nodes in Figures \ref{fig_back4_b} and
+\ref{fig_back1_b} represent trivial basic blocks. Therefore, we can
+always convert a CFG of basic-blocks into a CFG of statements, if
+needed.
 
 \section{Example: Dead-Code Elimination}
 

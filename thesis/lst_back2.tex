@@ -1,27 +1,31 @@
 \begin{minipage}[t]{2in}
-\begin{Verbatim}
-     E (1)
+\begin{AVerb}
+     E (\ref{lst_back2_entry}) \refstepcounter{nodeCounter} \label{lst_back2_entry}
      |
      V
-   -----(2)
+   -----(\ref{lst_back2_assigna}) \refstepcounter{nodeCounter} \label{lst_back2_assigna}
   |a = 1|
-  |b = 2|
    -----
      |
      V
- ---------(3)    -----(4)
+   -----(\ref{lst_back2_assignb}) \refstepcounter{nodeCounter} \label{lst_back2_assignb}
+  |b = 2|
+   -----
+     |  \refstepcounter{nodeCounter} \label{lst_back2_test}
+     V  \refstepcounter{nodeCounter} \label{lst_back2_true}
+ ---------(\ref{lst_back2_test})    -----(\ref{lst_back2_true})
 |if(a > b)|---->|c = 4|
  ---------       -----
-     |             |
-     V             V
- ---------(5)  ---------(6)
+     |             | \refstepcounter{nodeCounter} \label{lst_back2_false}
+     V             V \refstepcounter{nodeCounter} \label{lst_back2_print}
+ ---------(\ref{lst_back2_false})  ---------(\ref{lst_back2_print})
 |c = a + 3|-->|printf(c)|
  ---------     ---------
-                   |
+                   | \refstepcounter{nodeCounter} \label{lst_back2_exit}
                    V
                    |
-                   X (7)
-\end{Verbatim}
+                   X (\ref{lst_back2_exit})
+\end{AVerb}
 \end{minipage}
 
 
