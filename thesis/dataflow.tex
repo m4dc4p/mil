@@ -31,7 +31,7 @@ by Gary Kildall \citep{Kildall1973}, refers to an algorithm for
 applying an ``optimizing function'' to a given program. In itself it
 does not give a specific optimization; rather, it gives a technique
 for applying many different optimizations. In today's terms, dataflow
-analysis treats a program as a ``control-flow graph'' (CFG), applies a
+analysis treats a program as a ``control-flow graph'', applies a
 ``transfer'' function to compute ``facts'' about the execution of the
 program, and then applies a ``rewriting'' function to transform the
 program based on those facts. Dataflow analysis is now considered
@@ -39,54 +39,65 @@ standard technique and can be found in most compiler textbooks.
 
 \section{Dataflow Concepts}
 
-The CFG for a program shows all possible execution ``paths'' that may
-occur when the program runs. Nodes represent statements, while
-directed edges show the order that statements may be executed.
-Program execution enters the graph from one or more entry points and
-leaves the graph through one or exit points.
+%% Control-flow graph
 
-Figure \ref{fig_back1} gives the CFG for a C-language program
-fragment.  ``#E#'' represents the entry point for the program. The
-conditional statement #if(a > b)# will be executed first. Execution
-can then move to either of the two following nodes, depending on the
-values of #a# and #b#. Finally, execution leaves the graph through one of
-the exit nodes, indicated by ``#X#'' in the diagram.
+The \emph{control-flow graph} (CFG) of a program shows how the program
+may be executed: which statements follow one another, branches that
+can be taken, loops that may execute, and possible ways the program
+can terminate.
 
 \begin{myfig}[th]
 \begin{tabular}{cc}
-\begin{minipage}[t]{1in}
-\begin{Verbatim}[numbers=left]
-if(a > b)
-  c = a; 
-else     
-  c = b; 
-\end{Verbatim}
-\end{minipage} \vline & 
-\begin{minipage}[t]{1in}
-  \begin{Verbatim}[gobble=2]
-       E
-       ||
-       V
-     ---------     ------
-    ||if(a > b)||-->||c = a||-->X
-     ---------     ------
-       ||
-       V
-     -----
-    ||c = b||
-     -----
-      ||
-      X
-  \end{Verbatim}
-\end{minipage} \\
- (a) & (b) \rule{0pt}{24pt}
+\subfloat{\input{lst_back1}%%
+  \label{fig_back1_a}} \vline & 
+\subfloat{\input{lst_back2}%%
+  \label{fig_back1_b}} \\
+\subref{fig_back1_a} & \subref{fig_back1_b} \\\rule{0pt}{24pt}
 \end{tabular}
-\caption{A C-language program fragment (\emph{a}) and its associated
-  control-flow graph (\emph{b}). Notice that all possible paths are
-  shown in the CFG. Each specific execution of the program will
-  depend on the values of \verb=a= and \verb=b=.}
+\caption{(\emph{a}): A C-language program fragment. (\emph{b}): The
+  \emph{control-flow graph} (CFG) for the program.}
 \label{fig_back1}
 \end{myfig}
+
+Figure \ref{fig_back1} shows a simple C program and the associated
+CFG. Each \emph{node} in the graph represents a statement in the
+original program. In
+the figure, node 7 represents the #print# statement at line
+\ref{lst_back1_print}. Node 1, the \emph{entry point}, designates
+where program execution begins. Nothing precedes the entry point, and
+only one entry point exists in the graph.\footnote{Multiple entry
+  points can be defined but it only complicates later
+  analysis. Instead, we can always transform a graph with multiple
+  entry points into one with a single entry point by creating one node
+  that precedes all existing entry points. That node can then
+  determine which entry point to execute, based on whatever conditions
+  were orignally used to select the individual entry point.} 
+
+The \emph{directed edge} from node 2 to node 3 shows how the
+assignments on line \ref{lst_back1_assign} precede the test on line
+\ref{lst_back1_test}. Edges show the order in which nodes
+execute. \emph{Predecessor} nodes always execute before
+\emph{successor} nodes, except in the presence of loops.
+
+A node followed by multiple successors (i.e., where multiple edges
+leave the node) represents a \emph{branch} or \emph{conditional}. Node
+3 represents the test on line \ref{lst_back1_test}, which can branch to
+line \ref{lst_back1_test_true} or line \ref{lst_back1_test_false}. The
+edges leaving node 3 show that execution can branch to either node 4
+or node 5.
+
+The #printf# statement on line \ref{lst_back1_print} executes
+regardless of the result of the test on \ref{lst_back1_test}, which
+the graph shows by making both nodes 4 and 5 predecessors of node
+6. After line \ref{lst_back1_print}, the program ends. Node 7, an
+\emph{exit point}, shows where execution terminates. Unlike entry
+points, multiple exit points can exist in a graph.
+
+%% Basic blocks
+
+%% In & Out facts
+
+%% Direction & Transfer Function
 
 Dataflow analysis applies a ``transfer function'' to each node in the
 CFG to compute ``facts'' about the program's state before and after
@@ -101,6 +112,7 @@ on later ``out'' facts. The transfer function will be applied
 repeatedly until the facts stop changing -- they reach a ``fixed
 point.''
 
+%% Meet operator
 If the CFG for a program contains nodes with multiple predecessors,
 ``in'' facts must be combined in some way. The ``meet'' operator for
 each optimization combines facts. Usually, the operator takes the
@@ -117,6 +129,10 @@ change?); a backwards analysis computes facts up to a certain point
 statement?). Where a forwards analysis begins at the entry point(s)
 for the CFG, a backwards analysis begins at the exit points.
 
+
+%% Iterative Analysis & Fixed points
+
+%% Rewrite based on analysis
 Direction, the meet operator, facts, and the transfer function
 together define the optimizing function applied by dataflow analysis
 for a particular optimization. The result of the analysis is then used
