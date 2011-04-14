@@ -38,6 +38,7 @@ program based on those facts. Dataflow analysis is now considered
 standard technique and can be found in most compiler textbooks. 
 
 \section{Control-Flow Graphs}
+\label{sec_back1}
 
 %% Control-flow graph
 
@@ -61,47 +62,105 @@ can terminate.
 
 Figure \ref{fig_back1} shows a simple C program and its CFG. Each
 \emph{node} in the graph represents a statement in the original
-program. For example, nodes \ref{lst_back2_assigna} and \ref{lst_back2_assignb}
- represent the assignment statements on
-line \ref{lst_back1_assign}. Node \ref{lst_back2_entry}, the \emph{entry point},
-designates where program execution begins. Nothing precedes the entry
-point, and only one entry point exists in the graph.\footnote{Multiple
-  entry points can be defined but it only complicates later
-  analysis. Instead, we can always transform a graph with multiple
-  entry points into one with a single entry point by creating one node
-  that precedes all existing entry points. That node can then
-  determine which entry point to execute, based on whatever conditions
-  were orignally used to select the individual entry point.} After
-line \ref{lst_back1_print}, the program ends. Node \ref{lst_back2_exit}, an \emph{exit
-  point}, shows where execution terminates. Unlike entry points,
-multiple exit points can exist in a graph.
+program. For example, nodes \ref{lst_back2_assigna} and
+\ref{lst_back2_assignb} represent the assignment statements on line
+\ref{lst_back1_assign}. Node \ref{lst_back2_entry}, the \emph{entry
+  point}, designates where program execution begins. Nothing precedes
+the entry point, and only one entry point exists in the graph. After
+line \ref{lst_back1_print}, the program ends. Node
+\ref{lst_back2_exit}, an \emph{exit point}, shows where execution
+terminates. Unlike entry points, multiple exit points can exist in a
+graph.
 
-The \emph{directed edge} from node \ref{lst_back2_assigna}, to node
-\ref{lst_back2_assignb}, to node \ref{lst_back2_test} shows how the
-assignments on line \ref{lst_back1_assign} precede the test on line
+The \emph{directed edges} from node \ref{lst_back2_assigna} to node
+\ref{lst_back2_assignb}, and from node \ref{lst_back2_assignb} to node
+\ref{lst_back2_test} shows how the assignments on line
+\ref{lst_back1_assign} precede the test on line
 \ref{lst_back1_test}. Edges show the order in which nodes
 execute. \emph{Predecessor} nodes always execute before
 \emph{successor} nodes (except in the presence of loops).
 
 The test on line \ref{lst_back1_test} can branch to line
 \ref{lst_back1_test_true} or line \ref{lst_back1_test_false}. The
-edges leaving node \ref{lst_back2_test} (representing the test ``if(#a > b#)'') 
-show that execution can branch to either node
+edges leaving node \ref{lst_back2_test} (representing the test
+``\verb=if(a > b)='') show that execution can branch to either node
 \ref{lst_back2_true} ($a > b$) or node \ref{lst_back2_false} ($a \leq
 b$). A node followed by multiple successors (i.e., where multiple
 edges leave the node) represents a \emph{branch} or \emph{conditional}
 statement. Any one of the successor nodes may execute following the
 conditional statement, depending on the condition tested.
 
-Conversly, a node with multiple predecessors represents the
+Conversely, a node with multiple predecessors represents the
 destination of multiple execution paths. The #printf# statement on
 line \ref{lst_back1_print} always executes, regardless of the result
 of the test on \ref{lst_back1_test}. Our CFG represents this by making
 nodes \ref{lst_back2_true} and \ref{lst_back2_false} predecessors of
 node \ref{lst_back2_print}.
 
-\section{Facts}
+\section{Facts \& The Meet Operator}
 %% In & Out facts
+Dataflow analysis associates every node in the CFG with two sets of
+\emph{facts}. Facts describe the state of the machine before and after
+the statements represented by the node execute. \emph{In} facts describe
+the machine's state beforehand, while \emph{out} facts describe its state
+afterwards. 
+
+Consider Figure \ref{fig_back5}, which annotates the program fragment
+in Figure \ref{fig_back1} with the value of #a#, #b#, and #c# before
+and after every node. The symbol ``$\bot$'' (``bottom'') indicates an unknown value
+-- one for which we do not have any information yet. Prior to node
+\ref{lst_back7_assigna}, none of the variables values' can be known
+with certainty, which the fact $\{a : \bot,b : \bot,c : \bot\}$ shows.
+They may be set to a compiler default, a random value in memory, or
+even some previous value if this fragment is embedded in a loop. After
+node \ref{lst_back7_assigna}, though, we can know that #a# equals 1,
+which our new fact, $\{a : 1,b : \bot,c : \bot\}$, reflects. 
+
+\afterpage{\clearpage{\input{fig_back5}}\clearpage}
+
+At the entry node, we assign \emph{in} facts some default value
+($\bot$ in our example). Otherwise, for most of our example,
+\emph{out} facts become \emph{in} facts on successor nodes. However,
+facts can conflict.  Consider the value for #c# given by nodes
+\ref{lst_back7_true} and \ref{lst_back7_false}. Node
+\ref{lst_back7_true} says #c# equals 4, while node
+\ref{lst_back7_false} says #c# equals $a + 3$. We resolve the
+situation by assigning #c# the value ``$\top$'' (``top''). As opposed to $\bot$,
+$\top$ means we know a definite value for #c#, but we cannot specify
+which.
+
+The \emph{meet operator} defines how we combine facts as in the
+previous situation. In many cases, \emph{meet} resembles the set
+``union'' or ``intersection'' operations, but with some special
+behavior. Table \ref{tbl_back1} shows how our meet operator, $\sqcap$,
+combines facts. $v_1$ and $v_2$ represent values given to the same
+variable facts by different facts. The meet operator replaces $\bot$
+with definite values, but replaces differing values with
+$\top$. Though not illustrated in our example, the table also shows
+that $\top$ values will always replace definite values.
+
+\begin{table}[th]
+  \centering
+  \figbegin
+  \begin{math}
+    \begin{array}{cccc}
+      v_1 & v_2 & v_1 \sqcap v_2 \\
+      \cmidrule(r){1-1}\cmidrule(r){2-2}\cmidrule(r){3-3}
+      \bot & v_2 & v_2 & \\ 
+      v_1 & \bot & v_1 & \\
+      \top & v_2 & \top & \\
+      v_1 & \top & \top  &\\
+      v_1 & v_2 & \top & \text{(when $v_1 \neq v_2$)}\\
+      v_1 & v_2 & v_1 & \text{(when $v_1 = v_2$)}\\
+    \end{array}
+  \end{math}
+  \caption{How the meet operator used in
+    Figure \ref{fig_back5} combines facts. $v_1$ and $v_2$ are
+    separate values given by separate facts to the same variable. The
+    table shows how they are combined.}
+  \label{tbl_lang1}
+  \figend
+\end{table}
 
 \section{Direction \& The Transfer Function}
 %% Direction & Transfer Function
@@ -216,7 +275,7 @@ and can be considered ``dead.''}
 Of course, people do not normally write programs with such obviously
 useless statements, but other compiler optimizations can produce (or
 leave behind) many such statements. \emph{Uncurrying}, described in
-Chapter \ref{ref_chapter_uncurrying}, in fact depends on dead-code elmination.
+Chapter \ref{ref_chapter_uncurrying}, in fact depends on dead-code elimination.
 
 To eliminate the assignment like that on line
 \ref{fig_back2_dead_line}, we really need to determine which variables
@@ -235,7 +294,7 @@ our traversal finished. However, if we traverse backwards, we only
 need to note any reference to a variable. When we see an assignment to
 a variable \emph{not} in our live set, we know it will not be
 referenced afterwards. Therefore we compute ``liveness'' using a
-backwards travesal over the CFG.
+backwards traversal over the CFG.
 
 \begin{myfig}[th]
 \begin{minipage}{2in}
@@ -429,3 +488,6 @@ same meaning, but behaves better, according to the optimization used.
 % Example
 
 \end{document}
+
+% LocalWords:  Dataflow dataflow CFG printf variable's CFGs ccc Uncurrying
+% LocalWords:  liveness

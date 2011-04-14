@@ -1,0 +1,49 @@
+\begin{minipage}[t]{3in}\refstepcounter{nodeCounter}\label{lst_back7_entry}%%
+\refstepcounter{nodeCounter}\label{lst_back7_assigna}%%
+\refstepcounter{nodeCounter}\label{lst_back7_assignb}%%
+\refstepcounter{nodeCounter}\label{lst_back7_test}%%
+\refstepcounter{nodeCounter}\label{lst_back7_true}%%
+\refstepcounter{nodeCounter}\label{lst_back7_false}%%
+\refstepcounter{nodeCounter}\label{lst_back7_print}%%
+\refstepcounter{nodeCounter}\label{lst_back7_exit}
+\begin{AVerb}
+     E (\ref{lst_back7_entry})
+     |
+   -----(\ref{lst_back7_assigna}) $\mathit{in:} \{a : \bot,b : \bot,c : \bot\}$
+  |a = 1|
+   -----    $\mathit{out:} \{a : 1,b : \bot,c : \bot\}$
+     |  
+     V  
+   -----(\ref{lst_back7_assignb}) $\{a : 1,b : \bot,c : \bot\}$
+  |b : 2|
+   -----    $\{a : 1,b : 2,c : \bot\}$
+     |  
+     V    
+ ---------(\ref{lst_back7_test}) $\{a : 1,b : 2,c : \bot\}$
+|if(a > b)|---
+ ---------    $\{a : 1,b : 2,c : \bot\}$
+     |        |
+     |        V  
+     |      -----(\ref{lst_back7_true}) $\{a : 1,b : 2,c : \bot\}$
+     |     |c = 4|
+     |      -----    $\{a : 1,b : 2,c : 4\}$
+     |        |  
+     |         ->
+     V           |   
+ ---------(\ref{lst_back7_false}) $\{a : 1,b : 2,c : \bot\}$
+|c = a + 3|      |
+ ---------    $\{a : 1,b : 2,c : a + 3\}$
+     |-----<-----
+     V    
+ ---------(\ref{lst_back7_print}) $\{a : 1,b : 2,c : \top\}$
+|printf(c)|
+ ---------    $\{a : 1,b : 2,c : \top\}$
+     |    
+     X (\ref{lst_back7_exit})
+\end{AVerb}
+\end{minipage}
+
+
+
+
+
