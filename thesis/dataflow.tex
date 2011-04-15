@@ -39,10 +39,14 @@ standard technique and can be found in most compiler textbooks.
 
 \section{Control-Flow Graphs}
 \label{sec_back1}
+\newcommand{\inE}{\emph{in}\xspace}
+\newcommand{\out}{\emph{out}\xspace}
+\newcommand{\In}{\emph{In}\xspace}
+\newcommand{\Out}{\emph{Out}\xspace}
 
 %% Control-flow graph
 
-The \emph{control-flow graph} (CFG) of a program shows how the program
+The \emph{control-flow graph} (CFG) of a program shows how it
 may be executed: which statements follow one another, branches that
 can be taken, loops that may execute, and possible ways the program
 can terminate.
@@ -53,7 +57,7 @@ can terminate.
   \label{fig_back1_a}} \vline & 
 \subfloat{\input{lst_back2}%%
   \label{fig_back1_b}} \\
-\subref{fig_back1_a} & \subref{fig_back1_b} \\\rule{0pt}{24pt}
+\subref{fig_back1_a} & \subref{fig_back1_b} 
 \end{tabular}
 \caption{(\emph{a}): A C-language program fragment. (\emph{b}): The
   \emph{control-flow graph} (CFG) for the program.}
@@ -97,49 +101,76 @@ of the test on \ref{lst_back1_test}. Our CFG represents this by making
 nodes \ref{lst_back2_true} and \ref{lst_back2_false} predecessors of
 node \ref{lst_back2_print}.
 
+\section{Basic Blocks}
+%% Basic blocks
+Consider the C-language fragment and CFGs in Figure
+\ref{fig_back4}. Part \subref{fig_back4_b} shows the CFG for lines
+\ref{lst_back3_start} -- \ref{lst_back3_end} in part
+\subref{fig_back4_a}: a long, straight sequence of nodes, one after
+another. Collapsing those nodes into one, as in part
+\subref{fig_back4_c}, does not lose information and gives a more
+compact representation. 
+
+\afterpage{\clearpage{\input{fig_back4}}\clearpage}
+
+Each node in Figure \ref{fig_back4_c} represents a \emph{basic block}:
+a sequence of statements with one entry, one exit, and no branches
+in-between. Execution cannot start in the ``middle'' of the block, nor
+can it branch anywhere but at the end of the block. Basic blocks are a
+widely used representation for programs, found in standard compiler
+textbooks (\citep{AhoXX}, \citep{MunchXX}, \citep{AppelXX}).
+
+A basic block can consist of one statement -- a \emph{trivial}
+block. For example, the nodes in Figures \ref{fig_back4_b} and
+\ref{fig_back1_b} represent trivial basic blocks. We can always
+convert a CFG of basic-blocks into a CFG of statements, if needed.
+Dataflow optimization works as well with the ``collapsed'' nodes in
+part \subref{fig_back4_c} as those in Figure
+\subref{fig_back4_b}. Therefore, From this point forward we will work
+exclusively with basic blocks, rather than individual statements.
+
 \section{Facts \& The Meet Operator}
 %% In & Out facts
 Dataflow analysis associates every node in the CFG with two sets of
 \emph{facts}. Facts describe the state of the machine before and after
-the statements represented by the node execute. \emph{In} facts describe
-the machine's state beforehand, while \emph{out} facts describe its state
-afterwards. 
+execution of the statements represented by the node. \In facts
+describe the machine's state beforehand, while \out facts
+describe its state afterwards.
+
+\afterpage{\clearpage\input{fig_back5}\clearpage}
 
 Consider Figure \ref{fig_back5}, which annotates the program fragment
 in Figure \ref{fig_back1} with the value of #a#, #b#, and #c# before
-and after every node. The symbol ``$\bot$'' (``bottom'') indicates an unknown value
--- one for which we do not have any information yet. Prior to node
-\ref{lst_back7_assigna}, none of the variables values' can be known
-with certainty, which the fact $\{a : \bot,b : \bot,c : \bot\}$ shows.
-They may be set to a compiler default, a random value in memory, or
-even some previous value if this fragment is embedded in a loop. After
-node \ref{lst_back7_assigna}, though, we can know that #a# equals 1,
-which our new fact, $\{a : 1,b : \bot,c : \bot\}$, reflects. 
+and after every node. The symbol ``$\bot$'' (``bottom'') indicates an
+unknown value. Assigning $\bot$ to a variable means we do not know its
+value. Prior to node \ref{lst_back7_assign}, none of the variables
+values' can be known, which the fact $\{a : \bot,b : \bot,c : \bot\}$
+shows.  They may be set to a compiler default, a random value in
+memory, or even some previous value if this fragment is embedded in a
+loop. After node \ref{lst_back7_assign}, our new fact, $\{a : 1,b : 2,c : \bot\}$
+shows that we know that #a# equals 1, #b# equals 2, and that we stil do not know
+the value of #c#.
 
-\afterpage{\clearpage{\input{fig_back5}}\clearpage}
-
-At the entry node, we assign \emph{in} facts some default value
-($\bot$ in our example). Otherwise, for most of our example,
-\emph{out} facts become \emph{in} facts on successor nodes. However,
-facts can conflict.  Consider the value for #c# given by nodes
+At the entry node, we assign \inE facts a default value ($\bot$
+in our example). Elsewhere, \inE facts come from predecessor
+nodes. However, nodes with multiple predecessors can receive
+conflicting facts. Consider the value for #c# given by nodes
 \ref{lst_back7_true} and \ref{lst_back7_false}. Node
 \ref{lst_back7_true} says #c# equals 4, while node
 \ref{lst_back7_false} says #c# equals $a + 3$. We resolve the
-situation by assigning #c# the value ``$\top$'' (``top''). As opposed to $\bot$,
-$\top$ means we know a definite value for #c#, but we cannot specify
-which.
+situation by assigning #c# the value ``$\top$'' (``top''). As opposed
+to $\bot$, $\top$ means we know a definite value for #c#, but we
+cannot specify which.
 
 The \emph{meet operator} defines how we combine facts as in the
-previous situation. In many cases, \emph{meet} resembles the set
-``union'' or ``intersection'' operations, but with some special
-behavior. Table \ref{tbl_back1} shows how our meet operator, $\sqcap$,
-combines facts. $v_1$ and $v_2$ represent values given to the same
-variable facts by different facts. The meet operator replaces $\bot$
-with definite values, but replaces differing values with
+previous situation. Table \ref{tbl_back2} shows how our meet operator,
+$\sqcap$, combines facts. $v_1$ and $v_2$ represent values given to
+the same variable facts by different facts. The meet operator replaces
+$\bot$ with definite values, but replaces differing values with
 $\top$. Though not illustrated in our example, the table also shows
 that $\top$ values will always replace definite values.
 
-\begin{table}[th]
+\begin{table}[tbh]
   \centering
   \figbegin
   \begin{math}
@@ -151,53 +182,126 @@ that $\top$ values will always replace definite values.
       \top & v_2 & \top & \\
       v_1 & \top & \top  &\\
       v_1 & v_2 & \top & \text{(when $v_1 \neq v_2$)}\\
-      v_1 & v_2 & v_1 & \text{(when $v_1 = v_2$)}\\
+      v_1 & v_2 & v_1 & \text{(when $v_1 = v_2$)}
     \end{array}
   \end{math}
   \caption{How the meet operator used in
     Figure \ref{fig_back5} combines facts. $v_1$ and $v_2$ are
     separate values given by separate facts to the same variable. The
     table shows how they are combined.}
-  \label{tbl_lang1}
+  \label{tbl_back2}
   \figend
 \end{table}
 
-\section{Direction \& The Transfer Function}
-%% Direction & Transfer Function
+\section{Direction and The Transfer Function}
+Returning to Figure \ref{fig_back5}, we need to define a transfer
+function that can be applied to each node. The transfer function does
+two things:
+\begin{itemize}
+\item When an assignment occurs, update the value of the assigned variable in the \out facts.
+\item Otherwise, copy the variable's current value to the \out facts.
+\end{itemize}
+To help define our transfer function, we define the function |valueOf|,
+which either returns the value assigned to a variable, or its value
+from the \inE facts:
+\begin{equation} |valueOf|(v) = 
+  \begin{cases}
+    |assign|(v) & \text{when $v$ is assigned a value in the node,} \\
+    \text{\inE}(v) & \text{when $v$ is not assigned.} 
+  \end{cases}
+\label{eqn_back2}
+\end{equation}
+In the above, $v$ is a variable and |assign| retrieves the value assigned to
+that variable, if any.
+Our transfer function just needs to apply |valueOf| to all variables
+in our \inE facts, as well as all variable assignments in the node
+itself. If |assigned| is the set of all assigned variables in the
+node, we can define how our transfer function relates \inE and \out using
+set notation:
+\begin{equation}
+  \text{\out} = [|valueOf|(v) || v \in (\text{\inE} \cup |assigned|)].
+\end{equation}
 
-Dataflow analysis applies a ``transfer function'' to each node in the
-CFG to compute ``facts'' about the program's state before and after
-the execution of each node. The facts computed and the transfer
-function used depend on the specific optimization, but dataflow
-analysis always applies them in the same way. Each node has two sets
-of facts -- ``in'' and ``out.'' The transfer function uses the ``in''
-facts to compute ``out'' facts for a node. ``Out'' facts on a node
-become ``in'' facts on the node analyzed next.  If the CFG for a
-program contains loops, then ``in'' facts for a node may change based
-on later ``out'' facts. The transfer function will be applied
-repeatedly until the facts stop changing -- they reach a ``fixed
-point.''
+Dataflow analysis computes \inE and \out facts by repeatedly applyhing
+a \emph{transfer function} in a particular \emph{direction}. In Figure
+\ref{fig_back5}, we compute \out facts from by combining \inE facts
+with any assignment statements in the node; we used a \emph{forwards}
+analysis. A \emph{backwards} analysis computes \inE facts from \out
+facts. Our example in Section \ref{sec_back2} describes one particular
+backwards analysis in detail -- we will just illustrate a forwards
+analysis here.
 
-\section{The Meet Operator}
-%% Meet operator
-If the CFG for a program contains nodes with multiple predecessors,
-``in'' facts must be combined in some way. The ``meet'' operator for
-each optimization combines facts. Usually, the operator takes the
-intersection or union of all the facts. Intersection implies the
-analysis computes something is true for \emph{all} incoming paths. Union
-implies computing something for \emph{any} incoming path.
+%% Our previous example showed \inE and \out facts on each
+%% node, but did not specify how to compute those facts. For any given
+%% analysis, we compute facts based on our \emph{analysis direction} and
+%% \emph{transfer function}. The \emph{transfer function} specifies how we 
+%% create facts from statements in the program. Our \emph{direction} can 
+%% be \emph{forwards} or \emph{backwards}. A forwards analysis uses 
+%% the transfer function to compute \out facts from \inE facts. Conversely,
+%% a backwards analysis computes \inE facts using \out facts. 
 
-Because we represent the CFG for a program as a directed graph, we can
-choose which direction to traverse the CFG -- forwards or backwards.
-When traversing forward, we usually compute facts about program
-execution past a certain point (e.g., does a variable's value
-change?); a backwards analysis computes facts up to a certain point
-(e.g., what variables will be referenced following a given
-statement?). Where a forwards analysis begins at the entry point(s)
-for the CFG, a backwards analysis begins at the exit points.
+%% Returning to Figure \ref{fig_back5}
+
+%% \We used a forwards analysis to compute the \out facts in Figure
+%% \ref{fig_back5}.
+
+%% Dataflow analysis applies a ``transfer function'' to each node in the
+%% CFG to compute ``facts'' about the program's state before and after
+%% the execution of each node. The facts computed and the transfer
+%% function used depend on the specific optimization, but dataflow
+%% analysis always applies them in the same way. Each node has two sets
+%% of facts -- ``in'' and ``out.'' The transfer function uses the ``in''
+%% facts to compute ``out'' facts for a node. ``Out'' facts on a node
+%% become ``in'' facts on the node analyzed next.  If the CFG for a
+%% program contains loops, then ``in'' facts for a node may change based
+%% on later ``out'' facts. The transfer function will be applied
+%% repeatedly until the facts stop changing -- they reach a ``fixed
+%% point.''
+
+%% Because we represent the CFG for a program as a directed graph, we can
+%% choose which direction to traverse the CFG -- forwards or backwards.
+%% When traversing forward, we usually compute facts about program
+%% execution past a certain point (e.g., does a variable's value
+%% change?); a backwards analysis computes facts up to a certain point
+%% (e.g., what variables will be referenced following a given
+%% statement?). Where a forwards analysis begins at the entry point(s)
+%% for the CFG, a backwards analysis begins at the exit points.
 
 \section{Iterative Analysis}
 %% Iterative Analysis & Fixed points
+As we saw in Figure \ref{fig_back5}, facts can conflict
+when nodes have multiple predecessors. Even more complicated
+situations arise when a program contains loops. Consider
+the fragment in \ref{fig_back6}. How do we apply
+our |valueOf| function (Equation \ref{eqn_back2}) to a graph
+where node X is both a successor and a predecessor?
+
+Fortunately, \citep{SoAndSoXX} show that if the facts computed form a
+\emph{lattice}, and our transfer function is \emph{monotonic} then we
+can apply our transfer function over and over and know that, at some
+point, the facts will stop changing.  A monotonic function always
+increases. In our terms, it must always add information, and never
+take any away. Our |valueOf| function always \emph{adds} to \out: a
+variable will either have the value it did before (i.e., it was not
+assigned) or it will be assigned a new value. Values that form a
+lattice have some sort of ordering. In our case, we can say that $\bot
+\leq v \leq \top$, for all values $v$. If facts conflict, the $\sqcup$
+operator described in Table \ref{tbl_back2} ensures they will all
+eventually equal $\top$, at which point they will no longer conflict. Values
+will not endlessly cycle back and forth -- they eventually stop. 
+
+\begin{myfig}
+\begin{tabular}{cc}
+  \subfloat{\input{lst_back8}%%
+    \label{fig_back6_a}} \vline &%%
+  \subfloat{\input{lst_back9}%%
+    \label{fig_back6_b}} \\ 
+  \subref{fig_back1_a} & \subref{fig_back1_b}
+\end{tabular}
+\caption{\subref{fig_back6_a}: A simple C-language program with a loop. \subref{fig_back6_b}: The CFG 
+for the fragment.}
+\label{fig_back6}
+\end{myfig}
 
 \section{Rewriting}
 
@@ -210,46 +314,8 @@ not be different than the old, but it will behave differently: execute
 faster, use less memory, or whatever characteristic the optimization
 should improve.
 
-\section{Basic Blocks}
-%% Basic blocks
-Consider the C-language fragment and CFGs in Figure
-\ref{fig_back4}. Part \subref{fig_back4_b} shows the CFG for lines
-\ref{lst_back3_start} -- \ref{lst_back3_end} in part
-\subref{fig_back4_a}: a long, straight sequence of nodes, one after
-another. Collapsing those nodes into one, as in part
-\subref{fig_back4_c}, does not lose information and gives a more
-compact representation. 
-
-\begin{myfig}[th]
-\begin{tabular}{ccc}
-\subfloat{\input{lst_back3}\label{fig_back4_a}} \vline & %%
-\subfloat{\input{lst_back4}\label{fig_back4_b}} \vline & %%
-\subfloat{\input{lst_back5}\label{fig_back4_c}} \\
-\subref{fig_back4_a} & \subref{fig_back4_b} & \subref{fig_back4_c} \\\\\rule{0pt}{24pt}
-\end{tabular}
-\caption{\subref{fig_back4_a}: A C-language fragment to illustrate
-  \emph{basic blocks}.  \subref{fig_back4_b}: The CFG for
-  \subref{fig_back4_a} without basic blocks. \subref{fig_back4_c}: The
-  CFG for \subref{fig_back4_c} using basic blocks.}
-\label{fig_back4}
-\end{myfig}
-
-Each node in Figure \ref{fig_back3_c} represents a \emph{basic block}:
-a sequence of statements with one entry, one exit, and no branches
-in-between. Execution cannot start in the ``middle'' of the block, nor
-can it branch anywhere but at the end of the block. Basic blocks are a
-widely used representation for programs, found in standard compiler
-textbooks (\citep{AhoXX}, \citep{MunchXX}, \citep{AppelXX}).
-
-Dataflow optimization works as well with the ``collapsed'' nodes in
-part \subref{lst_back3_c} as those in Figure \subref{lst_back3_b}. In
-fact, a basic block can consist of one statement -- a \emph{trivial}
-block. For example, the nodes in Figures \ref{fig_back4_b} and
-\ref{fig_back1_b} represent trivial basic blocks. Therefore, we can
-always convert a CFG of basic-blocks into a CFG of statements, if
-needed.
-
 \section{Example: Dead-Code Elimination}
+\label{sec_back2}
 
 Consider Figure \ref{fig_back2}, again showing a C-language fragment.
 After assignment on line \ref{fig_back2_dead_line}, #b# is not
