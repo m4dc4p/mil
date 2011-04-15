@@ -29,13 +29,26 @@ the program, or automatically by a compiler.
 ``Dataflow analysis'' (or ``dataflow optimization''), first introduced
 by Gary Kildall \citep{Kildall1973}, refers to an algorithm for
 applying an ``optimizing function'' to a given program. In itself it
-does not give a specific optimization; rather, it gives a technique
-for applying many different optimizations. In today's terms, dataflow
-analysis treats a program as a ``control-flow graph'', applies a
-``transfer'' function to compute ``facts'' about the execution of the
-program, and then applies a ``rewriting'' function to transform the
-program based on those facts. Dataflow analysis is now considered
-standard technique and can be found in most compiler textbooks. 
+does not give a specific optimization; rather, it describes a method
+for applying many different optimizations. Since that time, a rich
+body of research and literature has been done, extending and refining
+Kilall's original description (\cite{SomePaperXX},
+\cite{SomeBookXX}). Dataflow analysis is now considered standard
+technique and can be found in most compiler textbooks.
+
+This chapter covers the concepts necessary to understand dataflow
+analysis. Section \ref{sec_back1} describes control-flow graphs, a
+data structure for representing programs. We discuss facts and the
+``meet'' operator in Section \ref{sec_back4}.  Section \ref{sec_back5}
+describes transfer functions and the difference between a ``forwards''
+and ``backwards'' analysis. We describe the iterative nature of
+dataflow analysis in Section \ref{sec_back6}, showing how we can
+analyze loops and other complicated control structures. Section
+\ref{sec_back7} discusses how we rewrite programs based on the
+dataflow analysis performed. We then give an extended example
+illustring \emph{dead-code elimination} in Section
+\ref{sec_back2}. Finally, we summarize our chapter in Section
+\ref{sec_back9}.
 
 \section{Control-Flow Graphs}
 \label{sec_back1}
@@ -84,9 +97,7 @@ The \emph{directed edges} from node \ref{lst_back2_assigna} to node
 execute. \emph{Predecessor} nodes always execute before
 \emph{successor} nodes (except in the presence of loops).
 
-The test on line \ref{lst_back1_test} can branch to line
-\ref{lst_back1_test_true} or line \ref{lst_back1_test_false}. The
-edges leaving node \ref{lst_back2_test} (representing the test
+The edges leaving node \ref{lst_back2_test} (representing the test
 ``\verb=if(a > b)='') show that execution can branch to either node
 \ref{lst_back2_true} ($a > b$) or node \ref{lst_back2_false} ($a \leq
 b$). A node followed by multiple successors (i.e., where multiple
@@ -102,6 +113,8 @@ nodes \ref{lst_back2_true} and \ref{lst_back2_false} predecessors of
 node \ref{lst_back2_print}.
 
 \section{Basic Blocks}
+\label{sec_back3}
+
 %% Basic blocks
 Consider the C-language fragment and CFGs in Figure
 \ref{fig_back4}. Part \subref{fig_back4_b} shows the CFG for lines
@@ -130,14 +143,13 @@ part \subref{fig_back4_c} as those in Figure
 exclusively with basic blocks, rather than individual statements.
 
 \section{Facts \& The Meet Operator}
+\label{sec_back4}
 %% In & Out facts
 Dataflow analysis associates every node in the CFG with two sets of
 \emph{facts}. Facts describe the state of the machine before and after
 execution of the statements represented by the node. \In facts
 describe the machine's state beforehand, while \out facts
 describe its state afterwards.
-
-\afterpage{\clearpage\input{fig_back5}\clearpage}
 
 Consider Figure \ref{fig_back5}, which annotates the program fragment
 in Figure \ref{fig_back1} with the value of #a#, #b#, and #c# before
@@ -150,6 +162,8 @@ memory, or even some previous value if this fragment is embedded in a
 loop. After node \ref{lst_back7_assign}, our new fact, $\{a : 1,b : 2,c : \bot\}$
 shows that we know that #a# equals 1, #b# equals 2, and that we stil do not know
 the value of #c#.
+
+\afterpage{\clearpage\input{fig_back5}\clearpage}
 
 At the entry node, we assign \inE facts a default value ($\bot$
 in our example). Elsewhere, \inE facts come from predecessor
@@ -194,16 +208,26 @@ that $\top$ values will always replace definite values.
 \end{table}
 
 \section{Direction and The Transfer Function}
+\label{sec_back5}
+Our previous example showed \inE and \out on each
+node, but did not specify how to compute those facts. For any given
+analysis, we compute facts based on our \emph{analysis direction} and
+\emph{transfer function}. The \emph{transfer function} specifies how we 
+create facts from statements in the program. Our \emph{direction} can 
+be \emph{forwards} or \emph{backwards}. A forwards analysis uses 
+the transfer function to compute \out from \inE. Conversely,
+a backwards analysis computes \inE using \out. 
+
 Returning to Figure \ref{fig_back5}, we need to define a transfer
 function that can be applied to each node. The transfer function does
 two things:
 \begin{itemize}
-\item When an assignment occurs, update the value of the assigned variable in the \out facts.
-\item Otherwise, copy the variable's current value to the \out facts.
+\item When an assignment occurs, update \out with the value of the assigned variable.
+\item Otherwise, copy the variable's current value to \out.
 \end{itemize}
-To help define our transfer function, we define the function |valueOf|,
+To help define our transfer function, we define |valueOf|,
 which either returns the value assigned to a variable, or its value
-from the \inE facts:
+from \inE:
 \begin{equation} |valueOf|(v) = 
   \begin{cases}
     |assign|(v) & \text{when $v$ is assigned a value in the node,} \\
@@ -211,34 +235,22 @@ from the \inE facts:
   \end{cases}
 \label{eqn_back2}
 \end{equation}
-In the above, $v$ is a variable and |assign| retrieves the value assigned to
-that variable, if any.
-Our transfer function just needs to apply |valueOf| to all variables
-in our \inE facts, as well as all variable assignments in the node
-itself. If |assigned| is the set of all assigned variables in the
-node, we can define how our transfer function relates \inE and \out using
-set notation:
+In the above, $v$ represents a variable; |assign| retrieves the value
+assigned to that variable, if any.  Our transfer function just needs
+to apply |valueOf| to all variables in \inE, as well as all
+variable assignments in the node itself. If |assigned| is the set of
+all assigned variables in the node, we can define how our transfer
+function relates \inE and \out using set notation:
 \begin{equation}
   \text{\out} = [|valueOf|(v) || v \in (\text{\inE} \cup |assigned|)].
 \end{equation}
 
-Dataflow analysis computes \inE and \out facts by repeatedly applyhing
-a \emph{transfer function} in a particular \emph{direction}. In Figure
-\ref{fig_back5}, we compute \out facts from by combining \inE facts
-with any assignment statements in the node; we used a \emph{forwards}
-analysis. A \emph{backwards} analysis computes \inE facts from \out
-facts. Our example in Section \ref{sec_back2} describes one particular
-backwards analysis in detail -- we will just illustrate a forwards
-analysis here.
-
-%% Our previous example showed \inE and \out facts on each
-%% node, but did not specify how to compute those facts. For any given
-%% analysis, we compute facts based on our \emph{analysis direction} and
-%% \emph{transfer function}. The \emph{transfer function} specifies how we 
-%% create facts from statements in the program. Our \emph{direction} can 
-%% be \emph{forwards} or \emph{backwards}. A forwards analysis uses 
-%% the transfer function to compute \out facts from \inE facts. Conversely,
-%% a backwards analysis computes \inE facts using \out facts. 
+In Figure \ref{fig_back5}, we compute \out using \inE and any
+assignment statements in the node: a \emph{forwards} analysis. Section
+\ref{sec_back2} gives a detailed example illustrating a
+\emph{backwards} analysis, computing \inE from \out. Each specific
+dataflow optimization uses a certain transfer function, applied
+backwards or forwards.
 
 %% Returning to Figure \ref{fig_back5}
 
@@ -268,27 +280,19 @@ analysis here.
 %% for the CFG, a backwards analysis begins at the exit points.
 
 \section{Iterative Analysis}
-%% Iterative Analysis & Fixed points
-As we saw in Figure \ref{fig_back5}, facts can conflict
-when nodes have multiple predecessors. Even more complicated
-situations arise when a program contains loops. Consider
-the fragment in \ref{fig_back6}. How do we apply
-our |valueOf| function (Equation \ref{eqn_back2}) to a graph
-where node X is both a successor and a predecessor?
+\label{sec_back6}
 
-Fortunately, \citep{SoAndSoXX} show that if the facts computed form a
-\emph{lattice}, and our transfer function is \emph{monotonic} then we
-can apply our transfer function over and over and know that, at some
-point, the facts will stop changing.  A monotonic function always
-increases. In our terms, it must always add information, and never
-take any away. Our |valueOf| function always \emph{adds} to \out: a
-variable will either have the value it did before (i.e., it was not
-assigned) or it will be assigned a new value. Values that form a
-lattice have some sort of ordering. In our case, we can say that $\bot
-\leq v \leq \top$, for all values $v$. If facts conflict, the $\sqcup$
-operator described in Table \ref{tbl_back2} ensures they will all
-eventually equal $\top$, at which point they will no longer conflict. Values
-will not endlessly cycle back and forth -- they eventually stop. 
+%% Iterative Analysis & Fixed points
+As we saw in Figure \ref{fig_back5}, facts can conflict when nodes
+have multiple predecessors. Even more complicated situations arise
+when a program contains loops. Consider the fragment in
+\ref{fig_back6}. To compute \inE on node \ref{lst_back9_test} (the
+test), we need \inE for each predecessor: nodes \ref{lst_back9_assign}
+(initializing #c#) and \ref{lst_back9_incr} (incrementing #c#). But
+node \ref{lst_back9_incr} is also a successor of node
+\ref{lst_back9_test}. How do we apply our |valueOf| function (Equation
+\ref{eqn_back2}) to a graph where node X is both a successor and a
+predecessor?
 
 \begin{myfig}
 \begin{tabular}{cc}
@@ -303,7 +307,79 @@ for the fragment.}
 \label{fig_back6}
 \end{myfig}
 
+Ironically enough, we can apply dataflow analysis to loops using \dots a
+loop. That is, we apply our transfer function \emph{iteratively}, to
+every node in the graph. In the case of Figure \ref{fig_back6}, we
+first initialize \inE to some default. We can then use |valueOf| to
+compute \out for any given node. Of course, facts will change over the
+course of iteration -- especially in the case of node
+\ref{lst_back9_test}. We just keep iterating until we
+reach a \emph{fixed point}, meaning the facts stop changing. 
+
+Table \ref{tbl_back3} shows \inE and \out for node \ref{lst_back9_test}, the
+most interesting node in the loop. $\mathit{out}_\ref{lst_back9_test}$ represents the \out set
+from the node. $\mathit{out}_\ref{lst_back9_assign}$ and $\mathit{out}_3$ are used to compute
+the input set, $\mathit{in}_\ref{lst_back9_test}$ for the node. We compute $\mathit{in}_\ref{lst_back9_test}$ from
+the \out facts of its predecessors, using the meet operator
+defined in Section \ref{sec_back4}:
+\begin{equation}
+  \mathit{in}_\ref{lst_back9_test} = \mathit{out}_\ref{lst_back9_assign} \sqcap \mathit{out}_\ref{lst_back9_incr}.
+\end{equation}
+The zeroth iteration shows the initial
+value for all sets. On the first iteration, we can see $\mathit{in}_\ref{lst_back9_test}$ equals 0:
+\begin{equation}
+  \begin{split}
+    \mathit{in}_\ref{lst_back9_test} &= \mathit{out}_\ref{lst_back9_assign} \sqcap \mathit{out}_\ref{lst_back9_incr} \\
+    &= 0 \sqcap \bot \\
+    &= 0.
+  \end{split}
+\end{equation}
+Notice that $\mathit{out}_\ref{lst_back9_incr}$ still equals $\bot$. We compute \inE and
+\out in the order nodes appear in the graph. Therefore, when computing
+$\mathit{in}_\ref{lst_back9_test}$, $\mathit{out}_\ref{lst_back9_incr}$ equals $\bot$. 
+
+On the second
+iteration, $\mathit{out}_\ref{lst_back9_incr}$ now equals 1 and $\mathit{out}_\ref{lst_back9_assign}$ equals
+0. According to our meet operator, $\mathit{in}_\ref{lst_back9_test}$ now equals $\top$:
+\begin{equation}
+  \begin{split}
+    \mathit{in}_\ref{lst_back9_test} &= \mathit{out}_\ref{lst_back9_assign} \sqcap \mathit{out}_\ref{lst_back9_incr} \\
+    &= 0 \sqcap 1 \\
+    &= \top.
+  \end{split}
+\end{equation}
+The $\top$ value propogates through and, on the third iteration, $\mathit{out}_\ref{lst_back9_test}$ and
+$\mathit{out}_\ref{lst_back9_incr}$ now equal $\top$. Facts will not change at this point so we 
+stop iterating.
+
+\begin{table}
+  \centering
+  \begin{math}
+    \begin{array}{lcccc}
+      \mathit{Iteration} & \mathit{out}_\ref{lst_back9_assign} & \mathit{out}_\ref{lst_back9_incr} & \mathit{in}_\ref{lst_back9_test} & \mathit{out}_\ref{lst_back9_test} \\
+      \cmidrule(r){1-1}\cmidrule(r){2-5} %%\cmidrule(r){1-1}\cmidrule(r){1-1}\cmidrule(r){1-1} \\
+      0 & \bot & \bot & \bot & \bot  \\
+      1 & 0 & \bot & 0 & 0 \\
+      2 & 0 & 1 & \top & \top \\
+      3 & 0 & \top & \top & \top  \\
+      \multicolumn{5}{c}{\dots} \\
+      \multicolumn{5}{l}{\mathit{in}_\ref{lst_back9_test} = \mathit{out}_\ref{lst_back9_assign} \sqcap \mathit{out}_\ref{lst_back9_incr}} \\
+      \multicolumn{5}{l}{\mathit{in}_3 = \mathit{out}_\ref{lst_back9_test}} \\
+      \multicolumn{5}{l}{\mathit{out}_\ref{lst_back9_incr} = \mathit{in}_3}
+    \end{array}
+  \end{math}
+  \caption{Iterative analysis of the CFG from Figure
+    \ref{fig_back6}. We show the facts that change -- $\mathit{out}_\ref{lst_back9_test}$ in
+    particular. Because node \ref{lst_back9_test} is analyzed before
+    node \ref{lst_back9_incr}, $\mathit{out}_\ref{lst_back9_incr}$ ``lags''
+    $\mathit{out}_\ref{lst_back9_test}$ by 1 iteration. The zeroth iteration represents the
+    initial values given to \inE and \out for all nodes.}
+  \figend
+  \label{tbl_back3}
+\end{table}
+
 \section{Rewriting}
+\label{sec_back7}
 
 %% Rewrite based on analysis
 Direction, the meet operator, facts, and the transfer function
@@ -447,22 +523,23 @@ a = 1;
 return a + 1;
 \end{Verbatim}
 
-\section{Conclusion}
+\section{Summary}
+\label{sec_back9}
 
-This chapter gave an overview of \emph{dataflow optimization}, a
-technique we used extensively in our work. The dataflow
-\emph{algorithm} gives a general technique for applying an
+This chapter gave an overview of \emph{dataflow optimization}. The
+dataflow \emph{algorithm} gives a general technique for applying an
 \emph{optimizing function} to the \emph{control flow graph} (CFG)
-representing a give program. The optimizing function computes
+representing a given program. The optimizing function computes
 \emph{facts} about each node in the graph, using a \emph{transfer}
-function to turn input facts into output facts. The CFG can be
-traversed forwards or backwards (depending on the particular
-optimization), and it may need to be traversed many times until the
-computed facts reach a \emph{fixed point}.  Each optimization defines
-a specific \emph{meet operator} that combines facts for nodes with
-multiple inputs. Finally, the facts computed are used to
-\emph{rewrite} the CFG, transforming the program so it still has the
-same meaning, but behaves better, according to the optimization used.
+function. A given analysis can proceed \emph{forwards} (where \inE
+facts produce \out facts) or \emph{backwards} (where \out facts
+produce \inE facts). Each optimization defines a specific \emph{meet
+  operator} that combines facts for nodes with multiple predecessors
+(for forwards analysis) or successors (for backwards). We compute
+facts\emph{iteratively}, stopping when they reach a \emph{fixed
+  point}. Finally, we \emph{rewrite} the CFG using the facts computed. The 
+meaning of our program does not change, but its behavior will be ``better,'' 
+whatever that means for the particular optimization applied.
 
 
 %% \subsection{Basic Blocks and Control-Flow Graphs}

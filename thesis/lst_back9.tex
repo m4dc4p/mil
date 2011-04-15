@@ -1,5 +1,28 @@
-\begin{minipage}[t]{2in}
+\begin{minipage}[t]{2in}%%
+\refstepcounter{nodeCounter}\label{lst_back9_entry}%%
+\refstepcounter{nodeCounter}\label{lst_back9_assign}%%
+\refstepcounter{nodeCounter}\label{lst_back9_test}%%
+\refstepcounter{nodeCounter}\label{lst_back9_incr}%%
+\refstepcounter{nodeCounter}\label{lst_back9_print}%%
+\refstepcounter{nodeCounter}\label{lst_back9_exit}%%
 \begin{AVerb}
-
+        E (\ref{lst_back9_entry})
+        |
+        V
+      -----(\ref{lst_back9_assign})
+     |c = 0|
+      -----
+        |<---------
+        V          |
+      ------(\ref{lst_back9_test})  ------(\ref{lst_back9_incr})
+     |c < 10|-->|c += 1|
+      ------     ------
+        |
+        V
+     --------(\ref{lst_back9_print})
+    |print(c)|
+     --------
+        |
+        X (\ref{lst_back9_exit})
 \end{AVerb}
 \end{minipage}
