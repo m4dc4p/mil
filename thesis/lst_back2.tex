@@ -1,34 +1,77 @@
-\begin{minipage}[t]{2in}
-\begin{AVerb}
-     E (\ref{lst_back2_entry}) \refstepcounter{nodeCounter} \label{lst_back2_entry}
-     |
-     V
-   -----(\ref{lst_back2_assigna}) \refstepcounter{nodeCounter} \label{lst_back2_assigna}
-  |a = 1|
-   -----
-     |
-     V
-   -----(\ref{lst_back2_assignb}) \refstepcounter{nodeCounter} \label{lst_back2_assignb}
-  |b = 2|
-   -----
-     |  \refstepcounter{nodeCounter} \label{lst_back2_test}
-     V  \refstepcounter{nodeCounter} \label{lst_back2_true}
- ---------(\ref{lst_back2_test})    -----(\ref{lst_back2_true})
-|if(a > b)|---->|c = 4|
- ---------       -----
-     |             | \refstepcounter{nodeCounter} \label{lst_back2_false}
-     V             V \refstepcounter{nodeCounter} \label{lst_back2_print}
- ---------(\ref{lst_back2_false})  ---------(\ref{lst_back2_print})
-|c = a + 3|-->|printf(c)|
- ---------     ---------
-                   | \refstepcounter{nodeCounter} \label{lst_back2_exit}
-                   V
-                   |
-                   X (\ref{lst_back2_exit})
-\end{AVerb}
+%% \begin{AVerb}
+%%      E (\ref{lst_back2_entry}) \refstepcounter{nodeCounter} \label{lst_back2_entry}
+%%      |
+%%      V
+%%    -----(\ref{lst_back2_assigna}) \refstepcounter{nodeCounter} \label{lst_back2_assigna}
+%%   |a = 1|
+%%    -----
+%%      |
+%%      V
+%%    -----(\ref{lst_back2_assignb}) \refstepcounter{nodeCounter} \label{lst_back2_assignb}
+%%   |b = 2|
+%%    -----
+%%      |  \refstepcounter{nodeCounter} \label{lst_back2_test}
+%%      V  \refstepcounter{nodeCounter} \label{lst_back2_true}
+%%  ---------(\ref{lst_back2_test})    -----(\ref{lst_back2_true})
+%% |if(a > b)|---->|c = 4|
+%%  ---------       -----
+%%      |             | \refstepcounter{nodeCounter} \label{lst_back2_false}
+%%      V             V \refstepcounter{nodeCounter} \label{lst_back2_print}
+%%  ---------(\ref{lst_back2_false})  ---------(\ref{lst_back2_print})
+%% |c = a + 3|-->|printf(c)|
+%%  ---------     ---------
+%%                    | \refstepcounter{nodeCounter} \label{lst_back2_exit}
+%%                    V
+%%                    |
+%%                    X (\ref{lst_back2_exit})
+%% \end{AVerb}
+\begin{minipage}{2in}
+  \tikzset{
+    stmt/.style={
+      rectangle,
+      draw=black, thick,
+      minimum height=2em,
+      %% inner sep=2pt,
+      %% text centered,
+      %% node distance=.5in,
+    },
+    entex/.style={
+      minimum height=2em,
+      %% inner sep=2pt,
+      %% text centered,
+    },
+    labeled/.style={circle, 
+      draw=black, thin,
+      font={\footnotesize},
+      inner sep=0,
+      label position=above right,
+      fill=white,
+      right=1mm
+    },
+  }
+  \begin{tikzpicture}[>=stealth, node distance=.5in]
+    \node[entex] (entry) {$E$};
+    \node[stmt,
+      below of=entry,label={[labeled]$B_\ref{lst_back2_assigna}$}] (assigna) {#a = 1#\refstepcounter{nodeCounter}\label{lst_back2_assigna}};
+    \node[stmt,
+      below of=assigna,label={[labeled]$B_\ref{lst_back2_assignb}$}] (assignb) {#b = 2#\refstepcounter{nodeCounter}\label{lst_back2_assignb}};
+    \node[stmt,
+      below of=assignb,label={[labeled,right=5mm]$B_\ref{lst_back2_test}$}] (test) {#if(a > b)#\refstepcounter{nodeCounter}\label{lst_back2_test}};
+    \node[stmt,
+      right=.5in of test,label={[labeled]$B_\ref{lst_back2_true}$}] (true) {#c = 4#\refstepcounter{nodeCounter}\label{lst_back2_true}};
+    \node[stmt,
+      below of=test,label={[labeled,right=5mm]$B_\ref{lst_back2_false}$}] (false) {#c = a + 3#\refstepcounter{nodeCounter}\label{lst_back2_false}};
+    \node[stmt,
+      below of=true,label={[labeled,right=5mm]$B_\ref{lst_back2_print}$}] (print) {#printf(c)#\refstepcounter{nodeCounter}\label{lst_back2_print}};
+    \node[entex,
+      below of=print] (exit) {$X$};
+    \draw [->>] (entry) to (assigna);
+    \draw [->] (assigna) to (assignb);
+    \draw [->] (assignb) to (test);
+    \draw [->] (test) to (true);
+    \draw [->] (test) to (false);
+    \draw [->] (true) to (print);
+    \draw [->] (false) to (print);
+    \draw [->>] (print) to (exit);
+  \end{tikzpicture}
 \end{minipage}
-
-
-
-
-
