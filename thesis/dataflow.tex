@@ -2,7 +2,8 @@
 %include polycode.fmt
 \include{preamble}
 \begin{document}
-\include{document.preamble}
+\input{document.preamble}
+\UndefineShortVerb{\#}
 \newcounter{nodeCounter}[subfigure]
 %% Float parameters
 \renewcommand{\textfraction}{0.1}
@@ -12,6 +13,11 @@
 \newcommand{\out}{\emph{out}\xspace}
 \newcommand{\In}{\emph{In}\xspace}
 \newcommand{\Out}{\emph{Out}\xspace}
+\newcommand{\entryN}{\emph{E}\xspace}
+\newcommand{\exitN}{\emph{X}\xspace}
+\newcommand{\refNode}[1]{\ensuremath{B_{\ref{#1}}}\xspace}
+\newcommand{\labelNode}[1]{\refstepcounter{nodeCounter}\label{#1}}
+\DefineShortVerb{\#}
 
 \chapter{Dataflow Optimization}
 \label{ref_chapter_background}
@@ -23,46 +29,66 @@
 % concepts: basic blocks, control flow, facts, and
 % rewrites. Bind/Return elimination is used as an an example.
 
-The term ``program optimization'' refers to the process of
+The term \emph{program optimization} refers to the process of
 transforming a program without changing its semantics (i.e., meaning),
 while at the same time ``improving'' its behavior.  For example, an
 optimized program may run faster, use less memory, consume less power,
-or some sense perform ``better'' than the unoptimized
-program. Optimizations can be performed ``by hand,'' while writing
+or in some sense perform ``better'' than the unoptimized
+program. Optimizations can be performed by hand, while writing
 the program, or automatically by a compiler. 
 
-``Dataflow analysis'' (or ``dataflow optimization''), first introduced
-by Gary Kildall \citep{Kildall1973}, refers to an algorithm for
-applying an ``optimizing function'' to a given program. In itself it
-does not give a specific optimization; rather, it describes a method
-for applying many different optimizations. Since that time, a rich
-body of research and literature has been done, extending and refining
-Kilall's original description (\cite{SomePaperXX},
-\cite{SomeBookXX}). Dataflow analysis is now considered standard
-technique and can be found in most compiler textbooks.
+\emph{Dataflow analysis} (or \emph{dataflow optimization}), introduced
+by Gary Kildall \citep{Kildall1973}, gives a framework in which many
+different kinds of optimizations can be applied. He innovated by
+describing a method for applying optimizations \emph{in general}, not
+by describing a specific optimization.  We informally describe the
+dataflow algorithm here. For a technical treatment, see
+\citep{AhoXX}. Munchnik \citep{MunchXX} describes a large number of
+specific optimiizations which use dataflow analysis as well.
 
-This chapter covers the concepts necessary to understand dataflow
-analysis. Section \ref{sec_back1} describes control-flow graphs, a
-data structure for representing programs. We discuss facts and the
-``meet'' operator in Section \ref{sec_back4}.  Section \ref{sec_back5}
-describes transfer functions and the difference between a ``forwards''
-and ``backwards'' analysis. We describe the iterative nature of
-dataflow analysis in Section \ref{sec_back6}, showing how we can
-analyze loops and other complicated control structures. Section
-\ref{sec_back7} discusses how we rewrite programs based on the
-dataflow analysis performed. We then give an extended example
-illustring \emph{dead-code elimination} in Section
-\ref{sec_back2}. Finally, we summarize our chapter in Section
-\ref{sec_back9}.
+The dataflow algorithm analyses and transforms \emph{control-flow graphs}, a
+data structure for representing programs. The algorithm associates each
+node with a set of \inE and \out \emph{facts}, representing some
+aspect of the program's state. In a \emph{forwards} analysis, we
+compute \out from \inE. A \emph{backwards} analysis does the opposite:
+\inE from \out.  In both case, a \emph{transfer function} transforms
+one set of facts to the other. When nodes have multiple predecssors
+(or successors), we combine facts using a \emph{meet operator}. The
+algorithm computes facts until reaching a \emph{fixed point}. The
+facts computed can be used to \emph{rewrite} the control-flow graph,
+giving us an optimized program. In some cases, we do not rewrite the
+graph, but use the results of the analysis in a later optimization.
+
+This chapter describes the concepts necessary to understand dataflow
+analysis and gives an extended example to illustrate them
+together. Section~\ref{sec_back1} describes control-flow
+graphs. Control-flow graphs can be expressed in terms of basic blocks,
+which we motivate in Section~\ref{sec_back3}. We discuss facts and the
+meet operator in Section \ref{sec_back4}. Section~\ref{sec_back5}
+discusses the relationship between the transfer function and the
+direction of analysis. We illustrate we dataflow must be an iterative
+algorithm (and define what a fixed point means in this context) in
+Section~\ref{sec_back6}. We treat rewriting in
+Section~\ref{sec_back7}. To demonstrate these concepts together, we
+demonstrate \emph{dead-code elimination} in Section~\ref{back_2}.
 
 \section{Control-Flow Graphs}
 \label{sec_back1}
 %% Control-flow graph
 
-The \emph{control-flow graph} (CFG) of a program shows how it
-may be executed: which statements follow one another, branches that
-can be taken, loops that may execute, and possible ways the program
-can terminate.
+Figure~\ref{fig_back1} shows a simple C program and its
+\emph{control-flow graph} (CFG). Each \emph{node} in \subref{fig_back1_b} 
+represents a statement or expression in the original program. For
+example, \refNode{lst_back2_assigna} and \refNode{lst_back2_assignb}
+represent the assignment statements on line
+\ref{lst_back1_assign}. Notice that the declaration of #c# does not
+appear in a corresponding node. Because the declaration does not cause
+a runtime effect, we do not represent it in the graph.  Nodes \entryN
+and \exitN designate where program execution \emph{enters} and \emph{leaves}
+the graph. If the graph represented the entire program, we would say
+execution \emph{begins} at \entryE and \emph{terminates} at \exitN. However, the CFG
+may be embedded in a larger program, for which reason we say
+\emph{enters} and \emph{leaves}.
 
 \begin{myfig}[th]
 \begin{tabular}{cc}
@@ -72,45 +98,25 @@ can terminate.
   \label{fig_back1_b}} \\
 \subref{fig_back1_a} & \subref{fig_back1_b} 
 \end{tabular}
-\caption{(\emph{a}): A C-language program fragment. (\emph{b}): The
+\caption{\subref{fig_back1_a} A C-language program fragment. \subref{fig_back1_b} The
   \emph{control-flow graph} (CFG) for the program.}
 \label{fig_back1}
 \end{myfig}
 
-Figure \ref{fig_back1} shows a simple C program and its CFG. Each
-\emph{node} in the graph represents a statement in the original
-program. For example, nodes \ref{lst_back2_assigna} and
-\ref{lst_back2_assignb} represent the assignment statements on line
-\ref{lst_back1_assign}. Node \ref{lst_back2_entry}, the \emph{entry
-  point}, designates where program execution begins. Nothing precedes
-the entry point, and only one entry point exists in the graph. After
-line \ref{lst_back1_print}, the program ends. Node
-\ref{lst_back2_exit}, an \emph{exit point}, shows where execution
-terminates. Unlike entry points, multiple exit points can exist in a
-graph.
+Directed edges show the order in which nodes execute. The edges
+leaving \refNode{lst_back2_test} (representing the test
+``\verb=if(a > b)='' on line \ref{lst_back1_test}) show that execution
+can branch to either \refNode{lst_back2_true} (when $a > b$) or
+\refNode{lst_back2_false} (when $a \leq b$). A node followed by
+multiple successors (i.e., where multiple edges leave the node)
+represents a \emph{branch} or \emph{conditional} statement. Any one of
+the successor nodes may execute following the conditional statement.
 
-The \emph{directed edges} from node \ref{lst_back2_assigna} to node
-\ref{lst_back2_assignb}, and from node \ref{lst_back2_assignb} to node
-\ref{lst_back2_test} shows how the assignments on line
-\ref{lst_back1_assign} precede the test on line
-\ref{lst_back1_test}. Edges show the order in which nodes
-execute. \emph{Predecessor} nodes always execute before
-\emph{successor} nodes (except in the presence of loops).
-
-The edges leaving node \ref{lst_back2_test} (representing the test
-``\verb=if(a > b)='') show that execution can branch to either node
-\ref{lst_back2_true} ($a > b$) or node \ref{lst_back2_false} ($a \leq
-b$). A node followed by multiple successors (i.e., where multiple
-edges leave the node) represents a \emph{branch} or \emph{conditional}
-statement. Any one of the successor nodes may execute following the
-conditional statement, depending on the condition tested.
-
-Conversely, a node with multiple predecessors represents the
-destination of multiple execution paths. The #printf# statement on
-line \ref{lst_back1_print} always executes, regardless of the result
-of the test on \ref{lst_back1_test}. Our CFG represents this by making
-nodes \ref{lst_back2_true} and \ref{lst_back2_false} predecessors of
-node \ref{lst_back2_print}.
+The dataflow algorithm approximates a program's runtime state by
+analyzing the control flow of the program. CFGs show the order in
+which expressions and statements in a program are evaluated. The
+dataflow algorithm intimately depends on the program representation
+provided by the CFG.
 
 \section{Basic Blocks}
 \label{sec_back3}
