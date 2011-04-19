@@ -99,8 +99,8 @@
 \newcommand{\out}{\emph{out}\xspace}
 \newcommand{\In}{\emph{In}\xspace}
 \newcommand{\Out}{\emph{Out}\xspace}
-\newcommand{\inB}{\ensuremath{\mathit{in}(B)}\xspace}
-\newcommand{\outB}{\ensuremath{\mathit{out}(B)}\xspace}
+\newcommand{\inB}[1]{\ensuremath{\mathit{in}({\if#1x B\else{B_\ref{#1}}\fi})}\xspace}
+\newcommand{\outB}[1]{\ensuremath{\mathit{out}({\if#1x B\else{B_\ref{#1}}\fi})}\xspace}
 \newcommand{\entryN}{\emph{E}\xspace}
 \newcommand{\exitN}{\emph{X}\xspace}
 \newcommand{\refNode}[1]{\ensuremath{B_{\ref{#1}}}\xspace}
