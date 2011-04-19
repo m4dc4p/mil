@@ -3,21 +3,10 @@
 \include{preamble}
 \begin{document}
 \input{document.preamble}
-\UndefineShortVerb{\#}
-\newcounter{nodeCounter}[subfigure]
 %% Float parameters
 \renewcommand{\textfraction}{0.1}
 \renewcommand{\topfraction}{0.9}
 %% in and out sets
-\newcommand{\inE}{\emph{in}\xspace}
-\newcommand{\out}{\emph{out}\xspace}
-\newcommand{\In}{\emph{In}\xspace}
-\newcommand{\Out}{\emph{Out}\xspace}
-\newcommand{\entryN}{\emph{E}\xspace}
-\newcommand{\exitN}{\emph{X}\xspace}
-\newcommand{\refNode}[1]{\ensuremath{B_{\ref{#1}}}\xspace}
-\newcommand{\labelNode}[1]{\refstepcounter{nodeCounter}\label{#1}}
-\DefineShortVerb{\#}
 
 \chapter{Dataflow Optimization}
 \label{ref_chapter_background}
@@ -121,52 +110,76 @@ provided by the CFG.
 \section{Basic Blocks}
 \label{sec_back3}
 
+\begin{myfig}[th]
+\begin{tabular}{ccc}
+\begin{minipage}[b]{1.5in}
+  \subfloat{\input{lst_back3}\label{fig_back4_a}}
+\end{minipage} & %%
+\begin{minipage}[b]{1.5in}
+  \subfloat{\input{lst_back4}\label{fig_back4_b}}
+\end{minipage}& %%
+\begin{minipage}[b]{1.5in}
+  \subfloat{\input{lst_back5}\label{fig_back4_c}}
+\end{minipage} \\
+\subref{fig_back4_a} & \subref{fig_back4_b} & \subref{fig_back4_c} \\
+\end{tabular}
+\caption{\subref{fig_back4_a}: A C-language fragment to illustrate
+  \emph{basic blocks}.  \subref{fig_back4_b}: The CFG for
+  \subref{fig_back4_a} without basic blocks. \subref{fig_back4_c}: The
+  CFG for \subref{fig_back4_c} using basic blocks.}
+\label{fig_back4}
+\end{myfig}
+
 %% Basic blocks
-Consider the C-language fragment and CFGs in Figure
-\ref{fig_back4}. Part \subref{fig_back4_b} shows the CFG for lines
-\ref{lst_back3_start} -- \ref{lst_back3_end} in part
-\subref{fig_back4_a}: a long, straight sequence of nodes, one after
-another. Collapsing those nodes into one, as in part
-\subref{fig_back4_c}, does not lose information and gives a more
-compact representation. 
+Consider the C-language fragment and CFGs in Figure~\ref{fig_back4}. 
+Part~\subref{fig_back4_b} shows the CFG for part~\subref{fig_back4_a}: a long, straight sequence of nodes, one after
+another. Part~\subref{fig_back4_C}, however, collapses all those nodes
+into~\refNode{lst_back5_assign}. Our graph of statements becomes a
+graph of \emph{blocks}.
 
-\afterpage{\clearpage{\input{fig_back4}}\clearpage}
+Part~\subref{fig_back4_c} represents the assignment statements on
+lines~\ref{lst_back3_start} -- \ref{lst_back3_end} as a \emph{basic
+  block}: a sequence of statements with one entry, one exit, and no
+branches in-between. Execution cannot start in the ``middle'' of the
+block, nor can it branch anywhere but at the end of the block. In fact,
+Part~\ref{fig_back4_b} also shows four basic blocks -- they just happen
+to consist of one statement each.
 
-Each node in Figure \ref{fig_back4_c} represents a \emph{basic block}:
-a sequence of statements with one entry, one exit, and no branches
-in-between. Execution cannot start in the ``middle'' of the block, nor
-can it branch anywhere but at the end of the block. Basic blocks are a
-widely used representation for programs, found in standard compiler
-textbooks (\citep{AhoXX}, \citep{MunchXX}, \citep{AppelXX}).
+The representation given in Part~\subref{fig_back4_c} has a number of
+advantages. It tends to reduce both the number of nodes and the number
+of edges in the graph. The dataflow algorithm maintains two sets of
+\emph{facts} for every node -- reducing the number of nodes obviously
+reduces the number of facts stored. The algorithm also iteratively
+propagates facts along edges -- so reducing the number of edges
+reduces the amount of work we need to do. When rewriting, blocks allow
+us to move larger amounts of the program at once. It also can be shown
+(see \citep{AhoXX}) that we do not lose any information by collapsing
+statements into blocks. For efficiency and brevity, we will work with
+basic blocks rather than statements from here forward.
 
-A basic block can consist of one statement -- a \emph{trivial}
-block. For example, the nodes in Figures \ref{fig_back4_b} and
-\ref{fig_back1_b} represent trivial basic blocks. We can always
-convert a CFG of basic-blocks into a CFG of statements, if needed.
-Dataflow optimization works as well with the ``collapsed'' nodes in
-part \subref{fig_back4_c} as those in Figure
-\subref{fig_back4_b}. Therefore, From this point forward we will work
-exclusively with basic blocks, rather than individual statements.
 
 \section{Facts \& The Meet Operator}
 \label{sec_back4}
 %% In & Out facts
 Dataflow analysis associates every node in the CFG with two sets of
-\emph{facts}. Facts describe the state of the machine before and after
-execution of the statements represented by the node. \In facts
-describe the machine's state beforehand, while \out facts
-describe its state afterwards.
+\emph{facts}. Facts are a data structure that describe the state of
+the machine before and after execution of the block represented
+by the node. The \inE facts describe the machine's state beforehand,
+while \out facts describe its state afterwards. Because we associate facts
+with each block, we write \inB to mean the \inE facts for block $B$, and
+\outB to mean the \out facts for block $b$.
 
-Consider Figure \ref{fig_back5}, which annotates the program fragment
+Consider Figure~\ref{fig_back5}, which annotates the program fragment
 in Figure \ref{fig_back1} with the value of #a#, #b#, and #c# before
 and after every node. The symbol ``$\bot$'' (``bottom'') indicates an
-unknown value. Assigning $\bot$ to a variable means we do not know its
-value. Prior to node \ref{lst_back7_assign}, none of the variables
-values' can be known, which the fact $\{a : \bot,b : \bot,c : \bot\}$
-shows.  They may be set to a compiler default, a random value in
-memory, or even some previous value if this fragment is embedded in a
-loop. After node \ref{lst_back7_assign}, our new fact, $\{a : 1,b : 2,c : \bot\}$
-shows that we know that #a# equals 1, #b# equals 2, and that we stil do not know
+unknown value. Assigning $\bot$ to a variable means we have no
+information about its value. Prior to node~\ref{lst_back7_assign},
+none of the variables values' can be known, which the fact $\{a :
+\bot,b : \bot,c : \bot\}$ shows. They may be set to a compiler
+default, a random value in memory, or even some previous value if this
+fragment is embedded in a loop. After node \ref{lst_back7_assign}, our
+new fact, $\{a : 1,b : 2,c : \bot\}$ shows that we know that #a#
+is 1, #b# is 2, and that we still do not know have information about
 the value of #c#.
 
 \afterpage{\clearpage\input{fig_back5}\clearpage}

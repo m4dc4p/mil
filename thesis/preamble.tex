@@ -24,6 +24,8 @@
 \usetikzlibrary{arrows,automata,positioning}
 %% Used for CFGs.
 \tikzset{
+  >=stealth, 
+  node distance=.5in,
   stmt/.style={rectangle,
     draw=black, thick,        
     minimum height=2em,
@@ -73,11 +75,12 @@
 \newcommand\figbegin{\rule{\linewidth-\rulefigmargin}{0.4pt}\\\vspace{12pt}}
 \newcommand\figend{\rule{\linewidth-\rulefigmargin}{0.4pt}}
 
-\newcommand{\lamA}{\ensuremath{\lambda}-calculus\xspace}
-\newcommand{\LamA}{\ensuremath{\lambda}-Calculus\xspace}
-
 \newcommand{\citep}[1]{(\emph{#1})\xspace}
 \renewcommand{\cite}[1]{\emph{#1}\xspace}
+
+%% Functional languages chapter commands
+\newcommand{\lamA}{\ensuremath{\lambda}-calculus\xspace}
+\newcommand{\LamA}{\ensuremath{\lambda}-Calculus\xspace}
 \newcommand{\lamAbs}[2]{\ensuremath{\lambda#1.\ #2}}
 \newcommand{\lamApp}[2]{\ensuremath{#1\ #2}}
 \newcommand{\lamPApp}[2]{\ensuremath{(#1\ #2)}}
@@ -88,6 +91,21 @@
 \newcommand{\compRho}[1]{\ensuremath{\rho(#1)}}
 \newcommand{\verSub}[2]{\enusremath{#1_{#2}}}
 \newcommand{\verSup}[2]{\enusremath{#1_{#2}}}
+%% End functional languages chapter
+
+%% Dataflow chapter commands
+\newcounter{nodeCounter}[figure]
+\newcommand{\inE}{\emph{in}\xspace}
+\newcommand{\out}{\emph{out}\xspace}
+\newcommand{\In}{\emph{In}\xspace}
+\newcommand{\Out}{\emph{Out}\xspace}
+\newcommand{\inB}{\ensuremath{\mathit{in}(B)}\xspace}
+\newcommand{\outB}{\ensuremath{\mathit{out}(B)}\xspace}
+\newcommand{\entryN}{\emph{E}\xspace}
+\newcommand{\exitN}{\emph{X}\xspace}
+\newcommand{\refNode}[1]{\ensuremath{B_{\ref{#1}}}\xspace}
+\newcommand{\labelNode}[1]{\refstepcounter{nodeCounter}\label{#1}}
+%% End dataflow
 
 \newenvironment{myfig}[1][h]{\begin{figure}[#1]%%
 \centering%%

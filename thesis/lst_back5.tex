@@ -1,28 +1,19 @@
-\begin{minipage}[t]{2in}
-\begin{AVerb}
-         E (1)
-         |
-         V
-       -----(2)
-      |a = 1|
-      |b = 2|
-      |c = 3|
-      |d = 4|
-       -----
-         |
-         V
- -----------------(3)
-|if(a + d > b + c)|--|
- -----------------   V
-         |          ---(4)
-         V         |\dots|
-     ---(5)         ---
-    |\dots|--> X <---|
-     ---
-\end{AVerb}
-\end{minipage}
+\begin{tikzpicture}
+  \node[entex] (entry) {};
 
+  \node[stmt, below=.25in of entry] (assign) {
+    \begin{minipage}{.5in}
+    \begin{AVerb}
+a = 1 
+b = 2
+c = 3
+d = 4
+    \end{AVerb}
+    \end{minipage}
+    \labelNode{lst_back5_assign}};
+  \node[labelfor=assign] () {\refNode{lst_back5_assign}};
+  \node[entex, below=.25in of assign] (exit) {};
 
-
-
-
+  \draw [->>] (entry) to (assign);
+  \draw [->>] (assign) to (exit);
+\end{tikzpicture}

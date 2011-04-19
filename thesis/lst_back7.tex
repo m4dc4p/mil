@@ -1,45 +1,52 @@
-\begin{minipage}[t]{3in}\refstepcounter{nodeCounter}\label{lst_back7_entry}%%
-\refstepcounter{nodeCounter}\label{lst_back7_assign}%%
-\refstepcounter{nodeCounter}\label{lst_back7_test}%%
-\refstepcounter{nodeCounter}\label{lst_back7_true}%%
-\refstepcounter{nodeCounter}\label{lst_back7_false}%%
-\refstepcounter{nodeCounter}\label{lst_back7_print}%%
-\refstepcounter{nodeCounter}\label{lst_back7_exit}
-\begin{AVerb}
-     E (\ref{lst_back7_entry})
-     |
-   -----(\ref{lst_back7_assign}) $\mathit{in:} \{a : \bot,b : \bot,c : \bot\}$
-  |a = 1|
-  |b = 2|
-  |  c  |
-   -----    $\mathit{out:} \{a : 1,b : 2,c : \bot\}$
-     |
-     V
- ---------(\ref{lst_back7_test}) $\{a : 1,b : 2,c : \bot\}$
-|if(a > b)|---
- ---------    $\{a : 1,b : 2,c : \bot\}$
-     |        |
-     |        V
-     |      -----(\ref{lst_back7_true}) $\{a : 1,b : 2,c : \bot\}$
-     |     |c = 4|
-     |      -----    $\{a : 1,b : 2,c : 4\}$
-     |        |
-     |         ->
-     V           |
- ---------(\ref{lst_back7_false}) $\{a : 1,b : 2,c : \bot\}$
-|c = a + 3|      |
- ---------    $\{a : 1,b : 2,c : a + 3\}$
-     |-----<-----
-     V
- ---------(\ref{lst_back7_print}) $\{a : 1,b : 2,c : \top\}$
-|print(c) |
- ---------    $\{a : 1,b : 2,c : \top\}$
-     |
-     X (\ref{lst_back7_exit})
-\end{AVerb}
-\end{minipage}
+\begin{tikzpicture}
+  \node[entex] (entry) {};
 
+  \node[stmt,
+    below of=entry] (assign) {
+    \begin{minipage}{.5in}
+      \begin{AVerb}
+a = 1
+b = 1
+      \end{AVerb}
+    \end{minipage}\labelNode{lst_back7_assign}};
+  \node[labelfor=assign] {\refNode{lst_back7_assign}};
+  \node[above=5mm of assign, anchor=west] {$\mathit{in:} \{a=\bot, b=\bot, c=\bot\}$};
+  \node[below=3mm of assign, anchor=west] {$\mathit{out:} \{a=1, b=2, c=\bot\}$};
 
+  \node[stmt,
+    below=.75in of assign] (test) {#if(a > b)#\labelNode{lst_back7_test}};
+  \node[labelfor=test] {\refNode{lst_back7_test}};
+  \node[above=3mm of test, anchor=east] {$\mathit{in(\refNode{lst_back7_test})}: \{a=1, b=2, c=\bot\}$};
+  \node[below=3mm of test, anchor=east] {$\mathit{out(\refNode{lst_back7_test})}: \{a=1, b=2, c=\bot\}$};
+  \node[below right=0mm and 0mm of test, anchor=west] {$\mathit{out(\refNode{lst_back7_test})}: \{a=1, b=2, c=\bot\}$};
+  
+  \node[stmt,
+    right=2in of test] (true) {#c = 4#\labelNode{lst_back7_true}};
+  \node[labelfor=true] {\refNode{lst_back7_true}};
+  \node[above=3mm of true, anchor=east] {$\mathit{in:} \{a=1, b=2, c=\bot\}$};
+  \node[below=3mm of true, anchor=west] {$\mathit{out:} \{a=1, b=2, c=4\}$};
 
+  \node[stmt,
+    below=.75in of test] (false) {#c = a + 3#\labelNode{lst_back7_false}};
+  \node[labelfor=false] {\refNode{lst_back7_false}};
+  \node[above=5mm of false, anchor=west] {$\mathit{in:} \{a=1, b=2, c=\bot\}$};
+  \node[below=3mm of false, anchor=west] {$\mathit{out:} \{a=1, b=2, c= a + 3\}$};
 
+  \node[stmt,
+    below=.75in of false] (print) {#print(c)#\labelNode{lst_back7_print}};
+  \node[labelfor=print] {\refNode{lst_back7_print}};
+  \node[above=3mm of print, anchor=east] {$\mathit{in:} \{a=1, b=2, c=a + 3\}$};
+  \node[above right=-1mm and 3mm of print, anchor=west] {$\mathit{in:} \{a=1, b=2, c=4\}$};
+  \node[below=3mm of print, anchor=east] {$\mathit{out:} \{a=1, b=2, c=\top\}$};
 
+  \node[entex, below=.5in of print] (exit) {};
+
+  \draw [->>] (entry) to (assign);
+  \draw [->] (assign) to (test);
+  \draw [->] (test) to (true);
+  \draw [->] (test) to (false);
+  \draw [->] (true) |- (print);
+  \draw [->] (false) to (print);
+  \draw [->>] (print) to (exit);
+
+\end{tikzpicture}
