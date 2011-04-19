@@ -99,12 +99,33 @@
 \newcommand{\out}{\emph{out}\xspace}
 \newcommand{\In}{\emph{In}\xspace}
 \newcommand{\Out}{\emph{Out}\xspace}
-\newcommand{\inB}[1]{\ensuremath{\mathit{in}({\if#1x B\else{B_\ref{#1}}\fi})}\xspace}
-\newcommand{\outB}[1]{\ensuremath{\mathit{out}({\if#1x B\else{B_\ref{#1}}\fi})}\xspace}
+%% ``anonymous'' in(B) -- no label  attached to the block
+\newcommand{\inBa}{\ensuremath{\mathit{in}(B)}\xspace}
+\newcommand{\inB}[1]{\ensuremath{\mathit{in}(B_{\ref{#1}})}\xspace}
+%% ``anonymous'' out(B) -- no label attached to the block
+\newcommand{\outBa}{\ensuremath{\mathit{out}(B)}\xspace}
+\newcommand{\outB}[1]{\ensuremath{\mathit{out}(B_{\ref{#1}})}\xspace}
 \newcommand{\entryN}{\emph{E}\xspace}
 \newcommand{\exitN}{\emph{X}\xspace}
 \newcommand{\refNode}[1]{\ensuremath{B_{\ref{#1}}}\xspace}
 \newcommand{\labelNode}[1]{\refstepcounter{nodeCounter}\label{#1}}
+
+%% Formats a list of facts
+%% Argument should be like \facts{a/1, b/2, foobar/\bot, baz/\top}.
+%% 
+\newcounter{factctr}
+\newcommand{\facts}[1]{%%
+  \ensuremath{\{%%
+    \setcounter{factctr}{0}%%
+    \foreach \varName/\varVal in {#1}{%%
+      \ifthenelse{\value{factctr}>0}{,}{}\mathit{\varName}=\varVal%%
+      \stepcounter{factctr}%%
+    }\}}\xspace%%
+}
+
+\newcommand{\inFacts}[2]{\ensuremath{\inB{#1}: \facts{#2}}}
+\newcommand{\outFacts}[2]{\ensuremath{\outB{#1}: \facts{#2}}}
+
 %% End dataflow
 
 \newenvironment{myfig}[1][h]{\begin{figure}[#1]%%

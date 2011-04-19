@@ -3,7 +3,7 @@
 \include{preamble}
 \begin{document}
 \input{document.preamble}
-%% Float parameters
+% Float parameters
 \renewcommand{\textfraction}{0.1}
 \renewcommand{\topfraction}{0.9}
 %% in and out sets
@@ -164,23 +164,23 @@ basic blocks rather than statements from here forward.
 The dataflow algorithm computes two sets of \emph{facts} for every
 node in the CFG. Facts are a data structure that describe the state of
 the program before and after execution of the block represented by the
-node. \inB{x} describes the program's state just prior to entering the
-block $B$, while \outB{x} describes the program's state just after
+node. \inBa describes the program's state just prior to entering the
+block $B$, while \outBa describes the program's state just after
 exiting the block.
 
-\afterpage{\clearpage\input{fig_back5}\clearpage}
+\input{fig_back5}
 
 Consider Figure~\ref{fig_back5}, which annotates the program fragment
 in Figure~\ref{fig_back1} with facts about #a#, #b#, and #c# before
 and after every node. Prior to \refNode{lst_back7_assign}, none of the
 variables' values can be known: they may be set to a compiler default,
 a random value in memory, or even some previous value if this fragment
-is embedded in a loop.  The fact \inB{lst_back7_assign}, 
-$\{a:\bot, b:\bot, c:\bot\}$, represents our lack of information by assigning
+is embedded in a loop.  The fact \inB{lst_back7_assign}, \facts{a/\bot,
+b/\bot, c/\bot}, represents our lack of information by assigning
 each variable the value ``$\bot$'' (``bottom''). After
-\refNode{lst_back7_assign}, \outB{lst_back7_assign} has the value 
-$\{a:1, b:2, c:\bot\}$, showing that we know #a# is 1, #b# is 2, and we
-still do not have information about the value of #c#.
+\refNode{lst_back7_assign}, \outB{lst_back7_assign} is \facts{a/1,
+  b/2, c/\bot}, showing that we know #a# is 1, #b# is 2, and we still
+do not have information about the value of #c#.
 
 Now consider the value for #c# given by \refNode{lst_back7_true} and
 \refNode{lst_back7_false}. \outB{lst_back7_true} says #c# is 4, but
@@ -214,9 +214,9 @@ specific value.
 \end{table}
 
 A \emph{meet operator} defines how we combine facts when values
-conflict. Table~\ref{tbl_back2} defines ``\raisebox{.5em}{$\sqcap$}''
+conflict. Table~\ref{tbl_back2} defines ``\raisebox{.1em}{$\sqcap$}''
 (``least upper bound'' or ``lub''), which combines values as we did
-above.. $v_1$ and $v_2$ represent values given to the same variable by
+above. $v_1$~and $v_2$ represent values given to the same variable by
 different facts. Because $\bot$ represents the lack of information, we
 can replace it with any value (lines 1 and 2). On the other hand,
 $\top$ means we already know several possible values. Finding a new
