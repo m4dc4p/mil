@@ -1,0 +1,49 @@
+%% \begin{AVerb}[commandchars=\\\{\}]
+%%        E
+%%        ||      
+%%        v
+%%      -----
+%%     ||a = 1||    \emph{live:}  \ensuremath{\emptyset}
+%%      -----
+%%        ||      
+%%        V
+%%    ---------
+%%   ||b = a + 1||  \emph{live:} \{a\}  
+%%    ---------
+%%        ||      
+%%        V
+%%   ------------
+%%  ||return a + 1|| \emph{live:} \{a\}
+%%   ------------
+%%        ||      
+%%        X          \emph{live:}  \ensuremath{\emptyset}
+%% \end{AVerb}
+\begin{tikzpicture}
+  \node[entex] (entry) {};
+
+  \node[stmt, below of=entry] (assigna) {#a = 1#\labelNode{lst_back10_assigna}};
+  \node[labelfor=entry] () {\refNode{lst_back10_assigna}};
+
+  \node[stmt, below of=assigna] (test) {#if(rnd() > 1)#\labelNode{lst_back10_test}};
+  \node[labelfor=test] () {\refNode{lst_back10_test}};
+
+  \node[stmt, right of=test] (true) {#b = a + 1#\labelNode{lst_back10_true}};
+  \node[labelfor=true] () {\refNode{lst_back10_lst_back10_true}};
+
+  \node[stmt, below of=test] (false) {#b = a - 1#\labelNode{lst_back10_false}};
+  \node[labelfor=false] () {\refNode{lst_back10_lst_back10_false}};
+
+  \node[stmt, below of=false] (return) {#return a + 1#\labelNode{lst_back10_return}};
+  \node[labelfor=return] () {\refNode{lst_back10_lst_back10_return}};
+
+  \node[entex, below of=return] (exit) {};
+
+  \draw [->>] (entry) to (assigna);
+  \draw [->] (assigna) to (test);
+  \draw [->] (test) to (true);
+  \draw [->] (test) to (false);
+  \draw [->] (true) |- (return);
+  \draw [->] (false) to (return);
+  \draw [->>] (return) to (exit);
+
+\end{tikzpicture}
