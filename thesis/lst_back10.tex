@@ -22,28 +22,28 @@
   \node[entex] (entry) {};
 
   \node[stmt, below of=entry] (assigna) {#a = 1#\labelNode{lst_back10_assigna}};
-  \node[labelfor=entry] () {\refNode{lst_back10_assigna}};
+  \node[labelfor=assigna] () {\refNode{lst_back10_assigna}};
 
-  \node[stmt, below of=assigna] (test) {#if(rnd() > 1)#\labelNode{lst_back10_test}};
+  \node[stmt, below=.75in of assigna] (test) {#if(rnd() > 1)#\labelNode{lst_back10_test}};
   \node[labelfor=test] () {\refNode{lst_back10_test}};
 
-  \node[stmt, right of=test] (true) {#b = a + 1#\labelNode{lst_back10_true}};
-  \node[labelfor=true] () {\refNode{lst_back10_lst_back10_true}};
+  \node[stmt, right=.75in of test] (true) {#b = a + 1#\labelNode{lst_back10_true}};
+  \node[labelfor=true] () {\refNode{lst_back10_true}};
 
-  \node[stmt, below of=test] (false) {#b = a - 1#\labelNode{lst_back10_false}};
-  \node[labelfor=false] () {\refNode{lst_back10_lst_back10_false}};
+  \node[stmt, below=.75in of test] (false) {#b = a - 1#\labelNode{lst_back10_false}};
+  \node[labelfor=false] () {\refNode{lst_back10_false}};
 
-  \node[stmt, below of=false] (return) {#return a + 1#\labelNode{lst_back10_return}};
-  \node[labelfor=return] () {\refNode{lst_back10_lst_back10_return}};
+  \node[stmt, below=.75in of false] (return) {#return a + 1#\labelNode{lst_back10_return}};
+  \node[labelfor=return] () {\refNode{lst_back10_return}};
 
   \node[entex, below of=return] (exit) {};
 
-  \draw [->>] (entry) to (assigna);
-  \draw [->] (assigna) to (test);
-  \draw [->] (test) to (true);
-  \draw [->] (test) to (false);
-  \draw [->] (true) |- (return);
-  \draw [->] (false) to (return);
-  \draw [->>] (return) to (exit);
+  \draw [->>] (entry) to node[anchor=west] () {$\mathit{live}: \emptyset$} (assigna);
+  \draw [->] (assigna) to node[anchor=west] () {$\mathit{live}: \lbrace a \rbrace$} (test);
+  \draw [->] (test) to node [anchor=south] () {$\mathit{live}: \lbrace a \rbrace$} (true);
+  \draw [->] (test) to node [anchor=east] () {$\mathit{live}: \lbrace a \rbrace$} (false);
+  \draw [->] (true) |- node [anchor=west] () {$\mathit{live}: \lbrace a \rbrace$} (return);
+  \draw [->] (false) to node [anchor=east] () {$\mathit{live}: \lbrace a \rbrace$} (return);
+  \draw [->>] (return) to node[anchor=west] () {$\mathit{live}: \emptyset$} (exit);
 
 \end{tikzpicture}
