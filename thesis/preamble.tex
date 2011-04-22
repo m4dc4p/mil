@@ -19,6 +19,8 @@
 \usepackage{longtable}
 \usepackage{afterpage}
 \usepackage{subfig}
+\usepackage{xifthen}
+\usepackage{soul}
 
 \usepackage{tikz}
 \usetikzlibrary{arrows,automata,positioning}
@@ -45,6 +47,7 @@
     fill=white,
     above right=-1.5mm and -1.5mm of #1,
   },
+  fact/.style={ }
 }
 
 %% GSO margins.
@@ -114,14 +117,32 @@
 %% Argument should be like \facts{a/1, b/2, foobar/\bot, baz/\top}.
 %% 
 \newcounter{factctr}
-\newcommand{\facts}[1]{%%
+\newtoks\varVal
+\newtoks\varName
+\newcommand{\facts}[1]{\begingroup%%
+  %% Test if the argument given contains a forward slash (/). Expands
+  %% slashTest with argument such that if a slash is NOT present the 
+  %% token \noSlash will be given as argument 2 to slashTest. Otherwise
+  %% there must be slash.
+  \def\hasSlash##1{\expandafter\slashTest##1/\noslash\endslash}%%
+  \def\slashTest##1/##2##3\endslash{\ifx\noslash##2 N\else Y\fi}%%
+  \def\getArgs##1/##2{\varName={##1}%%
+    \varVal={##2}}
   \ensuremath{\{%%
     \setcounter{factctr}{0}%%
-    \foreach \varName/\varVal in {#1}{%%
-      \ifthenelse{\value{factctr}>0}{,}{}\mathit{\varName}=\varVal%%
+    \foreach \var in {#1}{%%
+      %% Separate list with a comma
+      \ifthenelse{\value{factctr}>0}{,}{}%%
+      %% \tracingmacros=1%%
+      %% If key/val arguments, use first form. Otherwise
+      %% use second.
+      \ifthenelse{\equal{\hasSlash{\var}}{Y}}%%
+                  {\expandafter\getArgs\var \mathit{\the\varName}=\the\varVal}%%
+                  {\var}%%{\var}%%
+      %% \tracingmacros=0%%
       \stepcounter{factctr}%%
     }\}}\xspace%%
-}
+\endgroup}
 
 \newcommand{\inFacts}[2]{\ensuremath{\inB{#1}: \facts{#2}}}
 \newcommand{\outFacts}[2]{\ensuremath{\outB{#1}: \facts{#2}}}

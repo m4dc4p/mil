@@ -1,49 +1,26 @@
-%% \begin{AVerb}[commandchars=\\\{\}]
-%%        E
-%%        ||      
-%%        v
-%%      -----
-%%     ||a = 1||    \emph{live:}  \ensuremath{\emptyset}
-%%      -----
-%%        ||      
-%%        V
-%%    ---------
-%%   ||b = a + 1||  \emph{live:} \{a\}  
-%%    ---------
-%%        ||      
-%%        V
-%%   ------------
-%%  ||return a + 1|| \emph{live:} \{a\}
-%%   ------------
-%%        ||      
-%%        X          \emph{live:}  \ensuremath{\emptyset}
-%% \end{AVerb}
 \begin{tikzpicture}
-  \node[entex] (entry) {};
+  \node[entex] (entry) {\entryN};
 
-  \node[stmt, below of=entry] (assigna) {#a = 1#\labelNode{lst_back10_assigna}};
+  \node[stmt, below=.5in of entry] (assigna) {#a = 1#\labelNode{lst_back10_assigna}};
   \node[labelfor=assigna] () {\refNode{lst_back10_assigna}};
+  \node[fact, above=5mm of assigna, anchor=west] () {\inFacts{lst_back10_assigna}{\emptyset}};
+  \node[fact, below=3mm of assigna, anchor=west] () {\outFacts{lst_back10_assigna}{a}};
 
-  \node[stmt, below=.75in of assigna] (test) {#if(rnd() > 1)#\labelNode{lst_back10_test}};
-  \node[labelfor=test] () {\refNode{lst_back10_test}};
+  \node[stmt, below=.75in of assigna] (assignb) {#b = a + 1#\labelNode{lst_back10_assignb}};
+  \node[labelfor=assignb] () {\refNode{lst_back10_assignb}};
+  \node[fact, above=5mm of assignb, anchor=west] () {\inFacts{lst_back10_assignb}{a}};
+  \node[fact, below=3mm of assignb, anchor=west] () {\outFacts{lst_back10_assignb}{a}};
 
-  \node[stmt, right=.75in of test] (true) {#b = a + 1#\labelNode{lst_back10_true}};
-  \node[labelfor=true] () {\refNode{lst_back10_true}};
-
-  \node[stmt, below=.75in of test] (false) {#b = a - 1#\labelNode{lst_back10_false}};
-  \node[labelfor=false] () {\refNode{lst_back10_false}};
-
-  \node[stmt, below=.75in of false] (return) {#return a + 1#\labelNode{lst_back10_return}};
+  \node[stmt, below=.75in of assignb] (return) {#return a + 1#\labelNode{lst_back10_return}};
   \node[labelfor=return] () {\refNode{lst_back10_return}};
+  \node[fact, above=5mm of return, anchor=west] () {\inFacts{lst_back10_return}{a}};
+  \node[fact, below=3mm of return, anchor=west] () {\outFacts{lst_back10_return}{\emptyset}};
 
-  \node[entex, below of=return] (exit) {};
+  \node[entex, below=.5in of return] (exit) {\exitN};
 
-  \draw [->>] (entry) to node[anchor=west] () {$\mathit{live}: \emptyset$} (assigna);
-  \draw [->] (assigna) to node[anchor=west] () {$\mathit{live}: \lbrace a \rbrace$} (test);
-  \draw [->] (test) to node [anchor=south] () {$\mathit{live}: \lbrace a \rbrace$} (true);
-  \draw [->] (test) to node [anchor=east] () {$\mathit{live}: \lbrace a \rbrace$} (false);
-  \draw [->] (true) |- node [anchor=west] () {$\mathit{live}: \lbrace a \rbrace$} (return);
-  \draw [->] (false) to node [anchor=east] () {$\mathit{live}: \lbrace a \rbrace$} (return);
-  \draw [->>] (return) to node[anchor=west] () {$\mathit{live}: \emptyset$} (exit);
+  \draw [->>] (entry) to (assigna);
+  \draw [->] (assigna) to (assignb);
+  \draw [->] (assignb) to (return);
+  \draw [->>] (return) to (exit);
 
 \end{tikzpicture}

@@ -27,7 +27,7 @@ by describing a specific optimization.  We informally describe the
 dataflow algorithm here. For a more formal treatment, see
 \citep{AhoXX}.
 
-The dataflow algorithm analyses and transforms \emph{control-flow
+The dataflow algorithm analyzes and transforms \emph{control-flow
   graphs}, a data structure for representing programs. The algorithm
 associates each node in the graph with a set of \inE and \out
 \emph{facts}, representing the portion of the program's state under
@@ -43,15 +43,14 @@ results of the analysis in a later optimization.
 
 This chapter describes the concepts necessary to understand dataflow
 analysis and gives an extended example to illustrate them
-together. Section~\ref{sec_back1} describes control-flow
-graphs. Control-flow graphs can be expressed in terms of basic blocks,
-which we motivate in Section~\ref{sec_back3}. We discuss facts,
-direction, the transfer function and the meet operator in Section
-\ref{sec_back4}. We illustrate why dataflow must be an iterative
-algorithm (and define what a fixed point means in this context) in
-Section~\ref{sec_back6}. We treat rewriting in
+together. Section~\ref{sec_back1} describes control-flow graphs. We
+discuss facts, direction, the transfer function and the meet operator
+in Section \ref{sec_back4}. We illustrate why dataflow must be an
+iterative algorithm (and define what a fixed point means in this
+context) in Section~\ref{sec_back6}. We treat rewriting in
 Section~\ref{sec_back7}. To demonstrate these concepts together, we
-demonstrate \emph{dead-code elimination} in Section~\ref{back_2}.
+give an extended example of \emph{dead-code elimination} in
+Section~\ref{sec_back2}.
 
 \section{Control-Flow Graphs}
 \label{sec_back1}
@@ -72,7 +71,7 @@ appear in a corresponding node. Because the declaration does not cause
 a runtime effect, we do not represent it in the graph.  Nodes \entryN
 and \exitN designate where program execution \emph{enters} and \emph{leaves}
 the graph. If the graph represented the entire program, we would say
-execution \emph{begins} at \entryE and \emph{terminates} at \exitN. However, the CFG
+execution \emph{begins} at \entryN and \emph{terminates} at \exitN. However, the CFG
 may be embedded in a larger program, for which reason we say
 \emph{enters} and \emph{leaves}.
 
@@ -91,9 +90,9 @@ may be embedded in a larger program, for which reason we say
 
 Directed edges show the order in which nodes execute. The edges
 leaving \refNode{lst_back2_test} (representing the test
-``\verb=if(a > b)='' on line \ref{lst_back1_test}) show that execution
-can branch to either \refNode{lst_back2_true} (when $a > b$) or
-\refNode{lst_back2_false} (when $a \leq b$). A node followed by
+``\verb=if(rnd() + a > b)='' on line \ref{lst_back1_test}) show that execution
+can branch to either \refNode{lst_back2_true} (when $\mathit{rnd}() + a > b$) or
+\refNode{lst_back2_false} (when $mathit{rnd}() + a \leq b$). A node followed by
 multiple successors (i.e., where multiple edges leave the node)
 represents a \emph{branch} or \emph{conditional} statement. Any one of
 the successor nodes may execute following the conditional statement.
@@ -103,63 +102,6 @@ analyzing the control flow of the program. CFGs show the order in
 which expressions and statements in a program are evaluated. The
 dataflow algorithm intimately depends on the program representation
 provided by the CFG.
-
-\section{Basic Blocks}
-\label{sec_back3}
-
-%% Begin by placing the specific concept in the overall context of
-%% dataflow. Give a small example highlighting the concept. Point
-%% out fine points or subtleties that occur when generalizing the concept. End
-%% by summarizing how the concept fits into dataflow (in a bit larger
-%% sense than the first summary).
-
-\begin{myfig}[th]
-\begin{tabular}{ccc}
-\begin{minipage}[b]{1.5in}
-  \subfloat{\input{lst_back3}\label{fig_back4_a}}
-\end{minipage} & %%
-\begin{minipage}[b]{1.5in}
-  \subfloat{\input{lst_back4}\label{fig_back4_b}}
-\end{minipage}& %%
-\begin{minipage}[b]{1.5in}
-  \subfloat{\input{lst_back5}\label{fig_back4_c}}
-\end{minipage} \\
-\subref{fig_back4_a} & \subref{fig_back4_b} & \subref{fig_back4_c} \\
-\end{tabular}
-\caption{\subref{fig_back4_a}: A C-language fragment to illustrate
-  \emph{basic blocks}.  \subref{fig_back4_b}: The CFG for
-  \subref{fig_back4_a} without basic blocks. \subref{fig_back4_c}: The
-  CFG for \subref{fig_back4_c} using basic blocks.}
-\label{fig_back4}
-\end{myfig}
-
-%% Basic blocks
-Consider the C-language fragment and CFGs in Figure~\ref{fig_back4}. 
-Part~\subref{fig_back4_b} shows the CFG for part~\subref{fig_back4_a}: a long, straight sequence of nodes, one after
-another. Part~\subref{fig_back4_C}, however, collapses all those nodes
-into~\refNode{lst_back5_assign}. Our graph of statements becomes a
-graph of \emph{blocks}.
-
-Part~\subref{fig_back4_c} represents the assignment statements on
-lines~\ref{lst_back3_start} -- \ref{lst_back3_end} as a \emph{basic
-  block}: a sequence of statements with one entry, one exit, and no
-branches in-between. Execution cannot start in the ``middle'' of the
-block, nor can it branch anywhere but at the end of the block. In fact,
-Part~\ref{fig_back4_b} also shows four basic blocks -- they just happen
-to consist of one statement each.
-
-The representation given in Part~\subref{fig_back4_c} has a number of
-advantages. It tends to reduce both the number of nodes and the number
-of edges in the graph. The dataflow algorithm maintains two sets of
-\emph{facts} for every node -- reducing the number of nodes obviously
-reduces the number of facts stored. The algorithm also iteratively
-propagates facts along edges -- so reducing the number of edges
-reduces the amount of work we need to do. When rewriting, blocks allow
-us to move larger amounts of the program at once. It also can be shown
-(see \citep{AhoXX}) that we do not lose any information by collapsing
-statements into blocks. For efficiency and brevity, we will work with
-basic blocks rather than statements from here forward.
-
 
 \section{Facts, Transfer Functions, Direction \& The Meet Operator}
 \label{sec_back4}
@@ -189,7 +131,7 @@ state we care about in this program). Each \inBa gives the variables'
 values just prior to executing block $B$, while each \outBa gives
 their values just after $B$ has executed.  
 
-Figure~\ref{fig_Back5} shows a \emph{forwards} analysis, where \outBa
+Figure~\ref{fig_back5} shows a \emph{forwards} analysis, where \outBa
 is computed from \inBa, for each block. Facts are created by a
 \emph{transfer function} that inspects the statements in each node and
 updates values assigned to variables, if any. Sometimes a dataflow
@@ -228,7 +170,7 @@ similar analysis, except \refNode{lst_back7_print}, where we need to
   take special action.
 
 When a node has multiple predecessors, like \refNode{lst_back7_print},
-we must combine multiple \outB values into a single \inB. The value
+we must combine multiple \outBa values into a single \inBa. The value
 for #c# in \outB{lst_back7_true} is 4, while in \outB{lst_back7_false}
 #c# is 3. We have two distinct values for #c# and no way to determine
 which will be the case when \refNode{lst_back7_print} executes. We
@@ -266,7 +208,7 @@ is $\top$. When values differ, as in Line~3, again the result is
 $\top$. Only when values are equal, as shown in the last line, do we
 preserve the value.
 
-Facts define the state of the program that we are analysing. The
+Facts define the state of the program that we are analyzing. The
 transfer function transforms input facts into output facts. In a
 forwards analysis, input facts come from predecessor nodes and output
 facts flow to successors. For a backwards analysis, the opposite
@@ -308,7 +250,7 @@ for the fragment.}
 
 We solve this problem by applying our transfer function
 \emph{iteratively}. In the case of Figure \ref{fig_back6}, we first
-initialize each all \inB and \outB facts to some default. We then use
+initialize each all \inBa and \outBa facts to some default. We then use
 |valueOf| to compute each \outBa. Of course, facts will change over
 the course of iteration -- especially in the case of node
 \ref{lst_back9_test}. We keep iterating until we reach a \emph{fixed
@@ -394,21 +336,22 @@ we do want to rewrite the CFG.
 \section{Example: Dead-Code Elimination}
 \label{sec_back2}
 
+%% Begin by placing the specific concept in the overall context of
+%% dataflow. Give a small example highlighting the concept. Point
+%% out fine points or subtleties that occur when generalizing the concept. End
+%% by summarizing how the concept fits into dataflow (in a bit larger
+%% sense than the first summary).
+
 Consider Figure \ref{fig_back2}, again showing a C-language fragment.
-After its assignment on line \ref{fig_back2_dead_line}, #b# is not
-referenced. Removing the #b# will not affect the meaning of the
-program and, at least, will reduce the size of the program. It may
-even make it run faster or use less memory. We call this optimization
-\emph{dead-code elimination}.
+The assignment to #b# on line~\ref{fig_back2_dead_line} has no visible
+effect and can be removed without affecting the meaning of the
+program. We call this optimization \emph{dead-code elimination}.
 
 \begin{myfig}[ht]
 \begin{minipage}{1in}
   \begin{AVerb}[numbers=left]
     a = 1;
-    if(rnd() > 1)
-      b = a + 1;\label{fig_back2_dead_line}
-    else
-      b = a - 1;
+    b = a + 1;\label{fig_back2_dead_line}
     return a + 1;
   \end{AVerb}
 \end{minipage}
@@ -418,30 +361,16 @@ and can be considered ``dead.''}
 \label{fig_back2}
 \end{myfig}
 
-Of course, people do not normally write programs with such obviously
-useless statements, but other compiler optimizations can produce (or
-leave behind) many such statements. \emph{Uncurrying}, described in
-Chapter \ref{ref_chapter_uncurrying}, in fact depends on dead-code
+Of course, programmers do not normally write programs with such
+obviously useless statements, but other compiler optimizations can
+leave behind many such statements. \emph{Uncurrying}, described in
+Chapter~\ref{ref_chapter_uncurrying}, in fact depends on dead-code
 elimination.
 
-To eliminate the assignment like that on line
-\ref{fig_back2_dead_line}, we really need to determine which variables
-are referenced after assignment. Such variables are ``live''; if a
-variable is \emph{not} live, then it is dead. We use this ``liveness''
-analysis to determine if a particular assignment is dead.
-
-To determine if a variable is live, we need to know if it is
-referenced after assignment. Such variables make up the \emph{the
-  live set} which we can compute between each statement. To compute
-the live set, we can choose to traverse the CFG for the program
-forwards or backwards.  In the forwards case, we must track each
-assignment and determine, when we exit the CFG, if the variable was
-used afterwards. In general we would need to track every assignment
-until our traversal finished. However, if we traverse backwards, we
-only need any variable references to the live set. When we see an
-assignment to a variable \emph{not} in our live set, we know it has
-never been referenced. Therefore we compute ``liveness'' using a
-backwards traversal over the CFG.
+The assignment on line~\ref{fig_back2_dead_line} can be eliminated
+because #b# does not get referenced again. If a variable is referenced
+after assignment, we say it is ``live.'' We call the dataflow
+analysis that finds all live variables a ``liveness'' analysis. 
 
 \begin{myfig}[th]
 \begin{minipage}{2in}
@@ -452,62 +381,184 @@ set for each node.}
 \label{fig_back3}
 \end{myfig}
 
-Figure \ref{fig_back3} shows the CFG for this example. Annotations
-show the facts we will compute: the live set before and after. Though
-execution follows the arrows in the CFG, our analysis proceeds
-backwards. For example, the input to node 2 is the live set computed
-for node 3 (``$\{a\}$'' in this case).
+Figure \ref{fig_back3} shows the CFG for this example. The annotations
+on edges show the facts computed for this analysis: the set of live
+variables. Recall from Section~\ref{sec_back4} that we can choose to
+traverse the CFG forwards or backwards. Going forwards would require
+us to track each assignment and then, after traversing the CFG,
+determine if the variable was referenced again. The backwards case
+requires that we add each variable reference to the live set. When an
+assignment occurs, we can check if the variable appears in the live
+set. If not, we know the variable was never referenced and is not
+live. For simplicity and efficiency, we choose to go backwards rather
+than forwards.
 
-Our transfer function computes the live set based on \emph{uses} and
-\emph{definitions} in a statement. Any reference (or use) of a
-variable goes into the live set. Any assignment (or definition) of a
-variable removes it from the live set. We can then define our transfer
-function, |live|, for a statement as:
-
+We define our transfer function such that, for some statement $B$,
+\inBa represents the variables that are live in the statement. A live
+variable is referenced (i.e., \emph{used}) in $B$ or one
+of its successors. A variable that appears in \outBa but not \inBa must
+not be live. The only way to remove a variable from \outBa is if it is 
+assigned (i.e. or \emph{defined}) in $B$. We can then define our transfer
+function from \outBa to \inBa in terms of the \emph{use} and \emph{def} sets:
 \begin{align}
-  & |live|(s) = (\Varid{in}(s) \cup |use|(s)) - |def|(s), \label{eqn_back1} \\
-\intertext{where}
-  & s     & \text{Statement considered.} \notag\\
-  & |use|(s) &  \text{Set of variables used in $s$}. \notag\\
-  & |def|(s) & \text{Variable assigned to in $s$ (a singleton set)}. \notag\\
-  & \mathit{in}(s) & \text{Live variables computed for $s$' successor}. \notag
+  & \inBa = (\outBa \cup |use|(B)) - |def|(B), \label{eqn_back1} \\
+\text{where} \notag\\
+  & B     & \text{Statement considered.} \notag\\
+  & |use|(B) & \text{Variables referenced in $B$}. \notag\\
+  & |def|(B) & \text{Variables assigned $B$}. \notag\\
 \end{align}
 
-Table \ref{tbl_back1} shows the |use| and |def| sets for each
-statement. The live set computed, |live|, becomes the input, \mathit{in}, for
-the statement's predecessor. We include the exit node (``#X#'') in the
-table to show the initial value of \mathit{in} for the last statement --
-$\emptyset$, the empty set. Our analysis then works backwards through the
-program. If our program (and its CFG) contained any loops, we would
-need to run this algorithm multiple times, until the live set for each
-statement reached a fixed point.
+Table \ref{tbl_back1} shows the |use|, |def|, \inBa and \outBa sets for
+each statement. We include the exit node (``\exitN'') in the table to
+show the initial value of \outBa for the last statement -- $\emptyset$,
+the empty set. Our analysis then works backwards through the
+program. Each \inBa becomes the input, \outBa, for the statement's
+predecessor. If our program (and its CFG) contained any loops, we
+would need to run this algorithm multiple times, until the live set
+for each statement reached a fixed point.
 
 \begin{table}
   \centering
-  \begin{tabular}{lcccc}
-    $s$ & $|use|(s)$ & $|def|(s)$ & $\mathit{in}(s)$ &  $|live|(s)$ \\
-    \cmidrule(r){1-1}\cmidrule(r){2-2}\cmidrule(r){3-3}\cmidrule(r){4-4}\cmidrule(r){5-5}
-    #X# & & & & $\emptyset$ \\
-    #return a + 1# & $\{a\}$ & $\emptyset$ & $\emptyset$ & $\{a\}$ \\
-    #b = a + 1# & $\{a\}$ & $\{b\}$ & $\{a\}$ & $\{a\}$ \\
-    #a = 1# & $\emptyset$ & $\{a\}$ & $\{a\}$ & $\emptyset$ \\
-    \bottomrule
-  \end{tabular}
-  \caption{The $|use|$, $|def|$ and $|live|$ sets computed using equation \ref{eqn_back1} for our example program.}
+  \begin{math}
+    \begin{array}{lcccc}
+      & |use|(B) & |def|(B) & \outBa & \inBa \\
+      \cmidrule(r){2-5} %%\cmidrule(r){1-1}\cmidrule(r){2-2}\cmidrule(r){3-3}\cmidrule(r){4-4}\cmidrule(r){5-5}
+      \exitN & \emptyset & \emptyset & \emptyset & \emptyset \\
+      #return a + 1# & \{a\} & \emptyset & \emptyset & \{a\} \\
+      #b = a + 1# & \{a\} & \{b\} & \{a\} & \{a\} \\
+      #a = 1# & \emptyset & \{a\} & \{a\} & \emptyset \\
+    \end{array}
+  \end{math}
+  \caption{The $|use|$, $|def|$, \inBa and \outBa sets computed using
+    equation \ref{eqn_back1} for our example program.}
   \label{tbl_back1}
+  \figend
 \end{table}
 
 With the live set computed for each statement, our analysis can now
-determine which statements to eliminate. Only nodes 1 and 2 in Figure
-\ref{fig_back3} perform an assignment. The live set for node 1 (``#a = 1#'')
-contains #a#, so we do not eliminate it. In node 2 (``#b = a + 1#''),
-the live set does \emph{not} contain #b#. Therefore, we can eliminate
-node 2, giving us a new program without any dead code:
+determine which statements to eliminate. Only
+\refNode{lst_back10_assigna} and \refNode{lst_back10_assignb} in
+Figure~\ref{fig_back3} perform an assignment. The live set for
+\refNode{lst_back10_assigna} (``#a = 1#'') contains #a#, so we do not
+eliminate it. For \refNode{lst_back10_assignb} (``#b = a + 1#''), the
+live set does \emph{not} contain #b#. Therefore, we can eliminate
+\refNode{lst_back10_assignb}, giving us the new program in
+Figure~\ref{fig_back6}.
 
-\begin{Verbatim}
+\begin{myfig}[th]
+  \centering
+  \begin{minipage}{1in}
+  \begin{AVerb}[numbers=left]
 a = 1;
 return a + 1;
-\end{Verbatim}
+  \end{AVerb}
+  \end{minipage}
+  \caption{The program from Figure~\ref{fig_back3} with the useless assignment to
+    \verb=b= eliminated.}
+\end{myfig}
+
+%% In the
+%% forwards case, we must track each assignment and determine, when we
+%% exit the CFG, if the variable was ever used. We would need to track
+%% every assignment until our traversal finished. However, if we traverse
+%% backwards, we only need to add each reference to our live set. When we
+%% see an assignment to a variable \emph{not} in our live set, we know it
+%% has never been referenced.
+
+%% \emph{live set} The \inE and \out sets show the facts computed for this
+%% analysis. The computed show the live variables for that program point
+%% \emph{live set}, annotates edges between each statement. The live set
+%% is the \emph{fact} we compute for this analysis.
+
+%% Annotations
+%% show the facts we will compute
+%% Recall from Section~\ref{sec_back4} that a dataflow analysis can
+%% go \emph{forwards} or \emph{backwards}. 
+
+%% To eliminate the assignment like that on
+%% line~\ref{fig_back2_dead_line}, we need to determine which variables
+%% are ``live'' -- that is, variables referenced after assignment. Such variables are ``live''; if a
+%% variable is \emph{not} live, then it is dead. We use this ``liveness''
+%% analysis to determine if a particular assignment is dead.
+
+%% To determine if a variable is live, we need to know if it is
+%% referenced after assignment. Such variables make up a \emph{live set}
+%% that we can compute between each statement. To compute the live set,
+%% we can choose to traverse the CFG for the program forwards or
+%% backwards.  In the forwards case, we must track each assignment and
+%% determine, when we exit the CFG, if the variable was ever used. We
+%% would need to track every assignment until our traversal
+%% finished. However, if we traverse backwards, we only need to add each
+%% reference to our live set. When we see an assignment to a variable
+%% \emph{not} in our live set, we know it has never been
+%% referenced. Therefore we compute ``liveness'' using a backwards
+%% traversal over the CFG.
+
+%% \begin{myfig}[th]
+%% \begin{minipage}{2in}
+%% \input{lst_back10}
+%% \end{minipage}
+%% \caption{The CFG for our example program, annotated with the live
+%% set for each node.}
+%% \label{fig_back3}
+%% \end{myfig}
+
+%% Figure \ref{fig_back3} shows the CFG for this example. Annotations
+%% show the facts we will compute: the live set before and after. Though
+%% execution follows the arrows in the CFG, our analysis proceeds
+%% backwards. For example, the input to node 2 is the live set computed
+%% for node 3 (``$\{a\}$'' in this case).
+
+%% Our transfer function computes the live set based on \emph{uses} and
+%% \emph{definitions} in a statement. Any reference (or use) of a
+%% variable goes into the live set. Any assignment (or definition) of a
+%% variable removes it from the live set. We can then define our transfer
+%% function, |live|, for a statement as:
+
+%% \begin{align}
+%%   & |live|(s) = (\Varid{in}(s) \cup |use|(s)) - |def|(s), \label{eqn_back1} \\
+%% \intertext{where}
+%%   & s     & \text{Statement considered.} \notag\\
+%%   & |use|(s) &  \text{Set of variables used in $s$}. \notag\\
+%%   & |def|(s) & \text{Variable assigned to in $s$ (a singleton set)}. \notag\\
+%%   & \Varid{in}(s) & \text{Live variables computed for $s$' successor}. \notag
+%% \end{align}
+
+%% Table \ref{tbl_back1} shows the |use| and |def| sets for each
+%% statement. The live set computed, |live|, becomes the input, $\Varid{in}$, for
+%% the statement's predecessor. We include the exit node (``#X#'') in the
+%% table to show the initial value of $\Varid{in}$ for the last statement --
+%% $\emptyset$, the empty set. Our analysis then works backwards through the
+%% program. If our program (and its CFG) contained any loops, we would
+%% need to run this algorithm multiple times, until the live set for each
+%% statement reached a fixed point.
+
+%% \begin{table}
+%%   \centering
+%%   \begin{tabular}{lcccc}
+%%     $s$ & $|use|(s)$ & $|def|(s)$ & $\Varid{in}(s)$ &  $|live|(s)$ \\
+%%     \cmidrule(r){1-1}\cmidrule(r){2-2}\cmidrule(r){3-3}\cmidrule(r){4-4}\cmidrule(r){5-5}
+%%     #X# & & & & $\emptyset$ \\
+%%     #return a + 1# & $\{a\}$ & $\emptyset$ & $\emptyset$ & $\{a\}$ \\
+%%     #b = a + 1# & $\{a\}$ & $\{b\}$ & $\{a\}$ & $\{a\}$ \\
+%%     #a = 1# & $\emptyset$ & $\{a\}$ & $\{a\}$ & $\emptyset$ \\
+%%     \bottomrule
+%%   \end{tabular}
+%%   \caption{The $|use|$, $|def|$ and $|live|$ sets computed using equation \ref{eqn_back1} for our example program.}
+%%   \label{tbl_back1}
+%% \end{table}
+
+%% With the live set computed for each statement, our analysis can now
+%% determine which statements to eliminate. Only nodes 1 and 2 in Figure
+%% \ref{fig_back3} perform an assignment. The live set for node 1 (``#a = 1#'')
+%% contains #a#, so we do not eliminate it. In node 2 (``#b = a + 1#''),
+%% the live set does \emph{not} contain #b#. Therefore, we can eliminate
+%% node 2, giving us a new program without any dead code:
+
+%% \begin{Verbatim}
+%% a = 1;
+%% return a + 1;
+%% \end{Verbatim}
 
 \section{Summary}
 \label{sec_back9}
@@ -618,5 +669,6 @@ whatever that means for the particular optimization applied.
 
 \end{document}
 
-% LocalWords:  Dataflow dataflow CFG printf variable's CFGs ccc Uncurrying
-% LocalWords:  liveness
+% LocalWords:  Dataflow dataflow CFG printf variable's CFGs ccc Uncurrying lst
+% LocalWords:  liveness Kildall AhoXX assigna assignb runtime valueOf ccccc lub
+% LocalWords:  incr lcccc

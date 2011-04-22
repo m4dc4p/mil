@@ -1,6 +1,6 @@
 \begin{minipage}{2in}
   \begin{tikzpicture}[>=stealth, node distance=.5in]
-    \node[entex] (entry) {$E$};
+    \node[entex] (entry) {\entryN};
     \node[stmt,
       below of=entry] (assigna) {#a = 1#\labelNode{lst_back2_assigna}};
     \node[labelfor=assigna] () {\refNode{lst_back2_assigna}};
@@ -20,7 +20,7 @@
       below of=true,] (print) {#print(c)#\labelNode{lst_back2_print}};
     \node[labelfor=print] () {\refNode{lst_back2_print}};
     \node[entex,
-      below of=print] (exit) {$X$};
+      below of=print] (exit) {\exitN};
     \draw [->>] (entry) to (assigna);
     \draw [->] (assigna) to (assignb);
     \draw [->] (assignb) to (test);
