@@ -1,12 +1,190 @@
 \documentclass[12pt]{report}
 %include polycode.fmt
+%include lineno\lineno.fmt
 \include{preamble}
 \begin{document}
 \input{document.preamble}
 
-\chapter{Functional Languages}
+\chapter{The \LamA \& Functional Languages}
 \label{ref_chapter_languages}
 
+%% Overall: Justify why the lambda-calculus matters
+%%   * Give syntax and evaluation rules for lambda-case
+%%   * Set the foundation for MIL-to-LC later
+
+John McCarthy created LISP, the first ``functional'' language, in 196X
+\citep{McCarthyXX}. Here, ``functional'' refers to mathematical
+functions, not the fact that it actually worked (though it did that
+quite well too!). This class of languages revolve around defining,
+manipulating and evaluating functions. A function that returns a
+function can be hard to get used to, so some examples may help. First,
+we look at some functions that just compute values -- they do not
+return functions or anything fancy. 
+
+\begin{myfig}[bth]
+  \begin{tabular}{cc}
+  \subfloat{%%
+\begin{minipage}{1in}%%
+> double :: Int -> Int {-"\label{lang_fig1_haskell_sig}"-}
+> double a = 2 * a {-"\label{lang_fig1_haskell_impl}"-}
+\end{minipage}%%
+\label{lang_fig1_haskell}} & %%
+  \subfloat{
+%% \begin{minipage}[1in]
+%%     \begin{lstlisting}[language=ml]%%
+%% double : int -> int *!\label{lang_fig1_ml_sig}!*
+%% double a = 2 * a *!\label{lang_fig1_ml_ref}*!
+%%     \end{lstlisting}%%
+%% \end{minipage}
+\label{lang_fig1_ml}
+  } \\
+  \subref{lang_fig1_haskell} & \subref{lang_fig1_ml} \\
+  \subfloat{%%
+%% \begin{minipage}[1in]
+%%     \begin{lstlisting}[language=scheme]%%
+%% (def double a (* 2 a))
+%%     \end{lstlisting}%%
+%% \end{minipage}
+\label{lang_fig1_scheme}
+  } & \subfloat{%%
+%% \begin{minipage}[1in]
+%%     \begin{lstlisting}[language=javascript]%%
+%% function double(a) { return 2 * a; }
+%%     \end{lstlisting}%%
+%% \end{minipage}
+\label{lang_fig1_js}
+  } \\
+  \subref{lang_fig1_scheme} & \subref{lang_fig1_JS} 
+  \end{tabular}
+  \caption{Definitions of a function that doubles its argument in
+    \subref{lang_fig1_haskell} Haskell, \subref{lang_fig1_ml} ML, 
+    \subref{lang_fig1_scheme} Scheme, and \subref{lang_fig1_js} JavaScript.}
+  \label{lang_fig1}
+\end{myfig}
+
+Figure~\ref{lang_fig1} shows a function that doubles an integer,
+written in Haskell (Part \subref{lang_fig1_haskell}), ML (Part
+\subref{lang_fig1_ml}), Scheme (Part \subref{lang_fig1_scheme}), and
+JavaScript (Part \subref{lang_fig1_js}). Haskell and ML are
+\emph{statically typed} languages, so their definitions begin with a
+\emph{type signature}. Figure~\ref{lang_fig1}, Part
+\ref{lang_fig1_haskell}, gives the Haskell
+version. Line~\ref{lang_fig1_haskell_sig}, ``|double :: Int -> Int|,''
+indicates that the function takes a value of type |Int| and returns an
+|Int| (where |Int| represents an finite-precision integer value
+\citep{HaskellReport}). Line~\ref{lang_fig1_haskell_impl} implements
+|double|. The name comes first, followed by its argument
+(``|a|''). The right-hand side of the equals sign gives the expression
+that will be evaluated when the function is
+applied. Part~\subref{lang_fig1_ml_impl} gives the ML
+implementation. Line~\ref{lang_fig1_ml_impl} gives the type signature
+for \lstinline[language=ml]=double=, ``\lstinline[language=ml]=double
+:: int -> int=,' ' with much the same meaning as the Haskell
+version. The following line gives the implementation of
+\lstinline[language=ml]=double=, again following the Haskell
+pattern. Part \subref{lang_fig1_scheme} gives the Scheme
+defintion. Scheme is a dynamically typed language, so no signatures
+can be given -- just the implementation. The function is introduced by
+the ``\lstinline[language=scheme]=def='' keyword, followed by the
+function name and any arguments (``\lstinline[language=scheme]=double
+a='').  The postfix expression, ``\lstinline[language=scheme]=(* 2
+a)=,'' indicates the argument is doubled when the function is
+applied. Part \subref{lang_fig1_js} shows the JavaScript
+version. JavaScript is also a dynamically typed language, so no type
+signature can be given. All functions are introduced by the
+``\lstinline[language=javascript]=function='' keyword, followed by the
+function name and any arguments. The body of the function, on
+Line~\ref{fig_lang1_js_impl}, uses the
+``\lstinline[language=javascript]=return='' keyword to indicate the
+function doubles its argument and returns the resulting value.
+
+...
+
+\section{Why \LamA?}
+\ref{lang_sec1_}
+
+The \lamA really is the essential functional programming language.  
+That does not mean it is the programming language anyone
+should ever use outside research or theoretical settings. What it
+means is the \lamA has everything you need to model the behavior
+of other programming languages. 
+
+Of course, you could say the same about any Turing-complete
+language. What makes the \lamA special is its simplicity. Nothing is
+built-in, not even the natural numbers. There is almost nothing to get
+in the way of studying your particular domain, rather than fiddling
+with the programming language.
+
+Again, that could be said about any sufficiently simple
+Turing-complete programming language. However, the \lamA is inherently
+functional -- it can only define functions, and all values computed
+are themselves functional. Translating from the \lamA to
+another functional language is usually straightforward (or maybe your
+target language isn't very functional). 
+
+Its power, simplicity, and functional nature make the \lamA so popular
+in functional language research, and motivate our own choice in using
+it. We do not show how to compile a ``real-world'' functional language
+to our intermediate language, but by showing how to compile the 
+\lamA to our language, we show our technique could be used by ``real'' 
+functional languages (with some adaptions, of course).
+
+%% We will be demonstrating a number of dataflow optimizations over
+%% our intermediate language programs, but all of our source programs will
+%% be written in a variant of the \lamA. Any variante
+
+%% A compilation technique demonstrated for
+%% some variant of the \lamA can be translated into any other functional
+%% programming language. Making the translation work well with the syntax
+%% and semantics of the target language is still hard work, but
+%% absolutely possible -- a result developed for the \lamA really is
+%% universal (as far as you want to make use of that result, of course). 
+
+%% It is these three reasons that make the \lamA such a popular
+%% language for showing theoretic (or practical) results
+
+%% This chapter introduces the \lamA calcus, giving its 
+
+%% Most importantly, results obtained
+%% using the \lamA are guaranteed to translate to other Turing-complete
+%% languages -- and usually with better syntax! 
+
+%% Being Turing-complete, the \lamA is capable of exeucting any program
+%% you could write on a modern computer.  
+
+%%  . What it does mean is that anything possible in the \lamA Being
+%% Turing-complete, it can be
+
+%% \emph{\ldots transition
+%%   \ldots}. Most importantly, the \lamA serves as the \emph{lingua
+%%   franca} for functional programmers. It provides a way to translate
+%% between functional programming languages, and a way to carry
+%% developments from one language to another. 
+
+%% so its capabilities are
+%% as powerful as any other Turing-complete programming language. 
+
+%% Being Turing-complete, it can emulate any other
+%% Turing-complete language. Its direct support for manipulating
+%% functions-as-values makes it a good choice for emulating higher-level
+%% functional languages.
+
+%% It is not a language that you want to write many 
+%% programs in, 
+
+%% Its sparse syntax
+%% and straightforward evaluation rules means their is less to worry about
+%% when trying out new design ideas or theories.  . Most importantly, though, 
+
+
+%% Figure~\ref{lang_fig1} defines
+%% a function for adding two numbers in Scheme, ML, Haskell and JavaScript,
+%% some of the more prominent functional languages in use today. 
+
+
+
+
+ 
 %% 1. Relate lambda-calculus to functional langauges in general
 %% 2. Define the lambda-calculus
 %%    * syntax, semantics, evaluation rules
@@ -37,8 +215,7 @@ n$. Using $|adder|$, we can now re-define $|adder1|$ above:
   |adder1| = |adder|\ 1.
 \end{equation}
 
-John McCarthy created LISP, the first functional language, in 196X
-\citep{McCarthyXX}. Other functional languages created since then include 
+Other functional languages created since then include 
 Scheme, ML, Haskell, and many more. While syntax, semantics and capabilities
 differ widely between all these languages, they all share the characteristic
 shown above: \emph{the ability to manipulate functions as first-class values}.
