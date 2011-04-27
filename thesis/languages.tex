@@ -19,11 +19,13 @@ and capabilities differ widely between all these languages, they
 share a common characteristic: \emph{the ability to manipulate
   functions as first-class values}.
 
+\numberson
+\numbersreset
 \begin{myfig}[bth]
   \begin{tabular}{cc}
   \subfloat{%%
     \begin{minipage}{2in}%%
-> double :: Int -> Int {-"\label{lang_fig1_haskell_sig}"-}
+> double :: Float -> Float {-"\label{lang_fig1_haskell_sig}"-}
 > double a = 2 * a {-"\label{lang_fig1_haskell_impl}"-}
     \end{minipage}%%
     \label{lang_fig1_haskell}} & %%
@@ -41,19 +43,20 @@ share a common characteristic: \emph{the ability to manipulate
     \subref{lang_fig1_scheme} Scheme, and \subref{lang_fig1_js} JavaScript.}
   \label{lang_fig1}
 \end{myfig}
+\numbersoff
 
 A function that returns a function can be hard to get used to, so some
 examples may help. First, we look at some functions that just compute
 values -- they do not return functions or anything fancy.
-Figure~\ref{lang_fig1} shows a function that doubles an integer,
+Figure~\ref{lang_fig1} shows a function that doubles a value,
 written in four different functional languages. 
 
 Part \subref{lang_fig1_haskell} gives the Haskell version. Haskell is
 a \emph{statically typed} language, so we begin with a \emph{type
-  signature} on Line~\ref{lang_fig1_haskell_sig}: ``|double :: Int ->
-Int|.'' This signature indicates that |double| takes an argument of
-type |Int| and returns a result, also of type |Int|, where |Int|
-represents a finite-precision integer value
+  signature} on Line~\ref{lang_fig1_haskell_sig}: ``|double :: Float ->
+Float|.'' This signature indicates that |double| takes an argument of
+type |Float| and returns a result, also of type |Float|, where |Float|
+represents a floating-point number
 \citep{HaskellReportXX}. Line~\ref{lang_fig1_haskell_impl} implements
 |double|. The function name comes first, followed by the argument
 (``|a|''). The right-hand side of the equals sign (``|=|'') defines the \emph{body} of the
@@ -62,10 +65,12 @@ to an argument and a result must be computed.
 
 Figure~\ref{lang_fig1}, Part~\subref{lang_fig1_ml}, gives the ML
 implementation. ML is also statically typed, so we start with the type
-signature on Line~\ref{lang_fig1_ml_sig}: #int -> int#. This signature
-has much the same meaning as the Haskell
+signature on Line~\ref{lang_fig1_ml_sig}: #float -> float#. This
+signature has much the same meaning as the Haskell
 version. Line~\ref{lang_fig1_ml_impl} gives the implementation of
-#double#, again following the Haskell pattern.
+#double#. The ``#*.#'' operator represents floating-point
+multiplication. Otherwise, the implementation is much the same as the
+Haskell version.
 
 Figure~\ref{lang_fig1}, Part \subref{lang_fig1_scheme}, gives the
 Scheme definition. Scheme is a dynamically typed language, so no
@@ -89,6 +94,150 @@ on Line~\ref{fig_lang1_js_impl}, uses the ``#return#'' keyword to
 indicate the function doubles its argument and returns the resulting
 value: ``#return 2 * a;#.''
 
+The functions defined in Figure~\ref{lang_fig1} all have one thing in
+common: they are limited to doubling their argument. If we want to
+triple our argument, halve it, zero it or perform any other
+multiplication, then we need to write a new function. Tedious to say
+the least. Fortunately, we can do better.
+
+\numberson
+\numbersreset
+\begin{myfig}
+  \begin{tabular}{cc}
+    \subfloat{\begin{minipage}{3.5in} \numbersreset %%
+> multiplier :: Float -> (Float -> Float)
+> multiplier multiple = 
+>   \a -> multiple * a {-"\label{lang_fig2_hs_fun}"-}
+>
+> double :: Float -> Float
+> double = multiplier 2 {-"\label{lang_fig2_hs_double}"-}
+      \end{minipage}\label{lang_fig2_hs}} & %%
+    \subfloat{\input{lang_fig2_ml}\label{lang_fig2_ml}} \\
+
+    \subref{lang_fig2_hs} & \subref{lang_fig2_ml} \\
+
+    \subfloat{\input{lang_fig2_scheme}\label{lang_fig2_scheme}} & %%
+    \subfloat{\input{lang_fig2_js}\label{lang_fig2_js}} \\
+
+    \subref{lang_fig2_scheme} & \subref{lang_fig2_js} \\
+
+  \end{tabular}
+  \caption{The |multiplier| function and how it can be used to define
+    |double|. When evaluated, |multiplier| returns a function that
+    will multiply its argument by |multiple|. We give
+    \subref{lang_fig2_hs} Haskell, \subref{lang_fig2_ml} ML,
+    \subref{lang_fig2_scheme} Scheme, and \subref{lang_fig2_js}
+    JavaScript versions.}
+  \label{lang_fig2}
+\end{myfig}
+\numbersoff
+
+Figure~\ref{lang_fig2} shows the definition of |multiplier| in the
+same four languages as Figure~\ref{lang_fig1}. When |multiplier| is
+evaluated, it produces a value like any funciton; that value just
+happens to be a function itself! The function returned takes an
+argument and multiplies it by the original multiple given to
+|multiplier|.
+
+Figure~\ref{lang_fig2}, Part~\subref{lang_fig2_hs} gives the Haskell
+version of |multiplier|. The signature, ``|Float -> (Float ->
+Float)|,'' shows that |multiplier| takes one argument, a |Float|
+value, and returns a function (``(|Float ->
+Float)|''). Line~\ref{lang_fig2_hs_fun} creates an \emph{anonymous}
+function: 
+
+> \a -> multiple * a
+
+The anonymous function is introduced with the ``|\|'' (``lambda'')
+symbol, followed by one argument, ``|a|.'' The body of the function
+follows the ``|->|'' (``arrow''). 
+Notice that |multiple| is \emph{not} an argument to the
+function. Instead, it is an argument to |multiplier|. We say
+|multiple| is \emph{captured} by the anonymous function. The anonymous
+function is the value returned by |multiplier|. When that value is
+itself applied to an argument, it will use the value of |multiple|
+originally given to |multiplier|.
+
+On Line~\ref{lang_fig2_hs_double} we use |multiplier| to define the
+|double| function from Figure~\ref{lang_fig2_hs}. The function has
+the same signature, ``|Float -> Float|,'' but no argument:
+
+> double :: Float -> Float
+> double = multiplier 2
+
+If we substitute the definition of
+|multiplier| in |double|, we can see the function |double| represents:
+
+\begin{math}
+  \begin{array}{cc}
+    |double| &= |multiplier 2| \\
+    &= |\a -> 2 * a | 
+  \end{array}
+\end{math}
+
+Notice that the argument |a| appears on the right-hand
+side here, for which reason |double| does not specify an argument
+in Figure~\ref{lang_fig2_hs}.
+
+Figure~\ref{lang_fig2}, Part \subref{lang_fig2_ml} shows the ML
+definition for #multiplier# and #double#. \texttt{multiplier} returns
+the value #f#, which is again a function. Line~\ref{lang_fig2_ml_fun}
+defines #f# as a local, named function:
+
+\begin{AVerb}
+  let f a = a *. multiple
+  in f
+\end{AVerb}
+
+Again, we capture the value of #multiple# when defining
+#f#. When #f# is evaluated, it will multiply its argument by the
+#multiple# given. The definition of #double# on Line~\ref{lang_fig2_ml_double}
+in terms of #multiplier# looks almost exactly the same as the Haskell version.
+
+In Figure~\ref{lang_fig2}, Part \subref{lang_fig2_scheme}, we give the
+Scheme version of #multiplier# and #double#. As in
+Figure~\ref{lang_fig1_scheme}, the body of #multiplier# is a function,
+defined using #lambda#. However, this function returns a
+function, again defined with #lambda#:
+
+\begin{AVerb}
+  (lambda (a) (* multiple a))))
+\end{AVerb}
+
+As in the Haskell and ML versions, the inner function captures the
+value of #multiple# given to the outer function. On
+Line~\ref{lang_fig2_scheme_double} we evaluate the expression
+\texttt{({multiplier} 2)} and assign the result to #double#:
+\begin{AVerb}
+  (define double 
+    (multiplier 2))
+\end{AVerb}
+
+Figure~\ref{lang_fig2}, Part \subref{lang_fig2_js} shows the JavaScript
+version of #multiplier#. The body of #multiplier# returns an anonmous
+function, defined using the #function# keyword without a function name:
+\begin{AVerb}
+  return function(a) \{ 
+    return multiple * a;
+  \};
+\end{AVerb}
+
+Once again, the #multiple# argument is captured and used by the
+returned function. Line~\ref{lang_fig2_js_double} shows how #double#
+is defined in terms of #multiplier#:
+
+\begin{AVerb}
+  var double = multiplier(2);
+\end{AVerb}
+
+The #var# keyword introduces an
+identifier, to which we assign the function returned by
+#multiplier(2)#. In some ways this syntax makes it most obvious that
+we are treating functions as values.
+
+%%  However, that value is itself a 
+%% function. |multilp
+%% evaluated, creates a new function. in our four languages
 
 \section{Why \LamA?}
 \label{lang_sec1_}

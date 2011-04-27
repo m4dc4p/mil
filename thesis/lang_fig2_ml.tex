@@ -1,0 +1,11 @@
+\begin{minipage}{3in}
+  \begin{AVerb}[gobble=4,numbers=left]
+    multiplier : float -> (float -> float)
+    multiplier multiple = 
+      let f a = a *. multiple \label{lang_fig2_ml_fun}
+      in f
+
+    double : float -> float
+    double = multiplier 2 \label{lang_fig2_ml_double}
+  \end{AVerb}
+\end{minipage}
