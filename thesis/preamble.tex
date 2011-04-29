@@ -1,9 +1,9 @@
 \usepackage[T1]{fontenc}
 %% \usepackage{fourier}
 \usepackage{palatino}
-%% \renewcommand\ttdefault{cmtt}
+\renewcommand\ttdefault{lmtt}
 \usepackage{helvet}
-\usepackage{inconsolata}
+%% \usepackage{inconsolata}
 \usepackage{comment}
 \usepackage{calc}
 \usepackage{xspace}
@@ -168,3 +168,10 @@
   codes={\catcode`\_8\catcode`\$3\catcode`\^7},%%
   numberblanklines=false}
 
+%% Turn on line numbers for Haskell code, 
+%% and reset the line number counter.
+\newcommand{\hsNumOn}{\numberson\numbersreset}
+\newcommand{\hsNumOff}{\numbersoff}
+%% Turn on line numbering in Haskell code within
+%% the environment, then turn it off.
+\newenvironment{withHsNum}{\numberson\numbersreset}{\numbersoff}

@@ -19,15 +19,19 @@ and capabilities differ widely between all these languages, they
 share a common characteristic: \emph{the ability to manipulate
   functions as first-class values}.
 
-\numberson
-\numbersreset
+A function that returns a function can be hard to get used to, so some
+examples may help. First, we look at a function that just computes
+a value -- it does not return a function or anything fancy.
+Figure~\ref{lang_fig1} shows ``#mag#'', a function that doubles its value,
+written in four different functional languages. 
+
 \begin{myfig}[bth]
   \begin{tabular}{cc}
   \subfloat{%%
-    \begin{minipage}{2in}%%
-> double :: Float -> Float {-"\label{lang_fig1_haskell_sig}"-}
-> double a = 2 * a {-"\label{lang_fig1_haskell_impl}"-}
-    \end{minipage}%%
+    \begin{minipage}{2in}\begin{withHsNum}%%
+> mag :: Float -> Float {-"\label{lang_fig1_haskell_sig}"-}
+> mag a = 2 * a {-"\label{lang_fig1_haskell_impl}"-}
+    \end{withHsNum}\end{minipage}%%
     \label{lang_fig1_haskell}} & %%
   \subfloat{\input{lang_fig1_ml}\label{lang_fig1_ml}} \\
 
@@ -43,42 +47,46 @@ share a common characteristic: \emph{the ability to manipulate
     \subref{lang_fig1_scheme} Scheme, and \subref{lang_fig1_js} JavaScript.}
   \label{lang_fig1}
 \end{myfig}
-\numbersoff
-
-A function that returns a function can be hard to get used to, so some
-examples may help. First, we look at some functions that just compute
-values -- they do not return functions or anything fancy.
-Figure~\ref{lang_fig1} shows a function that doubles a value,
-written in four different functional languages. 
 
 Part \subref{lang_fig1_haskell} gives the Haskell version. Haskell is
-a \emph{statically typed} language, so we begin with a \emph{type
-  signature} on Line~\ref{lang_fig1_haskell_sig}: ``|double :: Float ->
-Float|.'' This signature indicates that |double| takes an argument of
-type |Float| and returns a result, also of type |Float|, where |Float|
-represents a floating-point number
+a statically typed language, so we begin with a type signature on
+Line~\ref{lang_fig1_haskell_sig}: ``|mag :: Float -> Float|.'' This
+signature indicates that |mag| takes an argument of type |Float| and
+returns a result, also of type |Float|, where |Float| represents a
+floating-point number
 \citep{HaskellReportXX}. Line~\ref{lang_fig1_haskell_impl} implements
-|double|. The function name comes first, followed by the argument
-(``|a|''). The right-hand side of the equals sign (``|=|'') defines the \emph{body} of the
-function: ``|2 * a|.'' The body is evaluated when the function is applied
-to an argument and a result must be computed.
+|mag|. The function name comes first, followed by the argument
+(``|a|''). The right-hand side of the equals sign (``|=|'') defines
+the \emph{body} of the function: ``|2 * a|.'' The body is evaluated
+when the function is applied to an argument and a result must be
+computed.\footnote{Haskell is a \emph{lazy} language, meaning no
+  computations are performed until \emph{demanded}. Therefore, we say
+  the body is evaluated only when a ``result must be computed.''}
 
 Figure~\ref{lang_fig1}, Part~\subref{lang_fig1_ml}, gives the ML
 implementation. ML is also statically typed, so we start with the type
-signature on Line~\ref{lang_fig1_ml_sig}: #float -> float#. This
+signature on Line~\ref{lang_fig1_ml_sig}: ``#float -> float#.'' This
 signature has much the same meaning as the Haskell
 version. Line~\ref{lang_fig1_ml_impl} gives the implementation of
-#double#. The ``#*.#'' operator represents floating-point
+#mag#. The ``#*.#'' operator represents floating-point
 multiplication. Otherwise, the implementation is much the same as the
 Haskell version.
 
 Figure~\ref{lang_fig1}, Part \subref{lang_fig1_scheme}, gives the
 Scheme definition. Scheme is a dynamically typed language, so no
-signatures can be given -- just the implementation. Function
-definitions are introduced by the ``#def#'' keyword, followed by the
-function name and any arguments (``#double a#'').  The postfix
-expression, ``#(* 2 a)#,'' is the body of the function and will be
-evaluated when the function is applied.
+signature can be given -- just the implementation. The expression
+``\texttt{define mag}\ \emph{expr}'' associates \emph{expr} with the
+name ``#mag#.'' The expression in this case, ``\texttt{lambda (a)
+  \ldots)},'' creates a new function that takes one argument, ``#a#.''
+The body of the function, ``#(* 2 a)#,'' shows that the argument will
+be doubled when the function is applied.
+
+%% ``#define#'' keyword
+%% associates a name with a value. The
+%% ``#lambda#'' keyword indicates that a function will be created. The
+%% funciton defined takes only one argument, designated ``#a#.'' The
+%% postfix expression, ``#(* 2 a)#,'' defines the body of the function
+%% and will be evaluated when the function is applied.
 
 Figure~\ref{lang_fig1}, Part \subref{lang_fig1_js}, shows the
 JavaScript version. Line~\ref{lang_fig1_js_def} gives the
@@ -87,9 +95,9 @@ named arguments. JavaScript is also a dynamically typed language, so
 this is \emph{not} a type signature, but rather a specification of how
 to call the function.\footnote{In JavaScript, functions can take more
   arguments than are declared, for which reason we say ``named''
-  arguments here.}  Functions definitions always start with the
+  arguments here.}  Function definitions always start with the
 ``#function#'' keyword, followed by the function name and any
-named arguments in parentheses: ``#double (a)#''. The body of the function,
+named arguments in parentheses: ``#mag (a)#''. The body of the function,
 on Line~\ref{fig_lang1_js_impl}, uses the ``#return#'' keyword to
 indicate the function doubles its argument and returns the resulting
 value: ``#return 2 * a;#.''
@@ -97,20 +105,65 @@ value: ``#return 2 * a;#.''
 The functions defined in Figure~\ref{lang_fig1} all have one thing in
 common: they are limited to doubling their argument. If we want to
 triple our argument, halve it, zero it or perform any other
-multiplication, then we need to write a new function. Tedious to say
-the least. Fortunately, we can do better.
+multiplication, then we need to write a new function.
 
-\numberson
-\numbersreset
+Of course, we can write a function that takes two arguments, the
+multiplier and the argument. For example, in JavaScript:
+\begin{AVerb}
+function magBy(multiple, a) \{
+  return multiple * a;
+\}
+\end{AVerb}
+But this limits us from re-using ``#magBy#'' in certain ways. 
+
+Imagine a function that wants to apply ``#magBy#'' to all items in a
+list:\footnote{In this fragment, #items# is an array of values,
+  accessed by index. We enumerate it using a #for# loop much like the
+  that found in the C language.}
+\begin{AVerb}
+function magAll(items, multiple) \{
+  for(var i = 0; i < items.length(); i++)
+    items[i] = magBy(multiple, items[i]);
+\}
+\end{AVerb}
+This definition creates two problems:
+\begin{enumerate}
+\item Every call to ``#magAll#'' requires us to specify a value for
+  ``#multiple#.'' 
+\item Our function is limited to using ``#magBy#.'' If ``#magBy#''
+  isn't appropriate for some situation, we need to write a new
+  ``#magAll#'' that uses a different version.
+\end{enumerate}
+We solve these two problems by making ``#magBy#'' a \emph{parameter}
+to ``#magAll#.'' In pictures, we create a ``hole'' in ``#magAll#''
+that we fill with code passed in:
+\begin{AVerb}
+function magAll(items, \emph{<code>}) \{
+  for(var i = 0; i < items.length(); i++)
+    items[i] = \emph{<code>};
+\}
+\end{AVerb}
+The ``\emph{<code>}'' argument precisely illustrates how 
+functional languages treat ``functions as values.''
+
+Figure~\ref{lang_fig2} shows the definition of |multiplier| in the
+same four languages as Figure~\ref{lang_fig1}, as well as a re-definition
+of ``|mag|'' in terms of ``|multiplier|.'' When |multiplier| is
+evaluated, it produces a value like any function; that value just
+happens to be a function itself! The function returned takes an
+argument and multiplies it by the original multiple given to
+|multiplier|.
+
 \begin{myfig}
   \begin{tabular}{cc}
-    \subfloat{\begin{minipage}{3.5in} \numbersreset %%
+    \subfloat{\begin{minipage}{3.5in}\begin{withHsNum} %%
 > multiplier :: Float -> (Float -> Float)
 > multiplier multiple = 
 >   \a -> multiple * a {-"\label{lang_fig2_hs_fun}"-}
 >
-> double :: Float -> Float
-> double = multiplier 2 {-"\label{lang_fig2_hs_double}"-}
+> mag :: Float -> Float
+> mag = multiplier 2 {-"\label{lang_fig2_hs_mag}"-}
+        \end{withHsNum}
       \end{minipage}\label{lang_fig2_hs}} & %%
     \subfloat{\input{lang_fig2_ml}\label{lang_fig2_ml}} \\
 
@@ -123,25 +176,17 @@ the least. Fortunately, we can do better.
 
   \end{tabular}
   \caption{The |multiplier| function and how it can be used to define
-    |double|. When evaluated, |multiplier| returns a function that
+    |mag|. When evaluated, |multiplier| returns a function that
     will multiply its argument by |multiple|. We give
     \subref{lang_fig2_hs} Haskell, \subref{lang_fig2_ml} ML,
     \subref{lang_fig2_scheme} Scheme, and \subref{lang_fig2_js}
     JavaScript versions.}
   \label{lang_fig2}
 \end{myfig}
-\numbersoff
-
-Figure~\ref{lang_fig2} shows the definition of |multiplier| in the
-same four languages as Figure~\ref{lang_fig1}. When |multiplier| is
-evaluated, it produces a value like any funciton; that value just
-happens to be a function itself! The function returned takes an
-argument and multiplies it by the original multiple given to
-|multiplier|.
 
 Figure~\ref{lang_fig2}, Part~\subref{lang_fig2_hs} gives the Haskell
-version of |multiplier|. The signature, ``|Float -> (Float ->
-Float)|,'' shows that |multiplier| takes one argument, a |Float|
+version of ``|multiplier|.'' The signature, ``|Float -> (Float ->
+Float)|,'' shows that ``|multiplier|'' takes one argument, a ``|Float|''
 value, and returns a function (``(|Float ->
 Float)|''). Line~\ref{lang_fig2_hs_fun} creates an \emph{anonymous}
 function: 
@@ -150,37 +195,37 @@ function:
 
 The anonymous function is introduced with the ``|\|'' (``lambda'')
 symbol, followed by one argument, ``|a|.'' The body of the function
-follows the ``|->|'' (``arrow''). 
-Notice that |multiple| is \emph{not} an argument to the
+follows the arrow (``|->|''). 
+Notice that ``|multiple|'' is \emph{not} an argument to this
 function. Instead, it is an argument to |multiplier|. We say
 |multiple| is \emph{captured} by the anonymous function. The anonymous
 function is the value returned by |multiplier|. When that value is
 itself applied to an argument, it will use the value of |multiple|
 originally given to |multiplier|.
 
-On Line~\ref{lang_fig2_hs_double} we use |multiplier| to define the
-|double| function from Figure~\ref{lang_fig2_hs}. The function has
+On Line~\ref{lang_fig2_hs_mag} we use |multiplier| to define the
+|mag| function from Figure~\ref{lang_fig2_hs}. The function has
 the same signature, ``|Float -> Float|,'' but no argument:
 
-> double :: Float -> Float
-> double = multiplier 2
+> mag :: Float -> Float
+> mag = multiplier 2
 
 If we substitute the definition of
-|multiplier| in |double|, we can see the function |double| represents:
+|multiplier| in |mag|, we can see the function |mag| represents:
 
 \begin{math}
   \begin{array}{cc}
-    |double| &= |multiplier 2| \\
+    |mag| &= |multiplier 2| \\
     &= |\a -> 2 * a | 
   \end{array}
 \end{math}
 
 Notice that the argument |a| appears on the right-hand
-side here, for which reason |double| does not specify an argument
+side here, for which reason |mag| does not specify an argument
 in Figure~\ref{lang_fig2_hs}.
 
 Figure~\ref{lang_fig2}, Part \subref{lang_fig2_ml} shows the ML
-definition for #multiplier# and #double#. \texttt{multiplier} returns
+definition for #multiplier# and #mag#. \texttt{multiplier} returns
 the value #f#, which is again a function. Line~\ref{lang_fig2_ml_fun}
 defines #f# as a local, named function:
 
@@ -189,16 +234,16 @@ defines #f# as a local, named function:
   in f
 \end{AVerb}
 
-Again, we capture the value of #multiple# when defining
-#f#. When #f# is evaluated, it will multiply its argument by the
-#multiple# given. The definition of #double# on Line~\ref{lang_fig2_ml_double}
-in terms of #multiplier# looks almost exactly the same as the Haskell version.
+Again, we capture the value of #multiple# when defining #f#. When #f#
+is evaluated, it will multiply its argument by the #multiple#
+given. The definition of #mag# on Line~\ref{lang_fig2_ml_mag} in terms
+of #multiplier# looks almost exactly the same as the Haskell version.
 
 In Figure~\ref{lang_fig2}, Part \subref{lang_fig2_scheme}, we give the
-Scheme version of #multiplier# and #double#. As in
+Scheme version of #multiplier# and #mag#. As in
 Figure~\ref{lang_fig1_scheme}, the body of #multiplier# is a function,
-defined using #lambda#. However, this function returns a
-function, again defined with #lambda#:
+defined using #lambda#. However, this function returns a function,
+again defined with #lambda#:
 
 \begin{AVerb}
   (lambda (a) (* multiple a))))
@@ -206,10 +251,10 @@ function, again defined with #lambda#:
 
 As in the Haskell and ML versions, the inner function captures the
 value of #multiple# given to the outer function. On
-Line~\ref{lang_fig2_scheme_double} we evaluate the expression
-\texttt{({multiplier} 2)} and assign the result to #double#:
+Line~\ref{lang_fig2_scheme_mag} we evaluate the expression
+\texttt{({multiplier} 2)} and assign the result to #mag#:
 \begin{AVerb}
-  (define double 
+  (define mag 
     (multiplier 2))
 \end{AVerb}
 
@@ -223,17 +268,44 @@ function, defined using the #function# keyword without a function name:
 \end{AVerb}
 
 Once again, the #multiple# argument is captured and used by the
-returned function. Line~\ref{lang_fig2_js_double} shows how #double#
+returned function. Line~\ref{lang_fig2_js_mag} shows how #mag#
 is defined in terms of #multiplier#:
 
 \begin{AVerb}
-  var double = multiplier(2);
+  var mag*.te = multiplier(2);
 \end{AVerb}
 
 The #var# keyword introduces an
 identifier, to which we assign the function returned by
 #multiplier(2)#. In some ways this syntax makes it most obvious that
 we are treating functions as values.
+
+Returning to #magAll#, we can redefine it to take a function argument:
+\begin{AVerb}
+function magAll(items, magnifier) \{
+  for(var i = 0; i < items.length(); i++)
+    items[i] = magnifier(i);
+\}
+\end{AVerb}
+Here, #magnifier# is a function, passed as an argument. If 
+we wish to double the items in the array, we just pass #double#
+to #magAll#:
+\begin{AVerb}
+  magAll(items, double);
+\end{AVerb}
+To multiply the items however we need, we just create appropraite
+\emph{function values} and pass them to #magAll#:
+\begin{AVerb}
+  var halve = multiplier(0.5);
+  var quadruple = multiplier(4);
+  magAll(items, quadruple);
+  magAll(items, halve);
+\end{AVerb}
+We can even pass an \emph{anonymous function} directly to 
+#magAll#, as here where we halve the values again:
+\begin{AVerb}
+  magAll(items, function (i) \{ return i * 0.5; \});
+\end{AVerb}
 
 %%  However, that value is itself a 
 %% function. |multilp
