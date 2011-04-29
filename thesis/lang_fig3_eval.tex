@@ -1,0 +1,19 @@
+\begin{minipage}{2in}
+  \begin{AVerb}
+    $t_1$ $t_2$
+   --------- E-App1
+    $t_1$ v
+
+    $t_1$ $v_2$
+   --------- E-App1
+    $v_1$ $v_2$
+
+   ($\lambda$ x . t) v
+  -------------------- E-Abs
+ $\lambda$ x . ([v/x] t)
+
+   $\lambda$ x . t
+  ------------------ E-Val
+   $\lambda$ x . v
+  \end{AVerb}
+\end{minipage}

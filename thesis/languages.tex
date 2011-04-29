@@ -15,15 +15,26 @@
 John McCarthy created LISP, the first ``functional'' language, in 196X
 \citep{McCarthyXX}. Other functional languages created since then
 include Scheme, ML, Haskell, and many more. While syntax, semantics
-and capabilities differ widely between all these languages, they 
-share a common characteristic: \emph{the ability to manipulate
-  functions as first-class values}.
+and capabilities differ widely between all these languages, they share
+a common characteristic: \emph{functions are values}.  This chapter
+explains what that means and introduces the language we will use to
+write our programs. Section~\ref{lang_sec2} introduces the basic idea
+of treating functions as values through examples in four different
+functional languages: Haskell, Scheme, ML and
+JavaScript. Section~\ref{lang_sec1} introduces the syntax and
+semantics of the \lamA -- in some ways the simplest possible
+functional programming language. We then describe \lamC in
+Section~\ref{lang_sec4}, a variant of the \lamA that we will be using
+throughout the remainder of this thesis. We summarize our chapter in
+Section~\ref{lang_sec5}.
 
-A function that returns a function can be hard to get used to, so some
-examples may help. First, we look at a function that just computes
-a value -- it does not return a function or anything fancy.
-Figure~\ref{lang_fig1} shows ``#mag#'', a function that doubles its value,
-written in four different functional languages. 
+\section{Introductory Example}
+\label{lang_sec2}
+A function that returns a function can be hard to get used to, so we
+first look at a function that just computes a value -- it does not
+return a function or anything fancy.  Figure~\ref{lang_fig1} shows
+``#mag#,'' a function that doubles its value, written in four
+different functional languages.
 
 \begin{myfig}[bth]
   \begin{tabular}{cc}
@@ -50,22 +61,21 @@ written in four different functional languages.
 
 Part \subref{lang_fig1_haskell} gives the Haskell version. Haskell is
 a statically typed language, so we begin with a type signature on
-Line~\ref{lang_fig1_haskell_sig}: ``|mag :: Float -> Float|.'' This
+Line~\ref{lang_fig1_haskell_sig}: |mag :: Float -> Float|. This
 signature indicates that |mag| takes an argument of type |Float| and
-returns a result, also of type |Float|, where |Float| represents a
-floating-point number
-\citep{HaskellReportXX}. Line~\ref{lang_fig1_haskell_impl} implements
-|mag|. The function name comes first, followed by the argument
-(``|a|''). The right-hand side of the equals sign (``|=|'') defines
-the \emph{body} of the function: ``|2 * a|.'' The body is evaluated
-when the function is applied to an argument and a result must be
-computed.\footnote{Haskell is a \emph{lazy} language, meaning no
-  computations are performed until \emph{demanded}. Therefore, we say
-  the body is evaluated only when a ``result must be computed.''}
+returns a result, also of type
+|Float|. Line~\ref{lang_fig1_haskell_impl} implements |mag|. The
+function name comes first, followed by the argument (|a|). The
+right-hand side of the equals sign defines the \emph{body} of the
+function: |2 * a|. The body is evaluated when the function is applied
+to an argument and a result must be computed.\footnote{Haskell is a
+  \emph{lazy} language, meaning no computations are performed until
+  demanded. Therefore, we say the body is evaluated only when a
+  ``result must be computed.''}
 
 Figure~\ref{lang_fig1}, Part~\subref{lang_fig1_ml}, gives the ML
 implementation. ML is also statically typed, so we start with the type
-signature on Line~\ref{lang_fig1_ml_sig}: ``#float -> float#.'' This
+signature on Line~\ref{lang_fig1_ml_sig}: #float -> float#. This
 signature has much the same meaning as the Haskell
 version. Line~\ref{lang_fig1_ml_impl} gives the implementation of
 #mag#. The ``#*.#'' operator represents floating-point
@@ -93,14 +103,13 @@ JavaScript version. Line~\ref{lang_fig1_js_def} gives the
 \emph{signature} of the function -- the name of the function and any
 named arguments. JavaScript is also a dynamically typed language, so
 this is \emph{not} a type signature, but rather a specification of how
-to call the function.\footnote{In JavaScript, functions can take more
-  arguments than are declared, for which reason we say ``named''
-  arguments here.}  Function definitions always start with the
+to call the function.\footnote{We say ``named'' here because JavaScript functions
+can take more arguments than declared.}  Function definitions always start with the
 ``#function#'' keyword, followed by the function name and any
-named arguments in parentheses: ``#mag (a)#''. The body of the function,
+named arguments in parentheses: #mag (a)#. The body of the function,
 on Line~\ref{fig_lang1_js_impl}, uses the ``#return#'' keyword to
 indicate the function doubles its argument and returns the resulting
-value: ``#return 2 * a;#.''
+value: #return 2 * a#.
 
 The functions defined in Figure~\ref{lang_fig1} all have one thing in
 common: they are limited to doubling their argument. If we want to
@@ -131,28 +140,27 @@ This definition creates two problems:
 \item Every call to ``#magAll#'' requires us to specify a value for
   ``#multiple#.'' 
 \item Our function is limited to using ``#magBy#.'' If ``#magBy#''
-  isn't appropriate for some situation, we need to write a new
+  is not appropriate for some situation, we need to write a new
   ``#magAll#'' that uses a different version.
 \end{enumerate}
 We solve these two problems by making ``#magBy#'' a \emph{parameter}
-to ``#magAll#.'' In pictures, we create a ``hole'' in ``#magAll#''
-that we fill with code passed in:
+to ``#magAll#.'' It is something like creating a ``hole'' in the
+definition of ``#magAll#'', where we can put code that is passed in as
+an argument:
 \begin{AVerb}
 function magAll(items, \emph{<code>}) \{
   for(var i = 0; i < items.length(); i++)
     items[i] = \emph{<code>};
 \}
 \end{AVerb}
-The ``\emph{<code>}'' argument precisely illustrates how 
-functional languages treat ``functions as values.''
+The ``\emph{<code>}'' argument illustrates how functional languages
+treat ``functions as values.''
 
-Figure~\ref{lang_fig2} shows the definition of |multiplier| in the
-same four languages as Figure~\ref{lang_fig1}, as well as a re-definition
-of ``|mag|'' in terms of ``|multiplier|.'' When |multiplier| is
-evaluated, it produces a value like any function; that value just
-happens to be a function itself! The function returned takes an
-argument and multiplies it by the original multiple given to
-|multiplier|.
+Figure~\ref{lang_fig2} shows the definition of |mag| in terms of a
+new function, |multiplier|.  When |multiplier| is evaluated, it
+produces a value like any function; that value just happens to be a
+function itself! The function returned takes an argument and
+multiplies it by the original multiple given to |multiplier|.
 
 \begin{myfig}
   \begin{tabular}{cc}
@@ -185,27 +193,25 @@ argument and multiplies it by the original multiple given to
 \end{myfig}
 
 Figure~\ref{lang_fig2}, Part~\subref{lang_fig2_hs} gives the Haskell
-version of ``|multiplier|.'' The signature, ``|Float -> (Float ->
-Float)|,'' shows that ``|multiplier|'' takes one argument, a ``|Float|''
-value, and returns a function (``(|Float ->
-Float)|''). Line~\ref{lang_fig2_hs_fun} creates an \emph{anonymous}
-function: 
+version of |multiplier|. The signature, |Float -> (Float -> Float)|,
+shows that |multiplier| takes one argument, a |Float| value, and
+returns a functio,n (|Float -> Float)|. The implementation on Line~\ref{lang_fig2_hs_fun}
+usea an \emph{anonymous} function:
 
 > \a -> multiple * a
 
-The anonymous function is introduced with the ``|\|'' (``lambda'')
-symbol, followed by one argument, ``|a|.'' The body of the function
-follows the arrow (``|->|''). 
-Notice that ``|multiple|'' is \emph{not} an argument to this
-function. Instead, it is an argument to |multiplier|. We say
-|multiple| is \emph{captured} by the anonymous function. The anonymous
-function is the value returned by |multiplier|. When that value is
-itself applied to an argument, it will use the value of |multiple|
-originally given to |multiplier|.
+The anonymous function is introduced with the |\| (``lambda'') symbol,
+followed by the function's argument, |a|. The body of the function
+follows the arrow.  Notice that |multiple| is \emph{not} an
+argument to this function. Instead, it is an argument to
+|multiplier|. We say |multiple| is \emph{captured} by the anonymous
+function. The anonymous function is the value returned by
+|multiplier|. When that value is itself applied to an argument, it
+will use the value of |multiple| originally given to |multiplier|.
 
 On Line~\ref{lang_fig2_hs_mag} we use |multiplier| to define the
 |mag| function from Figure~\ref{lang_fig2_hs}. The function has
-the same signature, ``|Float -> Float|,'' but no argument:
+the same signature, |Float -> Float|, but no argument:
 
 > mag :: Float -> Float
 > mag = multiplier 2
@@ -224,7 +230,7 @@ Notice that the argument |a| appears on the right-hand
 side here, for which reason |mag| does not specify an argument
 in Figure~\ref{lang_fig2_hs}.
 
-Figure~\ref{lang_fig2}, Part \subref{lang_fig2_ml} shows the ML
+Figure~\ref{lang_fig2}, Part \subref{lang_fig2_ml,} shows the ML
 definition for #multiplier# and #mag#. \texttt{multiplier} returns
 the value #f#, which is again a function. Line~\ref{lang_fig2_ml_fun}
 defines #f# as a local, named function:
@@ -260,7 +266,7 @@ Line~\ref{lang_fig2_scheme_mag} we evaluate the expression
 
 Figure~\ref{lang_fig2}, Part \subref{lang_fig2_js} shows the JavaScript
 version of #multiplier#. The body of #multiplier# returns an anonmous
-function, defined using the #function# keyword without a function name:
+function, defined by using the #function# keyword without a name:
 \begin{AVerb}
   return function(a) \{ 
     return multiple * a;
@@ -272,13 +278,12 @@ returned function. Line~\ref{lang_fig2_js_mag} shows how #mag#
 is defined in terms of #multiplier#:
 
 \begin{AVerb}
-  var mag*.te = multiplier(2);
+  var mag = multiplier(2);
 \end{AVerb}
 
-The #var# keyword introduces an
-identifier, to which we assign the function returned by
-#multiplier(2)#. In some ways this syntax makes it most obvious that
-we are treating functions as values.
+The #var# keyword introduces an identifier, to which we assign the
+function returned by #multiplier(2)#. In some ways this syntax makes
+it most obvious that we are treating functions as values.
 
 Returning to #magAll#, we can redefine it to take a function argument:
 \begin{AVerb}
@@ -307,38 +312,10 @@ We can even pass an \emph{anonymous function} directly to
   magAll(items, function (i) \{ return i * 0.5; \});
 \end{AVerb}
 
+\emph{\ldots Signposts and Transition \ldots}
 %%  However, that value is itself a 
 %% function. |multilp
 %% evaluated, creates a new function. in our four languages
-
-\section{Why \LamA?}
-\label{lang_sec1_}
-
-The \lamA really is the essential functional programming language.  
-That does not mean it is the programming language anyone
-should ever use outside research or theoretical settings. What it
-means is the \lamA has everything you need to model the behavior
-of other programming languages. 
-
-Of course, you could say the same about any Turing-complete
-language. What makes the \lamA special is its simplicity. Nothing is
-built-in, not even the natural numbers. There is almost nothing to get
-in the way of studying your particular domain, rather than fiddling
-with the programming language.
-
-Again, that could be said about any sufficiently simple
-Turing-complete programming language. However, the \lamA is inherently
-functional -- it can only define functions, and all values computed
-are themselves functional. Translating from the \lamA to
-another functional language is usually straightforward (or maybe your
-target language isn't very functional). 
-
-Its power, simplicity, and functional nature make the \lamA so popular
-in functional language research, and motivate our own choice in using
-it. We do not show how to compile a ``real-world'' functional language
-to our intermediate language, but by showing how to compile the 
-\lamA to our language, we show our technique could be used by ``real'' 
-functional languages (with some adaptions, of course).
 
 %% We will be demonstrating a number of dataflow optimizations over
 %% our intermediate language programs, but all of our source programs will
@@ -432,6 +409,7 @@ functional languages (with some adaptions, of course).
 %% shown above: \emph{the ability to manipulate functions as first-class values}.
 
 \section{The \LamA}
+\label{lang_sec1}
 %%\emph{Why is it important}
 
 %%\emph{What is the \lamA}
@@ -439,30 +417,105 @@ functional languages (with some adaptions, of course).
 Alonzo Church defined his \lamA (``lambda calculus'') in 19XX
 \citep{ChurchXX} to study systems of recursive equations. Being
 Turing-complete, it can be used to model the behavior of any
-computational system. However, it is particularly useful for modeling
-functional programming languages. %% why?
+computational system. Like Turing machines, the \lamA is \emph{not}
+``programming language'' in any practical sense, but it has proved
+incredibly useful when modelling the behavior of other functional
+programming languages.
 
-Figure \ref{lang_fig2} gives a syntax for the ``pure''
-\lamA. ``Abstraction'' defines a new function, while ``application''
-gives a particular argument to a function. ``Variables'' are defined
-when mentioned. 
+In the ``pure'' \lamA, \emph{everything} is a function -- there are no
+other values. Figure \ref{lang_fig3}, Part \subref{lang_fig3_syntax}, gives the syntax of the pure
+\lamA: ``abstraction'' defines a new function; ``application'' can
+evaluate a function with a given argument; ``variables'' are
+introduced by abstractions, but have no structure or intrinsic value. 
+
+Part \subref{lang_fig3_eval} shows to evaluate \lamA terms. Each rule
+should be read top-to-bottom. When a term matches the top of the rule,
+we rewrite according to the bottom portion. Each \texttt{\emph{t}}
+stands for an arbitrarily large term -- meaning we can ``match'' the
+portions in typewriter font, while ``parameterizing'' over
+\texttt{\emph{t}}. These rules show ``call-by-value'' style, where
+arguments are evaluated before functions. Other styles include
+``call-by-need'' and ``call-by-name,'' where arguments are only
+evaluated as needed, but we do not address them here.
+
+The {\sc E-App1} and {\sc E-App2} rules show that terms must be
+reduced to values before application can be applied. {\sc E-App1}
+ensures that the argument ($t_2$) is reduce to a value before the
+function ($t_1$) is applied.  Each $v$ represents a value -- a term
+that cannot be reduced any further. {\sc E-Abs} shows how arguments
+are substituted in the body of an abstraction: the notation $[v/x] t$
+means we replace all occurrences of $x$ in $t$ with $v$. There are
+many subtle issues that arise when arguments have the same names as
+parameters, but we do not need to worry about them here. {\sc E-Val}
+lets us continue to reduce any terms found inside a $\lambda$ if
+needed.  Notice, however, that no rule will match $\lambda$ terms
+(i.e., abstractions) except when applied to an argument or when their
+body is not fully evaulated: $\lambda$ terms are our values.
 
 \begin{myfig}[ht]
-  \begin{equation*}
-    \begin{aligned}
-      \mathit{term} &= a, b, \ldots & \text{\emph{(Variables})} \\
-      &= \lamAbs{x}{t} & \text{\emph{(Abstraction)}} \\
-      &= \lamApp{t}{t} & \text{\emph{(Application)}}
-    \end{aligned}
-  \end{equation*}
-  \caption{The \lamA' syntax. A term can be a \emph{variable}, \emph{abstraction},
-  or \emph{application}. When $t$ appears, it means a term can be substituted. Other
-  letters stand for variables. In the case of \emph{abstraction}, $x$ always stands
-  for a single variable.}
-  \label{lang_fig2}
+  \begin{tabular}{cc}
+    \subfloat{\input{lang_fig3_syntax}\label{lang_fig3_syntax}} & %%
+    \subfloat{\input{lang_fig3_eval}\label{lang_fig3_eval}} \\
+    \subref{lang_fig3_syntax} & \subref{lang_fig3_eval}
+  \end{tabular}
+  \caption{In \subref{lang_fig3_syntax}, the \lamA' syntax;
+    \subref{lang_fig3_eval} shows how to evaluate \lamA terms using
+    the \emph{call-by-value} (or \emph{strict}) style.}
+  \label{lang_fig3}
 \end{myfig}
 
 %%\emph{What does it look like?}
+Simple as it is, the pure \lamA can be used to represent a number of
+common data structures. For example, the natural numbers (0, 1, 2,
+\ldots) can be represented by a series of ``successors'' of zero. Note
+that function application is right-associative, meaning
+\lamPApp{s}{\lamPApp{s}{z}} is the same as \lamApp{\lamApp{s}{s}}{z},
+but \emph{not} the same as \lamPApp{\lamPApp{s}{s}}{z}:
+\begin{equation*}
+  \begin{split}
+    0 &= \lamAbs{s}{\lamAbs{z}{z}} \\
+    1 &= \lamAbs{s}{\lamAbs{z}{\lamApp{s}{z}}} \\
+    2 &= \lamAbs{s}{\lamAbs{z}{\lamApp{s}{\lamApp{s}{z}}}} \\
+    \ldots
+  \end{split}
+\end{equation*}
+In other words, the number of applications of $s$ gives the natural
+number represented by the function. 
+
+This representation allows
+us to define a number of common arithmetic operations. We start 
+with the \emph{successor} function, which always adds 1 to its
+argument:
+\begin{equation}
+  \mathit{succ} = \lamAbs{n}{\lamAbs{s}{\lamAbs{z}{\lamApp{s}{\lamApp{n}{z}}}}}
+\end{equation}
+
+%% \s. \z. z
+%% \s. \z. s z
+%% \s. \z. s s z
+
+%% \n. \s. \z. s (n z)
+
+%% succ (\s. \z. z)
+%%   = \s. \z. s ((\s. \z. z) z)
+%%   = \s. \z. s ((\z. z))
+%%   = \s. \z. s z
+
+Nothing is built-in,
+not even the natural numbers. There is almost nothing to get in the
+way of studying your particular domain, rather than fiddling with the
+programming language. However, the \lamA is inherently functional --
+it can only define functions, and all values computed are really
+functions. Translating from the \lamA to another functional language
+is usually straightforward.\footnote{And, if not, maybe your target
+  language isn't very functional.}
+
+Its power, simplicity, and functional nature of the \lamA motivates
+our own choice in using it. We do not show how to compile a
+``real-world'' functional language to our intermediate language, but
+by showing how to compile the \lamA to our language, we show our
+technique could be used by ``real'' functional languages (with some
+adaptions, of course).
 
 Using this syntax, we can define some common functions. |Identity|
 returns its argument:
@@ -507,24 +560,27 @@ itself. Other variants include \emph{call-by-need} and
 \emph{call-by-name}, where arguments are not evaluated until
 needed. We do not considers those variants further, however.
 
-\section{Compiling the \LamA}
-\label{sec_lang1}
+%% \section{Why \LamA?}
+%% \label{lang_sec1}
 
-%% Define which steps in compilation we're going to worry about
-Compiling even a language as simple as the \lamA involves a number of
-steps, such as defining a concrete syntax, parsing source programs
-into an abstract syntax tree (AST), and producing an executable
-program from the AST. For our purposes, however, we just focus on the
-\lamA' three fundamental operations:
+%% \section{Compiling the \LamA}
+%% \label{sec_lang1}
 
-\begin{itemize}
-\item Naming values (\emph{variables}).
-\item Apply a function to an argument (\emph{application}).
-\item Create a new function (\emph{abstraction}). 
-\end{itemize}
+%% %% Define which steps in compilation we're going to worry about
+%% Compiling even a language as simple as the \lamA involves a number of
+%% steps, such as defining a concrete syntax, parsing source programs
+%% into an abstract syntax tree (AST), and producing an executable
+%% program from the AST. For our purposes, however, we just focus on the
+%% \lamA' three fundamental operations:
 
-Any compiler for the \lamA must be able to produce executable programs
-which implement these operations. 
+%% \begin{itemize}
+%% \item Naming values (\emph{variables}).
+%% \item Apply a function to an argument (\emph{application}).
+%% \item Create a new function (\emph{abstraction}). 
+%% \end{itemize}
+
+%% Any compiler for the \lamA must be able to produce executable programs
+%% which implement these operations. 
 
 %% \subsection{The Target Machine}
 %% We begin by defining a \emph{target machine}, |M|, for our compiler. To
@@ -581,94 +637,94 @@ which implement these operations.
 %% \end{description}
 %% The following sections describe each aspect in detail.
 
-\subsection{Variables}
-\label{subsec_lang1}
+%% \subsection{Variables}
+%% \label{subsec_lang1}
 
 %% Free variables and environment
-Consider how to find a value by its name. For example, consider
-the |compose| function (expression \ref{eq_lang3}):
-\begin{equation}
-  \lamCompose.  \label{eq_lang1}
-\end{equation}
-We see three variables: $f$, $g$, and $x$. We say $x$ is \emph{bound},
-because it is given as an argument, and that $f$ and $g$ are
-\emph{free} because, in this context, they are not arguments in a 
-$\lambda$-abstraction. To evaluate this expression, though, we need
-a way to find the values of these terms.  
+%% Consider how to find a value by its name. For example, consider
+%% the |compose| function (expression \ref{eq_lang3}):
+%% \begin{equation}
+%%   \lamCompose.  \label{eq_lang1}
+%% \end{equation}
+%% We see three variables: $f$, $g$, and $x$. We say $x$ is \emph{bound},
+%% because it is given as an argument, and that $f$ and $g$ are
+%% \emph{free} because, in this context, they are not arguments in a 
+%% $\lambda$-abstraction. To evaluate this expression, though, we need
+%% a way to find the values of these terms.  
 
-We can describe where to find $f, g$ and $x$ in terms of memory
-locations. We can say that $x$ will appear in a special location,
-|arg|, because it is the argument to the function and we will always
-put arguments in the same place. We can further say that another
-special location, |clo|, will have two
-slots. The first will contain $g$ and the second will contain
-$f$. Conceptually, then, our expression can be represented as:
-\begin{center}
-  \begin{tabular}{c}
-    \begin{math}\begin{aligned}[b]
-      |arg| &= x, \\
-      |clo|[0] &= g, \\
-      |clo|[1] &= f 
-    \end{aligned}\text{\ in}\end{math} \\
-    \lamAbs{|arg|}{\lamApp{|clo|[1]}{\lamPApp{|clo|[0]}{arg}}}.
-  \end{tabular}
-\end{center}
+%% We can describe where to find $f, g$ and $x$ in terms of memory
+%% locations. We can say that $x$ will appear in a special location,
+%% |arg|, because it is the argument to the function and we will always
+%% put arguments in the same place. We can further say that another
+%% special location, |clo|, will have two
+%% slots. The first will contain $g$ and the second will contain
+%% $f$. Conceptually, then, our expression can be represented as:
+%% \begin{center}
+%%   \begin{tabular}{c}
+%%     \begin{math}\begin{aligned}[b]
+%%       |arg| &= x, \\
+%%       |clo|[0] &= g, \\
+%%       |clo|[1] &= f 
+%%     \end{aligned}\text{\ in}\end{math} \\
+%%     \lamAbs{|arg|}{\lamApp{|clo|[1]}{\lamPApp{|clo|[0]}{arg}}}.
+%%   \end{tabular}
+%% \end{center}
 
-\par
-In general, the $|clo|$ location holds the \emph{environment} for our
-expression. For any given expression, we will be able to find all the
-free variables (i.e., all those except the argument) in the
-environment. The compiler will be responsible for ensuring the correct
-environment is available whenever a given expression is evaluated.
+%% \par
+%% In general, the $|clo|$ location holds the \emph{environment} for our
+%% expression. For any given expression, we will be able to find all the
+%% free variables (i.e., all those except the argument) in the
+%% environment. The compiler will be responsible for ensuring the correct
+%% environment is available whenever a given expression is evaluated.
 
 %% Our machine, then, must have instructions for storing and retrieving
 %% values. #Store# and #Load# (from Table \ref{tbl_lang1}) serve this
 %% purpose. 
 
-\subsection{Function Application}
-\label{subsec_lang2}
+%% \subsection{Function Application}
+%% \label{subsec_lang2}
 
 %% Application & closures
-Associating locations with names is not enough, however. Looking again
-at expression \ref{eq_lang1}, $g$ clearly represents a function to
-which we pass the argument $x$. To compute the value of
-$\lamPApp{g}{x}$, we must be able to execute the code representing
-$g$. We already assigned a storage location for $g$ ($|clo|[0]$) -- now
-we just say that the value in $|clo|[0]$ is a \emph{label} that tells
-us where to find the code representing $g$. However, $g$ will need
-an environment of its own, to hold any free variables for $g$. Therefore,
-we pair the label indicating where to find $g$ with a list of free
-variables. We call this structure a \emph{closure}.
+%% Associating locations with names is not enough, however. Looking again
+%% at expression \ref{eq_lang1}, $g$ clearly represents a function to
+%% which we pass the argument $x$. To compute the value of
+%% $\lamPApp{g}{x}$, we must be able to execute the code representing
+%% $g$. We already assigned a storage location for $g$ ($|clo|[0]$) -- now
+%% we just say that the value in $|clo|[0]$ is a \emph{label} that tells
+%% us where to find the code representing $g$. However, $g$ will need
+%% an environment of its own, to hold any free variables for $g$. Therefore,
+%% we pair the label indicating where to find $g$ with a list of free
+%% variables. We call this structure a \emph{closure}.
 
-Closures are the fundamental data structures used to compile
-functional languages. They may not have the exact form described here
-but they always have the same purpose: they pair a label with the free
-variables used in the function represented. 
+%% Closures are the fundamental data structures used to compile
+%% functional languages. They may not have the exact form described here
+%% but they always have the same purpose: they pair a label with the free
+%% variables used in the function represented. 
 
-\subsection{Abstraction}
-\label{subsec_lang3}
-The \lamA lets us define functions which return new functions. We have
-seen how to access variables in the environment and how to execute
-unknown functions using closures. Now we come to the final element
-needed to compile the \lamA\ -- creating closures.
+%% \subsection{Abstraction}
+%% \label{subsec_lang3}
+%% The \lamA lets us define functions which return new functions. We have
+%% seen how to access variables in the environment and how to execute
+%% unknown functions using closures. Now we come to the final element
+%% needed to compile the \lamA\ -- creating closures.
 
-Consider the following expression, where we apply the $|const|$ function (expression 
-\ref{eq_lang4}) to an argument:
-\begin{equation}
-  \begin{split}
-    |main| &= \lamApp{|const|}{s} \\
-         &= \lamAppP{\lamAbs{a}{\lamAbs{b}{a}}}{s}.
-  \end{split}
-\end{equation}
-In order to evaluate $|main|$, we need to apply the $|const|$ function
-to $s$. From the previous section we know that a closure is required to
-implement function application. It follows that
-\lamAbs{a}{\lamAbs{b}{a}} must create a closure which will
-then be used to execute the body of the $\lambda$-abstraction with the
-argument $s$. In fact, the ``value'' created by a
-$\lambda$-abstraction is always a closure. The closure will point to
-the body of the $\lambda$-abstraction and will hold the free variables
-necessary to evaluate it.
+%% Consider the following expression, where we apply the $|const|$ function (expression 
+%% \ref{eq_lang4}) to an argument:
+%% \begin{equation}
+%%   \begin{split}
+%%     |main| &= \lamApp{|const|}{s} \\
+%%          &= \lamAppP{\lamAbs{a}{\lamAbs{b}{a}}}{s}.
+%%   \end{split}
+%% \end{equation}
+%% In order to evaluate $|main|$, we need to apply the $|const|$ function
+%% to $s$. From the previous section we know that a closure is required to
+%% implement function application. It follows that
+%% \lamAbs{a}{\lamAbs{b}{a}} must create a closure which will
+%% then be used to execute the body of the $\lambda$-abstraction with the
+%% argument $s$. In fact, the ``value'' created by a
+%% $\lambda$-abstraction is always a closure. The closure will point to
+%% the body of the $\lambda$-abstraction and will hold the free variables
+%% necessary to evaluate it.
 
 %% \subsection{Compiling from \lamA to \machLam}
 
@@ -745,22 +801,22 @@ necessary to evaluate it.
 %% and place it inline.
 
 \section{Conclusion}
-Functional languages distinguish themselves by their ability to treat
-\emph{functions} as \emph{first-class values}. The \lamA, invented
-some time before the first functional language, turned out to be a
-simple but effective way to model (and experiment with) the behavior
-of functional languages. Therefore, understanding how to compile the
-\lamA can effectively show us how to compile functional languages in
-general.
+%% Functional languages distinguish themselves by their ability to treat
+%% \emph{functions} as \emph{first-class values}. The \lamA, invented
+%% some time before the first functional language, turned out to be a
+%% simple but effective way to model (and experiment with) the behavior
+%% of functional languages. Therefore, understanding how to compile the
+%% \lamA can effectively show us how to compile functional languages in
+%% general.
 
-This chapter gave the basic mechanisms needed to understand the \lamA:
-\emph{variables}, \emph{application}, and
-\emph{abstraction}. Understanding how to compile the \lamA means
-understanding how to compile these three mechanisms. Variables become
-\emph{locations}. Application means evaluating a function with a given
-\emph{environment} for any \emph{free variables}. Abstractions create
-\emph{closures} that carry two pieces of information: the location of
-the compiled function body and the value of free variables to be used
-when evaluating the function.
+%% This chapter gave the basic mechanisms needed to understand the \lamA:
+%% \emph{variables}, \emph{application}, and
+%% \emph{abstraction}. Understanding how to compile the \lamA means
+%% understanding how to compile these three mechanisms. Variables become
+%% \emph{locations}. Application means evaluating a function with a given
+%% \emph{environment} for any \emph{free variables}. Abstractions create
+%% \emph{closures} that carry two pieces of information: the location of
+%% the compiled function body and the value of free variables to be used
+%% when evaluating the function.
 
 \end{document}
