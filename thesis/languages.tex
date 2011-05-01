@@ -9,8 +9,9 @@
 \label{ref_chapter_languages}
 
 %% Overall: Justify why the lambda-calculus matters
-%%   * Give syntax and evaluation rules for lambda-case
-%%   * Set the foundation for MIL-to-LC later
+%%   * Give syntax and evaluation rules for pure lambda calculus 
+%%   * Extend for ADTs and case statements
+%%   * Set the foundation for LC-to-MIL later
 
 John McCarthy created LISP, the first ``functional'' language, in 196X
 \citep{McCarthyXX}. Other functional languages created since then
@@ -418,51 +419,205 @@ Alonzo Church defined his \lamA (``lambda calculus'') in 19XX
 \citep{ChurchXX} to study systems of recursive equations. Being
 Turing-complete, it can be used to model the behavior of any
 computational system. Like Turing machines, the \lamA is \emph{not}
-``programming language'' in any practical sense, but it has proved
+a ``programming language'' in any practical sense, but it has proved
 incredibly useful when modelling the behavior of other functional
 programming languages.
 
-In the ``pure'' \lamA, \emph{everything} is a function -- there are no
-other values. Figure \ref{lang_fig3}, Part \subref{lang_fig3_syntax}, gives the syntax of the pure
-\lamA: ``abstraction'' defines a new function; ``application'' can
-evaluate a function with a given argument; ``variables'' are
-introduced by abstractions, but have no structure or intrinsic value. 
+\subsection{Syntax of the \LamA}
+\label{lang_sec1_syntax}
 
-Part \subref{lang_fig3_eval} shows to evaluate \lamA terms. Each rule
-should be read top-to-bottom. When a term matches the top of the rule,
-we rewrite according to the bottom portion. Each \texttt{\emph{t}}
-stands for an arbitrarily large term -- meaning we can ``match'' the
-portions in typewriter font, while ``parameterizing'' over
-\texttt{\emph{t}}. These rules show ``call-by-value'' style, where
-arguments are evaluated before functions. Other styles include
-``call-by-need'' and ``call-by-name,'' where arguments are only
-evaluated as needed, but we do not address them here.
+Figure~\ref{lang_fig3} shows the three types of terms used in the
+\lamA: \emph{variables}, \emph{abstractions} and
+\emph{applications}. \emph{Variables} have no further structure --
+they are just names. An \emph{abstraction} defines a function that has
+one parameter, $x$, and a body given by the term $t$. The parameter
+$x$ does not stand for a term -- it can only be used as a variable in
+the body of $t$.  An \emph{application} applies the term $t_2$ to the
+term $t_1$.
 
-The {\sc E-App1} and {\sc E-App2} rules show that terms must be
-reduced to values before application can be applied. {\sc E-App1}
-ensures that the argument ($t_2$) is reduce to a value before the
-function ($t_1$) is applied.  Each $v$ represents a value -- a term
-that cannot be reduced any further. {\sc E-Abs} shows how arguments
-are substituted in the body of an abstraction: the notation $[v/x] t$
-means we replace all occurrences of $x$ in $t$ with $v$. There are
-many subtle issues that arise when arguments have the same names as
-parameters, but we do not need to worry about them here. {\sc E-Val}
-lets us continue to reduce any terms found inside a $\lambda$ if
-needed.  Notice, however, that no rule will match $\lambda$ terms
-(i.e., abstractions) except when applied to an argument or when their
-body is not fully evaulated: $\lambda$ terms are our values.
-
-\begin{myfig}[ht]
-  \begin{tabular}{cc}
-    \subfloat{\input{lang_fig3_syntax}\label{lang_fig3_syntax}} & %%
-    \subfloat{\input{lang_fig3_eval}\label{lang_fig3_eval}} \\
-    \subref{lang_fig3_syntax} & \subref{lang_fig3_eval}
-  \end{tabular}
-  \caption{In \subref{lang_fig3_syntax}, the \lamA' syntax;
-    \subref{lang_fig3_eval} shows how to evaluate \lamA terms using
-    the \emph{call-by-value} (or \emph{strict}) style.}
+\begin{myfig}[th]
+  \begin{minipage}{5in}
+    \begin{align*}
+      \mathit{term} &= a, b, \ldots & \hfill\text{\emph{(Variables)}} \\
+      &= \lamAbs{x}{t} & \hfill\text{\emph{(Abstraction)}} \\ 
+      &= \lamApp{t}{t} & \hfill\text{\emph{(Application)}}
+    \end{align*}
+  \end{minipage}
+  \caption{The \lamA' syntax.}
   \label{lang_fig3}
 \end{myfig}
+
+Using this syntax, we can define some basic functions. |Identity|
+returns its argument:
+\begin{align}
+  |identity| &= \lamAbs{x}{x}. \label{lang_eq1} \\
+  \intertext{|Const| takes two arguments but always returns the first:}
+  |const| &= \lamAbs{a}{\lamAbs{b}{a}}. \label{lang_eq_const1} \\
+  \intertext{|Compose| takes two functions and an argument. The result of
+    applying the second function to the argument is passed to the first:}
+  |compose| &= \lamCompose. \label{lang_eq_compose1} 
+\end{align}
+Note that application is left-associative, meaning
+\lamApp{const}{\lamApp{a}{b}} is the same as \lamAppP{\lamApp{const}{a}}{b}
+but \emph{not} the same as \lamApp{const}{(\lamApp{a}{b})}. Abstractions
+also extend as far right as possible, unless parentheses are used to
+delimit scope. That is, \lamAbs{x}{\lamApp{x}{\lamAbs{y}{y}}} is the
+same as $(\lamAbs{x}{\lamApp{x}{(\lamAbs{y}{y})}})$, but not the
+same as $\lamApp{(\lamAbs{x}{x})}{(\lamAbs{y}{y})}$.
+
+\subsection{Evaluating \LamA Terms}
+\label{lang_sec1_eval}
+
+When an abstraction, \lamAbs{x}{t_1}, is applied to a term, $t_2$, we
+can \emph{substitute} $t_2$ for each occurrence of $x$ in $t_1$. We say
+that $t_1$ ``maps to'' or ``substitues for'' each $x$ in $t_2$. Using
+Pierce's notation \citep{PierceXX}, we write this as:
+\begin{equation}
+  \lamAppP{\lamAbs{x}{t_1}}{t_2} = [t_2 \mapsto x] t_1.
+\end{equation}
+Though substituation may appear simple, it is surprisingly hard to get
+right. When $t_2$ mentions variables that are bound by $t_1$, we can
+unintenionally capture values that we did not expect. For example,
+consider the following substitution, where we replace $x$ with $y$
+blindly:
+\begin{equation}
+  \begin{split}
+    & \lamAppP{\lamAbs{x}{\lamAbs{y}{\lamApp{x}{y}}}}{y} \\
+    & \quad = [y \mapsto x] \lamAbs{y}{\lamApp{x}{y}} \\
+    & \quad = \lamAbs{y}{\lamApp{y}{y}}
+  \end{split}
+\label{lang_eq_capt1}
+\end{equation}
+Clearly, ``doubling'' the $y$ term in the last abstraction is not what
+we mean here -- we are really referring to two different
+$y$'s. Solving this issue algorithmically is very tricky -- but we can
+avoid it altogether by assuming we can \emph{rename} variables
+correctly and at any time, to avoid unintentional capture. That is, we
+imagine we can rewrite Equation~\ref{lang_eq_capt1} using new
+variables as needed:
+\begin{equation}
+  \begin{split}
+    & \lamAppP{\lamAbs{x}{\lamAbs{y}{\lamApp{x}{y}}}}{y} \\
+    & \qquad = [y \mapsto x] \lamAbs{w}{\lamApp{x}{w}} \\
+    & \qquad = \lamAbs{w}{\lamApp{y}{w}}
+  \end{split}
+\label{lang_eq_capt2}
+\end{equation}
+For a full treatment of this issue, see Pierce \citep{PierceXX},
+Chapter X, Section Y.
+
+Following Pierce \citep{PierceXX}, who in turn follows Church
+\citep{ChurchXX}, we call any term where we can use substitution
+(i.e., an abstraction applied to term) a \emph{reducible expression}
+or \emph{redex}. We call the act of reducing
+\emph{beta-reduction}. Evaluating (or ``executing'') a \lamA
+expression means finding these redexes and \emph{beta-reducing} them.
+
+For example, consider the following term:
+\begin{equation}
+  \lamAppP{\lamAbs{y}{\lamApp{\lamAbs{x}{y}}{y}}} %%
+         {\lamAbs{z}{\lamAppP{\lamAbs{x}{x}}{z}}}
+\end{equation}
+There are three possible redexes (i.e., substitutions) we can make in 
+this program:
+\begin{center}
+  \begin{tabular}{lccc}
+    & \emph{term} & \emph{substitutes for} & \emph{in} \\
+    \cmidrule(r){2-2} \cmidrule(r){3-3} \cmidrule(r){4-4}
+    1. & $y$ & $x$ & $(\lamAbs{x}{y})$ \\
+    2. & $z$ & $x$ & $(\lamAbs{x}{x})$ \\
+    3. & $(\lamAbs{z}{\lamAppP{\lamAbs{x}{x}}{z}})$ & $y$ & $(\lamAbs{y}{\lamApp{\lamAbs{x}{y}}{y}})$
+  \end{tabular}
+\end{center}
+The means by which we choose what redex to beta-reduce is called our
+\emph{evaluation strategy}.
+
+There are a number of possible strategies we can use. We follow
+Pierce's taxonomy \citep{PierceXX} here. \emph{Full beta-reduction}
+lets us choose any of the possible redexes, in any order we wish,
+until no more redexes remain. \emph{Normal-order} requires us to
+choose the leftmost, outermost redex, again until none
+remain. \emph{Call-by-name} also requires us to choose the leftmost,
+outermost redex first, but we cannot reduce any redexes inside (or
+``under'') abstractions. \emph{Call-by-value}, like call-by-need,
+restricts us from reducing inside abstractions and requires that we
+reduce the outermost redex first, and also requires that we reduce the
+right side of each application to a value before applying it to the
+left.
+
+\emph{\ldots Talk about normal form and values here \ldots}
+
+We can view evaulation of lambda-terms as a sequence of
+\emph{rewrites}. That is, at each step of evaluation we replace some
+portion of the term with another term, reduced according to a
+rule. Plotkin \citep{PlotkinXX} first gave this presentation as
+``structural operational semantics.'' Figure~\ref{lang_fig4} presents
+the rewrite rules for call-by-name and call-by-value strategies. We
+apply the rules by finding a match for our term on the left-hand side
+of a rule, and then rewriting according the right-hand side. Each
+rewrite is called a \emph{transition}, and the strategy as a whole a
+\emph{transition function}.
+
+\begin{myfig}[th]
+  \begin{tabular}{cc}
+    \subfloat{\input{lang_fig3_eval}\label{lang_fig4_eval}} & %%
+    \subfloat{\input{lang_fig4_eval_need}\label{lang_fig4_eval_need}} \\
+    \subref{lang_fig4_eval} & \subref{lang_fig4_eval_need}
+  \end{tabular}
+  \caption{Two different strategies for evaluating \lamA terms: \subref{lang_fig4_eval}
+    shows \emph{call-by-value}; \subref{lang_fig4_eval_need} gives \emph{call-by-need}.
+  In both cases, terms are evaluated by matching a rule on the left and rewriting
+  according to the right-hand side. The $t$'s represent arbitrary terms, while
+  the $v$'s represent values.}
+  \label{lang_fig4}
+\end{myfig}
+
+%% as \emph{rewrite} rules. 
+%% Interestingly, these strategies are not strictly equivalent: some will
+%% fail to terminate where others do not. The SuchAndSuch theorem states that,
+%% if a term can 
+%% The call-by-value strategy is used by many 
+%% programming languages today: Java, C, PHP, and more. Call-by-name 
+%% (under the variant call-by-need) is not very widely used -- the Haskell
+%% programming language is one of the most prominent to employ it. 
+
+
+
+%% using
+%%   a variety Part \subref{lang_fig4_eval} shows to evaluate \lamA
+%%   terms. Each rule should be read top-to-bottom. When a term matches
+%%   the top of the rule, we rewrite according to the bottom
+%%   portion. Each \texttt{\emph{t}} stands for an arbitrarily large term
+%%   -- meaning we can ``match'' the portions in typewriter font, while
+%%   ``parameterizing'' over \texttt{\emph{t}}. These rules show
+%%   ``call-by-value'' style, where arguments are evaluated before
+%%   functions. Other styles include ``call-by-need'' and
+%%   ``call-by-name,'' where arguments are only evaluated as needed, but
+%%   we do not address them here.
+
+%% The {\sc E-App1} and {\sc E-App2} rules show that terms must be
+%% reduced to values before application can be applied. {\sc E-App1}
+%% ensures that the argument ($t_2$) is reduce to a value before the
+%% function ($t_1$) is applied.  Each $v$ represents a value -- a term
+%% that cannot be reduced any further. {\sc E-Abs} shows how arguments
+%% are substituted in the body of an abstraction: the notation $[v/x] t$
+%% means we replace all occurrences of $x$ in $t$ with $v$. There are
+%% many subtle issues that arise when arguments have the same names as
+%% parameters, but we do not need to worry about them here. {\sc E-Val}
+%% lets us continue to reduce any terms found inside a $\lambda$ if
+%% needed.  Notice, however, that no rule will match $\lambda$ terms
+%% (i.e., abstractions) except when applied to an argument or when their
+%% body is not fully evaulated: $\lambda$ terms are our values.
+
+
+%% Every abstraction, \lamAbs{x}{t}, \emph{binds} its argument, $x$, in
+%% the context of its body, $t$. Alternatively, we can say $x$ is
+%% \emph{bound} by the abstraction. Our syntax allows us to write terms
+%% containing \emph{free} variables -- variables not bound by any
+%% enclosing abstraction. For example, $b$ is free in \lamAbs{a}{\lamApp{a}{b}},
+%% but bound in \lamAbs{b}{\lamApp{a}{b}}. A term containing free variables
+%% is \emph{open}; otherwise, it is \emph{closed}.
+
 
 %%\emph{What does it look like?}
 Simple as it is, the pure \lamA can be used to represent a number of
@@ -501,64 +656,67 @@ argument:
 %%   = \s. \z. s ((\z. z))
 %%   = \s. \z. s z
 
-Nothing is built-in,
-not even the natural numbers. There is almost nothing to get in the
-way of studying your particular domain, rather than fiddling with the
-programming language. However, the \lamA is inherently functional --
-it can only define functions, and all values computed are really
-functions. Translating from the \lamA to another functional language
-is usually straightforward.\footnote{And, if not, maybe your target
-  language isn't very functional.}
+%% Nothing is built-in,
+%% not even the natural numbers. There is almost nothing to get in the
+%% way of studying your particular domain, rather than fiddling with the
+%% programming language. However, the \lamA is inherently functional --
+%% it can only define functions, and all values computed are really
+%% functions. Translating from the \lamA to another functional language
+%% is usually straightforward.\footnote{And, if not, maybe your target
+%%   language isn't very functional.}
 
-Its power, simplicity, and functional nature of the \lamA motivates
-our own choice in using it. We do not show how to compile a
-``real-world'' functional language to our intermediate language, but
-by showing how to compile the \lamA to our language, we show our
-technique could be used by ``real'' functional languages (with some
-adaptions, of course).
+%% Its power, simplicity, and functional nature of the \lamA motivates
+%% our own choice in using it. We do not show how to compile a
+%% ``real-world'' functional language to our intermediate language, but
+%% by showing how to compile the \lamA to our language, we show our
+%% technique could be used by ``real'' functional languages (with some
+%% adaptions, of course).
 
-Using this syntax, we can define some common functions. |Identity|
-returns its argument:
-\begin{align}
-  |identity| &= \lamAbs{x}{x}. \label{eq_lang2} \\
-  \intertext{|Const| takes two arguments but always returns the first:}
-  |const| &= \lamAbs{a}{\lamAbs{b}{a}}. \label{eq_lang4} \\
-  \intertext{|Compose| takes two functions and an argument. The result of
-    applying the second function to the argument is passed to the first:}
-  |compose| &= \lamCompose. \label{eq_lang3} 
-\end{align}
-Note that function application is right-associative, meaning
-\lamPApp{f}{\lamPApp{g}{x}} is the same as \lamApp{\lamApp{f}{g}}{x},
-but \emph{not} the same as \lamPApp{\lamPApp{f}{g}}{x}.
+%% Using this syntax, we can define some common functions. |Identity|
+%% returns its argument:
+%% \begin{align}
+%%   |identity| &= \lamAbs{x}{x}. \label{eq_lang2} \\
+%%   \intertext{|Const| takes two arguments but always returns the first:}
+%%   |const| &= \lamAbs{a}{\lamAbs{b}{a}}. \label{eq_lang4} \\
+%%   \intertext{|Compose| takes two functions and an argument. The result of
+%%     applying the second function to the argument is passed to the first:}
+%%   |compose| &= \lamCompose. \label{eq_lang3} 
+%% \end{align}
+%% Note that function application is right-associative, meaning
+%% \lamPApp{f}{\lamPApp{g}{x}} is the same as \lamApp{\lamApp{f}{g}}{x},
+%% but \emph{not} the same as \lamPApp{\lamPApp{f}{g}}{x}.
 
-\begin{myfig}[bt]
-\begin{minipage}{2in}
-\begin{Verbatim}
-                ##  
-                 #  
- ##  ## ## ###   #  
-####  # ## ###   #  
-#     ###  # #   #  
- ###   #   ## # ### 
-\end{Verbatim}
-\end{minipage}
-  \caption{Evaluation rules for \lamA. These rules show 
-    \emph{call-by-value}, where arguments are evaluated
-    before functions.}
-  \label{fig_lang2}
-\end{myfig}
+%% \begin{myfig}[bt]
+%% \begin{minipage}{2in}
+%% \begin{Verbatim}
+%%                 ##  
+%%                  #  
+%%  ##  ## ## ###   #  
+%% ####  # ## ###   #  
+%% #     ###  # #   #  
+%%  ###   #   ## # ### 
+%% \end{Verbatim}
+%% \end{minipage}
+%%   \caption{Evaluation rules for \lamA. These rules show 
+%%     \emph{call-by-value}, where arguments are evaluated
+%%     before functions.}
+%%   \label{fig_lang2}
+%% \end{myfig}
 
-A \lamA term executes by rewriting the expression according to the
-rules in Figure \ref{fig_lang2}. We match our term to each of the
-patterns above the line. If we have a match, we rewrite according to
-the pattern below the line. When no more matches can be made, we say
-the term is in \emph{normal form}: we have finished executing.
+%% A \lamA term executes by rewriting the expression according to the
+%% rules in Figure \ref{fig_lang2}. We match our term to each of the
+%% patterns above the line. If we have a match, we rewrite according to
+%% the pattern below the line. When no more matches can be made, we say
+%% the term is in \emph{normal form}: we have finished executing.
 
-The rules given implement \emph{call-by-value} evaluation order,
-meaning arguments to a function are evaluated before the function
-itself. Other variants include \emph{call-by-need} and
-\emph{call-by-name}, where arguments are not evaluated until
-needed. We do not considers those variants further, however.
+%% The rules given implement \emph{call-by-value} evaluation order,
+%% meaning arguments to a function are evaluated before the function
+%% itself. Other variants include \emph{call-by-need} and
+%% \emph{call-by-name}, where arguments are not evaluated until
+%% needed. We do not considers those variants further, however.
+
+\section{\lamC -- Extending the \lamA}
+\label{lang_sec4}
 
 %% \section{Why \LamA?}
 %% \label{lang_sec1}
@@ -801,6 +959,7 @@ needed. We do not considers those variants further, however.
 %% and place it inline.
 
 \section{Conclusion}
+\label{lang_sec5}
 %% Functional languages distinguish themselves by their ability to treat
 %% \emph{functions} as \emph{first-class values}. The \lamA, invented
 %% some time before the first functional language, turned out to be a

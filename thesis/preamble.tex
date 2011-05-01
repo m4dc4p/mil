@@ -89,7 +89,8 @@
 \newcommand{\lamApp}[2]{\ensuremath{#1\ #2}}
 \newcommand{\lamPApp}[2]{\ensuremath{(#1\ #2)}}
 \newcommand{\lamAppP}[2]{\ensuremath{(#1)\ #2}}
-\newcommand{\lamCompose}{\lamAbs{f}{\lamAbs{g}{\lamAbs{x}{\lamApp{f}{\lamApp{g}{x}}}}}}
+\newcommand{\lamId}{\lamAbs{x}{x}}
+\newcommand{\lamCompose}{\lamAbs{f}{\lamAbs{g}{\lamAbs{x}{\lamApp{f}{(\lamApp{g}{x})}}}}}
 \newcommand{\machLam}{\ensuremath{M_\lambda}\xspace}
 \newcommand{\compMach}[1]{\ensuremath{\llbracket #1 \rrbracket}}
 \newcommand{\compRho}[1]{\ensuremath{\rho(#1)}}
