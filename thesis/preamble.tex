@@ -89,6 +89,7 @@
 \newcommand{\lamApp}[2]{\ensuremath{#1\ #2}}
 \newcommand{\lamPApp}[2]{\ensuremath{(#1\ #2)}}
 \newcommand{\lamAppP}[2]{\ensuremath{(#1)\ #2}}
+\newcommand{\lamApPp}[2]{\ensuremath{#1\ (#2)}}
 \newcommand{\lamId}{\lamAbs{x}{x}}
 \newcommand{\lamCompose}{\lamAbs{f}{\lamAbs{g}{\lamAbs{x}{\lamApp{f}{(\lamApp{g}{x})}}}}}
 \newcommand{\machLam}{\ensuremath{M_\lambda}\xspace}
@@ -96,7 +97,8 @@
 \newcommand{\compRho}[1]{\ensuremath{\rho(#1)}}
 \newcommand{\verSub}[2]{\ensuremath{#1_{#2}}}
 \newcommand{\verSup}[2]{\ensuremath{#1^{#2}}}
-\newcommand{\lamC}{\ensuremath{\lambda_C\xspace}}
+\newcommand{\lamC}{\ensuremath{\lambda_C}\xspace}
+\newcommand{\lamPlus}{\lamAbs{m}{\lamAbs{n}{\lamAbs{s}{\lamAbs{z}{\lamApp{m}{\lamApPp{s}{\lamApp{n}{\lamApp{s}{z}}}}}}}}}
 %% End functional languages chapter
 
 %% Dataflow chapter commands

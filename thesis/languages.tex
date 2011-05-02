@@ -435,7 +435,7 @@ $x$ does not stand for a term -- it can only be used as a variable in
 the body of $t$.  An \emph{application} applies the term $t_2$ to the
 term $t_1$.
 
-\begin{myfig}[th]
+\begin{myfig}[tbh]
   \begin{minipage}{5in}
     \begin{align*}
       \mathit{term} &= a, b, \ldots & \hfill\text{\emph{(Variables)}} \\
@@ -545,30 +545,39 @@ reduce the outermost redex first, and also requires that we reduce the
 right side of each application to a value before applying it to the
 left.
 
-\emph{\ldots Talk about normal form and values here \ldots}
+In our work, we chose to use the call-by-value strategy over other
+alternatives for three reasons. The memory behavior of call-by-need
+can be hard to predict (i.e., the problem of ``space leaks'' in lazy
+languages is well known). Call-by-value is the norm among popular
+high-level languages (Scheme, ML, and JavaScript, to name a few). Our
+research language, Habit \citep{HabitXX}, designed for systems and
+device programming, also uses the call-by-value strategy, motivating
+our choice.
 
-We can view evaulation of lambda-terms as a sequence of
-\emph{rewrites}. That is, at each step of evaluation we replace some
-portion of the term with another term, reduced according to a
-rule. Plotkin \citep{PlotkinXX} first gave this presentation as
-``structural operational semantics.'' Figure~\ref{lang_fig4} presents
-the rewrite rules for call-by-name and call-by-value strategies. We
-apply the rules by finding a match for our term on the left-hand side
-of a rule, and then rewriting according the right-hand side. Each
-rewrite is called a \emph{transition}, and the strategy as a whole a
-\emph{transition function}.
+Figure~\ref{lang_fig4} uses Plotkin's ``structural operational
+semantics'' \citep{PlotkinXX} to presents \emph{rewrite rules} for the
+call-by-value strategy. This presentation treats evaluation of
+lambda-terms as a sequence of \emph{rewrites}. Each step of evaluation
+matches a redex to the left-hand side of one of our rules. The redex
+is rewritten according to the right-hand side. If no more redexes
+remain, evaluation terminates. Each rewrite is called a
+\emph{transition}, and the strategy as a whole a \emph{transition
+  function}.
 
-\begin{myfig}[th]
-  \begin{tabular}{cc}
-    \subfloat{\input{lang_fig3_eval}\label{lang_fig4_eval}} & %%
-    \subfloat{\input{lang_fig4_eval_need}\label{lang_fig4_eval_need}} \\
-    \subref{lang_fig4_eval} & \subref{lang_fig4_eval_need}
-  \end{tabular}
-  \caption{Two different strategies for evaluating \lamA terms: \subref{lang_fig4_eval}
-    shows \emph{call-by-value}; \subref{lang_fig4_eval_need} gives \emph{call-by-need}.
-  In both cases, terms are evaluated by matching a rule on the left and rewriting
-  according to the right-hand side. The $t$'s represent arbitrary terms, while
-  the $v$'s represent values.}
+\begin{myfig}[tbh]
+\begin{minipage}{2.5in}
+  \begin{math}
+    \begin{array}{lclr}
+      \lamApp{t_1}{t_2} & \rightarrow & \lamApp{t_1}{v} & \text{\sc CBN-App1} \\
+      \lamApp{t_1}{v_2} & \rightarrow & \lamApp{v_1}{v_2} & \text{\sc CBN-App2} \\
+      \lamAppP{\lamAbs{x}{t}}{v} & \rightarrow & [v \mapsto x] t & \text{\sc CBN-Abs}
+    \end{array}
+  \end{math}
+\end{minipage}
+  \caption{Rewrite rules for the \emph{call-by-value} evaluation
+    strategy. Redexes are evaluated finding a matching left-hand side
+    left and rewriting according to the right-hand side. The $t$'s
+    represent arbitrary terms, while the $v$'s represent values.}
   \label{lang_fig4}
 \end{myfig}
 
@@ -620,40 +629,82 @@ rewrite is called a \emph{transition}, and the strategy as a whole a
 
 
 %%\emph{What does it look like?}
-Simple as it is, the pure \lamA can be used to represent a number of
-common data structures. For example, the natural numbers (0, 1, 2,
-\ldots) can be represented by a series of ``successors'' of zero. Note
-that function application is right-associative, meaning
-\lamPApp{s}{\lamPApp{s}{z}} is the same as \lamApp{\lamApp{s}{s}}{z},
-but \emph{not} the same as \lamPApp{\lamPApp{s}{s}}{z}:
-\begin{equation*}
+We now show how natural numbers, and some common arithmetic operations, can be 
+expressed using just the \lamA. We start with the \emph{Church Numerals}, that 
+represent the natural numbers (0, 1, 2, etc.). Each numeral is represented
+as some number of successors of 0::
+\begin{equation}
   \begin{split}
     0 &= \lamAbs{s}{\lamAbs{z}{z}} \\
     1 &= \lamAbs{s}{\lamAbs{z}{\lamApp{s}{z}}} \\
     2 &= \lamAbs{s}{\lamAbs{z}{\lamApp{s}{\lamApp{s}{z}}}} \\
     \ldots
   \end{split}
-\end{equation*}
-In other words, the number of applications of $s$ gives the natural
-number represented by the function. 
-
-This representation allows
-us to define a number of common arithmetic operations. We start 
-with the \emph{successor} function, which always adds 1 to its
-argument:
-\begin{equation}
-  \mathit{succ} = \lamAbs{n}{\lamAbs{s}{\lamAbs{z}{\lamApp{s}{\lamApp{n}{z}}}}}
+  \label{lang_eq_nats}
 \end{equation}
+In other words, the number of applications of $s$ gives the natural
+number represented by the term. 
+
+Using this representation, we can define the \emph{successor}
+function, which always adds 1 to its argument:
+\begin{equation}
+  \mathit{succ} = \lamAbs{n}{\lamAbs{s}{\lamAbs{z}{\lamApPp{s}{\lamApp{n}{\lamApp{s}{z}}}}}}
+\end{equation}
+Using the rewrite rules from Figure~\ref{lang_fig4}, we show how
+evaluating $\lamApp{\mathit{succ}}{0}$ results in 1.\footnote{``0''
+  and ``1'' stand for the lambda-terms in
+  Equation~\ref{lang_eq_nats}.} At each step we give the rule used to
+rewrite the redex:
+\begin{equation*}
+  \begin{array}{rlr}
+    \lamApp{\mathit{succ}}{0} &= \\ 
+    &= \lamAppP{\lamAbs{n}{\lamAbs{s}{\lamAbs{z}{\lamApPp{s}{\lamApp{n}{\lamApp{s}{z}}}}}}}{0} & \text{\emph{Definition of} succ.} \\
+    &= \lamAbs{s}{\lamAbs{z}{\lamApPp{s}{\lamApp{0}{\lamApp{s}{z}}}}} & \text{\sc E-Abs} \\
+    &= \lamAbs{s}{\lamAbs{z}{\lamApPp{s}{\lamAppP{\lamAbs{s}{\lamAbs{z}{z}}}{\lamApp{s}{z}}}}} & \text{\emph{Definition of 0 from Equation~\ref{lang_eq_nats}}} \\
+    & \multicolumn{2}{r}{\emph{For illustration, we reduce the $\lambda$'s introduced by 0, though normally we would not.}} \\
+    &= \lamAbs{s}{\lamAbs{z}{\lamApPp{s}{\lamAppP{\lamAbs{z}{z}}{z}}}}  & \text{\sc E-Abs} \\
+    &= \lamAbs{s}{\lamAbs{z}{\lamApp{s}{z}}}  & \text{\sc E-Abs} \\
+    &= 1 & \text{\emph{Definition of 1.}}
+  \end{array}
+\end{equation*}
+
+Addition can be represented by applying one numeral to the other:
+\begin{equation}
+  \begin{align}
+    \mathit{plus} = \lamPlus
+  \end{align}
+\end{equation}
+In fact, $\mathit{plus}$ generalizes $\mathit{succ}$ by adding $s$ to
+$n$ $m$ times, rather than just once. To illustrate, we add
+$1$ and $1$:
+\begin{equation*}
+  \begin{array}{llr}
+    \lamApp{\mathit{plus}}{\lamApp{1}{1}} &= \\
+    &= \lamAppP{\lamPlus}{\lamApp{1}{1}} & \text{\emph{Definition of} plus}. \\
+    &= \lamAppP{\lamAbs{n}{\lamAbs{s}{\lamAbs{z}{\lamApp{1}{\lamApPp{s}{\lamApp{n}{\lamApp{s}{z}}}}}}}}{1} & \text{\sc E-Abs} \\
+    &= \lamAbs{s}{\lamAbs{z}{\lamApp{1}{\lamApPp{s}{\lamApp{1}{\lamApp{s}{z}}}}}} & \text{E-Abs} \\
+    &= \lamAbs{s}{\lamAbs{z}{\lamApp{(\lamAbs{s}{\lamAbs{z}{\lamApp{s}{z}}})}{\lamApPp{s}{\lamApp{1}{\lamApp{s}{z}}}}}} & \text{\emph{Definition of 1 from Equation~\ref{lang_eq_nats}}.} \\
+    & \multicolumn{2}{r}{\emph{Again, we reduce under the $\lambda$ here, for illustration.}} \\
+    &= \lamAbs{s}{\lamAbs{z}{\lamApp{(\lamAbs{z}{\lamApp{s}{z}})}{(\lamApp{1}{\lamApp{s}{z}})}}} & \text{\sc E-abs} \\
+
+    &= \lamAbs{s}{\lamAbs{z}{\lamApp{s}{(\lamApp{1}{\lamApp{s}{z}})}}} & \text{\sc E-abs} \\
+    &= \lamAbs{s}{\lamAbs{z}{\lamApp{s}{(\lamApp{(\lamAbs{s}{\lamAbs{z}{\lamApp{s}{z}}})}{\lamApp{s}{z}})}}} & \text{\emph{Definition of 1.}} \\
+    &= \lamAbs{s}{\lamAbs{z}{\lamApp{s}{(\lamApp{(\lamAbs{z}{\lamApp{s}{z}})}{z})}}} & \text{\sc E-Abs}} \\
+    &= \lamAbs{s}{\lamAbs{z}{\lamApp{s}{\lamApp{s}{z}}}} & \text{\sc E-Abs}} \\
+    &= 2. & \text{\emph{Definition of 2.}}
+  \end{array}
+\end{equation*}
 
 %% \s. \z. z
 %% \s. \z. s z
 %% \s. \z. s s z
 
-%% \n. \s. \z. s (n z)
+%% \n. \s. \z. s (n s z)
 
 %% succ (\s. \z. z)
-%%   = \s. \z. s ((\s. \z. z) z)
-%%   = \s. \z. s ((\z. z))
+%%   = (\n. \s. \z. s (n s z)) (\s. \z. z)
+%%   = \s. \z. s ((\s. \z. z) s z)
+%%   = \s. \z. s (\z. z) z)
 %%   = \s. \z. s z
 
 %% Nothing is built-in,
