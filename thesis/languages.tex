@@ -914,21 +914,29 @@ that are already in scope.
     term &= \mathit{C}\ \mathit{arg}_1\ \mathit{arg}_2\ \ldots\ \mathit{arg}_n, n \ge 0 & \hfil\text{\emph{(ADTs)}} \\ \\
       &= |case|\ t\ |of| & \hfil\text{\emph{(Case Discrimination)}} \\
       & \qquad\mathit{C}_1\ \mathit{arg}_1\ \mathit{arg}_2\ \ldots\ \mathit{arg}_n \rightarrow t_1, n \ge 0 \\
-      & \qquad\mathit{C}_2\ \mathit{arg}_1\ \mathit{arg}_2\ \ldots\ \mathit{arg}_n \rightarrow t_2, n \ge 0 \\
-      & \qquad\ldots \\
-      &= a, b, \ldots & \hfill\text{\emph{(Variables)}} \\
-      &= \lamAbs{x}{t} & \hfill\text{\emph{(Abstraction)}} \\ 
-      &= \lamApp{t_1}{t_2} & \hfill\text{\emph{(Application)}}  \end{align*}
+      & \qquad\mathit{C}_2\ \mathit{arg}_1\ \mathit{arg}_2\ \ldots\ \mathit{arg}_n \rightarrow t_2, n \ge 0 
+  \end{align*}
   \end{minipage}
   \caption{The syntax of \lamC, which extends \lamA from
     Figure~\ref{lang_fig3} with \emph{algrebraic data types} (ADTs)
     and \emph{case discrimination}. $t$ again represents an arbitrary
-    term. $C$ stands for a constructor name. We also repeat the rules
-    from Figure~\ref{lang_fig3} here.}
+    term. $C$ stands for a constructor name.}
   \label{lang_fig5}
 \end{myfig}
 
-Figure~\ref{lang_fig6} shows how we evaluate our new terms.
+Figure~\ref{lang_fig6} shows how we evaluate our new terms. In {\sc
+  Case1}, the discriminant must evaluate to a constructor. Otherwise,
+the behavior is undefined. If we just evaluated to $v$, then that
+would imply a $\lambda$ could appear as a discriminant, which we do
+not want. {\sc Case2} shows two important actions. First, the
+discriminate value is matched to an alternative with the same
+constructor.\footnote{If the constructor does appear in any
+  alternative, or appears more than once, again the behavior will be
+  undefined. } Second, the alternative's body will be evaluated with
+new bindings where $v_1$ maps to $a_1$, $v_2$ maps to $a_2$, etc. The
+{\sc Data} rule shows that constructors will evaluate all of their
+arguments to values.\footnote{Note that order of evaluation for
+  arguments is \emph{not} specified.}
 
 \begin{myfig}[tbh]
   \begin{minipage}{5in}
@@ -947,23 +955,26 @@ Figure~\ref{lang_fig6} shows how we evaluate our new terms.
         \begin{minipage}{1in}
           \begin{math}
             \begin{array}{l}
-              |case|\ v\ |of| \\
+              |case|\ |C|\ v_1\ \ldots\ v_n\ |of| \\
               \;\ldots
             \end{array}
           \end{math}
-        \end{minipage} & \text{\sc Case1} \\ \\
+        \end{minipage} & \text{({\sc Case1})} \\ \\
 
         \begin{minipage}{2in}
           \begin{math}
             \begin{array}{l}
               |case|\ |C|\ v_1\ \ldots\ v_n\ |of| \\
-              \;\ldots
+              \;\ldots \\
               \; |C|\ a_1\ \ldots\ a_n \rightarrow\ t \\
               \;\ldots
             \end{array}
           \end{math}
         \end{minipage} & %% 
-        \rightarrow & [v_1 \mapsto a_1, \ldots, v_n \mapsto a_n]\ t & \text{\sc Case2}
+        \rightarrow & [v_1 \mapsto a_1, \ldots, v_n \mapsto a_n]\ t & \text{({\sc Case2})} \\ \\
+
+        \;|C|\ t_1\ \ldots\ t_n& %%
+        \rightarrow & |C|\ v_1 \ldots\ v_n & \text{({\sc Data})}
 
       \end{array}
     \end{math}
@@ -974,6 +985,43 @@ Figure~\ref{lang_fig6} shows how we evaluate our new terms.
     which matches.}
   \label{lang_fig6}
 \end{myfig}
+
+With our new terms, we can more easily define functions from
+Section~\ref{lang_sec1}. Rather than the Church numerals,
+we can use define \emph{plus} in terms of Peano numbers now:
+
+> plus = \m -> \n -> case m of
+>   S m' -> S (plus m' n)
+>   Z -> n
+
+Multiplication can be defined in terms of |plus|:
+
+> mult = \m -> \n -> case m of
+>   S m' -> plus n (mult m' n)
+>   Z -> Z
+
+This allows us to define our |multiplier| and |mag| function from
+Section~\ref{lang_sec2}:\footnote{We use ``2'' here to represent the
+  Peano number |S (S Z)|.}
+
+> multiplier = \multiple -> \a -> mult multiple a
+> mag = multiplier 2
+
+Figure~\ref{lang_fig7} collects the syntax and evaluation rules for
+\lamC into one place. Part~\subref{lang_fig7_sytnax} gives the full
+syntax for \lamC, and Part~\subref{lang_fig7_eval} gives our
+evaluation rules. We extend the syntax for convenience in two ways. We
+have added the ability to define top-level definitions, so that a
+program is formed of multiple definitions, each of which is available
+to all top-level functions. We have also allowed arguments to be
+written to the left of the equals when defining a function.  In each
+case we can always translate our expressions into the simpler syntax
+we illustrated above.
+
+\emph{\ldots signposts and transitions \ldots}
+
+\afterpage{\clearpage\input{lang_fig7}\clearpage}
+
 %% \section{Why \LamA?}
 %% \label{lang_sec1}
 
