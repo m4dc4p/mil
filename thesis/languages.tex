@@ -14,7 +14,7 @@
 %%   * Set the foundation for LC-to-MIL later
 
 John McCarthy created LISP, the first ``functional'' language, in 196X
-\citep{McCarthyXX}. Other functional languages created since then
+\citep{McCarthy}. Other functional languages created since then
 include Scheme, ML, Haskell, and many more. While syntax, semantics
 and capabilities differ widely between all these languages, they share
 a common characteristic: \emph{functions are values}.  This chapter
@@ -66,7 +66,7 @@ Line~\ref{lang_fig1_haskell_sig}: |Float -> Float|. This
 signature indicates that |mag| takes an argument of type |Float| and
 returns a result, also of type
 |Float|. Line~\ref{lang_fig1_haskell_impl} implements |mag|. The
-function name comes first, followed by the argument (|a|). The
+function name comes first, followed by the argument, |a|. The
 right-hand side of the equals sign defines the \emph{body} of the
 function: |2 * a|. The body is evaluated when the function is applied
 to an argument and a result must be computed.\footnote{Haskell is a
@@ -86,11 +86,11 @@ Haskell version.
 Figure~\ref{lang_fig1}, Part \subref{lang_fig1_scheme}, gives the
 Scheme definition. Scheme is a dynamically typed language, so no
 signature can be given -- just the implementation. The expression
-``\texttt{define mag}\ \emph{expr}'' associates \emph{expr} with the
-name ``#mag#.'' The expression in this case, ``\texttt{(lambda (a)
-  \ldots)},'' creates a new function that takes one argument, ``#a#.''
-The body of the function, ``#(* 2 a)#,'' shows that the argument will
-be doubled when the function is applied.
+\texttt{define mag (lambda (a) \ldots)}\ associates the value created by
+the #lambda# expresion with the name #mag#. \texttt{(lambda (a)
+  \ldots)} creates a new function that takes one argument, #a#.  The
+body of the function, #(* 2 a)#, shows that the argument will be
+doubled when the function is applied.
 
 %% ``#define#'' keyword
 %% associates a name with a value. The
@@ -106,10 +106,11 @@ named arguments.\footnote{We say ``named'' here because JavaScript
   functions can take more arguments than declared.}  JavaScript is
 also a dynamically typed language, so this is \emph{not} a type
 signature, but rather a specification of how to call the
-function. Function definitions always start with the ``#function#''
-keyword, followed by the function name and any named arguments in
-parentheses: #mag (a)#. The body of the function, on
-Line~\ref{fig_lang1_js_impl}, uses the ``#return#'' keyword to
+function. Function definitions always start with the #function#
+keyword, followed by the function name, any named arguments in
+parentheses, and the body in braces: \texttt{function mag (a) \{
+  \ldots\ \}}. The body of the function, on
+Line~\ref{fig_lang1_js_impl}, uses the #return# keyword to
 indicate the function doubles its argument and returns the resulting
 value: #return 2 * a#.
 
@@ -125,9 +126,9 @@ function magBy(multiple, a) \{
   return multiple * a;
 \}
 \end{AVerb}
-But this limits us from re-using ``#magBy#'' in certain ways. 
+But this limits us from re-using #magBy# in certain ways. 
 
-Imagine a function that wants to apply ``#magBy#'' to all items in a
+Imagine a function that wants to apply #magBy# to all items in a
 list:\footnote{In this fragment, #items# is an array of values,
   accessed by index. We enumerate it using a #for# loop much like the
   that found in the C language.}
@@ -139,15 +140,15 @@ function magAll(items, multiple) \{
 \end{AVerb}
 This definition creates two problems:
 \begin{enumerate}
-\item Every call to ``#magAll#'' requires us to specify a value for
-  ``#multiple#.'' 
-\item Our function is limited to using ``#magBy#.'' If ``#magBy#''
+\item Every call to #magAll# requires us to specify a value for
+  #multiple#.
+\item Our function is limited to using #magBy#. If #magBy#
   is not appropriate for some situation, we need to write a new
-  ``#magAll#'' that uses a different version.
+  #magAll# that uses a different version.
 \end{enumerate}
-We solve these two problems by making ``#magBy#'' a \emph{parameter}
-to ``#magAll#.'' It is something like creating a ``hole'' in the
-definition of ``#magAll#'', where we can put code that is passed in as
+We solve these two problems by making #magBy# a \emph{parameter}
+to #magAll#. It is something like creating a ``hole'' in the
+definition of #magAll#, where we can put code that is passed in as
 an argument:
 \begin{AVerb}
 function magAll(items, \emph{<code>}) \{
@@ -198,7 +199,7 @@ Figure~\ref{lang_fig2}, Part~\subref{lang_fig2_hs} gives the Haskell
 version of |multiplier|. The signature, |Float -> (Float -> Float)|,
 shows that |multiplier| takes one argument, a |Float| value, and
 returns a function (|Float -> Float)|. The implementation on
-Line~\ref{lang_fig2_hs_fun} usea an \emph{anonymous} function:
+Line~\ref{lang_fig2_hs_fun} uses an \emph{anonymous} function:
 
 > \a -> multiple * a
 
@@ -267,7 +268,7 @@ Line~\ref{lang_fig2_scheme_mag} we evaluate the expression
 \end{AVerb}
 
 Figure~\ref{lang_fig2}, Part \subref{lang_fig2_js} shows the JavaScript
-version of #multiplier#. The body of #multiplier# returns an anonmous
+version of #multiplier#. The body of #multiplier# returns an anonymous
 function, defined by using the #function# keyword without a name:
 \begin{AVerb}
   return function(a) \{ 
@@ -431,7 +432,7 @@ Alonzo Church defined his \lamA (``lambda calculus'') in 19XX
 Turing-complete, it can be used to model the behavior of any
 computational system. Like Turing machines, the \lamA is \emph{not}
 a ``programming language'' in any practical sense, but it has proved
-incredibly useful when modelling the behavior of other functional
+incredibly useful when modeling the behavior of other functional
 programming languages.
 
 \subsection{Syntax of the \LamA}
@@ -462,11 +463,11 @@ Using this syntax, we can define some basic functions. |Identity|
 returns its argument:
 \begin{align}
   |identity| &= \lamAbs{x}{x}. \label{lang_eq1} \\
-  \intertext{|Const| takes two arguments but always returns the first:}
-  |const| &= \lamAbs{a}{\lamAbs{b}{a}}. \label{lang_eq_const1} \\
   \intertext{|Compose| takes two functions and an argument. The result of
     applying the second function to the argument is passed to the first:}
-  |compose| &= \lamCompose. \label{lang_eq_compose1} 
+  |compose| &= \lamCompose. \label{lang_eq_compose1} \\
+  \intertext{|Const| takes two arguments but always returns the first:}
+  |const| &= \lamAbs{a}{\lamAbs{b}{a}}. \label{lang_eq_const1} 
 \end{align}
 Note that application is left-associative, meaning
 \lamApp{const}{\lamApp{a}{b}} is the same as \lamAppP{\lamApp{const}{a}}{b}
@@ -481,20 +482,20 @@ same as $\lamApp{(\lamAbs{x}{x})}{(\lamAbs{y}{y})}$.
 
 When an abstraction, \lamAbs{x}{t_1}, is applied to a term, $t_2$, we
 can \emph{substitute} $t_2$ for each occurrence of $x$ in $t_1$. We say
-that $t_2$ ``maps to'' or ``substitues for'' each $x$ in $t_1$. Using
+that $t_2$ ``maps to'' or ``substitutes for'' each $x$ in $t_1$. Using
 Pierce's notation \citep{PierceXX}, we write this as:
 \begin{equation}
-  \lamAppP{\lamAbs{x}{t_1}}{t_2} = [t_2 \mapsto x] t_1.
+  \lamAppP{\lamAbs{x}{t_1}}{t_2} = [t_2 \mapsto x]\ t_1.
 \end{equation}
 Though substitution may appear simple, it is surprisingly hard to get
 right. When $t_2$ mentions variables that are bound by $t_1$, we can
-unintenionally capture values that we did not expect. For example,
+unintentionally capture values that we did not expect. For example,
 consider the following substitution, where we replace $x$ with $y$
 blindly:
 \begin{equation}
   \begin{split}
     & \lamAppP{\lamAbs{x}{\lamAbs{y}{\lamApp{x}{y}}}}{y} \\
-    & \quad = [y \mapsto x] \lamAbs{y}{\lamApp{x}{y}} \\
+    & \quad = [y \mapsto x]\ \lamAbs{y}{\lamApp{x}{y}} \\
     & \quad = \lamAbs{y}{\lamApp{y}{y}}
   \end{split}
 \label{lang_eq_capt1}
@@ -509,7 +510,7 @@ variables as needed:
 \begin{equation}
   \begin{split}
     & \lamAppP{\lamAbs{x}{\lamAbs{y}{\lamApp{x}{y}}}}{y} \\
-    & \qquad = [y \mapsto x] \lamAbs{w}{\lamApp{x}{w}} \\
+    & \qquad = [y \mapsto x]\ \lamAbs{w}{\lamApp{x}{w}} \\
     & \qquad = \lamAbs{w}{\lamApp{y}{w}}
   \end{split}
 \label{lang_eq_capt2}
@@ -517,16 +518,16 @@ variables as needed:
 For a full treatment of this issue, see Pierce \citep{PierceXX},
 Chapter X, Section Y.
 
-Following Pierce \citep{PierceXX}, who in turn follows Church
+Following Church
 \citep{ChurchXX}, we call any term where we can use substitution
-(i.e., an abstraction applied to term) a \emph{reducible expression}
+(i.e., a term applied to an abstraction) a \emph{reducible expression}
 or \emph{redex}. We call the act of reducing
 \emph{beta-reduction}. Evaluating (or ``executing'') a \lamA
 expression means finding these redexes and \emph{beta-reducing} them.
 
 For example, consider the following term:
 \begin{equation}
-  \lamAppP{\lamAbs{y}{\lamApp{\lamAbs{x}{y}}{y}}} %%
+  \lamAppP{\lamAbs{y}{\lamAppP{\lamAbs{x}{y}}{y}}} %%
          {\lamAbs{z}{\lamAppP{\lamAbs{x}{x}}{z}}}
 \end{equation}
 There are three possible redexes (i.e., substitutions) we can make in 
@@ -544,18 +545,16 @@ this program:
 The means by which we choose what redex to beta-reduce is called our
 \emph{evaluation strategy}.
 
-There are a number of possible strategies we can use. We follow
-Pierce's taxonomy \citep{PierceXX} here. \emph{Full beta-reduction}
-lets us choose any of the possible redexes, in any order we wish,
-until no more redexes remain. \emph{Normal-order} requires us to
-choose the leftmost, outermost redex, again until none
+There are a number of possible strategies we can use. \emph{Full
+  beta-reduction} lets us choose any of the possible redexes, in any
+order we wish, until no more redexes remain. \emph{Normal-order}
+requires us to choose the leftmost, outermost redex, again until none
 remain. \emph{Call-by-name} also requires us to choose the leftmost,
 outermost redex first, but we cannot reduce any redexes inside, or
-``under,'' $\lambda$'s (i.e., abstractions). \emph{Call-by-value},
-like call-by-need, restricts us from reducing inside abstractions and
-requires that we reduce the outermost redex first, and also requires
-that we reduce the right side of each application to a value before
-applying it to the left.
+``under,'' $\lambda$'s (i.e., abstractions). \emph{Call-by-value}, has
+the same restrictions as call-by-name and also requires that we reduce
+the right side (i.e., the argument) of each application to a value
+before applying it to the left.
 
 The phrase ``no more redexes'' really means we have reduced the term
 to a \emph{value}. In the \lamA, \emph{values} are abstractions. That
@@ -563,7 +562,10 @@ is, \emph{literally} functions \emph{are} values! The evaluation
 strategies differ on when to stop reducing: full-beta reduction and
 normal-order will reduce ``under'' an abstraction, while call-by-need
 and call-by-value will not. In all cases though, evaluation terminates
-(if at all), when only abstraction remains, with no more redexes.
+(if at all), when only an abstraction remains. In the call-by-value
+and call-by-name case, we can have redexes \emph{inside} the
+abstraction when we terminate. That is not the case for full and
+normal-order evaluation.
 
 In our work, we chose to use the call-by-value strategy over other
 alternatives for three reasons:
@@ -579,9 +581,9 @@ alternatives for three reasons:
   choice.
 \end{itemize}
 
-Figure~\ref{lang_fig4} uses Plotkin's ``structural operational
-semantics'' \citep{PlotkinXX} to pre\-sent \emph{rewrite rules} for the
-call-by-value strategy. This presentation treats evaluation of
+Figure~\ref{lang_fig4} uses Plotkin's \emph{structural operational
+  semantics} \citep{PlotkinXX} to formalize our evaluation strategy as
+a set of \emph{rewrite rules}. That is, we treat evaluation of
 lambda-terms as a sequence of \emph{rewrites}. Each step of evaluation
 matches a redex to the left-hand side of one of the rules. The redex
 is rewritten according to the right-hand side. If no more redexes
@@ -596,7 +598,7 @@ whole a \emph{transition function}.
     \begin{array}{lclr}
       \lamApp{t_1}{t_2} & \rightarrow & \lamApp{t_1}{v} & (\text{\sc App1}) \\
       \lamApp{t_1}{v_2} & \rightarrow & \lamApp{v_1}{v_2} & (\text{\sc App2}) \\
-      \lamAppP{\lamAbs{x}{t}}{v} & \rightarrow & [v \mapsto x] t & (\text{\sc Abs})
+      \lamAppP{\lamAbs{x}{t}}{v} & \rightarrow & [v \mapsto x]\ t & (\text{\sc Abs})
     \end{array}
   \end{math}
 \end{minipage}
@@ -610,7 +612,7 @@ whole a \emph{transition function}.
 Notice how the rules for application implement call-by-value. {\sc
   App1} requires that the argument, $t_2$, be reduced to a value, $v$,
 before we can evaluate the function term, $t_1$. {\sc App2} reduces
-the function term, $t$, to a value, $v_1$. Because values are
+the function term, $t_1$, to a value, $v_1$. Because values are
 abstractions, {\sc Abs} will only be applied after {\sc App1} and {\sc
   App2} have done their work.
 
@@ -664,7 +666,7 @@ abstractions, {\sc Abs} will only be applied after {\sc App1} and {\sc
 %%\emph{What does it look like?}
 We now show how natural numbers and some common arithmetic operations
 can be expressed using just the \lamA. We start with the \emph{Church
-  Numerals}, which represent natural numbers (0, 1, 2, etc.) as functions
+  numerals}, which represent natural numbers (0, 1, 2, etc.) as functions
 of two variables, $s$ and $z$:
 \begin{equation}
   \begin{split}
@@ -693,8 +695,8 @@ rewrite the redex:
     \lamApp{\mathit{succ}}{0} &= \\ 
     &= \lamAppP{\lamAbs{n}{\lamAbs{s}{\lamAbs{z}{\lamApPp{s}{\lamApp{n}{\lamApp{s}{z}}}}}}}{0} & \text{\emph{Definition of} succ.} \\
     &= \lamAbs{s}{\lamAbs{z}{\lamApPp{s}{\lamApp{0}{\lamApp{s}{z}}}}} & \text{\sc Abs} \\
-    &= \lamAbs{s}{\lamAbs{z}{\lamApPp{s}{\lamAppP{\lamAbs{s}{\lamAbs{z}{z}}}{\lamApp{s}{z}}}}} & \text{\emph{Definition of}\ 0 \emph{from Equation~\ref{lang_eq_nats}}} \\
-    & \multicolumn{2}{r}{\emph{For illustration, we reduce the $\lambda$'s introduced by 0, though call-by-value does not technically allow it.}} \\
+    &= \lamAbs{s}{\lamAbs{z}{\lamApPp{s}{\lamAppP{\lamAbs{s}{\lamAbs{z}{z}}}{\lamApp{s}{z}}}}} & \text{\emph{Definition of}\ 0 \emph{from Equation~\ref{lang_eq_nats}}} \\ \\
+    \multicolumn{3}{l}{\parbox[c]{\linewidth}{\emph{For illustration, we reduce the $\lambda$'s introduced by 0, though call-by-value does not technically allow it.}}} \\ \\
     &= \lamAbs{s}{\lamAbs{z}{\lamApPp{s}{\lamAppP{\lamAbs{z}{z}}{z}}}}  & \text{\sc Abs} \\
     &= \lamAbs{s}{\lamAbs{z}{\lamApp{s}{z}}}  & \text{\sc Abs} \\
     &= 1 & \text{\emph{Definition of}\ 1.}
@@ -714,8 +716,8 @@ $1$ and $1$:
     &= \lamAppP{\lamPlus}{\lamApp{1}{1}} & \text{\emph{Definition of} plus}. \\
     &= \lamAppP{\lamAbs{n}{\lamAbs{s}{\lamAbs{z}{\lamApp{1}{\lamApPp{s}{\lamApp{n}{\lamApp{s}{z}}}}}}}}{1} & \text{\sc Abs} \\
     &= \lamAbs{s}{\lamAbs{z}{\lamApp{1}{\lamApPp{s}{\lamApp{1}{\lamApp{s}{z}}}}}} & \text{Abs} \\
-    &= \lamAbs{s}{\lamAbs{z}{\lamApp{(\lamAbs{s}{\lamAbs{z}{\lamApp{s}{z}}})}{\lamApPp{s}{\lamApp{1}{\lamApp{s}{z}}}}}} & \text{\emph{Definition of}\ 1 \emph{from Equation~\ref{lang_eq_nats}}.} \\
-    & \multicolumn{2}{r}{\emph{Again, we reduce under the $\lambda$ here, for illustration.}} \\
+    &= \lamAbs{s}{\lamAbs{z}{\lamApp{(\lamAbs{s}{\lamAbs{z}{\lamApp{s}{z}}})}{\lamApPp{s}{\lamApp{1}{\lamApp{s}{z}}}}}} & \text{\emph{Definition of}\ 1 \emph{from Equation~\ref{lang_eq_nats}}.} \\ \\
+    \multicolumn{3}{l}{\emph{Again, we reduce under the $\lambda$ here, for illustration.}} \\ \\
     &= \lamAbs{s}{\lamAbs{z}{\lamApp{(\lamAbs{z}{\lamApp{s}{z}})}{(\lamApp{1}{\lamApp{s}{z}})}}} & \text{\sc abs} \\
 
     &= \lamAbs{s}{\lamAbs{z}{\lamApp{s}{(\lamApp{1}{\lamApp{s}{z}})}}} & \text{\sc abs} \\
@@ -725,8 +727,6 @@ $1$ and $1$:
     &= 2. & \text{\emph{Definition of}\ 2.}
   \end{array}
 \end{equation*}
-
-\emph{ ... Signpost and transitions ...}
 
 %% Nothing is built-in,
 %% not even the natural numbers. There is almost nothing to get in the
@@ -789,16 +789,16 @@ $1$ and $1$:
 
 \section{\lamC\ -- Extending the \lamA}
 \label{lang_sec4}
-While Section~\ref{lang_sec1} should make it clear that the \lamA is
-capable of general-purpose programming, it is also cumbersome
-and inconvenient. In particular, representing conditions and values in
-purely ``functional'' form is extremely verbose. Therefore
-we extend the \lamA in our work by adding two new terms: \emph{algebraic
-data types}\ and \emph{case discrimination}. 
+Section~\ref{lang_sec1} should make it clear that the \lamA is capable
+of general-purpose programming, but also quite cumbersome. In
+particular, representing conditional statements and values in purely
+``functional'' form is extremely verbose. Therefore we extend the
+\lamA in our work by adding two new terms: \emph{algebraic data
+  types}\ and \emph{case discrimination}.
 
-\emph{Algebraic data types} (ADTs) allow us to construct ``raw'' values that
-are not just abstractions. They consist of a \emph{constructor} tag
-and zero or more fields. For example, we can create boolean values by
+\emph{Algebraic data types} (ADTs) are a new type of value, alongside
+$\lambda$-abstractions.  They consist of a \emph{constructor} tag and
+zero or more fields. For example, we can create boolean values by
 defining two constructors:
 
 > Boolean = True | False
@@ -809,7 +809,7 @@ does not actually support naming data types like |Boolean|; we only are able
 to name the constructors |True| and |False|. For presentation, however, this
 shorthand is convenient and will be used as needed.
 
-Constructors can be defined to take arguments. This allows us to build
+Constructors can take also take arguments. This allows us to build
 composite data values from simpler pieces. For example, lists
 typically have one constructor taking no arguments that represents the
 empty list, and another taking two arguments, one of which holds an
@@ -818,9 +818,11 @@ element of the list and other which holds the ``rest'' of the list:
 > List = Nil | Cons x xs
 
 Here, |Nil| represents the empty list. |Cons| holds an element of the
-list (|x|) and the rest of the list (|xs|). For example, the list
-|[True, False, True]| translates to the following sequence of |List|
-constructors:
+list (|x|) and the rest of the list (|xs|). While the |x| argument can
+hold any value, the |xs| argument must be another |Cons| or |Nil|
+value. If |xs| is some other value, we do not have a valid list. For
+example, the list |[True, False, True]| translates to the following
+sequence of |List| constructors:
 
 > Cons True (Cons False (Cons True Nil))) 
 
@@ -829,7 +831,7 @@ empty list, |Nil|, is written as empty brackets: |[]|.
 
 Natural numbers can be represented as successors to zero, otherwise
 known as \emph{Peano} numbers. We define two constructors, |Z| for
-zero and |S| for succcessor:
+zero and |S| for successor:
 
 > Natural = Z | S n
 
@@ -845,16 +847,16 @@ terminated by a |Z|:
 > {-"\ldots"-}
 
 Constructors are just like functions, except for one crucial
-difference: our language does not specify their ``body.'' Instead,
-constructors create new data, in some way that our language does not
-specify or have access to.
+difference: we do not write their ``body.'' Instead, the body of the
+constructor creates new data, in some way that we cannot explicitly express
+in \lamC. 
 
-Where ADTs (\emph{algebraic data types}) create data, \emph{case
-  discrimination} (or \emph{case expressions}), take data apart. Case
-expressions are a generalized form of the \emph{if} or \emph{switch}
-statements found in languages such as C, Java, and JavaScript. The
-case expression inspects a value (the \emph{discriminant}) and selects
-one of many \emph{case alternatives} (or \emph{arms}) based on the value
+We use ADTs to construct values; we take them apart using \emph{case
+  expressions} (or \emph{case discrimination}). Case expressions are a
+generalized form of the \emph{if} or \emph{switch} statements found in
+languages such as C, Java, and JavaScript. The case expression
+inspects a value (the \emph{discriminant}) and selects one of many
+\emph{case alternatives} (or \emph{arms}) based on the value
 found. The value of the alternative becomes the value of the case
 expression.
 
@@ -862,21 +864,21 @@ For example, we can implement \emph{if} over booleans using \emph{case}:
 
 > case b of
 >   True -> {-"\ldots"-}
->   False -> {- "\ldots"-}
+>   False -> {-"\ldots"-}
 
 Each alternative specifies a constructor to the left of the arrow. The
 right-hand side gives the body that will be evaluated if the
 discriminant matches the constructor. 
 
 When the constructor used in the case alternatives takes arguments,
-then those values become availble in the arm associated with the
-alternative.  Looking at lists, we can write \emph{take1}, which
+then those values become available in the arm associated with the
+alternative.  Looking at lists, we can write \emph{takeOne}, which
 will take 1 element from a list and return a list. If the list
 given has no elements, an empty list is returned:
 
-> take1 l = case l of
->             Cons a as -> Cons a Nil
->             Nil -> Nil   
+> takeOne = {-"\lamAbs{l}{}"-} case l of
+>               Cons a as -> Cons a Nil
+>               Nil -> Nil   
 
 We use |a| and |as| to emphasize that these bindings are new and based on
 the value of |l|.
@@ -888,55 +890,55 @@ example, this expression would have undefined behavior:
 > case (Cons True Nil) of
 >   Nil -> Nil
 
-Normally, an implementation will generate an error when this
-expression is evaluated.
-
 Figure~\ref{lang_fig5} shows the syntax for ADTs and case
-discriminiation. An ADT consists of a constructor name |C| and zero or
-more arguments. ADTs can only appear in term positions. Specifically,
-they cannot be used as the parameter variable in an abstraction. That
-is, we do not support ``pattern-matching,'' as found in many
-functional languages. Case discrimination consisist of the
-determinant, which can be an arbitrary term ($t$), and one or more
-alternatives (or ``arms''). Each arm consists of a constructor name
+discrimination. An ADT consists of a constructor name, |C|, and zero
+or more arguments ($t_1$, $t_2$, \ldots). Each argument can be a
+term. The ADT term itself can only appear where our syntax allows
+terms. Specifically, they cannot be used as the parameter variable in
+an abstraction. That is, we do not support ``pattern-matching,'' as
+found in many functional languages. Case discrimination consists of
+the determinant term, $t$, and one or more alternatives (or
+``arms''). Each arm consists of a constructor ($C_1$, $C_2$, \ldots)
 and a ``binding'' for each argument that the constructor was defined
-with. A case alternative cannot specify more or less arguments than
-the original constructor had. Each arm has a body, which is an
-arbitrary term. Both the new bindings from the arm \emph{and} the
-discriminant are in scope in the arm.\footnote{Any other variables
-  bound by enclosing $\lambda$'s are in scope as well, of course.}
-Bindings in the arm will ``shadow'' any bindings with the same name
-that are already in scope.
+with ($a_1$, $b_1$, \ldots). The number of bindings must exactly match
+the number of arguments defined for the constructor. Each binding is
+also a \emph{variable} -- we do \emph{not} allow terms. Each arm
+defines a body ($t_1$, $t_2$, \ldots). Both the new bindings from the
+arm \emph{and} the discriminant are in scope in the arm.\footnote{Any
+  other variables bound by enclosing $\lambda$'s are in scope as well,
+  of course.}  Bindings in the arm will ``shadow'' any bindings with
+the same name that are already in scope.
 
 \begin{myfig}[tbh]
   \begin{minipage}{3in}
   \begin{align*}
-    term &= \mathit{C}\ \mathit{arg}_1\ \mathit{arg}_2\ \ldots\ \mathit{arg}_n, n \ge 0 & \hfil\text{\emph{(ADTs)}} \\ \\
+    term &= \mathit{C}\ t_1\ t_2\ \ldots\ t_n, n \ge 0 & \hfil\text{\emph{(ADTs)}} \\ \\
       &= |case|\ t\ |of| & \hfil\text{\emph{(Case Discrimination)}} \\
-      & \qquad\mathit{C}_1\ \mathit{arg}_1\ \mathit{arg}_2\ \ldots\ \mathit{arg}_n \rightarrow t_1, n \ge 0 \\
-      & \qquad\mathit{C}_2\ \mathit{arg}_1\ \mathit{arg}_2\ \ldots\ \mathit{arg}_n \rightarrow t_2, n \ge 0 
+      & \qquad\mathit{C}_1\ a_1\ a_2\ \ldots\ a_n \rightarrow t_1, n \ge 0 \\
+      & \qquad\mathit{C}_2\ b_1\ b_2\ \ldots\ b_n \rightarrow t_2, n \ge 0 
   \end{align*}
   \end{minipage}
   \caption{The syntax of \lamC, which extends \lamA from
-    Figure~\ref{lang_fig3} with \emph{algrebraic data types} (ADTs)
-    and \emph{case discrimination}. $t$ again represents an arbitrary
-    term. $C$ stands for a constructor name.}
+    Figure~\ref{lang_fig3} with \emph{algebraic data types} (ADTs) and
+    \emph{case discrimination}. $t$ again represents an arbitrary
+    term. $C$ stands for a constructor name. $a$ and $b$ represent
+    variables, not terms.}
   \label{lang_fig5}
 \end{myfig}
 
 Figure~\ref{lang_fig6} shows how we evaluate our new terms. In {\sc
   Case1}, the discriminant must evaluate to a constructor. Otherwise,
-the behavior is undefined. If we just evaluated to $v$, then that
-would imply a $\lambda$ could appear as a discriminant, which we do
-not want. {\sc Case2} shows two important actions. First, the
-discriminate value is matched to an alternative with the same
-constructor.\footnote{If the constructor does appear in any
-  alternative, or appears more than once, again the behavior will be
-  undefined. } Second, the alternative's body will be evaluated with
-new bindings where $v_1$ maps to $a_1$, $v_2$ maps to $a_2$, etc. The
-{\sc Data} rule shows that constructors will evaluate all of their
-arguments to values.\footnote{Note that order of evaluation for
-  arguments is \emph{not} specified.}
+the behavior is undefined. If we allowed evaluation to an arbitrary
+value, that would imply a $\lambda$ could appear as a discriminant,
+which does not make sense. {\sc Case2} shows two important
+actions. First, the discriminate value is matched to an alternative
+with the same constructor \emph{and} number of arguments.\footnote{The
+  behavior is undefined if a single match is not found.}  Second, the
+alternative's body will be evaluated with new bindings, where $v_1$
+maps to $a_1$, $v_2$ maps to $a_2$, etc. The {\sc Value} rule shows
+that constructors will evaluate all of their arguments to
+values.\footnote{Note that order of evaluation for arguments is
+  \emph{not} specified.}
 
 \begin{myfig}[tbh]
   \begin{minipage}{5in}
@@ -974,7 +976,7 @@ arguments to values.\footnote{Note that order of evaluation for
         \rightarrow & [v_1 \mapsto a_1, \ldots, v_n \mapsto a_n]\ t & \text{({\sc Case2})} \\ \\
 
         \;|C|\ t_1\ \ldots\ t_n& %%
-        \rightarrow & |C|\ v_1 \ldots\ v_n & \text{({\sc Data})}
+        \rightarrow & |C|\ v_1 \ldots\ v_n & \text{({\sc Value})}
 
       \end{array}
     \end{math}
@@ -988,15 +990,15 @@ arguments to values.\footnote{Note that order of evaluation for
 
 With our new terms, we can more easily define functions from
 Section~\ref{lang_sec1}. Rather than the Church numerals,
-we can use define \emph{plus} in terms of Peano numbers now:
+we can define \emph{plus} in terms of Peano numbers:
 
-> plus = \m -> \n -> case m of
+> plus = {-"\lamAbs{m}{\lamAbs{n}{}}"-} case m of
 >   S m' -> S (plus m' n)
 >   Z -> n
 
 Multiplication can be defined in terms of |plus|:
 
-> mult = \m -> \n -> case m of
+> mult = {-"\lamAbs{m}{\lamAbs{n}{}}"-} case m of
 >   S m' -> plus n (mult m' n)
 >   Z -> Z
 
@@ -1004,21 +1006,19 @@ This allows us to define our |multiplier| and |mag| function from
 Section~\ref{lang_sec2}:\footnote{We use ``2'' here to represent the
   Peano number |S (S Z)|.}
 
-> multiplier = \multiple -> \a -> mult multiple a
+> multiplier = {-"\lamAbs{multiple}{\lamAbs{a}{}}"-} mult multiple a
 > mag = multiplier 2
 
 Figure~\ref{lang_fig7} collects the syntax and evaluation rules for
-\lamC into one place. Part~\subref{lang_fig7_sytnax} gives the full
+\lamC into one place. Part~\subref{lang_fig7_syntax} gives the full
 syntax for \lamC, and Part~\subref{lang_fig7_eval} gives our
 evaluation rules. We extend the syntax for convenience in two ways. We
 have added the ability to define top-level definitions, so that a
 program is formed of multiple definitions, each of which is available
 to all top-level functions. We have also allowed arguments to be
-written to the left of the equals when defining a function.  In each
-case we can always translate our expressions into the simpler syntax
-we illustrated above.
-
-\emph{\ldots signposts and transitions \ldots}
+written to the left of the equals when defining a function.  We also
+updated the abstraction notation from ``$\lamAbs{x}{t}$'' to ``|\x ->
+t|.''
 
 \afterpage{\clearpage\input{lang_fig7}\clearpage}
 
@@ -1262,8 +1262,35 @@ we illustrated above.
 %% registers expected by our function, we generate the code for our body
 %% and place it inline.
 
-\section{Conclusion}
+\section{Summary}
 \label{lang_sec5}
+
+In this chapter we described the basic proposition of functional
+languages: \emph{functions are values}. Section~\ref{lang_sec2} showed
+how to create a code ``hole'' in a function definition, which is later
+filled with ``code'' passed as an argument. We introduced the \lamA in
+Section~\ref{lang_sec1}, describing its syntax and our chosen
+evaluation strategy, \emph{call-by-value}. In Section~\ref{lang_sec4}
+we extended the \lamA to \lamC, the language we will be using for the
+rest of this thesis. For reference, Figure~\ref{lang_fig7} shows the
+complete syntax and evaluation rules.
+
+%% Nothing is built-in,
+%% not even the natural numbers. There is almost nothing to get in the
+%% way of studying your particular domain, rather than fiddling with the
+%% programming language. However, the \lamA is inherently functional --
+%% it can only define functions, and all values computed are really
+%% functions. Translating from the \lamA to another functional language
+%% is usually straightforward.\footnote{And, if not, maybe your target
+%%   language isn't very functional.}
+
+%% Its power, simplicity, and functional nature of the \lamA motivates
+%% our own choice in using it. We do not show how to compile a
+%% ``real-world'' functional language to our intermediate language, but
+%% by showing how to compile the \lamA to our language, we show our
+%% technique could be used by ``real'' functional languages (with some
+%% adaptions, of course).
+
 %% Functional languages distinguish themselves by their ability to treat
 %% \emph{functions} as \emph{first-class values}. The \lamA, invented
 %% some time before the first functional language, turned out to be a

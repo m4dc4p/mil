@@ -6,7 +6,7 @@
 
       \;\lamApp{t_1}{v_2} & \rightarrow & \lamApp{v_1}{v_2} & (\text{\sc App2}) \\ \\
 
-      \;\lamAppP{\lamAbs{x}{t}}{v} & \rightarrow & [v \mapsto x] t & (\text{\sc Abs}) \\ \\
+      \;\lamAppP{|\x -> t|}{v} & \rightarrow & [v \mapsto x] t & (\text{\sc Abs}) \\ \\
       \begin{minipage}{1in}
         \begin{math}
           \begin{array}{l}
@@ -38,7 +38,7 @@
       \rightarrow & [v_1 \mapsto a_1, \ldots, v_n \mapsto a_n]\ t & \text{({\sc Case2})} \\ \\
 
       \;|C|\ t_1\ \ldots\ t_n& %%
-      \rightarrow & |C|\ v_1 \ldots\ v_n & \text{({\sc Data})}
+      \rightarrow & |C|\ v_1 \ldots\ v_n & \text{({\sc Value})}
 
     \end{array}
   \end{math}
