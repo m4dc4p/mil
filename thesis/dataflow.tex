@@ -224,6 +224,26 @@ analysis performed.
 %% by summarizing how the concept fits into dataflow (in a bit larger
 %% sense than the first summary).
 
+\begin{equation}
+  \begin{align}
+    In(B) &= \bigwedge_{P \in pred(B)} Out(P)
+    B \bigwedge\ \empty\ &= B
+    B \bigwedge\ C &= [\{a=v_b\} \wedge\ \{a=v_c\} || \{a=v_b\}\ \in\ B, \{a=v_c\}\ \in\ C] \\%%
+                   &\; \cup\ [\{b=v_b\} || \{b=v_b\}\ \in\ B, \{b=v_b\}\ \not\in\ C] \\%%
+                   &\; \cup\ [\{c=v_c\} || \{c=v_c\}\ \not\in\ B, \{c=v_c\}\ \in\ C]
+    \{a=$bottom$\} \wedge \{a=v\} &= \{a=v\}
+    \{a=$top$\} \wedge \{a=v\} &= \{a=$top$\}
+    \{a=v\} \wedge \{a=u\} &= \{a=$top$\}
+    \{a=v\} \wedge \{a=v\} &= \{a=v\}
+  \end{align}
+\end{equation}
+
+\begin{tabular}{ll}
+  \textbf{Lattice} & $\bottom$, 0, 1, \ldots, and $\top$. \\
+  \textbf{Meet} &  As above. \\
+\end{tabular}
+Our lattice consists of 
+
 As we saw in Figure \ref{fig_back5}, facts can conflict when nodes
 have multiple predecessors. Even more complicated situations arise
 when a program contains loops. Consider the fragment in
