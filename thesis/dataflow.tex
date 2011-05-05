@@ -19,35 +19,25 @@ optimized program may run faster, use less memory, or consume less
 power.  Optimizations can be performed by hand, while writing the
 program, or automatically by a compiler.
 
-\emph{Dataflow analysis} (or \emph{dataflow optimization}), introduced
-by Gary Kildall \citep{Kildall1973}, gives a framework in which many
-different kinds of optimizations can be applied. He innovated by
-describing a method for applying optimizations \emph{in general}, not
-by describing a specific optimization.  We informally describe the
-dataflow algorithm here. For a more formal treatment, see
-\citep{AhoXX}.
+The \emph{dataflow algorithm}, as described by Gary Kildall
+\citep{Kildall1973}, provides a framework analyzing and optimizing
+programs.  The algorithm \emph{iteratively} traverses the
+\emph{control-flow graph} for a program either \emph{forwards} or
+\emph{backwards}, computing \emph{facts} at each node using a
+\emph{transfer function}, until the facts reach a \emph{fixed
+  point}. The choice of facts, transfer function, and direction depend
+on the particular analysis performed. In other words, the dataflow
+\emph{algorithm} is parameterized by these choices; a dataflow
+\emph{analysis} is a specific instance of the algorithm.
 
-The dataflow algorithm analyzes and transforms \emph{control-flow
-  graphs}, a data structure for representing programs. The algorithm
-associates each node in the graph with a set of \inE and \out
-\emph{facts}, representing the portion of the program's state under
-analysis. In a \emph{forwards} analysis, we compute \out from \inE. A
-\emph{backwards} analysis does the opposite: \inE from \out.  In both
-case, a \emph{transfer function} transforms one set of facts to the
-other. When nodes have multiple predecessors (or successors), we
-combine facts using a \emph{meet operator}. The algorithm computes
-facts until reaching a \emph{fixed point}. The facts computed can be
-used to \emph{rewrite} the control-flow graph, giving us an optimized
-program. In some cases, we do not rewrite the graph, but use the
-results of the analysis in a later optimization.
-
-This chapter describes the concepts necessary to understand dataflow
-analysis and gives an extended example to illustrate them
-together. Section~\ref{sec_back1} describes control-flow graphs. We
-discuss facts, direction, the transfer function and the meet operator
-in Section \ref{sec_back4}. We illustrate why dataflow must be an
-iterative algorithm (and define what a fixed point means in this
-context) in Section~\ref{sec_back6}. We treat rewriting in
+This chapter describes the concepts necessary to understand the
+dataflow algorithm and gives an extended example of using the
+algorithm to determine \emph{liveness}. Section~\ref{sec_back1}
+describes control-flow graphs. We discuss facts, direction, the
+transfer function and the meet operator in Section \ref{sec_back4}. We
+illustrate why dataflow must be an iterative algorithm (and define
+what a fixed point means in this context) in
+Section~\ref{sec_back6}. We treat rewriting in
 Section~\ref{sec_back7}. To demonstrate these concepts together, we
 give an extended example of \emph{dead-code elimination} in
 Section~\ref{sec_back2}.
@@ -103,6 +93,62 @@ which expressions and statements in a program are evaluated. The
 dataflow algorithm intimately depends on the program representation
 provided by the CFG.
 
+%% \section{Basic Blocks}
+%% \label{sec_back3}
+
+%% %% Begin by placing the specific concept in the overall context of
+%% %% dataflow. Give a small example highlighting the concept. Point
+%% %% out fine points or subtleties that occur when generalizing the concept. End
+%% %% by summarizing how the concept fits into dataflow (in a bit larger
+%% %% sense than the first summary).
+
+%% \begin{myfig}[th]
+%% \begin{tabular}{ccc}
+%% \begin{minipage}[b]{1.5in}
+%%   \subfloat{\input{lst_back3}\label{fig_back4_a}}
+%% \end{minipage} & %%
+%% \begin{minipage}[b]{1.5in}
+%%   \subfloat{\input{lst_back4}\label{fig_back4_b}}
+%% \end{minipage}& %%
+%% \begin{minipage}[b]{1.5in}
+%%   \subfloat{\input{lst_back5}\label{fig_back4_c}}
+%% \end{minipage} \\
+%% \subref{fig_back4_a} & \subref{fig_back4_b} & \subref{fig_back4_c} \\
+%% \end{tabular}
+%% \caption{\subref{fig_back4_a}: A C-language fragment to illustrate
+%%   \emph{basic blocks}.  \subref{fig_back4_b}: The CFG for
+%%   \subref{fig_back4_a} without basic blocks. \subref{fig_back4_c}: The
+%%   CFG for \subref{fig_back4_c} using basic blocks.}
+%% \label{fig_back4}
+%% \end{myfig}
+
+%% %% Basic blocks
+%% Consider the C-language fragment and CFGs in Figure~\ref{fig_back4}. 
+%% Part~\subref{fig_back4_b} shows the CFG for part~\subref{fig_back4_a}: a long, straight sequence of nodes, one after
+%% another. Part~\subref{fig_back4_C}, however, collapses all those nodes
+%% into~\refNode{lst_back5_assign}. Our graph of statements becomes a
+%% graph of \emph{blocks}.
+
+%% Part~\subref{fig_back4_c} represents the assignment statements on
+%% lines~\ref{lst_back3_start} -- \ref{lst_back3_end} as a \emph{basic
+%%   block}: a sequence of statements with one entry, one exit, and no
+%% branches in-between. Execution cannot start in the ``middle'' of the
+%% block, nor can it branch anywhere but at the end of the block. In fact,
+%% Part~\ref{fig_back4_b} also shows four basic blocks -- they just happen
+%% to consist of one statement each.
+
+%% The representation given in Part~\subref{fig_back4_c} has a number of
+%% advantages. It tends to reduce both the number of nodes and the number
+%% of edges in the graph. The dataflow algorithm maintains two sets of
+%% \emph{facts} for every node -- reducing the number of nodes obviously
+%% reduces the number of facts stored. The algorithm also iteratively
+%% propagates facts along edges -- so reducing the number of edges
+%% reduces the amount of work we need to do. When rewriting, blocks allow
+%% us to move larger amounts of the program at once. It also can be shown
+%% (see \citep{AhoXX}) that we do not lose any information by collapsing
+%% statements into blocks. For efficiency and brevity, we will work with
+%% basic blocks rather than statements from here forward.
+
 \section{Facts, Transfer Functions, Direction \& The Meet Operator}
 \label{sec_back4}
 
@@ -111,7 +157,6 @@ provided by the CFG.
 %% out fine points or subtleties that occur when generalizing the concept. End
 %% by summarizing how the concept fits into dataflow (in a bit larger
 %% sense than the first summary).
-
 \begin{myfig}[th]
 \centering
 \input{lst_back7}
@@ -225,24 +270,36 @@ analysis performed.
 %% sense than the first summary).
 
 \begin{equation}
-  \begin{align}
-    In(B) &= \bigwedge_{P \in pred(B)} Out(P)
-    B \bigwedge\ \empty\ &= B
+  \begin{split}
+    B \bigwedge\ \emptyset\ &= B \\
     B \bigwedge\ C &= [\{a=v_b\} \wedge\ \{a=v_c\} || \{a=v_b\}\ \in\ B, \{a=v_c\}\ \in\ C] \\%%
-                   &\; \cup\ [\{b=v_b\} || \{b=v_b\}\ \in\ B, \{b=v_b\}\ \not\in\ C] \\%%
-                   &\; \cup\ [\{c=v_c\} || \{c=v_c\}\ \not\in\ B, \{c=v_c\}\ \in\ C]
-    \{a=$bottom$\} \wedge \{a=v\} &= \{a=v\}
-    \{a=$top$\} \wedge \{a=v\} &= \{a=$top$\}
-    \{a=v\} \wedge \{a=u\} &= \{a=$top$\}
-    \{a=v\} \wedge \{a=v\} &= \{a=v\}
+                   &\; \cup\ [\{b=v_b\} || \{b=v_b\}\ \in\ B, \{b=v_c\}\ \not\in\ C] \\%%
+                   &\; \cup\ [\{c=v_c\} || \{c=v_b\}\ \not\in\ B, \{c=v_c\}\ \in\ C] \\
+    \{a=\bot\} \wedge\ \{a=v\} &= \{a=v\} \\
+    \{a=\top\} \wedge\ \{a=v\} &= \{a=\top\} \\
+    \{a=v\} \wedge\ \{a=u\} &= \{a=\top\} (u \neq v) \\
+    \{a=v\} \wedge\ \{a=v\} &= \{a=v\} \\
+  \end{split}
+\end{equation}
+
+\begin{equation}
+  \begin{split}
+    f_B(In) &= [\mathit{assign}(v) || v \in\ In], \text{where $B$ is a block in the CFG} \\
+    assign(v) &= %%
+    \begin{cases}
+      c & \text{when $v$ assigned $c$ in B.} \\
+      In(v) & \text{when v not assigned in B.}
+    \end{split}
   \end{align}
 \end{equation}
 
 \begin{tabular}{ll}
-  \textbf{Lattice} & $\bottom$, 0, 1, \ldots, and $\top$. \\
+  \textbf{Lattice} & $\bot$, 0, 1, \ldots, and $\top$. \\
   \textbf{Meet} &  As above. \\
+  \textbf{Transfer} & As above. \\
+  \textbf{Direction} & Forward.
 \end{tabular}
-Our lattice consists of 
+
 
 As we saw in Figure \ref{fig_back5}, facts can conflict when nodes
 have multiple predecessors. Even more complicated situations arise
