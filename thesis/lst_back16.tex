@@ -1,0 +1,36 @@
+  \node[entex] (entry) {};
+
+  \node[stmt, below of=entry] (assign) {\begin{minipage}{0.5in}
+      \begin{AVerb} 
+m = 10
+n = 1
+i = 0
+      \end{AVerb}
+    \end{minipage}
+    \labelNode{\prefix assign}};
+  \node[labelfor=assign] () {\refNode{\prefix assign}};
+
+  \node[stmt, below of=assign] (test) {#i < cnt#\labelNode{\prefix test}};
+  \node[labelfor=test] () {\refNode{\prefix test}};
+
+  \node[stmt, right=.5in of test] (mult) {#n = val * m#\labelNode{\prefix mult}};
+  \node[labelfor=mult] () {\refNode{\prefix mult}};
+
+  \node[stmt, below of=mult] (incr) {#i++#\labelNode{\prefix incr}};
+  \node[labelfor=incr] () {\refNode{\prefix incr}};
+
+  \node[invis, right of=incr] (incr1) {};
+  \node[invis, above right of=mult] (incr2) {};
+
+  \node[stmt, below of=test] (return) {#return n#\labelNode{\prefix return}};
+  \node[labelfor=return] () {\refNode{\prefix return}};
+
+  \node[entex, below of=return] (exit) {};
+
+  \draw [->>] (entry) to (assign);
+  \draw [->] (assign) to (test);
+  \draw [->] (test) to (mult);
+  \draw [->] (mult) to (incr);
+  \draw [->] (incr) to (incr1) |- (incr2) |- (test.north);
+  \draw [->] (test) to (return);
+  \draw [->>] (return) to (exit);

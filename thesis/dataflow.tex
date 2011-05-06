@@ -12,13 +12,6 @@
 %% A short section giving the history of dataflow optimization techniques
 %% and basic concepts.
 
-The term \emph{program optimization} refers to the process of
-transforming a program without changing its semantics (i.e., meaning),
-while at the same time ``improving'' its behavior.  For example, an
-optimized program may run faster, use less memory, or consume less
-power.  Optimizations can be performed by hand, while writing the
-program, or automatically by a compiler.
-
 The \emph{dataflow algorithm}, as described by Gary Kildall
 \citep{Kildall1973}, provides a framework analyzing and optimizing
 programs.  The algorithm \emph{iteratively} traverses the
@@ -26,18 +19,18 @@ programs.  The algorithm \emph{iteratively} traverses the
 \emph{backwards}, computing \emph{facts} at each node using a
 \emph{transfer function}, until the facts reach a \emph{fixed
   point}. The choice of facts, transfer function, and direction depend
-on the particular analysis performed. In other words, the dataflow
+on the particular analysis performed. In essence, the dataflow
 \emph{algorithm} is parameterized by these choices; a dataflow
 \emph{analysis} is a specific instance of the algorithm.
 
 This chapter describes the concepts necessary to understand the
-dataflow algorithm and gives an extended example of using the
-algorithm to determine \emph{liveness}. Section~\ref{sec_back1}
-describes control-flow graphs. We discuss facts, direction, the
-transfer function and the meet operator in Section \ref{sec_back4}. We
-illustrate why dataflow must be an iterative algorithm (and define
-what a fixed point means in this context) in
-Section~\ref{sec_back6}. We treat rewriting in
+dataflow algorithm and gives an extended example demonstrating the use
+of \emph{liveness analysis} to eliminate
+\emph{dead-code}. Section~\ref{sec_back1} describes control-flow
+graphs. We discuss facts, direction, the transfer function and the
+meet operator in Section \ref{sec_back4}. We illustrate why dataflow
+must be an iterative algorithm (and define what a fixed point means in
+this context) in Section~\ref{sec_back6}. We treat rewriting in
 Section~\ref{sec_back7}. To demonstrate these concepts together, we
 give an extended example of \emph{dead-code elimination} in
 Section~\ref{sec_back2}.
@@ -149,6 +142,174 @@ provided by the CFG.
 %% statements into blocks. For efficiency and brevity, we will work with
 %% basic blocks rather than statements from here forward.
 
+\section{The Dataflow Algorithm}
+
+Kildall's dataflow algorithm provides a general-purpose mechanism for
+analyzing control-flow graphs of statements or basic blocks. The
+algorithm itself does not mandate a specific analysis. Rather, it is
+parameterized by the choice of \emph{facts}, \emph{lattice},
+\emph{meet operator}, \emph{transfer function}, and
+\emph{direction}. Facts, the lattice, and the meet operator are used
+to approximate the program's semantics. The transfer function creates
+facts using the flow of facts in the control-flow graph. The direction
+is dictacted by the type of analysis -- each particular analysis
+runs \emph{forwards} or \emph{backwards}.
+
+%% Constant-propagation
+Consider Figure~\ref{fig_back7}, Part~\subref{fig_back_7_initial}, which
+shows a C function containing a loop that multipies the argument by 10
+some number of times. Line~\ref{fig_back7_m} declares #m# and assigns
+it the value 10. The function uses #m# in the loop body on
+Line~\ref{fig_back7_loop} to multiply the value passed in
+repeatedly. 
+
+\begin{myfig}[tbh]
+  \begin{tabular}{cc}
+    \subfloat{\input{lst_back11}\label{fig_back_7_initial}} & %%
+    \subfloat{\input{lst_back12}\label{fig_back7_opt}} \\
+
+    \subref{fig_back7_initial} & \subref{fig_back7_opt} 
+  \end{tabular}
+  \caption{A C program which multiplies its argument, \texttt{val}, by
+    10 \texttt{cnt} times. Part~\subref{fig_back7_initial} shows the
+    original program. In Part~\subref{fig_back7_opt}, we have used
+    \emph{constant propagation} to replace the use of \texttt{m} in
+    the loop body with 10.}
+  \label{fig_back7}
+\end{myfig}
+
+The program in Figure~\ref{fig_back7_initial} can be improved by
+replacing the variable #m# with 10 in the loop body. We can use a
+dataflow analysis known as \emph{constant propagation} to implement
+this optimization. The constant propagation analysis recognizes when a
+variable's value does not change in some context and then replaces
+references to the variable with the constant
+value. Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt} shows the
+optimized program, replacing #m# with 10 on
+Line~\ref{fig_back7_opt_loop}.
+
+\begin{myfig}[tbh]
+  \input{lst_back13}
+  \caption{Control-flow graph for the program in
+    Figure~\ref{fig_back7_initial}.}
+  \label{fig_back8}
+\end{myfig}
+
+\subsection{Facts and Lattices} 
+\label{back_subsec_facts}
+
+Constant propagation analyzes how each variable's value changes during
+execution. The analysis \emph{approximates} the actual values of the
+variables, as determining their exact value in all cases is
+undecidable. Even so, we only need to know if a variable's value
+changes over time. We will place the value of each variable into one
+of three categories at each point in the control-flow graph:
+\emph{unknown}, a \emph{known constant}, and
+\emph{indeterminate}. \emph{Unknown}, which we will represent with
+$\bot$ (``bottom''), is the initial value for all variables in our
+analysis. A \emph{known constant}, which is just an integer in this
+case, means our analysis identified that the variable was assigned the
+given value. \emph{Indeterminate}, which we will represent with $\top$
+(``top''), means our analysis found that the variable could possibly
+have more than one value at a given point.
+
+Figure~\ref{fig_back9} shows the control-flow graph of our program
+annotated with \emph{facts} before (\inE) and after (\out) each
+program point. Our facts indicate if a given variable has a constant
+value at any point in the control-flow graph. Initially, we do not
+have any information about the value assigned to each variable, so all
+our facts assign $\bot$ to their respective variable. For this
+analysis, the facts represent knowledge about a variable's
+value. Other analysis' will use different facts. In all cases, though,
+facts are the fundamental value that a dataflow analysis computes.
+
+\begin{myfig}
+  \input{lst_back15}
+  \label{fig_back9}
+  \caption{Our program, annotated with initial \emph{facts} before
+    (\inE) and after (\out) each program point. We have no information
+    about any variable initially, so all values are $\bot$.}
+\end{myfig}
+
+The values $\bot$, $x$ (any integer), and $\top$ form a set which we will
+denote as \setLC. The set \setLC, together with a meet
+operator that we will define shortly, forms a
+\emph{lattice}.\footnote{The lattice can also have a \emph{join}
+  operator, but for our purposes we can work solely using the meet.}
+The lattice defines how our facts will indicate if a variable has a
+constant value. Each specific dataflow analysis uses the values
+appropriate to them, but dataflow always uses form a lattice.
+
+The \emph{meet operator} \lub (``meet'' or ``least upper bound''),
+defines how we will combine values in \setLC. Table~\ref{tbl_back4}
+gives the definition of \lub. For any value of $x \in \setLC$, $\bot
+\lub x$ results in $x$. Conversely, $x \lub \top$
+results in $\top$. Two differing constants, $C_1$ and $C_2$, result in
+$\top$, while equal constants give the same constant.
+
+\begin{myfig}[tbh]
+  \begin{math}
+    \begin{array}{cccc}
+      v_1 & v_2 & v_1 \lub v_2 \\
+      \cmidrule(r){1-1}\cmidrule(r){2-2}\cmidrule(r){3-3}
+      \bot & x & x \\
+      x & \top & \top & \\ 
+      C_1 & C_2 & \top & \text{($C_1 \neq C_2$)} \\
+      C_1 & C_2 & C_1 & \text{($C_1 = C_2$)}
+    \end{array}
+  \end{math}
+  \caption{Definition of the \emph{meet operator}, \lub, for the
+    lattice used in our constant propagation analysis. $v_1$ and $v_2$
+    are values in \setLC. The table shows how \lub combines any two
+    values.}
+  \label{tbl_back4}
+\end{myfig}
+
+Figure~\ref{fig_back10} shows our program with the final facts
+computed. The sets \inB{lst_back13_mult} and \outB{lst_back13_mult}
+show that #m# has the value 10 when block \refNode{lst_back13_mult}
+executes. The variables #n# and #i# have the value $\top$, indicating
+they could one of many different values. However, #cnt# and #val#
+still have $\bot$, because their values are not modified anywhere in
+the control-flow graph.
+
+\begin{myfig}
+  \input{lst_back14}
+  \label{fig_back10}
+  \caption{Our program, annotated with the final facts computed by the
+    constant propagation analysis. Notice the \inB{lst_back14_mult}
+    and \outB{lst_back14_mult} indicate that \texttt{m} has the value 10
+    while \refNode{lst_back14_mult} executes.}
+\end{myfig}
+
+
+
+%% values. 
+%% values $\bot$, an integer value, and $\top$ can be ordered such
+%% that $\bot \le x \le \top$, for all integers $x$. The \emph{meet
+%% operator} defines this ordering
+
+%% Before
+%% and after each block we will determine 
+
+%% To track
+%% the value of each variable, we use a \emph{lattice}. This particular
+%% lattice encodes three types of values: 
+%% Even so,
+%% for this analysis all we care to know is if the value remains
+%% the same or changes. 
+
+%% approximate by determining, at each point in the control-flow graph,
+%% whether a variable has one of three values: an \emph{unknown}, a
+%% \emph{constant}, or
+
+\section{Transfer Function \& Direction}
+\label{back_subsec_transfer}
+
+\runin{Iteration \& Fixed Points}
+
+\runin{Dataflow Equations}
+
 \section{Facts, Transfer Functions, Direction \& The Meet Operator}
 \label{sec_back4}
 
@@ -235,10 +396,10 @@ must be conservative, so we assign the value $\top$ to #c# in
       4. & v_1 & v_1 & v_1 
     \end{array}
   \end{math}
-  \caption{How the meet operator used in
-    Figure \ref{fig_back5} combines facts. $v_1$ and $v_2$ are
-    values given by separate \outBa facts to the same variable. The
-    table shows how they are combined.}
+  \caption{How the meet operator used in Figure \ref{fig_back5}
+    combines facts. $v_1$ and $v_2$ are values given by separate
+    \outBa facts to the same variable. The table shows how they are
+    combined.}
   \label{tbl_back2}
   \figend
 \end{table}

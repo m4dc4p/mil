@@ -48,7 +48,10 @@
     fill=white,
     above right=-1.5mm and -1.5mm of #1,
   },
-  fact/.style={ }
+  fact/.style={ },
+  %% Invisible node
+  invis/.style={inner sep=0pt, 
+    minimum height=0em}, 
 }
 
 %% GSO margins.
@@ -117,6 +120,8 @@
 \newcommand{\exitN}{\emph{X}\xspace}
 \newcommand{\refNode}[1]{\ensuremath{B_{\ref{#1}}}\xspace}
 \newcommand{\labelNode}[1]{\refstepcounter{nodeCounter}\label{#1}}
+\newcommand{\setL}[1]{\textsc{#1}\xspace}
+\newcommand{\setLC}{\setL{Const}}
 
 %% Formats a list of facts
 %% Argument should be like \facts{a/1, b/2, foobar/\bot, baz/\top}.
@@ -179,3 +184,6 @@
 %% Turn on line numbering in Haskell code within
 %% the environment, then turn it off.
 \newenvironment{withHsNum}{\numberson\numbersreset}{\numbersoff}
+
+%% Paragraph run-in
+\newcommand{\runin}[1]{\begingroup\noindent\sffamily\sc #1\qquad\endgroup}
