@@ -45,18 +45,18 @@ Section~\ref{sec_back2}.
 %% sense than the first summary).
 
 Figure~\ref{fig_back1} shows a simple C program and its
-\emph{control-flow graph} (CFG). Each \emph{node} in \subref{fig_back1_b} 
-represents a statement or expression in the original program. For
-example, \refNode{lst_back2_assigna} and \refNode{lst_back2_assignb}
-represent the assignment statements on line
-\ref{lst_back1_assign}. Notice that the declaration of #c# does not
-appear in a corresponding node. Because the declaration does not cause
-a runtime effect, we do not represent it in the graph.  Nodes \entryN
-and \exitN designate where program execution \emph{enters} and \emph{leaves}
-the graph. If the graph represented the entire program, we would say
-execution \emph{begins} at \entryN and \emph{terminates} at \exitN. However, the CFG
-may be embedded in a larger program, for which reason we say
-\emph{enters} and \emph{leaves}.
+\emph{control-flow graph} (CFG). Each \emph{node} in
+\subref{fig_back1_b} represents a statement or expression in the
+original program. For example, \refNode{lst_back2_assigna} and
+\refNode{lst_back2_assignb} represent the assignment statements on
+line \ref{lst_back1_assign}. Notice that the declaration of #c# does
+not appear in a corresponding node. Because the declaration does not
+cause a runtime effect, we do not represent it in the graph.  Nodes
+\entryN and \exitN designate where program execution \emph{enters} and
+\emph{leaves} the graph. If the graph represented the entire program,
+we would say execution \emph{begins} at \entryN and \emph{terminates}
+at \exitN. However, the CFG may be embedded in a larger program, for
+which reason we say \emph{enters} and \emph{leaves}.
 
 \begin{myfig}[th]
 \begin{tabular}{cc}
@@ -73,12 +73,13 @@ may be embedded in a larger program, for which reason we say
 
 Directed edges show the order in which nodes execute. The edges
 leaving \refNode{lst_back2_test} (representing the test
-``\verb=if(rnd() + a > b)='' on line \ref{lst_back1_test}) show that execution
-can branch to either \refNode{lst_back2_true} (when $\mathit{rnd}() + a > b$) or
-\refNode{lst_back2_false} (when $mathit{rnd}() + a \leq b$). A node followed by
-multiple successors (i.e., where multiple edges leave the node)
-represents a \emph{branch} or \emph{conditional} statement. Any one of
-the successor nodes may execute following the conditional statement.
+``\verb=if(rnd() + a > b)='' on line \ref{lst_back1_test}) show that
+execution can branch to either \refNode{lst_back2_true} (when
+$\mathit{rnd}() + a > b$) or \refNode{lst_back2_false} (when
+$mathit{rnd}() + a \leq b$). A node followed by multiple successors
+(i.e., where multiple edges leave the node) represents a \emph{branch}
+or \emph{conditional} statement. Any one of the successor nodes may
+execute following the conditional statement.
 
 The dataflow algorithm approximates a program's runtime state by
 analyzing the control flow of the program. CFGs show the order in
@@ -165,7 +166,7 @@ repeatedly.
 
 \begin{myfig}[tbh]
   \begin{tabular}{cc}
-    \subfloat{\input{lst_back11}\label{fig_back_7_initial}} & %%
+    \subfloat{\input{lst_back11}\label{fig_back7_initial}} & %%
     \subfloat{\input{lst_back12}\label{fig_back7_opt}} \\
 
     \subref{fig_back7_initial} & \subref{fig_back7_opt} 
@@ -200,52 +201,38 @@ Line~\ref{fig_back7_opt_loop}.
 
 Constant propagation analyzes how each variable's value changes during
 execution. The analysis \emph{approximates} the actual values of the
-variables, as determining their exact value in all cases is
-undecidable. Even so, we only need to know if a variable's value
-changes over time. We will place the value of each variable into one
-of three categories at each point in the control-flow graph:
-\emph{unknown}, a \emph{known constant}, and
-\emph{indeterminate}. \emph{Unknown}, which we will represent with
+variables, as we cannot in general determine their exact value. We
+will place the value of each variable into one of three categories at
+each point in the control-flow graph: \emph{unknown}, a \emph{known
+  constant}, or \emph{indeterminate}. \emph{Unknown}, represented by
 $\bot$ (``bottom''), is the initial value for all variables in our
-analysis. A \emph{known constant}, which is just an integer in this
-case, means our analysis identified that the variable was assigned the
-given value. \emph{Indeterminate}, which we will represent with $\top$
-(``top''), means our analysis found that the variable could possibly
-have more than one value at a given point.
+analysis. A \emph{known constant}, $C$, means our analysis identified
+that the variable was assigned a specific value. \emph{Indeterminate},
+indicated by $\top$ (``top''), means our analysis found that the
+variable might have more than one value at a given point.
 
 Figure~\ref{fig_back9} shows the control-flow graph of our program
 annotated with \emph{facts} before (\inE) and after (\out) each
-program point. Our facts indicate if a given variable has a constant
-value at any point in the control-flow graph. Initially, we do not
-have any information about the value assigned to each variable, so all
-our facts assign $\bot$ to their respective variable. For this
-analysis, the facts represent knowledge about a variable's
-value. Other analysis' will use different facts. In all cases, though,
-facts are the fundamental value that a dataflow analysis computes.
+program point. Each \emph{fact} indicates our knowledge
+of a variable's value at that point in the program. Initially, we
+do not have any information about the value assigned to any variables,
+so all the facts associate $\bot$ with each variable. 
 
 \begin{myfig}
   \input{lst_back15}
-  \label{fig_back9}
   \caption{Our program, annotated with initial \emph{facts} before
     (\inE) and after (\out) each program point. We have no information
     about any variable initially, so all values are $\bot$.}
+  \label{fig_back9}
 \end{myfig}
 
-The values $\bot$, $x$ (any integer), and $\top$ form a set which we will
-denote as \setLC. The set \setLC, together with a meet
-operator that we will define shortly, forms a
-\emph{lattice}.\footnote{The lattice can also have a \emph{join}
-  operator, but for our purposes we can work solely using the meet.}
-The lattice defines how our facts will indicate if a variable has a
-constant value. Each specific dataflow analysis uses the values
-appropriate to them, but dataflow always uses form a lattice.
-
-The \emph{meet operator} \lub (``meet'' or ``least upper bound''),
-defines how we will combine values in \setLC. Table~\ref{tbl_back4}
-gives the definition of \lub. For any value of $x \in \setLC$, $\bot
-\lub x$ results in $x$. Conversely, $x \lub \top$
-results in $\top$. Two differing constants, $C_1$ and $C_2$, result in
-$\top$, while equal constants give the same constant.
+The values $\bot$, $C$, and $\top$ form a set which we
+will denote as \setLC. The \emph{meet operator}, \lub (pronounced ``meet'' or
+``least upper bound''), defines how we will combine values in
+\setLC. Table~\ref{tbl_back4} gives the definition of \lub. For any
+value of $x \in \setLC$, $\bot \lub x$ results in $x$. Conversely, $x
+\lub \top$ results in $\top$. Two differing constants, $C_1$ and
+$C_2$, result in $\top$, while equal constants give the same constant.
 
 \begin{myfig}[tbh]
   \begin{math}
@@ -265,22 +252,53 @@ $\top$, while equal constants give the same constant.
   \label{tbl_back4}
 \end{myfig}
 
-Figure~\ref{fig_back10} shows our program with the final facts
-computed. The sets \inB{lst_back13_mult} and \outB{lst_back13_mult}
-show that #m# has the value 10 when block \refNode{lst_back13_mult}
-executes. The variables #n# and #i# have the value $\top$, indicating
-they could one of many different values. However, #cnt# and #val#
-still have $\bot$, because their values are not modified anywhere in
-the control-flow graph.
+Together, \setLC and \lub form a \emph{lattice}.\footnote{The lattice
+  can also have a \emph{join} operator, but for our purposes we solely
+  use the meet.}  The lattice precisely defines the facts computed in
+our analysis. In this case, the lattice (i.e., facts) represents
+knowledge about a variable's value. Each specific dataflow analysis
+computes different facts, but those facts are always represented by a
+lattice.
 
-\begin{myfig}
-  \input{lst_back14}
-  \label{fig_back10}
-  \caption{Our program, annotated with the final facts computed by the
-    constant propagation analysis. Notice the \inB{lst_back14_mult}
-    and \outB{lst_back14_mult} indicate that \texttt{m} has the value 10
-    while \refNode{lst_back14_mult} executes.}
-\end{myfig}
+We have established that our analysis computes \emph{facts} at each
+node in our programs control-flow graph. The facts are defined using a
+\emph{lattice}. The lattice lets us assign the value $\bot$, $C$ (a
+constant), or $\top$ to each variable in the program, at each node in
+the graph. So far we have only seen the initial value for our
+facts. We next explore how those facts are computed as the analysis 
+proceeds.
+
+%% Figure~\ref{fig_back11} demonstrates how the lattice computes facts
+%% for constant propagation. The set \out{lst_back17_assign} indicates,
+%% among other things, that $i$ is assigned 0: \factC{i}{0}. However,
+%% \out{lst_back17_incr} indicates that the value of $i$ is indeterminate: 
+%% \factC{i}{\top}. 
+
+%% First, the values
+%% computed for variables at each program point are in \setLC. Second,
+%% the meet operator, \lub, is used to combine facts  The
+%% lattice defines our facts. That is, the values in \setLC The lattice
+%% defines how our facts will indicate if a variable has a constant
+%% value.
+
+
+
+%% Figure~\ref{fig_back10} shows our program with the final facts
+%% computed. The sets \inB{lst_back13_mult} and \outB{lst_back13_mult}
+%% show that #m# has the value 10 when block \refNode{lst_back13_mult}
+%% executes. The variables #n# and #i# have the value $\top$, indicating
+%% they could one of many different values. However, #cnt# and #val#
+%% still have $\bot$, because their values are not modified anywhere in
+%% the control-flow graph.
+
+%% \begin{myfig}
+%%   \input{lst_back14}
+%%   \label{fig_back10}
+%%   \caption{Our program, annotated with the final facts computed by the
+%%     constant propagation analysis. Notice the \inB{lst_back14_mult}
+%%     and \outB{lst_back14_mult} indicate that \texttt{m} has the value 10
+%%     while \refNode{lst_back14_mult} executes.}
+%% \end{myfig}
 
 
 
@@ -303,12 +321,14 @@ the control-flow graph.
 %% whether a variable has one of three values: an \emph{unknown}, a
 %% \emph{constant}, or
 
-\section{Transfer Function \& Direction}
+\subsection{Transfer Function \& Direction}
 \label{back_subsec_transfer}
 
-\runin{Iteration \& Fixed Points}
+\subsection{Iteration \& Fixed Points}
+\label{back_subsec_iter}
 
-\runin{Dataflow Equations}
+\subsection{Dataflow Equations}
+\label{back_subsec_eq}
 
 \section{Facts, Transfer Functions, Direction \& The Meet Operator}
 \label{sec_back4}

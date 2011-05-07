@@ -147,18 +147,18 @@
       %% If key/val arguments, use first form. Otherwise
       %% use second.
       \ifthenelse{\equal{\hasSlash{\var}}{Y}}%%
-                  {\expandafter\getArgs\var \mathit{\the\varName}=\the\varVal}%%
-                  {\var}%%{\var}%%
+                  {\expandafter\getArgs\var \factC{\the\varName}{\the\varVal}}%%
+                  {\var}%%
       %% \tracingmacros=0%%
       \stepcounter{factctr}%%
     }\}}\xspace%%
 \endgroup}
-
+\newcommand{\factC}[2]{\ensuremath{\mathit{#1}=#2}}
 \newcommand{\inFacts}[2]{\ensuremath{\inB{#1}: \facts{#2}}}
 \newcommand{\outFacts}[2]{\ensuremath{\outB{#1}: \facts{#2}}}
 
 %% least upper bound operator. Raised outside mathmode
-\newcommand{\lub}{\ifthenelse{\boolean{mmode}}{\sqcap}{\raisebox{.1em}{\ensuremath{\sqcap}}}}
+\newcommand{\lub}{\ifthenelse{\boolean{mmode}}{\sqcap}{\raisebox{.1em}{\ensuremath{\sqcap}}}\xspace}
 %% End dataflow
 
 \newenvironment{myfig}[1][h]{\begin{figure}[#1]%%
@@ -186,4 +186,4 @@
 \newenvironment{withHsNum}{\numberson\numbersreset}{\numbersoff}
 
 %% Paragraph run-in
-\newcommand{\runin}[1]{\begingroup\noindent\sffamily\sc #1\qquad\endgroup}
+\newcommand{\runin}[1]{\begingroup\noindent\sffamily\textbf{#1}\qquad\endgroup}
