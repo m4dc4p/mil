@@ -20,6 +20,7 @@
 \usepackage{afterpage}
 \usepackage{subfig}
 \usepackage{xifthen}
+\usepackage{mathtools}
 %% \usepackage{listings}
 %% \lstset{escapeinside=!!}
 
@@ -110,12 +111,24 @@
 \newcommand{\out}{\emph{out}\xspace}
 \newcommand{\In}{\emph{In}\xspace}
 \newcommand{\Out}{\emph{Out}\xspace}
-%% ``anonymous'' in(B) -- no label  attached to the block
+%% in(B) -- fact function for an anonymous block.
 \newcommand{\inBa}{\ensuremath{\mathit{in}(B)}\xspace}
+%% in(B,v) -- fact function for an anonymous block and some variable.
+\newcommand{\inBav}[1]{\ensuremath{\mathit{in}(B, #1)}\xspace}
+%% in(B_x) -- fact function for an named block.
 \newcommand{\inB}[1]{\ensuremath{\mathit{in}(B_{\ref{#1}})}\xspace}
-%% ``anonymous'' out(B) -- no label attached to the block
+%% in(B_x,v) -- fact function for an named block and some variable.
+\newcommand{\inBv}[2]{\ensuremath{\mathit{in}(B_{\ref{#1}}, #2)}\xspace}
+%% out(B) -- fact function for an anonymous block.
 \newcommand{\outBa}{\ensuremath{\mathit{out}(B)}\xspace}
+%% out(B) -- fact function for an anonymous block, but using a different variable.
+\newcommand{\outXa}[1]{\ensuremath{\mathit{out}(#1)}\xspace}
+%% out(B,v) -- fact function for an anonymous block and some variable.
+\newcommand{\outBav}[1]{\ensuremath{\mathit{out}(B, #1)}\xspace}
+%% out(B_x) -- fact function for an named block.
 \newcommand{\outB}[1]{\ensuremath{\mathit{out}(B_{\ref{#1}})}\xspace}
+%% out(B_x,v) -- fact function for an named block and some variable.
+\newcommand{\outBv}[2]{\ensuremath{\mathit{out}(B_{\ref{#1}}, #2)}\xspace}
 \newcommand{\entryN}{\emph{E}\xspace}
 \newcommand{\exitN}{\emph{X}\xspace}
 \newcommand{\refNode}[1]{\ensuremath{B_{\ref{#1}}}\xspace}

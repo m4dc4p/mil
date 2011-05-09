@@ -330,6 +330,59 @@ proceeds.
 \subsection{Dataflow Equations}
 \label{back_subsec_eq}
 
+We can succinctly describe the constant propagation analysis using
+\emph{dataflow equations}. These equations express our lattice for
+facts and the transfer function for blocks. From the equations
+we can derive the direction of our analysis. We also know our
+analysis will terminate, as long as the transfer function is 
+\emph{monotonic}. 
+
+\runin{Facts} Our facts are a set; each element is a pair ($a$, $x$),
+with $a \in \setL{Var}$ and $x \in \setLC$. \setL{Var} is the set of
+all variables used in the controlf-flow graph (e.g., $m$, $cnt$, etc.)
+\setLC contains all the integers, plus a bottom element ($\bot$) and a
+top element ($\top$). 
+
+We define the functions \inE and \out such that \inBa gives all the
+facts prior to block $B$ executing. That is, \inBa takes a block, $B$,
+and returns a set, \facts{a/x,b/y,\dots}, associating each variable in
+the control-flow graph with the analysis' calculated value. Similarly,
+\outBa gives all the facts after block $B$ executes. We can also say
+\inBav{a} (as well as \outBav{a}) to mean the value associated with
+variable $a$ in the set returned by \inBa (or \outBa, of course). When
+discussing specific blocks, we will include the block number:
+\inB{lst_back15_mult}, \inBv{lst_back15_mul}{m},
+\outB{lst_back15_mult}, etc.
+
+\runin{Direction} We define \inBa for block $B$ in terms of the \out
+sets for each predecessor of $B$. The \inBa set will be the union of
+all \out sets for each predecessor. If the same variable occurs in two
+or more sets, then that variables' value will be calculated using the
+\emph{meet}, \lub. Otherwise, the variable's value is copied from the
+\out set to the \inBa set.
+
+\begin{align}
+  \inBa &= \bigwedge\limits_{P \in \mathit{pred}(B)} \outXa{P} \\ \notag\\
+  B \bigwedge\ \,\mathclap{\emptyset}\phantom{C} &= B \notag\\
+  B \bigwedge\ \,\mathclap{C}\phantom{C} &= \bigcup\limits_{\scriptstyle(a,x) \in B}
+                    \left(\bigcup\limits_{\scriptstyle(b,y) \in C} (a,x) \wedge (b,y)\right) \\ \\
+  (a,x) \wedge (b,y) &= 
+  \begin{cases}
+    a=x \lub y &, (a,x) \in B, (b,y) \in C,\ \text{\lub as in Table~\ref{tbl_back4}.}\\
+    a=x &, b \not\in \mathit{var}(B). \\
+    b=y &, a \not\in \mathit{var}(C). \\
+  \end{cases} \\ \notag\\
+  \setLC &= \bot, 0, {-1}, 1, {-2}, 2, \dots, \top. \notag\\
+  \setL{Var} &= \dots \text{\it set of variables used in the control-flow graph} \dots \notag\\ 
+  B, C, \dots &= \dots \text{\it sets of pairs}\ (a, x)\ \text{such that}\ a \in 
+    \setL{Var}\ \text{and}\ x \in \setLC. \notag\\ \notag\\
+  \mathit{out}(B) &= \dots \text{\it \out facts from block $B$}\dots \notag\\
+  \mathit{var}(B) &= \dots \text{\it variables used in block $B$}\dots \notag\\
+  \mathit{pred}(B) &= \dots \text{\it predecessors for block $B$}\dots \notag
+\end{align}
+
+\runin{Transfer Function} Our transfer function creates 
+
 \section{Facts, Transfer Functions, Direction \& The Meet Operator}
 \label{sec_back4}
 
