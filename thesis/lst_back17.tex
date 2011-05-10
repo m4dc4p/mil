@@ -1,0 +1,7 @@
+\begin{tikzpicture}[>=stealth, node distance=.75in]
+  \def\prefix{lst_back17_}
+  \input{lst_back16}
+  \node[fact, below=5mm of assign, anchor=west] () {\outFacts{lst_back17_assign}{\dots,i/0,\dots}};
+  \node[fact, below=3mm of incr, anchor=west] () {\outFacts{lst_back17_incr}{\dots,i/\top,\dots}};
+  \node[fact, above=3mm of test, anchor=west] () {\inFacts{lst_back17_test}{\dots,i/\top,\dots}};
+\end{tikzpicture}

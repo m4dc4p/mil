@@ -146,18 +146,18 @@ provided by the CFG.
 \section{The Dataflow Algorithm}
 
 Kildall's dataflow algorithm provides a general-purpose mechanism for
-analyzing control-flow graphs of statements or basic blocks. The
-algorithm itself does not mandate a specific analysis. Rather, it is
-parameterized by the choice of \emph{facts}, \emph{lattice},
-\emph{meet operator}, \emph{transfer function}, and
-\emph{direction}. Facts, the lattice, and the meet operator are used
-to approximate the program's semantics. The transfer function creates
-facts using the flow of facts in the control-flow graph. The direction
-is dictacted by the type of analysis -- each particular analysis
-runs \emph{forwards} or \emph{backwards}.
+analyzing control-flow graphs of programs. The algorithm itself does
+not mandate a specific analysis. Rather, it is parameterized by the
+choice of \emph{facts}, \emph{lattice}, \emph{meet operator},
+\emph{transfer function}, and \emph{direction}. Facts, the lattice,
+and the meet operator are used to approximate some property of the
+program that we wish to analyze. The transfer function creates facts
+that mimic the flow of information in the control-flow graph. The
+direction is dictacted by the type of analysis -- each particular
+analysis runs \emph{forwards} or \emph{backwards}.
 
 %% Constant-propagation
-Consider Figure~\ref{fig_back7}, Part~\subref{fig_back_7_initial}, which
+Consider Figure~\ref{fig_back7}, Part~\subref{fig_back7_initial}, which
 shows a C function containing a loop that multipies the argument by 10
 some number of times. Line~\ref{fig_back7_m} declares #m# and assigns
 it the value 10. The function uses #m# in the loop body on
@@ -209,14 +209,17 @@ $\bot$ (``bottom''), is the initial value for all variables in our
 analysis. A \emph{known constant}, $C$, means our analysis identified
 that the variable was assigned a specific value. \emph{Indeterminate},
 indicated by $\top$ (``top''), means our analysis found that the
-variable might have more than one value at a given point.
+variable might have more than one value at a given point. The values
+$\bot$, $C$, and $\top$ form a set which we will denote as \setLC.
 
 Figure~\ref{fig_back9} shows the control-flow graph of our program
 annotated with \emph{facts} before (\inE) and after (\out) each
-program point. Each \emph{fact} indicates our knowledge
-of a variable's value at that point in the program. Initially, we
-do not have any information about the value assigned to any variables,
-so all the facts associate $\bot$ with each variable. 
+program point. Each \emph{fact} indicates our knowledge of a
+variable's value at that point in the program. For this analysis, our
+facts are sets of pairs, $(a,x)$, where $a$ is the name of a variable
+and $x$ a value in \setLC. Initially, we do not have any information
+about the value assigned to any variables, so all the facts associate
+$\bot$ with each variable.
 
 \begin{myfig}
   \input{lst_back15}
@@ -226,13 +229,34 @@ so all the facts associate $\bot$ with each variable.
   \label{fig_back9}
 \end{myfig}
 
-The values $\bot$, $C$, and $\top$ form a set which we
-will denote as \setLC. The \emph{meet operator}, \lub (pronounced ``meet'' or
-``least upper bound''), defines how we will combine values in
+Constant propagation is a \emph{forwards} analysis, meaning the values
+for each \inE set are calculated based on the \out values of its
+predecessors. Figure~\ref{fig_back11} shows the facts computed partway
+through this analysis, concentrating on the nodes that reference $i$:
+\refNode{lst_back17_assign}, \refNode{lst_back17_test} and
+\refNode{lst_back17_incr}. \refNode{lst_back17_test} has two
+predecessors: \refNode{lst_back17_assign} and
+\refNode{lst_back17_incr}. Their \out sets,
+\outB{lst_back17_assign} and \outB{lst_back17_incr}, give differing
+values to $i$: 0 and $\top$. To combine these values when computing
+\inB{lst_back17_test}, we use a \emph{meet operator}.
+
+\begin{myfig}[tbh]
+  \input{lst_back17}
+  \caption{Our program, annotated with facts partway through the
+    analysis. Notice that \outB{lst_back17_assign} and
+    \outB{lst_back17_incr} give differing values to $i$. We use a \emph{meet
+      operator} when combining these two values while calculating
+    \inB{lst_back17_test}.}
+  \label{fig_back11}
+\end{myfig}
+
+The \emph{meet operator}, \lub (pronounced ``least upper bound'' or
+``lub''), defines how we will combine values in
 \setLC. Table~\ref{tbl_back4} gives the definition of \lub. For any
 value of $x \in \setLC$, $\bot \lub x$ results in $x$. Conversely, $x
 \lub \top$ results in $\top$. Two differing constants, $C_1$ and
-$C_2$, result in $\top$, while equal constants give the same constant.
+$C_2$, result in $\top$, while equal constants give the same constant. 
 
 \begin{myfig}[tbh]
   \begin{math}
@@ -260,13 +284,29 @@ knowledge about a variable's value. Each specific dataflow analysis
 computes different facts, but those facts are always represented by a
 lattice.
 
+We have defined \lub on elements in \setLC, but our facts are set of
+pairs $(a,x)$ where $a$ is a variable and $x$ a value in \setLC. To
+compute \inBa, we apply \lub set-wise to the values for matching
+variables in each \out set of $B$'s predecessors. When we allow \lub
+to operate over sets of pairs, we can show how
+\outB{lst_back17_assign} \lub \outB{lst_back17_incr} is equivalent to
+\inB{lst_back17_test} in Figure~\ref{fig_back11}:
+\begin{equation}
+  \begin{split}
+    \inB{lst_back17_test} &= \outB{lst_back17_assign} \lub \outB{lst_Back17_incr} \\
+    \{\dots,\factC{i}{\top},\dots\} &= \{\dots,\factC{i}{0},\dots\}\ \lub \{\dots,\factC{i}{\top},\dots\} \\
+    \{\dots,\factC{i}{\top},\dots\} &= \{\dots,\factC{i}{0 \lub \top},\dots\} \\
+    \{\dots,\factC{i}{\top},\dots\} &= \{\dots,\factC{i}{\top},\dots\} 
+  \end{split}
+\end{equation}
+
 We have established that our analysis computes \emph{facts} at each
 node in our programs control-flow graph. The facts are defined using a
 \emph{lattice}. The lattice lets us assign the value $\bot$, $C$ (a
 constant), or $\top$ to each variable in the program, at each node in
-the graph. So far we have only seen the initial value for our
-facts. We next explore how those facts are computed as the analysis 
-proceeds.
+the graph. The lattice's \emph{meet operator} is used to combing
+conflicting values when computing \inBa from the \out sets of $B$'s
+predecessors. We next explore how \out facts are computed for each node.
 
 %% Figure~\ref{fig_back11} demonstrates how the lattice computes facts
 %% for constant propagation. The set \out{lst_back17_assign} indicates,
@@ -280,8 +320,6 @@ proceeds.
 %% lattice defines our facts. That is, the values in \setLC The lattice
 %% defines how our facts will indicate if a variable has a constant
 %% value.
-
-
 
 %% Figure~\ref{fig_back10} shows our program with the final facts
 %% computed. The sets \inB{lst_back13_mult} and \outB{lst_back13_mult}
@@ -321,7 +359,7 @@ proceeds.
 %% whether a variable has one of three values: an \emph{unknown}, a
 %% \emph{constant}, or
 
-\subsection{Transfer Function \& Direction}
+\subsection{Transfer Functions}
 \label{back_subsec_transfer}
 
 \subsection{Iteration \& Fixed Points}
@@ -331,11 +369,10 @@ proceeds.
 \label{back_subsec_eq}
 
 We can succinctly describe the constant propagation analysis using
-\emph{dataflow equations}. These equations express our lattice for
-facts and the transfer function for blocks. From the equations
-we can derive the direction of our analysis. We also know our
-analysis will terminate, as long as the transfer function is 
-\emph{monotonic}. 
+\emph{dataflow equations}. These equations express our lattice and the
+transfer function. From the equations we can derive the direction of
+our analysis. Starting from initial values for each \inE and \out
+set, we iteratively compute facts until reaching a fixed point. 
 
 \runin{Facts} Our facts are a set; each element is a pair ($a$, $x$),
 with $a \in \setL{Var}$ and $x \in \setLC$. \setL{Var} is the set of
