@@ -361,26 +361,41 @@ or more sets, then that variables' value will be calculated using the
 \emph{meet}, \lub. Otherwise, the variable's value is copied from the
 \out set to the \inBa set.
 
+\begin{myfig}[tbph]
 \begin{align}
-  \inBa &= \bigwedge\limits_{P \in \mathit{pred}(B)} \outXa{P} \\ \notag\\
+  \outBa &= \mathit{transfer}(\inBa). \label{eqn_back3} \\
+  \inBa &= \bigwedge\limits_{\mathclap{P \in \mathit{pred}(B)}} \outXa{P} \\ 
   B \bigwedge\ \,\mathclap{\emptyset}\phantom{C} &= B \notag\\
-  B \bigwedge\ \,\mathclap{C}\phantom{C} &= \bigcup\limits_{\scriptstyle(a,x) \in B}
-                    \left(\bigcup\limits_{\scriptstyle(b,y) \in C} (a,x) \wedge (b,y)\right) \\ \\
+  B \bigwedge\ \,\mathclap{C}\phantom{C} &= \bigcup\limits_{(a,x) \in B}
+                    \left(\bigcup\limits_{(b,y) \in C} (a,x) \wedge (b,y)\right) \\ 
   (a,x) \wedge (b,y) &= 
   \begin{cases}
-    a=x \lub y &, (a,x) \in B, (b,y) \in C,\ \text{\lub as in Table~\ref{tbl_back4}.}\\
-    a=x &, b \not\in \mathit{var}(B). \\
-    b=y &, a \not\in \mathit{var}(C). \\
-  \end{cases} \\ \notag\\
-  \setLC &= \bot, 0, {-1}, 1, {-2}, 2, \dots, \top. \notag\\
-  \setL{Var} &= \dots \text{\it set of variables used in the control-flow graph} \dots \notag\\ 
+    (a,x \lub y) & \text{when}\ (a,x) \in B, (b,y) \in C,\ \text{\lub as in Table~\ref{tbl_back4}.}\\
+    (a,x) & \text{when}\ b \not\in \mathit{var}(B). \\
+    (b,y) & \text{when}\ a \not\in \mathit{var}(C). \\
+  \end{cases} \\ 
+  \mathit{transfer}(B) &= \bigcup\limits_{\mathclap{(a,x) \in B}} f(a,x) \\
+  f (a,x) &= 
+  \begin{cases}
+    (a,y) & \text{when \texttt{a = y}}. \\
+    (a,\top) & \text{when \texttt{a++}}. \\
+    (a,x) & \text{otherwise}. \\
+  \end{cases} \\
+  \setLC &= \bot, 0, -1, 1, \dots \text{\it all integers} \dots, \top. \notag\\
+  \setL{Var} &= \dots \text{\it set of variables used in the control-flow graph} \dots \notag\\
   B, C, \dots &= \dots \text{\it sets of pairs}\ (a, x)\ \text{such that}\ a \in 
-    \setL{Var}\ \text{and}\ x \in \setLC. \notag\\ \notag\\
+    \setL{Var}\ \text{and}\ x \in \setLC. \notag\\
   \mathit{out}(B) &= \dots \text{\it \out facts from block $B$}\dots \notag\\
   \mathit{var}(B) &= \dots \text{\it variables used in block $B$}\dots \notag\\
   \mathit{pred}(B) &= \dots \text{\it predecessors for block $B$}\dots \notag
 \end{align}
-
+\caption{The transfer function and associated definitions for the constant
+  propagation analysis. Equation~\eqref{eqn_back3} shows how \out facts are
+  created from \inE facts. \InBa facts, for some block $B$, are created from
+  the \outBa facts of its predecessors. Facts are combined using the set-wise
+  $\bigwedge$ operator.}
+\label{back_fig10}
+\end{myfig}
 \runin{Transfer Function} Our transfer function creates 
 
 \section{Facts, Transfer Functions, Direction \& The Meet Operator}
