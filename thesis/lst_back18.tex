@@ -1,0 +1,13 @@
+\begin{tikzpicture}[>=stealth, node distance=.75in]
+  \def\prefix{lst_back18_}
+  \input{lst_back16}
+  
+  \node[fact, below right=5mm and 5mm of assign, anchor=west] ()
+       {\outFactsM{lst_back18_assign}{m/{10},n/1,i/0,val/\bot,cnt/\bot}{1in}};
+
+  \node[fact, above right=5mm of mult, anchor=west] () 
+       {\inFactsM{lst_back18_mult}{m/\bot,n/\bot,i/\bot,val/\bot,cnt/\bot}{1in}};
+
+  \node[fact, below left=3mm of mult, anchor=west] () 
+       {\outFacts{lst_back18_mult}{m/10,n/\top,i/0,val/\bot,cnt/\bot}};
+\end{tikzpicture}

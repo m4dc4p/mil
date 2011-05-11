@@ -212,22 +212,22 @@ indicated by $\top$ (``top''), means our analysis found that the
 variable might have more than one value at a given point. The values
 $\bot$, $C$, and $\top$ form a set which we will denote as \setLC.
 
-Figure~\ref{fig_back9} shows the control-flow graph of our program
-annotated with \emph{facts} before (\inE) and after (\out) each
-program point. Each \emph{fact} indicates our knowledge of a
+\begin{myfig}[bth]
+  \input{lst_back17}
+  \caption{Our program, annotated with facts partway through the
+    analysis. Notice that \outB{lst_back17_assign} and
+    \outB{lst_back17_incr} give differing values to $i$. We use a \emph{meet
+      operator} when combining these two values while calculating
+    \inB{lst_back17_test}.}
+  \label{fig_back11}
+\end{myfig}
+
+Figure~\ref{fig_back11} shows the control-flow graph of our program
+annotated with \emph{facts} before (\inE) and after (\out) select
+program points. Each \emph{fact} indicates our knowledge of a
 variable's value at that point in the program. For this analysis, our
 facts are sets of pairs, $(a,x)$, where $a$ is the name of a variable
-and $x$ a value in \setLC. Initially, we do not have any information
-about the value assigned to any variables, so all the facts associate
-$\bot$ with each variable.
-
-\begin{myfig}
-  \input{lst_back15}
-  \caption{Our program, annotated with initial \emph{facts} before
-    (\inE) and after (\out) each program point. We have no information
-    about any variable initially, so all values are $\bot$.}
-  \label{fig_back9}
-\end{myfig}
+and $x$ a value in \setLC. 
 
 Constant propagation is a \emph{forwards} analysis, meaning the values
 for each \inE set are calculated based on the \out values of its
@@ -241,16 +241,6 @@ predecessors: \refNode{lst_back17_assign} and
 values to $i$: 0 and $\top$. To combine these values when computing
 \inB{lst_back17_test}, we use a \emph{meet operator}.
 
-\begin{myfig}[p]
-  \input{lst_back17}
-  \caption{Our program, annotated with facts partway through the
-    analysis. Notice that \outB{lst_back17_assign} and
-    \outB{lst_back17_incr} give differing values to $i$. We use a \emph{meet
-      operator} when combining these two values while calculating
-    \inB{lst_back17_test}.}
-  \label{fig_back11}
-\end{myfig}
-
 The \emph{meet operator}, \lub (pronounced ``least upper bound'' or
 ``lub''), defines how we will combine values in
 \setLC. Table~\ref{tbl_back4} gives the definition of \lub. For any
@@ -258,7 +248,7 @@ value of $x \in \setLC$, $\bot \lub x$ results in $x$. Conversely, $x
 \lub \top$ results in $\top$. Two differing constants, $C_1$ and
 $C_2$, result in $\top$, while equal constants give the same constant. 
 
-\begin{myfig}[p]
+\begin{myfig}
   \begin{math}
     \begin{array}{cccc}
       v_1 & v_2 & v_1 \lub v_2 \\
@@ -269,9 +259,9 @@ $C_2$, result in $\top$, while equal constants give the same constant.
       C_1 & C_2 & C_1 & \text{($C_1 = C_2$)}
     \end{array}
   \end{math}
-  \caption{Definition of the \emph{meet operator}, \lub, for the
+  \caption{Definition of the \emph{meet operator}, lub, for the
     lattice used in our constant propagation analysis. $v_1$ and $v_2$
-    are values in \setLC. The table shows how \lub combines any two
+    are values in \setLC. The table shows how lub combines any two
     values.}
   \label{tbl_back4}
 \end{myfig}
@@ -342,8 +332,6 @@ predecessors. We next explore how \out facts are computed for each node.
 %%     while \refNode{lst_back14_mult} executes.}
 %% \end{myfig}
 
-
-
 %% values. 
 %% values $\bot$, an integer value, and $\top$ can be ordered such
 %% that $\bot \le x \le \top$, for all integers $x$. The \emph{meet
@@ -365,6 +353,84 @@ predecessors. We next explore how \out facts are computed for each node.
 
 \subsection{Transfer Functions}
 \label{back_subsec_transfer}
+
+The dataflow algorithm calculates new facts using a \emph{transfer
+  function}. The transfer function is specific to both the analysis
+performed and the semantics of the programming language used to write
+the program analyzed. Theoretically, each node in the graph can
+have its own transfer function, but in practice the function is 
+defined by cases for each statement or expression in the language. 
+
+In a \emph{forwards} analysis, the transfer function computes the \out
+set for a given node. In a backwards analysis, the transfer function
+computes the \inE set. That is, a forwards analysis computes facts
+that hold \emph{after} a node executes. A backwards analysis computes
+facts that were true \emph{before} a node executed.  In both cases,
+the transfer function also considers known facts (i.e., \inE facts for
+forwards, \out for backwards) as well as the statements in the node.
+
+Our constant propagation analysis determines, for each node in the
+control-flow graph, what value a given variable has: $\bot$, $C$ (an
+integer), or $\top$. We choose to use pairs $(a,x)$, where $a$ is
+variable in the program and $x$ a value in \setLC, as the facts for
+our analysis. We define our transfer function in terms of a single 
+pair (i.e., fact):
+\begin{equation}
+  f (a,x) = 
+  \begin{cases}
+    (a,C) & \text{when \texttt{a = \emph{C}}, where \texttt{\emph{C}} is an integer.}. \\
+    (a,\top) & \text{when \texttt{a} updated}. \\
+    (a,x) & \text{otherwise}. \\
+  \end{cases}
+  \label{eqn_back4}
+\end{equation}
+
+Equation~\eqref{eqn_back4} considers two kinds of statements:
+assignment and increment. If the statement #a = C# appears in the
+node, our new fact is $(a,C)$, meaning #a# was assigned a known
+constant. We create the fact $(a,\top)$ for any other
+update.\footnote{In practice this analysis is much more sophisticated,
+  capable of analyzing complicated arithmetic expressions. Algebraic
+  properties such as associativity and distributivity are also usually
+  considered.} Finally, if neither type of statement appears in the
+node, we just pass the initial fact through unchanged.
+
+Though we have defined Equation~\eqref{eqn_back4} in terms of a single
+fact, we can easily extend it to sets of facts. To create \outBa for
+some node $B$, we apply Equation~\eqref{eqn_back4} element-wise to
+each fact in \inBa and combine the results into a set.
+
+Figure~\ref{fig_back9}, Part \subref{fig_back9_initial}, shows our
+program, annotated with initial \inE and \out
+facts. Figure~\ref{fig_back9}, Part \subref{fig_back9_transfer}, shows
+the same graph with annotations updated using
+Equation~\eqref{eqn_back4}. The assignments in
+\refNode{lst_back18_assign} create the facts \factC{m}{10},
+\factC{n}{1}, and \factC{i}{0} in \outB{lst_back18_assign}. The
+multiplication in \refNode{lst_back18_mult} is a non-constant update,
+so \outB{lst_back18_mult} contains \factC{n}{\top}. However, \outB{lst_back18_mult}
+also shows that #m# is not modified in \refNode{lst_back18_mult}; the value
+from \inB{lst_back18_mult} is just copied to \outB{lst_back18_mult}.
+
+\afterpage{\clearpage\input{fig_back9}\clearpage}
+
+%% The
+%% transfer function is one the parameters of the algorithm Each
+%% node can have its own unique function, but in practice 
+
+%% Constant propagation is a \emph{forwards analysis}: a node's \inE set is
+%% calculated using its predecessors \out sets. This also means a node's
+%% \out set is calculated using its \inE set 
+
+%% Not
+%% only does this mean we compute a given node's \inE set from its predecessors \out
+%% sets, but also that we compuet the same node's \out set using its \inE set.
+
+%% Our analysis computes \out sets for each node in the control-flow
+%% graph. A node's \out set is calculated using the statements in the node
+%% and its \inE set. We define a \emph{transfer function} for our 
+%% analysis that performs this calculation. 
+
 
 \subsection{Iteration \& Fixed Points}
 \label{back_subsec_iter}
@@ -402,41 +468,8 @@ or more sets, then that variables' value will be calculated using the
 \emph{meet}, \lub. Otherwise, the variable's value is copied from the
 \out set to the \inBa set.
 
-\begin{myfig}[tbph]
-\begin{align}
-  \outBa &= \mathit{transfer}(\inBa). \label{eqn_back3} \\
-  \inBa &= \bigwedge\limits_{\mathclap{P \in \mathit{pred}(B)}} \outXa{P} \\ 
-  B \bigwedge\ \,\mathclap{\emptyset}\phantom{C} &= B \notag\\
-  B \bigwedge\ \,\mathclap{C}\phantom{C} &= \bigcup\limits_{(a,x) \in B}
-                    \left(\bigcup\limits_{(b,y) \in C} (a,x) \wedge (b,y)\right) \\ 
-  (a,x) \wedge (b,y) &= 
-  \begin{cases}
-    (a,x \lub y) & \text{when}\ (a,x) \in B, (b,y) \in C,\ \text{\lub as in Table~\ref{tbl_back4}.}\\
-    (a,x) & \text{when}\ b \not\in \mathit{var}(B). \\
-    (b,y) & \text{when}\ a \not\in \mathit{var}(C). \\
-  \end{cases} \\ 
-  \mathit{transfer}(B) &= \bigcup\limits_{\mathclap{(a,x) \in B}} f(a,x) \\
-  f (a,x) &= 
-  \begin{cases}
-    (a,y) & \text{when \texttt{a = y}}. \\
-    (a,\top) & \text{when \texttt{a++}}. \\
-    (a,x) & \text{otherwise}. \\
-  \end{cases} \\
-  \setLC &= \bot, 0, -1, 1, \dots \text{\it all integers} \dots, \top. \notag\\
-  \setL{Var} &= \dots \text{\it set of variables used in the control-flow graph} \dots \notag\\
-  B, C, \dots &= \dots \text{\it sets of pairs}\ (a, x)\ \text{such that}\ a \in 
-    \setL{Var}\ \text{and}\ x \in \setLC. \notag\\
-  \mathit{out}(B) &= \dots \text{\it \out facts from block $B$}\dots \notag\\
-  \mathit{var}(B) &= \dots \text{\it variables used in block $B$}\dots \notag\\
-  \mathit{pred}(B) &= \dots \text{\it predecessors for block $B$}\dots \notag
-\end{align}
-\caption{The transfer function and associated definitions for the constant
-  propagation analysis. Equation~\eqref{eqn_back3} shows how \out facts are
-  created from \inE facts. \InBa facts, for some block $B$, are created from
-  the \outBa facts of its predecessors. Facts are combined using the set-wise
-  $\bigwedge$ operator.}
-\label{back_fig10}
-\end{myfig}
+\afterpage{\clearpage\input{fig_back10}\clearpage}
+
 \runin{Transfer Function} Our transfer function creates 
 
 \section{Facts, Transfer Functions, Direction \& The Meet Operator}
