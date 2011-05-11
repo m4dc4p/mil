@@ -158,7 +158,7 @@ analysis runs \emph{forwards} or \emph{backwards}.
 
 %% Constant-propagation
 Consider Figure~\ref{fig_back7}, Part~\subref{fig_back7_initial}, which
-shows a C function containing a loop that multipies the argument by 10
+shows a C function containing a loop that multiplies the argument by 10
 some number of times. Line~\ref{fig_back7_m} declares #m# and assigns
 it the value 10. The function uses #m# in the loop body on
 Line~\ref{fig_back7_loop} to multiply the value passed in
@@ -189,12 +189,12 @@ value. Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt} shows the
 optimized program, replacing #m# with 10 on
 Line~\ref{fig_back7_opt_loop}.
 
-\begin{myfig}[tbh]
-  \input{lst_back13}
-  \caption{Control-flow graph for the program in
-    Figure~\ref{fig_back7_initial}.}
-  \label{fig_back8}
-\end{myfig}
+%% \begin{myfig}[tbh]
+%%   \input{lst_back13}
+%%   \caption{Control-flow graph for the program in
+%%     Figure~\ref{fig_back7_initial}.}
+%%   \label{fig_back8}
+%% \end{myfig}
 
 \subsection{Facts and Lattices} 
 \label{back_subsec_facts}
@@ -241,7 +241,7 @@ predecessors: \refNode{lst_back17_assign} and
 values to $i$: 0 and $\top$. To combine these values when computing
 \inB{lst_back17_test}, we use a \emph{meet operator}.
 
-\begin{myfig}[tbh]
+\begin{myfig}[p]
   \input{lst_back17}
   \caption{Our program, annotated with facts partway through the
     analysis. Notice that \outB{lst_back17_assign} and
@@ -258,7 +258,7 @@ value of $x \in \setLC$, $\bot \lub x$ results in $x$. Conversely, $x
 \lub \top$ results in $\top$. Two differing constants, $C_1$ and
 $C_2$, result in $\top$, while equal constants give the same constant. 
 
-\begin{myfig}[tbh]
+\begin{myfig}[p]
   \begin{math}
     \begin{array}{cccc}
       v_1 & v_2 & v_1 \lub v_2 \\
@@ -276,29 +276,33 @@ $C_2$, result in $\top$, while equal constants give the same constant.
   \label{tbl_back4}
 \end{myfig}
 
-Together, \setLC and \lub form a \emph{lattice}.\footnote{The lattice
-  can also have a \emph{join} operator, but for our purposes we solely
-  use the meet.}  The lattice precisely defines the facts computed in
-our analysis. In this case, the lattice (i.e., facts) represents
-knowledge about a variable's value. Each specific dataflow analysis
-computes different facts, but those facts are always represented by a
-lattice.
-
 We have defined \lub on elements in \setLC, but our facts are set of
 pairs $(a,x)$ where $a$ is a variable and $x$ a value in \setLC. To
 compute \inBa, we apply \lub set-wise to the values for matching
-variables in each \out set of $B$'s predecessors. When we allow \lub
-to operate over sets of pairs, we can show how
-\outB{lst_back17_assign} \lub \outB{lst_back17_incr} is equivalent to
-\inB{lst_back17_test} in Figure~\ref{fig_back11}:
-\begin{equation}
+variables in each \out set of $B$'s
+predecessors. Figure~\ref{fig_back12} shows that when we allow \lub to
+operate over sets of pairs, \outB{lst_back17_assign} \lub
+\outB{lst_back17_incr} is equivalent to \inB{lst_back17_test} (as in
+Figure~\ref{fig_back11}):
+\begin{equation*}
   \begin{split}
-    \inB{lst_back17_test} &= \outB{lst_back17_assign} \lub \outB{lst_Back17_incr} \\
-    \{\dots,\factC{i}{\top},\dots\} &= \{\dots,\factC{i}{0},\dots\}\ \lub \{\dots,\factC{i}{\top},\dots\} \\
-    \{\dots,\factC{i}{\top},\dots\} &= \{\dots,\factC{i}{0 \lub \top},\dots\} \\
-    \{\dots,\factC{i}{\top},\dots\} &= \{\dots,\factC{i}{\top},\dots\} 
+    \inB{lst_back17_test} &= \outB{lst_back17_assign} \lub \outB{lst_back17_incr} 
+    \shortintertext{\hfil\it Definition of \inB{lst_back17_test}, \outB{lst_back17_assign}, and \outB{lst_back17_incr}.} 
+    \{\dots,\factC{i}{\top},\dots\} &= \{\dots,\factC{i}{0},\dots\}\ \lub \{\dots,\factC{i}{\top},\dots\}  
+    \shortintertext{\hfil\it Set-wise use of \lub.} 
+    \{\dots,\factC{i}{\top},\dots\} &= \{\dots,\factC{i}{0 \lub \top},\dots\} 
+    \shortintertext{\hfil\it Definition of \lub from Table~\ref{tbl_back4}.} 
+    \{\dots,\factC{i}{\top},\dots\} &= \{\dots,\factC{i}{\top},\dots\}.
   \end{split}
-\end{equation}
+\end{equation*}
+
+Together, \setLC and \lub form a \emph{lattice}.\footnote{The lattice
+  can also have a \emph{join} operator, but for our purposes we solely
+  use the meet.}  The lattice precisely defines the facts computed in
+our analysis. In this case, the lattice represents
+knowledge about a variable's value. Each specific dataflow analysis
+computes different facts, but those facts are always represented by a
+lattice.
 
 We have established that our analysis computes \emph{facts} at each
 node in our programs control-flow graph. The facts are defined using a

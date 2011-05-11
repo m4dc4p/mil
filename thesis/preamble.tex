@@ -21,6 +21,7 @@
 \usepackage{subfig}
 \usepackage{xifthen}
 \usepackage{mathtools}
+\usepackage{xparse}
 %% \usepackage{listings}
 %% \lstset{escapeinside=!!}
 
@@ -153,11 +154,11 @@
   \def\slashTest##1/##2##3\endslash{\ifx\noslash##2 N\else Y\fi}%%
   \def\getArgs##1/##2{\varName={##1}%%
     \varVal={##2}}
-  \ensuremath{\{%%
+  \ensuremath{%%
     \setcounter{factctr}{0}%%
     \foreach \var in {#1}{%%
       %% Separate list with a comma
-      \ifthenelse{\value{factctr}>0}{,}{}%%
+      \ifthenelse{\value{factctr}>0}{,\allowbreak}{}%%
       %% \tracingmacros=1%%
       %% If key/val arguments, use first form. Otherwise
       %% use second.
@@ -166,13 +167,22 @@
                   {\var}%%
       %% \tracingmacros=0%%
       \stepcounter{factctr}%%
-    }\}}\xspace%%
+    }}\xspace%%
 \endgroup}
-\newcommand{\factC}[2]{\ensuremath{\mathit{#1}=#2}}
-\newcommand{\inFacts}[2]{\ensuremath{\inB{#1}: \facts{#2}}}
-\newcommand{\outFacts}[2]{\ensuremath{\outB{#1}: \facts{#2}}}
+\newcommand{\factC}[2]{{\ensuremath{\mathit{#1}=#2}}}
+\newcommand{\doFacts}[4]{\ensuremath{#3{#1}: %%
+    \left\{ %%
+    \begin{minipage}[c]{#4}
+      \facts{#2}
+    \end{minipage}\right\}}}
 
-%% least upper bound operator. Raised outside mathmode
+\ExplSyntaxOn
+\DeclareDocumentCommand \inFactsM {m m m} {\doFacts{#1}{#2}{\inB}{#3}}
+\DeclareDocumentCommand \inFacts {m m O{1in}} {\doFacts{#1}{#2}{\inB}{#3}}
+\DeclareDocumentCommand \outFactsM {m m m} {\doFacts{#1}{#2}{\outB}{#3}}
+\DeclareDocumentCommand \outFacts {m m O{1in}} {\doFacts{#1}{#2}{\outB}{#3}}
+\ExplSyntaxOff
+
 \newcommand{\lub}{\ifthenelse{\boolean{mmode}}{\sqcap}{\raisebox{.1em}{\ensuremath{\sqcap}}}\xspace}
 %% End dataflow
 

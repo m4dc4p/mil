@@ -1,6 +1,10 @@
 \begin{tikzpicture}[>=stealth, node distance=.75in]
   \def\prefix{lst_back15_}
   \input{lst_back16}
-  \node[fact, above=5mm of mult, anchor=west] () {\inFacts{lst_back13_mult}{m/\bot,n/\bot,i/\bot,val/\bot,cnt/\bot}};
-  \node[fact, below=3mm of mult, anchor=west] () {\outFacts{lst_back13_mult}{m/\bot,n/\bot,i/\bot,val/\bot,cnt/\bot}};
+
+  \node[fact, above right=5mm of mult, anchor=west] () 
+       {\inFactsM{lst_back15_mult}{m/\bot,n/\bot,i/\bot,val/\bot,cnt/\bot}{1in}};
+
+  \node[fact, below left=3mm of mult, anchor=west] () 
+       {\outFacts{lst_back15_mult}{m/\bot,n/\bot,i/\bot,val/\bot,cnt/\bot}};
 \end{tikzpicture}
