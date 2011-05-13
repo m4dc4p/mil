@@ -8,7 +8,7 @@
       below of=assigna] (assignb) {#b = 2#\labelNode{lst_back2_assignb}};
     \node[labelfor=assignb] () {\refNode{lst_back2_assignb}};
     \node[stmt,
-      below of=assignb] (test) {#if(rnd() + a > b)#\labelNode{lst_back2_test}};
+      below of=assignb] (test) {#if(a > b)#\labelNode{lst_back2_test}};
     \node[labelfor=test] () {\refNode{lst_back2_test}};
     \node[stmt,
       right=.5in of test] (true) {#c = 4#\labelNode{lst_back2_true}};

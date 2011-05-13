@@ -1,5 +1,5 @@
 \begin{tikzpicture}
-  \node[entex] (entry) {};
+  \node[invis] (entry) {};
 
   \node[stmt, below=.25in of entry] (assign) {
     \begin{minipage}{.5in}
@@ -12,7 +12,7 @@ d = 4
     \end{minipage}
     \labelNode{lst_back5_assign}};
   \node[labelfor=assign] () {\refNode{lst_back5_assign}};
-  \node[entex, below=.25in of assign] (exit) {};
+  \node[invis, below=.25in of assign] (exit) {};
 
   \draw [->>] (entry) to (assign);
   \draw [->>] (assign) to (exit);
