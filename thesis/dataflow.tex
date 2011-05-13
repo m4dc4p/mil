@@ -263,21 +263,42 @@ We have defined \lub on elements in \setLC, but our facts are set of
 pairs $(a,x)$ where $a$ is a variable and $x$ a value in \setLC. To
 compute \inBa, we apply \lub set-wise to the values for matching
 variables in each \out set of $B$'s
-predecessors. Figure~\ref{fig_back12} shows that when we allow \lub to
-operate over sets of pairs, \outB{lst_back17_assign} \lub
-\outB{lst_back17_incr} is equivalent to \inB{lst_back17_test} (as in
-Figure~\ref{fig_back11}):
-\begin{equation*}
-  \begin{split}
-    \inB{lst_back17_test} &= \outB{lst_back17_assign} \lub \outB{lst_back17_incr} 
-    \shortintertext{\hfil\it Definition of \inB{lst_back17_test}, \outB{lst_back17_assign}, and \outB{lst_back17_incr}.} 
-    \{\dots,\factC{i}{\top},\dots\} &= \{\dots,\factC{i}{0},\dots\}\ \lub \{\dots,\factC{i}{\top},\dots\}  
-    \shortintertext{\hfil\it Set-wise use of \lub.} 
-    \{\dots,\factC{i}{\top},\dots\} &= \{\dots,\factC{i}{0 \lub \top},\dots\} 
-    \shortintertext{\hfil\it Definition of \lub from Table~\ref{tbl_back4}.} 
-    \{\dots,\factC{i}{\top},\dots\} &= \{\dots,\factC{i}{\top},\dots\}.
-  \end{split}
-\end{equation*}
+predecessors:
+\begin{align}\allowdisplaybreaks[0]
+    \inBa &= \bigwedge\limits_{\mathclap{P \in \mathit{pred}(B)}} \outXa{P} \label{eqn_back8}\\ 
+    B \bigwedge\ \,\mathclap{\emptyset}\phantom{C} &= B \notag\\*
+    B \bigwedge\ \,\mathclap{C}\phantom{C} &= \bigcup\limits_{(a,x) \in B}
+    \left(\bigcup\limits_{(b,y) \in C} (a,x) \wedge (b,y)\right) \label{eqn_back6}\\
+  (a,x) \wedge (b,y) &= 
+  \begin{cases}
+    (a,x \lub y) & \text{when}\ (a,x) \in B, (b,y) \in C,\ \text{\lub as in Table~\ref{tbl_back4}.}\\
+    (a,x) & \text{when}\ b \not\in \mathit{var}(B). \\
+    (b,y) & \text{when}\ a \not\in \mathit{var}(C). \\
+  \end{cases} \label{eqn_back7}
+\end{align}
+
+
+Using these equations, we can show how the \inB{lst_back17_test}
+set in Figure~\ref{fig_back11} is derived:
+\begin{flalign*}\allowdisplaybreaks[0]
+    \inB{lst_back17_test} &= \bigwedge\limits_{\mathclap{P \in \mathit{pred}(\refNode{lst_back17_test})}} \outXa{P} 
+    \shortintertext{Predecessors of \refNode{lst_back17_test}; Equation~\eqref{eqn_back8}.} 
+    \inB{lst_back17_test} &= \outB{lst_back17_assign} \bigwedge \outB{lst_back17_incr} 
+    \shortintertext{Equation~\eqref{eqn_back6}.}
+    \inB{lst_back17_test} &= \bigcup\limits_{(a,x) \in \outB{lst_back17_assign}}
+      \left(\bigcup\limits_{(b,y) \in \outB{lst_back17_incr}} (a,x) \wedge (b,y)\right) 
+    \shortintertext{Definition of \outB{lst_back17_assign}, and \outB{lst_back17_incr} in Figure~\ref{fig_back11}.}
+    \inB{lst_back17_test} &= \bigcup\limits_{(a,x) \in \{\factC{i}{0}\}}
+      \left(\bigcup\limits_{(b,y) \in \{\factC{i}{\top}\}} (a,x) \wedge (b,y)\right) 
+    \shortintertext{Equation~\eqref{eqn_back6}.}
+    \inB{lst_back17_test} &= \{\factC{i}{0}\}\ \wedge \{\factC{i}{\top}\} 
+    \shortintertext{Equation~\eqref{eqn_back7}.}
+    \inB{lst_back17_test} &= \{\factC{i}{0 \lub \top}\}
+    \shortintertext{Definition of \lub from Table~\ref{tbl_back4}.} 
+    \inB{lst_back17_test} &= \{\factC{i}{\top}\} 
+    \shortintertext{Definition of \inB{lst_back17_test}.}
+    \{\factC{i}{\top}\} &= \{\factC{i}{\top}\} 
+\end{flalign*}
 
 Together, \setLC and \lub form a \emph{lattice}.\footnote{The lattice
   can also have a \emph{join} operator, but for our purposes we solely
@@ -436,63 +457,174 @@ analyzed \emph{iteratively} until all \out (in the case of a forwards
 analysis) or \inE (in the case of a backwards analysis) sets reach a
 \emph{fixed point}.
 
-
-Figure~\ref{fig_back8}, Part~\subref{fig_back8_initial} shows our
-program, annotated with initial facts (i.e., all variables are assumed
-to be $\bot$). Table~\ref{tbl_back5} shows how the \inE and \out sets
-associated with each node change with each iteration of the analysis.
-Part~\subref{fig_back8_final} shows the facts computed after our
-constant propagation analysis has terminated.
-
+Table~\ref{tbl_back5} shows how the \inE and \out sets associated with
+each node change with each iteration of the analysis. The control-flow
+graph is reproduced in the table as well, to make the relations
+between nodes clear. The ``zero'' iteration corresponds to the initial
+value for all facts: everything is $\bot$, i.e., unknown. Each
+iteration shows the calculated values \inE and \out sets for each
+node. Recall that each \inE set is derived the \out sets of the
+predecessor nodes. Crucially, the \out set from the \emph{previous}
+iteration is used to derive the \inE set for a given
+node. \refNode{tbl_back5_test} is the only node with multiple
+predecessors.  To derive \inB{tbl_back5_test}, we use
+\outB{tbl_back_assign} and \outB{tbl_back_incr} from the
+\emph{previous} iteration:
 \begin{myfig}
-  \begin{tabular}{lp{0.8in}lccccc}
-    & & Node & 0 & 1 & 2 & 3 \\
-    & & \outXa{\textsc{E}} & \facts{m/\bot,n/\bot,i/\bot} & --- \\\\
-\tikz[remember picture] \node[table] (assign) {}; & \begin{minipage}{0.5in} %%
-  \begin{AVerb} 
-m = 10
-n = 1
-i = 0
-  \end{AVerb}
-\end{minipage} & \inB{lst_back15_assign} & \facts{m/\bot,n/\bot,i/\bot} & --- \\ 
-    & & \outB{lst_back15_assign} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/{10},n/1,i/0} & --- \\ \\
-    \tikz[remember picture] \node[table] (test) {}; & #i < cnt# & \inB{lst_back15_test} & \facts{m/\bot,n/\bot,i/\bot} & --- & \facts{m/{10},n/\bot,i/\top} \\
-    & & \outB{lst_back15_test} & \facts{m/\bot,n/\bot,i/\bot} & --- & \facts{m/{10},n/\top,i/\top} \\\\
-    \tikz[remember picture] \node[table] (mult) {}; & #n = val * m# & \inB{lst_back15_mult} & \facts{m/\bot,n/\bot,i/\bot} & --- & --- \\
-    & & \outB{lst_back15_mult} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/\bot,n/\top,i/\bot} & --- \\\\
-    \tikz[remember picture] \node[table] (incr) {}; & #i++# & \inB{lst_back15_incr} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/\bot,n/\top,i/\bot}   \\
-    & & \outB{lst_back15_incr} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/\bot,n/\bot,i/\top} & \facts{m/\bot,n/\top,i/\bot} \\\\
-    \tikz[remember picture] \node[table] (return) {}; & #return n# & \inB{lst_back15_return} & \facts{m/\bot,n/\bot,i/\bot} & ---  & \\
-    & & \outB{lst_back15_return} & \facts{m/\bot,n/\bot,i/\bot} & ---  \\\\
-    & & \inXa{\textsc{X}} & \facts{m/\bot,n/\bot,i/\bot} & ---
-  \end{tabular}
-  \caption{This table illustrates how facts change for each iteration
-    when applying our constant propagation analysis to our sample
-    program. The nodes {\sc E} and {\sc X} represent the invisible
-    \emph{entry} and \emph{exit} nodes.}
-  \label{tbl_back5}
-\end{myfig}
+  \setlength{\arraycolsep}{2pt}
+%% This style sets options we need
+%% below when rendering the CFG next to the
+%% table
+  \tikzset{dffig/.style={remember picture, overlay, xshift=-0.75in}}
+  \begin{math}
+  \begin{array}{ll@@{\phantom{X}}ccc@@{\phantom{X}}ccc@@{\phantom{X}}ccc@@{\phantom{X}}ccc@@{\phantom{X}}ccc@@{\phantom{X}}ccc}
+    & & %%
+      & 0 & & 
+      & 1 & & 
+      & 2 & & 
+      & 3 & &
+      & 4 & &
+      & 5 & \\ 
 
+    & \text{Node} & %%
+      m & n & i & %% 0
+      m & n & i & %% 1
+      m & n & i & %% 2
+      m & n & i & %% 3
+      m & n & i & %% 4
+      m & n & i \\ %% 5
+
+    \begin{tikzpicture}[dffig,yshift=0.1in]
+      \node[stmt] (assign) {\begin{minipage}{0.6in} %%
+            \tt m = 10 \\n = 1 \\i = 0
+          \end{minipage}\labelNode{tbl_back5_assign}}; 
+        \node[labelfor=assign] () {\refNode{tbl_back5_assign}};
+    \end{tikzpicture}
+    & %%
+    \inB{lst_back15_assign} & %%
+        \bot & \bot & \bot & %% 0 
+        \bot & \bot & \bot & %% 1 
+        \bot & \bot & \bot & %% 2
+        \bot & \bot & \bot & %% 3
+        \bot & \bot & \bot & %% 4
+        \bot & \bot & \bot \\ %% 5
+    & \outB{lst_back15_assign} & %%
+        \bot & \bot & \bot & %% 0 
+        10 & 1 & 0 & %% 1 
+        10 & 1 & 0 & %% 2
+        10 & 1 & 0 & %% 3
+        10 & 1 & 0 & %% 4
+        10 & 1 & 0 \\\\ %% 5
+
+    \begin{tikzpicture}[dffig] 
+      \node[stmt] (test) {\texttt{i < cnt}\labelNode{tbl_back5_test}}; 
+      \node[labelfor=test] () {\refNode{tbl_back5_test}};
+    \end{tikzpicture} & %%
+    \inB{lst_back15_test} & %%
+        \bot & \bot & \bot & %% 0 
+        \bot & \bot & \bot & %% 1 
+        10 & 1 & \top & %% 2
+        10 & \top & \top & %% 3
+        10 & \top & \top & %% 4
+        10 & \top & \top\\ %% 5
+    & \outB{lst_back15_test} & %%
+        \bot & \bot & \bot & %% 0 
+        \bot & \bot & \bot & %% 1 
+        10 & 1 & \top & %% 2
+        10 & \top & \top & %% 3
+        10 & \top & \top & %% 4
+        10 & \top & \top \\\\ %% 5
+
+    \begin{tikzpicture}[dffig] 
+      \node[stmt] (mult) {\texttt{n = val * m}\labelNode{tbl_back5_mult}};
+      \node[labelfor=mult] (mult_label) {\refNode{tbl_back5_mult}};
+    \end{tikzpicture}
+    & %%
+    \inB{lst_back15_mult} & %%
+        \bot & \bot & \bot & %% 0 
+        \bot & \bot & \bot & %% 1 
+        \bot & \bot & \bot & %% 2
+        10 & 1 & \top & %% 3
+        10 & \top & \top & %% 4
+        10 & \top & \top \\ %%5  
+    & \outB{lst_back15_mult} & %%
+        \bot & \bot & \bot & %% 0 
+        \bot & \top & \bot & %% 1 
+        \bot & \top & \bot & %% 2
+        10 & \top & \top & %% 3
+        10 & \top & \top & %% 4
+        10 & \top & \top \\\\ %% 5
+
+    \begin{tikzpicture}[dffig] 
+      \node[stmt] (incr) {\texttt{i++}\labelNode{tbl_back5_incr}};
+      \node[labelfor=incr] () {\refNode{tbl_back5_incr}};
+    \end{tikzpicture}
+    & %%
+    \inB{lst_back15_incr} & %%
+        \bot & \bot & \bot & %% 0 
+        \bot & \bot & \bot & %% 1 
+        \bot & \top & \bot & %% 2
+        \bot & \top & \bot & %% 3
+        10 & \top & \top & %% 4
+        10 & \top & \top \\ %% 5
+    & \outB{lst_back15_incr} & %%
+        \bot & \bot & \bot & %% 0 
+        \bot & \bot & \top & %% 1 
+        \bot & \top & \top & %% 2
+        \bot & \top & \top & %% 3
+        10 & \top & \top & %% 4
+        10 & \top & \top \\\\ %% 5
+
+    \begin{tikzpicture}[dffig] 
+      \node[stmt] (return) {\texttt{return n}\labelNode{tbl_back5_return}}; 
+      \node[labelfor=return] () {\refNode{tbl_back5_return}};
+    \end{tikzpicture}
+    & %%
+    \inB{lst_back15_return} & %%
+        \bot & \bot & \bot & %% 0 
+        \bot & \bot & \bot & %% 1 
+        \bot & \bot & \bot & %% 2
+        10 & 1 & \top & %% 3
+        10 & \top & \top & %% 4
+        10 & \top & \top \\ %% 5
+    & \outB{lst_back15_return} & %%
+        \bot & \bot & \bot & %% 0 
+        \bot & \bot & \bot & %% 1 
+        \bot & \bot & \bot & %% 2
+        10 & 1 & \top & %% 3
+        10 & \top & \top & %% 4
+        10 & \top & \top \\\\ %% 5
+
+  \end{array}
+  \end{math}
 \begin{tikzpicture}[overlay, remember picture]
   \draw[->] (assign.south) -|| (test.north);
   \draw[->] (test.south) -|| (mult.north);
   \draw[->] (mult.south) -|| (incr.north);
-  \draw[->] (incr.west) -|| ++(-4mm,0cm) ||- (test.west);
-  \draw[->] (incr.south) -|| (return.north);
+  \draw[->] (incr.west) -|| ($(mult.west) - (1mm,0)$) ||- (test.west);
+  \draw[->] (test.east) -|| ($(mult_label.east) + (1mm,0)$) ||- (return.east);
 \end{tikzpicture}
-
-\begin{myfig}
-  \begin{tabular}[c]
-    \subfloat{\input{lst_back15}\label{fig_back8_initial}} \\
-    \subref{fig_back8_initial} \\
-    \subfloat{\input{lst_back13}\label{fig_back8_final}} \\
-    \subref{fig_back8_final} 
-  \end{tabular}
-  \caption{The control flow graph for our program. Part~\subref{fig_back8_initial}
-    shows the initial facts associated with each node. Part~\subref{fig_back8_final}
-    shows the final facts computed by our constant propagation analysis.}
-  \label{fig_back8}
+  \caption{This table shows the facts calculated for all nodes in our
+    example program. After 5 iterations the facts reach a fixed point
+    (i.e., they stop changing) and we can see that
+    \inB{lst_back15_mult} shows that $m$ is always 10, proving we can
+    rewrite the multiplication safely. }
+  \label{tbl_back5}
 \end{myfig}
+
+
+%% \begin{myfig}
+%%   \begin{tabular}[c]
+%%     \subfloat{\input{lst_back15}\label{fig_back8_initial}} \\
+%%     \subref{fig_back8_initial} \\
+%%     \subfloat{\input{lst_back13}\label{fig_back8_final}} \\
+%%     \subref{fig_back8_final} 
+%%   \end{tabular}
+%%   \caption{The control flow graph for our program. Part~\subref{fig_back8_initial}
+%%     shows the initial facts associated with each node. Part~\subref{fig_back8_final}
+%%     shows the final facts computed by our constant propagation analysis.}
+%%   \label{fig_back8}
+%% \end{myfig}
 
 
 \subsection{Dataflow Equations}
