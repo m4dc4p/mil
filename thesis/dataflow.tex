@@ -1,6 +1,6 @@
 \documentclass[12pt]{report}
 %include polycode.fmt
-\include{preamble}
+\input{preamble}
 \begin{document}
 \input{document.preamble}
 \renewcommand{\textfraction}{0.1}
@@ -436,6 +436,7 @@ analyzed \emph{iteratively} until all \out (in the case of a forwards
 analysis) or \inE (in the case of a backwards analysis) sets reach a
 \emph{fixed point}.
 
+
 Figure~\ref{fig_back8}, Part~\subref{fig_back8_initial} shows our
 program, annotated with initial facts (i.e., all variables are assumed
 to be $\bot$). Table~\ref{tbl_back5} shows how the \inE and \out sets
@@ -444,20 +445,26 @@ Part~\subref{fig_back8_final} shows the facts computed after our
 constant propagation analysis has terminated.
 
 \begin{myfig}
-  \begin{tabular}{lccccc}
-    Node & 1 & 2 & 3 & 4 \\\midrule 
-    \outXa{\textsc{E}} & \facts{m/\bot,n/\bot,i/\bot} & \dots \\\\
-    \inB{lst_back15_assign} & \facts{m/\bot,n/\bot,i/\bot} & \dots \\ 
-    \outB{lst_back15_assign} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/{10},n/1,i/0} & \dots \\ \\
-    \inB{lst_back15_test} & \facts{m/\bot,n/\bot,i/\bot} & \dots & \facts{m/{10},n/\bot,i/\bot} \\
-    \outB{lst_back15_test} & \facts{m/\bot,n/\bot,i/\bot} & \dots & \facts{m/\bot,n/\bot,i/\bot} \\\\
-    \inB{lst_back15_mult} & \facts{m/\bot,n/\bot,i/\bot} & \dots & \dots \\
-    \outB{lst_back15_mult} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/\bot,n/\top,i/\bot} & \dots \\\\
-    \inB{lst_back15_incr} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/\bot,n/\top,i/\bot}   \\
-    \outB{lst_back15_incr} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/\bot,n/\bot,i/\top} & \facts{m/\bot,n/\top,i/\bot} \\\\
-    \inB{lst_back15_return} & \facts{m/\bot,n/\bot,i/\bot} & \dots  & \\
-    \outB{lst_back15_return} & \facts{m/\bot,n/\bot,i/\bot} & \dots  \\\\
-    \inXa{\textsc{X}} & \facts{m/\bot,n/\bot,i/\bot} & \dots
+  \begin{tabular}{lp{0.8in}lccccc}
+    & & Node & 0 & 1 & 2 & 3 \\
+    & & \outXa{\textsc{E}} & \facts{m/\bot,n/\bot,i/\bot} & --- \\\\
+\tikz[remember picture] \node[table] (assign) {}; & \begin{minipage}{0.5in} %%
+  \begin{AVerb} 
+m = 10
+n = 1
+i = 0
+  \end{AVerb}
+\end{minipage} & \inB{lst_back15_assign} & \facts{m/\bot,n/\bot,i/\bot} & --- \\ 
+    & & \outB{lst_back15_assign} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/{10},n/1,i/0} & --- \\ \\
+    \tikz[remember picture] \node[table] (test) {}; & #i < cnt# & \inB{lst_back15_test} & \facts{m/\bot,n/\bot,i/\bot} & --- & \facts{m/{10},n/\bot,i/\top} \\
+    & & \outB{lst_back15_test} & \facts{m/\bot,n/\bot,i/\bot} & --- & \facts{m/{10},n/\top,i/\top} \\\\
+    \tikz[remember picture] \node[table] (mult) {}; & #n = val * m# & \inB{lst_back15_mult} & \facts{m/\bot,n/\bot,i/\bot} & --- & --- \\
+    & & \outB{lst_back15_mult} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/\bot,n/\top,i/\bot} & --- \\\\
+    \tikz[remember picture] \node[table] (incr) {}; & #i++# & \inB{lst_back15_incr} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/\bot,n/\top,i/\bot}   \\
+    & & \outB{lst_back15_incr} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/\bot,n/\bot,i/\top} & \facts{m/\bot,n/\top,i/\bot} \\\\
+    \tikz[remember picture] \node[table] (return) {}; & #return n# & \inB{lst_back15_return} & \facts{m/\bot,n/\bot,i/\bot} & ---  & \\
+    & & \outB{lst_back15_return} & \facts{m/\bot,n/\bot,i/\bot} & ---  \\\\
+    & & \inXa{\textsc{X}} & \facts{m/\bot,n/\bot,i/\bot} & ---
   \end{tabular}
   \caption{This table illustrates how facts change for each iteration
     when applying our constant propagation analysis to our sample
@@ -465,6 +472,14 @@ constant propagation analysis has terminated.
     \emph{entry} and \emph{exit} nodes.}
   \label{tbl_back5}
 \end{myfig}
+
+\begin{tikzpicture}[overlay, remember picture]
+  \draw[->] (assign.south) -|| (test.north);
+  \draw[->] (test.south) -|| (mult.north);
+  \draw[->] (mult.south) -|| (incr.north);
+  \draw[->] (incr.west) -|| ++(-4mm,0cm) ||- (test.west);
+  \draw[->] (incr.south) -|| (return.north);
+\end{tikzpicture}
 
 \begin{myfig}
   \begin{tabular}[c]
