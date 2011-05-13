@@ -189,13 +189,6 @@ value. Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt} shows the
 optimized program, replacing #m# with 10 on
 Line~\ref{fig_back7_opt_loop}.
 
-%% \begin{myfig}[tbh]
-%%   \input{lst_back13}
-%%   \caption{Control-flow graph for the program in
-%%     Figure~\ref{fig_back7_initial}.}
-%%   \label{fig_back8}
-%% \end{myfig}
-
 \subsection{Facts and Lattices} 
 \label{back_subsec_facts}
 
@@ -385,8 +378,8 @@ pair (i.e., fact):
   \label{eqn_back4}
 \end{equation}
 
-Equation~\eqref{eqn_back4} considers two kinds of statements:
-assignment and increment. If the statement #a = C# appears in the
+Equation~\eqref{eqn_back4} considers two kinds of statements: constant
+and non-constant updates. If the statement #a = C# appears in the
 node, our new fact is $(a,C)$, meaning #a# was assigned a known
 constant. We create the fact $(a,\top)$ for any other
 update.\footnote{In practice this analysis is much more sophisticated,
@@ -398,7 +391,11 @@ node, we just pass the initial fact through unchanged.
 Though we have defined Equation~\eqref{eqn_back4} in terms of a single
 fact, we can easily extend it to sets of facts. To create \outBa for
 some node $B$, we apply Equation~\eqref{eqn_back4} element-wise to
-each fact in \inBa and combine the results into a set.
+each fact in \inBa and combine the results into a set:
+\begin{equation}
+  \outBa = \bigcup\limits_{\mathclap{(a,x) \in \inBa}} f(a,x)
+  \label{eqn_back5}
+\end{equation}
 
 Figure~\ref{fig_back9}, Part \subref{fig_back9_initial}, shows our
 program, annotated with initial \inE and \out
@@ -408,32 +405,80 @@ Equation~\eqref{eqn_back4}. The assignments in
 \refNode{lst_back18_assign} create the facts \factC{m}{10},
 \factC{n}{1}, and \factC{i}{0} in \outB{lst_back18_assign}. The
 multiplication in \refNode{lst_back18_mult} is a non-constant update,
-so \outB{lst_back18_mult} contains \factC{n}{\top}. However, \outB{lst_back18_mult}
-also shows that #m# is not modified in \refNode{lst_back18_mult}; the value
-from \inB{lst_back18_mult} is just copied to \outB{lst_back18_mult}.
+so \outB{lst_back18_mult} contains \factC{n}{\top}. However,
+\outB{lst_back18_mult} also shows that #m# is not modified in
+\refNode{lst_back18_mult}; the value from \inB{lst_back18_mult} is
+just copied to \outB{lst_back18_mult}.
 
 \afterpage{\clearpage\input{fig_back9}\clearpage}
 
-%% The
-%% transfer function is one the parameters of the algorithm Each
-%% node can have its own unique function, but in practice 
-
-%% Constant propagation is a \emph{forwards analysis}: a node's \inE set is
-%% calculated using its predecessors \out sets. This also means a node's
-%% \out set is calculated using its \inE set 
-
-%% Not
-%% only does this mean we compute a given node's \inE set from its predecessors \out
-%% sets, but also that we compuet the same node's \out set using its \inE set.
-
-%% Our analysis computes \out sets for each node in the control-flow
-%% graph. A node's \out set is calculated using the statements in the node
-%% and its \inE set. We define a \emph{transfer function} for our 
-%% analysis that performs this calculation. 
-
+Every dataflow analysis defines a \emph{transfer function} for
+creating (or updating) facts. The function is specific to both the
+analysis performed and the semantics of the underlying
+program. Equation~\ref{eqn_back4}, the transfer function for our
+constant propagation example, defines how we derive information about
+a variable's value after the statements in the given node execute.
+Equation~\ref{eqn_back5} extended Equation~\ref{eqn_back4} to sets,
+showing how we can create \outBa from \inBa. In the next section, we
+iteratively apply our transfer function and lattice to the
+control-flow graph. We will show both how our analysis is guaranteed
+to terminate and how we can be confident it has given us the best
+possible answer.
 
 \subsection{Iteration \& Fixed Points}
 \label{back_subsec_iter}
+
+Figure~\ref{fig_back11} in the previous section hints that facts
+develop over time during analysis. In fact, the transfer function is
+applied to each node in turn, creating new facts from old, until the
+facts stop changing. In other words, the control-flow graph is
+analyzed \emph{iteratively} until all \out (in the case of a forwards
+analysis) or \inE (in the case of a backwards analysis) sets reach a
+\emph{fixed point}.
+
+Figure~\ref{fig_back8}, Part~\subref{fig_back8_initial} shows our
+program, annotated with initial facts (i.e., all variables are assumed
+to be $\bot$). Table~\ref{tbl_back5} shows how the \inE and \out sets
+associated with each node change with each iteration of the analysis.
+Part~\subref{fig_back8_final} shows the facts computed after our
+constant propagation analysis has terminated.
+
+\begin{myfig}
+  \begin{tabular}{lccccc}
+    Node & 1 & 2 & 3 & 4 \\\midrule 
+    \outXa{\textsc{E}} & \facts{m/\bot,n/\bot,i/\bot} & \dots \\\\
+    \inB{lst_back15_assign} & \facts{m/\bot,n/\bot,i/\bot} & \dots \\ 
+    \outB{lst_back15_assign} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/{10},n/1,i/0} & \dots \\ \\
+    \inB{lst_back15_test} & \facts{m/\bot,n/\bot,i/\bot} & \dots & \facts{m/{10},n/\bot,i/\bot} \\
+    \outB{lst_back15_test} & \facts{m/\bot,n/\bot,i/\bot} & \dots & \facts{m/\bot,n/\bot,i/\bot} \\\\
+    \inB{lst_back15_mult} & \facts{m/\bot,n/\bot,i/\bot} & \dots & \dots \\
+    \outB{lst_back15_mult} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/\bot,n/\top,i/\bot} & \dots \\\\
+    \inB{lst_back15_incr} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/\bot,n/\top,i/\bot}   \\
+    \outB{lst_back15_incr} & \facts{m/\bot,n/\bot,i/\bot} & \facts{m/\bot,n/\bot,i/\top} & \facts{m/\bot,n/\top,i/\bot} \\\\
+    \inB{lst_back15_return} & \facts{m/\bot,n/\bot,i/\bot} & \dots  & \\
+    \outB{lst_back15_return} & \facts{m/\bot,n/\bot,i/\bot} & \dots  \\\\
+    \inXa{\textsc{X}} & \facts{m/\bot,n/\bot,i/\bot} & \dots
+  \end{tabular}
+  \caption{This table illustrates how facts change for each iteration
+    when applying our constant propagation analysis to our sample
+    program. The nodes {\sc E} and {\sc X} represent the invisible
+    \emph{entry} and \emph{exit} nodes.}
+  \label{tbl_back5}
+\end{myfig}
+
+\begin{myfig}
+  \begin{tabular}[c]
+    \subfloat{\input{lst_back15}\label{fig_back8_initial}} \\
+    \subref{fig_back8_initial} \\
+    \subfloat{\input{lst_back13}\label{fig_back8_final}} \\
+    \subref{fig_back8_final} 
+  \end{tabular}
+  \caption{The control flow graph for our program. Part~\subref{fig_back8_initial}
+    shows the initial facts associated with each node. Part~\subref{fig_back8_final}
+    shows the final facts computed by our constant propagation analysis.}
+  \label{fig_back8}
+\end{myfig}
+
 
 \subsection{Dataflow Equations}
 \label{back_subsec_eq}

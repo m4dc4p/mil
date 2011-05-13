@@ -116,6 +116,8 @@
 \newcommand{\OutBa}{\ensurmath{\mathit{Out}(B)}\xspace}
 %% in(B) -- fact function for an anonymous block.
 \newcommand{\inBa}{\ensuremath{\mathit{in}(B)}\xspace}
+%% in(X) -- fact function for an anonymous block, but using a different variable.
+\newcommand{\inXa}[1]{\ensuremath{\mathit{in}(#1)}\xspace}
 %% in(B,v) -- fact function for an anonymous block and some variable.
 \newcommand{\inBav}[1]{\ensuremath{\mathit{in}(B, #1)}\xspace}
 %% in(B_x) -- fact function for an named block.
@@ -124,7 +126,7 @@
 \newcommand{\inBv}[2]{\ensuremath{\mathit{in}(B_{\ref{#1}}, #2)}\xspace}
 %% out(B) -- fact function for an anonymous block.
 \newcommand{\outBa}{\ensuremath{\mathit{out}(B)}\xspace}
-%% out(B) -- fact function for an anonymous block, but using a different variable.
+%% out(X) -- fact function for an anonymous block, but using a different variable.
 \newcommand{\outXa}[1]{\ensuremath{\mathit{out}(#1)}\xspace}
 %% out(B,v) -- fact function for an anonymous block and some variable.
 \newcommand{\outBav}[1]{\ensuremath{\mathit{out}(B, #1)}\xspace}
@@ -169,7 +171,7 @@
       \stepcounter{factctr}%%
     }}\xspace%%
 \endgroup}
-\newcommand{\factC}[2]{{\ensuremath{\mathit{#1}=#2}}}
+\newcommand{\factC}[2]{{\ensuremath{(\mathit{#1},#2)}}}
 \newcommand{\doFacts}[4]{\ensuremath{#3{#1}: %%
     \left\{ %%
      \begin{minipage}[c]{#4}
@@ -212,3 +214,4 @@
 
 %% Paragraph run-in
 \newcommand{\runin}[1]{\begingroup\noindent\sffamily\textbf{#1}\qquad\endgroup}
+
