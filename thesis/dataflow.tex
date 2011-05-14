@@ -303,7 +303,7 @@ set in Figure~\ref{fig_back11} is derived:
     \intertext{Definition of \lub from Table~\ref{tbl_back4}.} 
     \inB{lst_back17_test} &= \{\factC{i}{\top}\} 
     \intertext{Definition of \inB{lst_back17_test}.}
-    \{\factC{i}{\top}\} &= \{\factC{i}{\top}\} 
+    \{\factC{i}{\top}\} &= \{\factC{i}{\top}\}.
 \end{flalign*}
 
 Together, \setLC and \lub form a \emph{lattice}.\footnote{The lattice
@@ -398,7 +398,7 @@ pair (i.e., fact):
 \begin{equation}
   f (a,x) = 
   \begin{cases}
-    (a,C) & \text{when \texttt{a = \emph{C}}, where \texttt{\emph{C}} is an integer.}. \\
+    (a,C) & \text{when \texttt{a = \emph{C}}, where \texttt{\emph{C}} is an integer.} \\
     (a,\top) & \text{when \texttt{a} updated}. \\
     (a,x) & \text{otherwise}. \\
   \end{cases}
@@ -420,7 +420,7 @@ fact, we can easily extend it to sets of facts. To create \outBa for
 some node $B$, we apply Equation~\eqref{eqn_back4} element-wise to
 each fact in \inBa and combine the results into a set:
 \begin{equation}
-  \outBa = \bigcup\limits_{\mathclap{(a,x) \in \inBa}} f(a,x)
+  \outBa = \bigcup\limits_{\mathclap{(a,x) \in \inBa}} f(a,x).
   \label{eqn_back5}
 \end{equation}
 
@@ -472,7 +472,7 @@ for a given node change during analysis. The control-flow graph is
 reproduced in Part~\subref{fig_back11_cfg}. Following the control-flow
 between nodes shows which \out sets are used to calcuate \inE sets.
 
-\begin{myfig}
+\begin{myfig}[tb]
   \setlength{\tabcolsep}{2pt}
   \hbox to \textwidth{\hss
   \begin{tabular}{cc}
@@ -505,7 +505,7 @@ attaching the iteration number to each set:
   \inB{lst_back15_test}^1 &= \outB{lst_back15_assign}^0 \bigwedge \outB{lst_back15_incr}^0 \\
   &= {\factC{i}{\bot}} \wedge {\factC{i}{\bot}} \\
   &= {\factC{i}{\bot \lub \bot}} \\
-  {\factC{i}{\bot}} &= {\factC{i}{\bot}}
+  {\factC{i}{\bot}} &= {\factC{i}{\bot}}.
 \end{align*}
 Now consider the second iteration, where \inB{lst_back15_test} assigns
 $\top$ to $i$. \outB{lst_back15_assign} gives $i$ the value
@@ -518,20 +518,78 @@ emphasizing its origin:
   \inB{lst_back15_test}^2 &= \outB{lst_back15_assign}^1 \bigwedge \outB{lst_back15_incr}^1 \\
   &= {\factC{i}{0}} \wedge {\factC{i}{\top}} \\
   &= {\factC{i}{0 \lub \top}} \\
-  {\factC{i}{\top}} &= {\factC{i}{\top}}
+  {\factC{i}{\top}} &= {\factC{i}{\top}}.
 \end{align*}
 Notice how the conflicting values for $i$ are resolved with the \lub
-operator. By the third iteration, \inB{lst_back15_test} and
-\outB{lst_back15_test} reach a fixed point,
-${\facts{m/{10},n/\top,i/\top}\}$.
+operator. The value of $i$ in \outB{lst_back15_test} has reached a fixed point
+with this iteration; it will no longer change.
 
-Figure~\ref{fig_back11} how we develop facts for this particular
-analysis, for a particular program. In general, we would like our 
-dataflow analysis to have two properties:
-\begin{enumerate}
-\item The analysis will terminate.
-\item The answer given is the best possible.
-\end{enumerate}
+The above example raises an important question: how do we know we have
+reached a fixed point? Formally, the question can be answered if our
+lattice has \emph{finite height} and the transfer function is
+\emph{monotone}.
+
+Let us begin with the lattice. Consider again the meet operator, \lub,
+defined in Table~\ref{tbl_back4} and our set of values, \setLC:
+\begin{align*}
+  \setLC &= \bot, \dots \mathit{all\ integers} \dots, \top. \\\\
+  \bot \lub x &= x. \\
+  x \lub \top &= \top.\\
+  C_1 \lub C_2 &= \top, \text{where} C_1 \neq C_2.\\
+  C_1 \lub C_1 &= C_1.
+\end{align*}
+The definition of \lub imposes a \emph{partial order} on the values
+in \setLC. That is, we can define an operator, \sqlt, such that
+for all $x$ and $y$ in \setLC:
+\begin{equation}
+  x \sqlt y\ \text{if and only if}\ x \lub y = y\ \text{and}\ x \neq y.
+  \label{eqn_back9}
+\end{equation}
+That is, $x$ is ``less than'' $y$ only when $x \lub y$ equals
+$y$.\footnote{This definition can also be given in terms of ``less
+  than or equal to'' by dropping the requirement that $x \neq y$, but
+  we choose to simplify and only present \sqlt here.}
+
+We now define the \emph{height} of our lattice. It is the
+longest possible ordering of values in \setLC such that:
+\begin{equation}
+  x_1 \sqlt x_2 \dots \sqlt x_n.
+  \label{eqn_back10}
+\end{equation}
+Equation~\eqref{eqn_back9} shows us that $\top$ is the ``greatest''
+element in \setLC and $\bot$ is the ``least.'' In turn, we
+know the maximum height of \setLC by Equation~\eqref{eqn_back10}: 3. We
+show by contradiction that any longer ordering is impossible:
+
+Given $x_1 \sqlt x_2 \sqlt \dots \sqlt x_4$, such that n = 4. If
+$x_4$ is $\top$, then $x_3$ must be an integer or $\bot$. If $x_3$ is
+$\bot$, by Equation~\eqref{eqn_back9}, there is no such $x_2$ such
+that $x_2 \sqlt \bot$. Therefore, $x_3$ cannot be $\bot$. If $x_3$ is
+an integer, again by Equation~\eqref{eqn_back9}, $x_2$ must be
+$\bot$. In turn, there is no such $x_1$ such that $x_1 \sqlt \bot$. Therefore,
+$x_4$ cannot be $\top$ and in fact, by similar arguments, it cannot exist. We
+can show by cases that $n$ (and the height of our lattice) must be 3. $\square$
+
+Now let us address the transfer function. A \emph{monotone} function 
+has the following property:
+\begin{equation}
+  f(x) \sqlt f(y)\ \text{whenever}\x x \sqlt y.
+  \label{eqn_back11}
+\end{equation}
+That is, when a monotone function does not change the ordering between
+its inputs. If $x$ is ``less than'' $y$, $f(x)$ will also be ``less
+than'' $f(y)$.\footnote{Again, this definition can be given in terms
+  $\sqsubseteq$, the ``less than or equal to'' partial ordering.}
+
+When our transfer function is monotone, we know that ``lesser'' facts
+will always be translated to ``lesser'' values. Therefore, we know our
+facts will either stay constant or get ``bigger.'' They will
+\emph{not} vary ``up'' and ``down'' the lattice -- they will only move
+in one direction.
+
+Trivially holds for our transfer function because it is defined in terms of \lub.
+
+Together, guarantees we terminate. How do we get the ``best'' answer?
 
 
 %% Monotonic
