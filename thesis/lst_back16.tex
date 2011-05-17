@@ -10,9 +10,7 @@ i = 0
     \labelNode{\prefix assign}};
   \node[labelfor=assign] () {\refNode{\prefix assign}};
 
-  \node[invis, below=0.25in of assign] (assign1) {};
-
-  \node[stmt, below=0.25in of assign1] (test) {#i < cnt#\labelNode{\prefix test}};
+  \node[stmt, below=0.25in of assign] (test) {#i < cnt#\labelNode{\prefix test}};
   \node[labelfor=test] () {\refNode{\prefix test}};
 
   \node[stmt, right=1.5in of test] (mult) {#n = val * m#\labelNode{\prefix mult}};
@@ -20,9 +18,6 @@ i = 0
 
   \node[stmt, below of=mult] (incr) {#i++#\labelNode{\prefix incr}};
   \node[labelfor=incr] () {\refNode{\prefix incr}};
-
-  \node[invis, right=1in of incr] (incr1) {};
-  \node[invis] (incr2) at (node cs: name=incr1,name=assign1) {};
 
   \node[stmt, below of=test] (return) {#return n#\labelNode{\prefix return}};
   \node[labelfor=return] () {\refNode{\prefix return}};
@@ -33,6 +28,6 @@ i = 0
   \draw [->] (assign) to (test);
   \draw [->] (test) to (mult);
   \draw [->] (mult) to (incr);
-  \draw [->] (incr) to (incr1) |- (incr2) |- (assign1) |- (test.north);
+  \draw [->] (incr) -| ($(mult.east) + (5mm,0mm)$) |- ($(test.north)!.5!(assign.south)$) to (test.north) ;
   \draw [->] (test) to (return);
   \draw [->>] (return) to (exit);

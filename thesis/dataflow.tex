@@ -578,20 +578,19 @@ We can more succinctly define the height using a strict ``less than''
 ordering. First, the \sqlt relation:
 \begin{equation}
   x \sqlt y\ \text{if and only if}\ x \lub y = y\ \text{and}\ x \neq y.
-  \label{eqn_back12}
 \end{equation}
 And now we can redefine height as the largest $n$ such that:
 \begin{equation}
   x_1 \sqlt x_2 \dots \sqlt x_n.
-  \label{eqn_back13}
+  \label{eqn_back17}
 \end{equation}
 
 We can show by contradiction that the height of our lattice is
 3. Given $x_1 \sqlt x_2 \sqlt \dots \sqlt x_n$, such that n = 4. If
 $x_4$ is $\top$, then $x_3$ must be an integer or $\bot$. If $x_3$ is
-$\bot$, by Equation~\eqref{eqn_back13}, there is no such $x_2$ such
+$\bot$, by Equation~\eqref{eqn_back17}, there is no such $x_2$ such
 that $x_2 \sqlt \bot$. Therefore, $x_3$ cannot be $\bot$. If $x_3$ is
-an integer, again by Equation~\eqref{eqn_back13}, $x_2$ must be
+an integer, again by Equation~\eqref{eqn_back17}, $x_2$ must be
 $\bot$. In turn, there is no such $x_1$ such that $x_1 \sqlt
 \bot$. Therefore, $x_4$ cannot be $\top$ and in fact, by similar
 arguments, it cannot exist. Using similar logic, we can show by cases
@@ -716,14 +715,26 @@ parameters:
 
 In turn, we can define the iterative dataflow algorithm for the
 \emph{forwards} direction. Figure~\ref{fig_back14} gives the
-algorithm.\footnote{A \emph{backwards} algorithm is very similar}
+algorithm.\footnote{A \emph{backwards} algorithm is very similar} The
+algorithm initializes all \out sets to $\bot$, or some suitable
+initial value from \setL{Fact}. The entry node gets special treatment
+in some cases, so we set \outXa{Entry} to its own initial value (though in
+many cases \outXa{Entry} is set to the same value as other \out
+sets). Line~\ref{fig_back14_loop} gives our termination condition:
+when \out sets stop changing, we are done. The superscript on each
+\out set represents the iteration. $\outBa^{i}$ means the $i$-th
+iteration, and $\outBa^{i-1}$ the previous ($i - 1$) iteration. In our
+loop, we calculate all \inE sets from their predecessors' \out sets. The new
+\inE sets are used to calculate \out sets for each node. Those \out sets are 
+tested and, if they have not changd from the previous iteration, the 
+algorithm terminates.
 
 \begin{myfig}
   \begin{minipage}{3in}
     \begin{AVerb}[numbers=left,gobble=6]
       Out(\emph{Entry}) = \emph{initial}, \emph{initial} $\in \setL{Facts}$.
       $\text{In(B)}^0$ = $\bot$, for all blocks $B$.
-      \textbf{until} ($\text{Out(B)}^{i} == \text{Out(B)}^{i - 1}$, for all $B$)
+      \textbf{until} ($\text{Out(B)}^{i} == \text{Out(B)}^{i - 1}$, for all $B$)\label{fig_back14_loop}
         In(B) = $\bigwedge_{P \in pred(B)} \text{Out}(P)$.
         Out(B) = \emph{transfer}(In(B)).
     \end{AVerb}
@@ -732,6 +743,66 @@ algorithm.\footnote{A \emph{backwards} algorithm is very similar}
     direction, and the transfer function.}
   \label{fig_back14}
 \end{myfig}
+
+Aho \citep{AhoXX} shows that for a dataflow analysis defined with a
+finite lattice and monotone transfer function, Figure~\ref{fig_back14}
+will compute a \emph{maximum fixed point}. The result has the property
+that, for all $F = \outBa$, no other $F' = \outBa$ can be computed such
+that $F \sqlt F'$. In other words, Figure~\ref{fig_back14} will compute
+the maximum possible information for the given analysis. 
+
+The maximum fixed point differs from the \emph{ideal} in that it may
+make more conservative estimates than justified by the program. In
+particular, the algorithm does not consider branches that will never
+be taken. For example, the C program from Figure~\ref{fig_back1_a}
+will never execute Line~\ref{lst_back19_test_true}, because the test
+#if(a > b)# is always false:
+\begin{center}
+\begin{minipage}[b]{2in}
+\begin{AVerb}[numbers=left]
+int a = 1, b = 2, c; \label{lst_back19_assign}
+if(a > b) \label{lst_back19_test}
+  c = 4; \label{lst_back19_test_true}
+else     
+  c = 3; \label{lst_back19_test_false}
+\dots
+\end{AVerb}
+\end{minipage}
+\end{center}
+
+Our algorithm, however, does not take such conditions into
+account. The ideal solution is called the \emph{meet over paths}
+solution because it takes into account all actual (and only those)
+paths taken by the program at runtime. Determining the actual paths
+taken is an undecidable problem -- thus we settle for the maximum
+fixed point. Fortunately, the algorithm is conservative --- it never
+ignores (or adds) paths --- so we can be sure that its analysis will
+never be wrong, just that it probalby will not be as good as the
+ideal.
+
+\section{Rewriting}
+
+
+\section{Summary}
+\label{sec_back9}
+
+This chapter gave an overview of \emph{dataflow optimization}. The
+dataflow \emph{algorithm} gives a general technique for applying an
+\emph{optimizing function} to the \emph{control flow graph} (CFG)
+representing a given program. The optimizing function computes
+\emph{facts} about each node in the graph, using a \emph{transfer}
+function. A given analysis can proceed \emph{forwards} (where \inBa
+facts produce \outBa facts) or \emph{backwards} (where \outBa facts
+produce \inBa facts). Each optimization defines a specific \emph{meet
+  operator} that combines facts for nodes with multiple predecessors
+(for forwards analysis) or successors (for backwards). We compute
+facts\emph{iteratively}, stopping when they reach a \emph{fixed
+  point}. Finally, we \emph{rewrite} the CFG using the facts computed. The 
+meaning of our program does not change, but its behavior will be ``better,'' 
+whatever that means for the particular optimization applied.
+
+
+
 %% \runin{Transfer Function} Our transfer function creates 
 
 %% \section{Facts, Transfer Functions, Direction \& The Meet Operator}
@@ -1221,25 +1292,6 @@ algorithm.\footnote{A \emph{backwards} algorithm is very similar}
 %% a = 1;
 %% return a + 1;
 %% \end{Verbatim}
-
-\section{Summary}
-\label{sec_back9}
-
-This chapter gave an overview of \emph{dataflow optimization}. The
-dataflow \emph{algorithm} gives a general technique for applying an
-\emph{optimizing function} to the \emph{control flow graph} (CFG)
-representing a given program. The optimizing function computes
-\emph{facts} about each node in the graph, using a \emph{transfer}
-function. A given analysis can proceed \emph{forwards} (where \inBa
-facts produce \outBa facts) or \emph{backwards} (where \outBa facts
-produce \inBa facts). Each optimization defines a specific \emph{meet
-  operator} that combines facts for nodes with multiple predecessors
-(for forwards analysis) or successors (for backwards). We compute
-facts\emph{iteratively}, stopping when they reach a \emph{fixed
-  point}. Finally, we \emph{rewrite} the CFG using the facts computed. The 
-meaning of our program does not change, but its behavior will be ``better,'' 
-whatever that means for the particular optimization applied.
-
 
 %% \subsection{Basic Blocks and Control-Flow Graphs}
 
