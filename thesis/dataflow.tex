@@ -398,7 +398,7 @@ pair (i.e., fact):
 \begin{equation}
   f (a,x) = 
   \begin{cases}
-    (a,C) & \text{when \texttt{a = \emph{C}}, where \texttt{\emph{C}} is an integer.} \\
+    (a,x \lub C) & \text{when \texttt{a = \emph{C}}, where \texttt{\emph{C}} is an integer.} \\
     (a,\top) & \text{when \texttt{a} updated}. \\
     (a,x) & \text{otherwise}. \\
   \end{cases}
@@ -407,13 +407,14 @@ pair (i.e., fact):
 
 Equation~\eqref{eqn_back4} considers two kinds of statements: constant
 and non-constant updates. If the statement #a = C# appears in the
-node, our new fact is $(a,C)$, meaning #a# was assigned a known
-constant. We create the fact $(a,\top)$ for any other
-update.\footnote{In practice this analysis is much more sophisticated,
-  capable of analyzing complicated arithmetic expressions. Algebraic
-  properties such as associativity and distributivity are also usually
-  considered.} Finally, if neither type of statement appears in the
-node, we just pass the initial fact through unchanged.
+node, our new fact is $(a,x \lub C)$, indicating we combine our
+previous knowledge about $x$ with the new constant assigned. We create
+the fact $(a,\top)$ for any other update.\footnote{In practice this
+  analysis is much more sophisticated, capable of analyzing
+  complicated arithmetic expressions. Algebraic properties such as
+  associativity and distributivity are also usually considered.}
+Finally, if neither type of statement appears in the node, we just
+pass $x$ through unchanged.
 
 Though we have defined Equation~\eqref{eqn_back4} in terms of a single
 fact, we can easily extend it to sets of facts. To create \outBa for
@@ -442,15 +443,13 @@ just copied to \outB{lst_back18_mult}.
 Every dataflow analysis defines a \emph{transfer function} for
 creating (or updating) facts. The function is specific to both the
 analysis performed and the semantics of the underlying
-program. Equation~\ref{eqn_back4}, the transfer function for our
+program. Equation~\eqref{eqn_back4}, the transfer function for our
 constant propagation example, defines how we derive information about
 a variable's value after the statements in the given node execute.
-Equation~\ref{eqn_back5} extended Equation~\ref{eqn_back4} to sets,
+Equation~\eqref{eqn_back5} extended Equation~\eqref{eqn_back4} to sets,
 showing how we can create \outBa from \inBa. In the next section, we
 iteratively apply our transfer function and lattice to the
-control-flow graph. We will show both how our analysis is guaranteed
-to terminate and how we can be confident it has given us the best
-possible answer.
+control-flow graph. 
 
 \subsection{Iteration \& Fixed Points}
 \label{back_subsec_iter}
@@ -463,32 +462,49 @@ analyzed \emph{iteratively} until all \out (in the case of a forwards
 analysis) or \inE (in the case of a backwards analysis) sets reach a
 \emph{fixed point}.
 
-Figure~\ref{fig_back11}, Part~\subref{fig_back11_tbl} shows how the
-\inE and \out sets associated with each node change with each
-iteration of the analysis. The ``zero'' iteration corresponds to the
-initial value for all facts: everything is $\bot$, i.e.,
-unknown. Reading from left-to-right shows how the \inE and \out facts
-for a given node change during analysis. The control-flow graph is
-reproduced in Part~\subref{fig_back11_cfg}. Following the control-flow
-between nodes shows which \out sets are used to calcuate \inE sets.
+Figure~\ref{fig_back13}, Part~\subref{fig_back13_tbl} shows how the
+\inE and \out sets for each node change during our
+analysis. The ``zeroth'' iteration corresponds to the initial value
+for all facts: everything is $\bot$, i.e., unknown. Reading from
+left-to-right gives the \inE and \out facts for a given node at each
+iteration of the analysis. The control-flow graph is reproduced in
+Part~\subref{fig_back13_cfg}. Following the control-flow between nodes
+shows which \out sets are used to calcuate \inE sets.
 
 \begin{myfig}[tb]
   \setlength{\tabcolsep}{2pt}
   \hbox to \textwidth{\hss
   \begin{tabular}{cc}
-    \subfloat{\input{fig_back11_tbl}\label{fig_back11_tbl}} & 
-    \subfloat{\input{fig_back11_cfg}\label{fig_back11_cfg}} \\
-    \subref{fig_back11_tbl} & \subref{fig_back11_cfg}
+    \subfloat{\input{fig_back13_tbl}\label{fig_back13_tbl}} & 
+    \subfloat{\input{fig_back12_cfg}\label{fig_back13_cfg}} \\
+    \subref{fig_back13_tbl} & \subref{fig_back13_cfg}
   \end{tabular}\hss}
-  \caption{This figure shows the facts calculated for all nodes in our
-    example program. Part~\subref{fig_back11_tbl} shows the \inE and
-    \out facts associated with each node. Part~\subref{fig_back11_cfg}
-    reproduces the control-flow graph for our program. After 5
+  \caption{This figure shows the values for $i$ calculated by all nodes in our
+    example program. Part~\subref{fig_back13_tbl} shows the \inE and
+    \out facts associated with each node, for variable $i$. Part~\subref{fig_back13_cfg}
+    reproduces the control-flow graph for our program. After 4
     iterations the facts reach a fixed point (i.e., they stop
-    changing) and we can see that \inB{lst_back15_mult} shows that $m$
-    is always 10, proving we can rewrite the multiplication safely. }
-  \label{fig_back11}
+    changing).}
+  \label{fig_back13}
 \end{myfig}
+
+%% \begin{myfig}[tb]
+%%   \setlength{\tabcolsep}{2pt}
+%%   \hbox to \textwidth{\hss
+%%   \begin{tabular}{cc}
+%%     \subfloat{\input{fig_back12_tbl}\label{fig_back12_tbl}} & 
+%%     \subfloat{\input{fig_back12_cfg}\label{fig_back12_cfg}} \\
+%%     \subref{fig_back12_tbl} & \subref{fig_back12_cfg}
+%%   \end{tabular}\hss}
+%%   \caption{This figure shows the facts calculated for all nodes in our
+%%     example program. Part~\subref{fig_back12_tbl} shows the \inE and
+%%     \out facts associated with each node. Part~\subref{fig_back12_cfg}
+%%     reproduces the control-flow graph for our program. After 5
+%%     iterations the facts reach a fixed point (i.e., they stop
+%%     changing) and we can see that \inB{lst_back15_mult} shows that $m$
+%%     is always 10, proving we can rewrite the multiplication safely. }
+%%   \label{fig_back12}
+%% \end{myfig}
 
 Consider the value for $i$ in \inB{lst_back15_test}, the node that
 tests the condition #i < cnt#. In the first iteration,
@@ -525,9 +541,9 @@ operator. The value of $i$ in \outB{lst_back15_test} has reached a fixed point
 with this iteration; it will no longer change.
 
 The above example raises an important question: how do we know we have
-reached a fixed point? Formally, the question can be answered if our
-lattice has \emph{finite height} and the transfer function is
-\emph{monotone}.
+reached a fixed point? How do we know we have gotten the best possible
+answer?  Both of these questsion can be answered if our lattice has
+\emph{finite height} and the transfer function is \emph{monotone}.
 
 Let us begin with the lattice. Consider again the meet operator, \lub,
 defined in Table~\ref{tbl_back4} and our set of values, \setLC:
@@ -535,61 +551,119 @@ defined in Table~\ref{tbl_back4} and our set of values, \setLC:
   \setLC &= \bot, \dots \mathit{all\ integers} \dots, \top. \\\\
   \bot \lub x &= x. \\
   x \lub \top &= \top.\\
-  C_1 \lub C_2 &= \top, \text{where} C_1 \neq C_2.\\
+  C_1 \lub C_2 &= \top, \text{where}\ C_1 \neq C_2.\\
   C_1 \lub C_1 &= C_1.
 \end{align*}
 The definition of \lub imposes a \emph{partial order} on the values
-in \setLC. That is, we can define an operator, \sqlt, such that
+in \setLC. That is, we can define an operator, \sqlte, such that
 for all $x$ and $y$ in \setLC:
 \begin{equation}
-  x \sqlt y\ \text{if and only if}\ x \lub y = y\ \text{and}\ x \neq y.
+  x \sqlte y\ \text{if and only if}\ x \lub y = y.
   \label{eqn_back9}
 \end{equation}
-That is, $x$ is ``less than'' $y$ only when $x \lub y$ equals
-$y$.\footnote{This definition can also be given in terms of ``less
-  than or equal to'' by dropping the requirement that $x \neq y$, but
-  we choose to simplify and only present \sqlt here.}
+That is, $x$ is ``less than or equal to'' $y$ only when $x \lub y$ equals
+$y$.
 
-We now define the \emph{height} of our lattice. It is the
+We now define the \emph{height} of our lattice as the
 longest possible ordering of values in \setLC such that:
 \begin{equation}
-  x_1 \sqlt x_2 \dots \sqlt x_n.
+  x_1 \sqlte x_2 \dots \sqlte x_n, \text{where}\ x_1 \neq x_2 \neq \dots \neq x_n.
   \label{eqn_back10}
 \end{equation}
-Equation~\eqref{eqn_back9} shows us that $\top$ is the ``greatest''
-element in \setLC and $\bot$ is the ``least.'' In turn, we
-know the maximum height of \setLC by Equation~\eqref{eqn_back10}: 3. We
-show by contradiction that any longer ordering is impossible:
+That is, the height is the longest possible path from the ``lowest''
+to ``highest'' element of the lattice where we do not repeat any
+values and where the \sqlte relation holds among all values.
 
-Given $x_1 \sqlt x_2 \sqlt \dots \sqlt x_4$, such that n = 4. If
+We can more succinctly define the height using a strict ``less than''
+ordering. First, the \sqlt relation:
+\begin{equation}
+  x \sqlt y\ \text{if and only if}\ x \lub y = y\ \text{and}\ x \neq y.
+  \label{eqn_back12}
+\end{equation}
+And now we can redefine height as the largest $n$ such that:
+\begin{equation}
+  x_1 \sqlt x_2 \dots \sqlt x_n.
+  \label{eqn_back13}
+\end{equation}
+
+We can show by contradiction that the height of our lattice is
+3. Given $x_1 \sqlt x_2 \sqlt \dots \sqlt x_n$, such that n = 4. If
 $x_4$ is $\top$, then $x_3$ must be an integer or $\bot$. If $x_3$ is
-$\bot$, by Equation~\eqref{eqn_back9}, there is no such $x_2$ such
+$\bot$, by Equation~\eqref{eqn_back13}, there is no such $x_2$ such
 that $x_2 \sqlt \bot$. Therefore, $x_3$ cannot be $\bot$. If $x_3$ is
-an integer, again by Equation~\eqref{eqn_back9}, $x_2$ must be
-$\bot$. In turn, there is no such $x_1$ such that $x_1 \sqlt \bot$. Therefore,
-$x_4$ cannot be $\top$ and in fact, by similar arguments, it cannot exist. We
-can show by cases that $n$ (and the height of our lattice) must be 3. $\square$
+an integer, again by Equation~\eqref{eqn_back13}, $x_2$ must be
+$\bot$. In turn, there is no such $x_1$ such that $x_1 \sqlt
+\bot$. Therefore, $x_4$ cannot be $\top$ and in fact, by similar
+arguments, it cannot exist. Using similar logic, we can show by cases
+that $n$ (and the height of our lattice) must be 3.
 
 Now let us address the transfer function. A \emph{monotone} function 
 has the following property:
 \begin{equation}
-  f(x) \sqlt f(y)\ \text{whenever}\x x \sqlt y.
+  f(x) \sqlte f(y)\ \text{whenever}\ x \sqlte y.
   \label{eqn_back11}
 \end{equation}
-That is, when a monotone function does not change the ordering between
-its inputs. If $x$ is ``less than'' $y$, $f(x)$ will also be ``less
-than'' $f(y)$.\footnote{Again, this definition can be given in terms
-  $\sqsubseteq$, the ``less than or equal to'' partial ordering.}
+That is, a monotone function does not change the ordering between its
+inputs. If $x$ is ``less than or equal to'' $y$, $f(x)$ will also be
+``less than or equal to'' $f(y)$. 
 
-When our transfer function is monotone, we know that ``lesser'' facts
-will always be translated to ``lesser'' values. Therefore, we know our
-facts will either stay constant or get ``bigger.'' They will
-\emph{not} vary ``up'' and ``down'' the lattice -- they will only move
-in one direction.
+The transfer function moves our facts along the lattice. A monotone
+transfer function will never ``decrease'' its argument -- $f$ will
+always produce a value that is at the same ``height'' or ``higher'' in
+the lattice. The lattice represents the information we have gathered
+during our analysis. In turn, the ordering of values represents ``how
+much'' we know. That is, when a variable is assigned $\bot$, we do not
+know anything about it. If it is assigned $\top$, we have seen ``too
+many'' assignments (or some other update).  This means our transfer
+function always increases (or does not change) the information we
+have. 
 
-Trivially holds for our transfer function because it is defined in terms of \lub.
+To show that our transfer function (from Equation~\eqref{eqn_back4}) is
+monotone, consider some fact $(v,x)$ and some block $B$. $v$ is a
+variable in the program; $x$ is a value in \setLC; and $B$ contains
+some number of statements.  We analyze the fact, $(v,x')$ produced
+applying our transfer function $f$ to $B$. If $B$ does not contain an
+assignment affecting $v$, then $x = x'$, and we already know that $x \sqlte
+x'$. If $B$ makes a non-constant update to $v$, then $x' = \top$ and we
+know $x \sqlte \top$ for all $x$ by the definition of \lub. Finally,
+if $B$ assigns some constant $C$ to $x$, then $x' = x \lub C$, which
+again satisfies our relation. Therefore, Equation~\eqref{eqn_back4} is
+monotone and, by a simple extension to sets, so is is
+Equation~\eqref{eqn_back5}.
 
-Together, guarantees we terminate. How do we get the ``best'' answer?
+%% If our lattice has finite height, we can be sure that our
+%% algorithm will terminate -- our transfer function will not oscillate
+%% up and down the lattice!
+%% By requiring the our analysis uses a \emph{lattice} with \emph{finite
+%%   height} and a \emph{monotone} transfer function, we know our
+%% analysis will eventually reach a fixed point and terminate. We will
+%% now discuss how these same properties guarantee we have reached the
+%% \emph{maximum fixpoint} and thus have the best possible answer.
+
+
+
+%% Our goal is to find the ``largest amount'' of ``smallest'' information
+%% about each variable. That is, if we assigned $\top$ to all variables,
+%% we have the ``largest'' amount of information, but we do not know
+%% anything useful. Assigning $\bot$ puts is in the opposite situation,
+%% where we know the ``least.'' We want something in the middle, where we
+%% have gathered the greatest amount of useful information. 
+
+
+
+%% have this
+%% property. 
+%% In terms of \setLC and
+%% Equation~\eqref{eqn_back4} (our transfer function), that means the
+%% value for a variable will either stay the same or get ``bigger,'' as
+%% defined by the lattice. For example, if \inBa (for some $B$) says $i$ is 10,
+%% then $i$ in \outBa will be either 10 or $\top$. If $i$ could become $\bot$ (or
+%% some other constant), Equation~\eqref{eqn_back4} would not be monotone. 
+
+
+%% Trivially holds for our transfer function because it is defined in terms of \lub.
+
+%% Together, guarantees we terminate. How do we get the ``best'' answer?
 
 
 %% Monotonic
@@ -614,38 +688,50 @@ Together, guarantees we terminate. How do we get the ``best'' answer?
 \subsection{Dataflow Equations}
 \label{back_subsec_eq}
 
-%% We can succinctly describe the constant propagation analysis using
-%% \emph{dataflow equations}. These equations express our lattice and the
-%% transfer function. From the equations we can derive the direction of
-%% our analysis. Starting from initial values for each \inE and \out
-%% set, we iteratively compute facts until reaching a fixed point. 
+As we stated in the beginning of this chapter, the dataflow algorithm
+is \emph{parameterized} by four items: facts, the meet operator,
+direction, and transfer function. The prior section presented each
+parameter for the constant propagation analysis
+separately. Figure~\ref{fig_back10} presents all of them together, as
+a set of \emph{dataflow equations}. Pairs of elements from the sets
+\setLC and \setL{Var} define our facts. Equations~\eqref{eqn_back12},
+\eqref{eqn_back13}, and \eqref{eqn_back16} define our meet
+operator. These equations and the set \setLC define our lattice. By
+calculating \out from \inE, Equation~\eqref{eqn_back3} indicates that
+this is a \emph{forwards} analysis.\footnote{Note that this equation
+  is the same for all \emph{forward} dataflow analysis'.}
+Equations~\eqref{eqn_back15} and \eqref{eqn_back16} define our
+transfer function.
 
-%% \runin{Facts} Our facts are a set; each element is a pair ($a$, $x$),
-%% with $a \in \setL{Var}$ and $x \in \setLC$. \setL{Var} is the set of
-%% all variables used in the controlf-flow graph (e.g., $m$, $cnt$, etc.)
-%% \setLC contains all the integers, plus a bottom element ($\bot$) and a
-%% top element ($\top$). 
+\input{fig_back10}
 
-%% We define the functions \inE and \out such that \inBa gives all the
-%% facts prior to block $B$ executing. That is, \inBa takes a block, $B$,
-%% and returns a set, \facts{a/x,b/y,\dots}, associating each variable in
-%% the control-flow graph with the analysis' calculated value. Similarly,
-%% \outBa gives all the facts after block $B$ executes. We can also say
-%% \inBav{a} (as well as \outBav{a}) to mean the value associated with
-%% variable $a$ in the set returned by \inBa (or \outBa, of course). When
-%% discussing specific blocks, we will include the block number:
-%% \inB{lst_back15_mult}, \inBv{lst_back15_mul}{m},
-%% \outB{lst_back15_mult}, etc.
+We can now define any dataflow analysis in terms of these four
+parameters:
+\begin{align*}
+  \setL{Facts} &= \text{\it our set of facts}. \\
+  \wedge &= \text{\it Our \emph{meet} operator.} \\
+  D &= \text{\it Direction, \emph{forwards} or \emph{backwards}}. \\
+  \mathit{transfer}(v) &= \text{\it Our transfer function, with $v \in \setL{Facts}$.}
+\end{align*}
 
-%% \runin{Direction} We define \inBa for block $B$ in terms of the \out
-%% sets for each predecessor of $B$. The \inBa set will be the union of
-%% all \out sets for each predecessor. If the same variable occurs in two
-%% or more sets, then that variables' value will be calculated using the
-%% \emph{meet}, \lub. Otherwise, the variable's value is copied from the
-%% \out set to the \inBa set.
+In turn, we can define the iterative dataflow algorithm for the
+\emph{forwards} direction. Figure~\ref{fig_back14} gives the
+algorithm.\footnote{A \emph{backwards} algorithm is very similar}
 
-\afterpage{\clearpage\input{fig_back10}\clearpage}
-
+\begin{myfig}
+  \begin{minipage}{3in}
+    \begin{AVerb}[numbers=left,gobble=6]
+      Out(\emph{Entry}) = \emph{initial}, \emph{initial} $\in \setL{Facts}$.
+      $\text{In(B)}^0$ = $\bot$, for all blocks $B$.
+      \textbf{until} ($\text{Out(B)}^{i} == \text{Out(B)}^{i - 1}$, for all $B$)
+        In(B) = $\bigwedge_{P \in pred(B)} \text{Out}(P)$.
+        Out(B) = \emph{transfer}(In(B)).
+    \end{AVerb}
+  \end{minipage}
+  \caption{The dataflow algorithm, using parameters for facts, the meet operator,
+    direction, and the transfer function.}
+  \label{fig_back14}
+\end{myfig}
 %% \runin{Transfer Function} Our transfer function creates 
 
 %% \section{Facts, Transfer Functions, Direction \& The Meet Operator}
