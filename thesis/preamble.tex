@@ -22,6 +22,7 @@
 \usepackage{xifthen}
 \usepackage{mathtools}
 \usepackage{xparse}
+\usepackage{natbib}
 %% \usepackage{listings}
 %% \lstset{escapeinside=!!}
 
@@ -85,7 +86,7 @@
 \newcommand\figbegin{\rule{\linewidth-\rulefigmargin}{0.4pt}\\\vspace{12pt}}
 \newcommand\figend{\rule{\linewidth-\rulefigmargin}{0.4pt}}
 
-\newcommand{\citep}[1]{(\emph{#1})\xspace}
+\providecommand{\citep}[1]{(\emph{#1})\xspace}
 \renewcommand{\cite}[1]{\emph{#1}\xspace}
 
 %% Functional languages chapter commands

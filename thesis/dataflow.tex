@@ -488,24 +488,6 @@ shows which \out sets are used to calcuate \inE sets.
   \label{fig_back13}
 \end{myfig}
 
-%% \begin{myfig}[tb]
-%%   \setlength{\tabcolsep}{2pt}
-%%   \hbox to \textwidth{\hss
-%%   \begin{tabular}{cc}
-%%     \subfloat{\input{fig_back12_tbl}\label{fig_back12_tbl}} & 
-%%     \subfloat{\input{fig_back12_cfg}\label{fig_back12_cfg}} \\
-%%     \subref{fig_back12_tbl} & \subref{fig_back12_cfg}
-%%   \end{tabular}\hss}
-%%   \caption{This figure shows the facts calculated for all nodes in our
-%%     example program. Part~\subref{fig_back12_tbl} shows the \inE and
-%%     \out facts associated with each node. Part~\subref{fig_back12_cfg}
-%%     reproduces the control-flow graph for our program. After 5
-%%     iterations the facts reach a fixed point (i.e., they stop
-%%     changing) and we can see that \inB{lst_back15_mult} shows that $m$
-%%     is always 10, proving we can rewrite the multiplication safely. }
-%%   \label{fig_back12}
-%% \end{myfig}
-
 Consider the value for $i$ in \inB{lst_back15_test}, the node that
 tests the condition #i < cnt#. In the first iteration,
 \inB{lst_back15_test} still assigns $\bot$ to
@@ -684,59 +666,60 @@ Equation~\eqref{eqn_back5}.
 %% \end{myfig}
 
 
-\subsection{Dataflow Equations}
+\section{Dataflow Equations}
 \label{back_subsec_eq}
 
 As we stated in the beginning of this chapter, the dataflow algorithm
-is \emph{parameterized} by four items: facts, the meet operator,
+is \emph{parameterized} by four items: facts, meet operator,
 direction, and transfer function. The prior section presented each
 parameter for the constant propagation analysis
 separately. Figure~\ref{fig_back10} presents all of them together, as
 a set of \emph{dataflow equations}. Pairs of elements from the sets
-\setLC and \setL{Var} define our facts. Equations~\eqref{eqn_back12},
-\eqref{eqn_back13}, and \eqref{eqn_back16} define our meet
-operator. These equations and the set \setLC define our lattice. By
-calculating \out from \inE, Equation~\eqref{eqn_back3} indicates that
-this is a \emph{forwards} analysis.\footnote{Note that this equation
-  is the same for all \emph{forward} dataflow analysis'.}
-Equations~\eqref{eqn_back15} and \eqref{eqn_back16} define our
-transfer function.
+\setLC and \setL{Var} define our facts. Equations~\eqref{eqn_back12}
+and \eqref{eqn_back13} define our meet operator; together with the set
+\setLC, they define our lattice. Equations~\eqref{eqn_back3} and
+\eqref{eqn_back16} together defieshow we are defining a \emph{forwards}
+  analysis. Equations~\eqref{eqn_back15} and \eqref{eqn_back16} define
+our transfer function.
 
 \input{fig_back10}
 
 We can now define any dataflow analysis in terms of these four
 parameters:
 \begin{align*}
-  \setL{Facts} &= \text{\it our set of facts}. \\
-  \wedge &= \text{\it Our \emph{meet} operator.} \\
-  D &= \text{\it Direction, \emph{forwards} or \emph{backwards}}. \\
-  \mathit{transfer}(v) &= \text{\it Our transfer function, with $v \in \setL{Facts}$.}
+  \setL{Facts} & \qquad & \text{\it Our set of facts}. \\
+  \wedge & \qquad & \text{\it Our \emph{meet} operator.} \\
+  D & \qquad & \text{\it Direction, \emph{forwards} or \emph{backwards}}. \\
+  \mathit{transfer}(v) & \qquad & \text{\it Our transfer function, with $v \in \setL{Facts}$.}
 \end{align*}
 
 In turn, we can define the iterative dataflow algorithm for the
 \emph{forwards} direction. Figure~\ref{fig_back14} gives the
-algorithm.\footnote{A \emph{backwards} algorithm is very similar} The
-algorithm initializes all \out sets to $\bot$, or some suitable
-initial value from \setL{Fact}. The entry node gets special treatment
-in some cases, so we set \outXa{Entry} to its own initial value (though in
-many cases \outXa{Entry} is set to the same value as other \out
-sets). Line~\ref{fig_back14_loop} gives our termination condition:
-when \out sets stop changing, we are done. The superscript on each
-\out set represents the iteration. $\outBa^{i}$ means the $i$-th
-iteration, and $\outBa^{i-1}$ the previous ($i - 1$) iteration. In our
-loop, we calculate all \inE sets from their predecessors' \out sets. The new
-\inE sets are used to calculate \out sets for each node. Those \out sets are 
-tested and, if they have not changd from the previous iteration, the 
-algorithm terminates.
+algorithm.\footnote{The \emph{backwards} algorithm is almost
+  identical.} The algorithm initializes all \out sets to $\bot$, or
+some suitable initial value from \setL{Facts}. The entry node gets
+special treatment in some cases, so we set \outXa{Entry} to its own
+initial value (though in many cases \outXa{Entry} is set to the same
+value as other \out sets). We now enter the main loop of the
+algorithm. The body of the loop always executes at least once. We
+first calculate all \inE sets from their predecessors' \out sets on
+Line~\ref{fig_back14_in}. On the next line, the new \inE sets are used
+to calculate \out sets for each node.  Line~\ref{fig_back14_loop}
+gives our termination condition: when \out sets stop changing, we are
+done. The superscript on each \out set represents the
+iteration. $\outBa^{i}$ means the $i$-th iteration, and $\outBa^{i-1}$
+the previous ($i - 1$) iteration. The loop repeats if any \out set has
+changed since the last iteration. Otherwise, the algorithm terminates.
 
 \begin{myfig}
   \begin{minipage}{3in}
     \begin{AVerb}[numbers=left,gobble=6]
       Out(\emph{Entry}) = \emph{initial}, \emph{initial} $\in \setL{Facts}$.
       $\text{In(B)}^0$ = $\bot$, for all blocks $B$.
-      \textbf{until} ($\text{Out(B)}^{i} == \text{Out(B)}^{i - 1}$, for all $B$)\label{fig_back14_loop}
-        In(B) = $\bigwedge_{P \in pred(B)} \text{Out}(P)$.
-        Out(B) = \emph{transfer}(In(B)).
+      \textbf{do} \{
+        In(B) = $\bigwedge_{P \in pred(B)} \text{Out}(P)$. \label{fig_back14_in}
+        Out(B) = \emph{transfer}(In(B)).  \label{fig_back14_out}
+      \} \textbf{until}($\text{Out(B)}^{i} == \text{Out(B)}^{i - 1}$, for all $B$)\label{fig_back14_loop}
     \end{AVerb}
   \end{minipage}
   \caption{The dataflow algorithm, using parameters for facts, the meet operator,
@@ -744,21 +727,34 @@ algorithm terminates.
   \label{fig_back14}
 \end{myfig}
 
+We have presented the iterative, forwards dataflow algorithm and shown
+how the algorithm can be parameterized for a particular analysis. We
+gave the parameterization for our constant propagation analysis in
+Figure~\ref{fig_back10}. We know the algorithm will terminate if
+our transfer function is \emph{monotone} and we have defined lattice
+with \emph{finite} height. However, we have not discussed how to measure
+the results our analysis gives us -- how do we know that they are the 
+best possible? We will address that question in the next section.
+
+\section{Quality of Solutions to the Dataflow Equations}
+
 Aho \citep{AhoXX} shows that for a dataflow analysis defined with a
 finite lattice and monotone transfer function, Figure~\ref{fig_back14}
-will compute a \emph{maximum fixed point}. The result has the property
-that, for all $F = \outBa$, no other $F' = \outBa$ can be computed such
-that $F \sqlt F'$. In other words, Figure~\ref{fig_back14} will compute
-the maximum possible information for the given analysis. 
+will compute a \emph{maximum fixed point}. A maximum fixed point means
+that for any $F = \outBa$ computed by the algorithm, no other $F'$ can
+be computed such that $F \sqlt F'$. In other words,
+Figure~\ref{fig_back14} will compute \out facts with the best
+possible information that our algorithm is capable of.
 
-The maximum fixed point differs from the \emph{ideal} in that it may
-make more conservative estimates than justified by the program. In
-particular, the algorithm does not consider branches that will never
-be taken. For example, the C program from Figure~\ref{fig_back1_a}
-will never execute Line~\ref{lst_back19_test_true}, because the test
-#if(a > b)# is always false:
+The maximum fixed point solution differs from the \emph{ideal}
+solution in that the maximum fixed point solution may make more
+conservative estimates than necessary. In particular,
+the algorithm does not consider branches that will never be taken. For
+example, the C program from Figure~\ref{fig_back1_a} will never
+execute Line~\ref{lst_back19_test_true}, because the test #if(a > b)#
+is always false:
 \begin{center}
-\begin{minipage}[b]{2in}
+\begin{minipage}{2in}\singlespacing\vskip-\baselineskip
 \begin{AVerb}[numbers=left]
 int a = 1, b = 2, c; \label{lst_back19_assign}
 if(a > b) \label{lst_back19_test}
@@ -772,16 +768,61 @@ else
 
 Our algorithm, however, does not take such conditions into
 account. The ideal solution is called the \emph{meet over paths}
-solution because it takes into account all actual (and only those)
-paths taken by the program at runtime. Determining the actual paths
-taken is an undecidable problem -- thus we settle for the maximum
-fixed point. Fortunately, the algorithm is conservative --- it never
-ignores (or adds) paths --- so we can be sure that its analysis will
-never be wrong, just that it probalby will not be as good as the
-ideal.
+solution because it takes into account only the paths that will taken
+by the program. Determining the actual paths taken is an undecidable
+problem -- thus we settle for the maximum fixed point. Fortunately,
+the algorithm is conservative --- it never ignores (or adds) paths ---
+so we can be sure that its analysis will never be wrong, just that it
+probably will not be as good as the ideal.
 
-\section{Rewriting}
+\section{Applying Results}
 
+Figure~\ref{fig_back7}, Part~\subref{fig_back7_initial} gave a sample
+program which we wished to optimize using a \emph{constant propagation}
+dataflow analysis. Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt} gave
+the result, replacing all occurrences of #m# with 10. Now knowing
+the dataflow algorithm and the equations for constant propagation, we
+can derive how that transformation is made.
+
+Table~\ref{fig_back12} gives the facts calculated for all nodes in our
+program, during each iteration of the analysis. The first iteration
+calculates that \outB{lst_back15_assign} assigns #m# the value 10, due
+to the assignment #m = 10# on Line~\ref{fig_back7_m}. The second
+iteration propagates this value to \inB{lst_back15_test} and in turn
+to \outB{lst_back15_test}, because the test on
+Line~\ref{fig_back7_test} does not affect #m#. In the third iteration,
+we see the same with \inB{lst_back15_mult} and \outB{lst_back15_mult}
+on Line~\ref{fig_back7_loop}. The analysis continues for two more
+iterations as other values propagate, but at this point we have all
+the information we need to optimize the program. Once the analysis
+reaches a fixed point, we can safely replace all occurrences of #m#
+with #10#, resulting in the optimized program given in
+Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt}.
+
+\begin{myfig}
+  \setlength{\tabcolsep}{2pt}
+  \hbox to \textwidth{\hss
+  \begin{tabular}{cc}
+    \subfloat{\input{fig_back12_tbl}\label{fig_back12_tbl}} & 
+    \subfloat{\input{fig_back12_cfg}\label{fig_back12_cfg}} \\
+    \subref{fig_back12_tbl} & \subref{fig_back12_cfg}
+  \end{tabular}\hss}
+  \caption{This figure shows the facts calculated for all nodes in our
+    example program. Part~\subref{fig_back12_tbl} shows the \inE and
+    \out facts associated with each node. Part~\subref{fig_back12_cfg}
+    reproduces the control-flow graph for our program. After 5
+    iterations the facts reach a fixed point (i.e., they stop
+    changing) and we can see that \inB{lst_back15_mult} shows that $m$
+    is always 10, proving we can rewrite the multiplication safely. }
+  \label{fig_back12}
+\end{myfig}
+
+We have now seen how we can use constant propagation to optimize a
+simple program. Typically many more optimizations will be run over the
+same code, each (hopefully) improving it a little more. For example,
+we could use an optimziation called \emph{dead-code elimination} to
+remove the declaration of #m# altogether from our optimized program,
+as it is no longer used. 
 
 \section{Summary}
 \label{sec_back9}
@@ -1380,6 +1421,10 @@ whatever that means for the particular optimization applied.
 % How do you use it?
 
 % Example
+
+\ifthenelse{\boolean{standaloneFlag}}
+           {\bibliography{dataflow}}
+           {}
 
 \end{document}
 
