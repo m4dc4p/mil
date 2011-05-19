@@ -6,5 +6,7 @@
 *.d
 *.temp
 *.fls
-*.run.cookie
+*.cookie
 *.f.tex
+*.bib
+!thesis.bib

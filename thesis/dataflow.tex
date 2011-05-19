@@ -145,7 +145,7 @@ reduces the number of facts stored. The algorithm also iteratively
 propagates facts along edges -- so reducing the number of edges
 reduces the amount of work we need to do. When rewriting, blocks allow
 us to move larger amounts of the program at once. It also can be shown
-(see \citep{AhoXX}) that we do not lose any information by collapsing
+(see \citep{Aho2006}) that we do not lose any information by collapsing
 statements into blocks. For efficiency and brevity, we will work with
 basic blocks rather than statements from here forward.
 
@@ -738,7 +738,7 @@ best possible? We will address that question in the next section.
 
 \section{Quality of Solutions to the Dataflow Equations}
 
-Aho \citep{AhoXX} shows that for a dataflow analysis defined with a
+Aho \citep{Aho2006} shows that for a dataflow analysis defined with a
 finite lattice and monotone transfer function, Figure~\ref{fig_back14}
 will compute a \emph{maximum fixed point}. A maximum fixed point means
 that for any $F = \outBa$ computed by the algorithm, no other $F'$ can
@@ -1423,8 +1423,7 @@ whatever that means for the particular optimization applied.
 % Example
 
 \ifthenelse{\boolean{standaloneFlag}}
-           {\bibliography{dataflow}}
-           {}
+           {\bibliography{dataflow}}{}
 
 \end{document}
 
