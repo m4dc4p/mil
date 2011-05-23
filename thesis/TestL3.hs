@@ -25,6 +25,21 @@ mapNot = ("mapNot", def)
                      (Var "isnt"))
           (cons (Constr "A" []) nil)
 
+-- | Map a two-argument, partially applied function.
+mapMult :: Def
+mapMult = ("mapMult", def)
+  where
+    def = App (App (Var "myMap") 
+                   (App (Var "isnt2") (Constr "True" [])))
+          (cons (Constr "A" []) nil)
+
+isnt2 :: Def
+isnt2 = ("isnt2", def)
+  where
+    def = abs "g" $ \g ->
+          abs "f" $ \f -> Case f [Alt "True" [] g
+                                 , Alt "False" [] true]
+          
 applyNil :: Def
 applyNil = ("applyNil", def)
   where
@@ -215,7 +230,7 @@ progM progs = do
     --  putStrLn "\n ========= Optimized Individually ============="
     --  printResult (prepareExpr tops progs) (compileInd (inlineBlocks . deadBlocks . opt4 . opt3 . bindSubst) progs)
     putStrLn "\n ========= Optimized Together ============="
-    putStrLn (render (printProgM (compileAll (mostOpt tops) progs)))
+    putStrLn (render (printProgM (compileAll (mostOpt tops ([], emptyClosedGraph)) progs)))
   where           
     tops = map fst progs
 
@@ -245,6 +260,7 @@ progM progs = do
 
     -- Compiles all procedures together so we do get inter-procedure
     -- optimization.
+    compileAll :: (ProgM C C -> ProgM C C) -> [(Name, Expr)] -> ProgM C C
     compileAll opts = opts . foldr (|*><*|) emptyClosedGraph . snd . foldr compileEach (0, []) 
 
     -- Compiles all procedures independently, so 
