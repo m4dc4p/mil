@@ -1,6 +1,7 @@
 \documentclass[12pt]{report}
 \usepackage{standalone}
 %include polycode.fmt
+%include lineno.fmt
 \input{preamble}
 
 % Used by included files to know they
@@ -13,16 +14,16 @@
 \DefineShortVerb{\#}
 \doublespacing
              
-\input{frontmatter.f}
+\input{front.f}
 
 \pagenumbering{arabic}
-\input{introduction.f}
+\input{intro.f}
 
 \input{dataflow.f}
 
-\include{languages.f}
+\input{languages.f}
 
-\include{mil.f}
+\input{mil.f}
 
 \chapter{The Hoopl Library}
 
@@ -31,9 +32,9 @@ it approaches dataflow analysis. Important concepts
 such as shape, transfer and rewrite functions, facts and
 lattices will be described. }
 
-\include{uncurrying.f}
+\input{uncurrying.f}
 
-\include{deadcode.f}
+\input{deadcode.f}
 
 \chapter{Monadic Optimizations}
 \emph{Describes optimizations based on the monad laws: bind/return collapse and

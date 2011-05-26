@@ -30,13 +30,18 @@
 #
 fileinfo	:= LaTeX Makefile
 author		:= Chris Monson
-version		:= 2.2.0-rc8
+version		:= 2.2.0
 #
+.DEFAULT_GOAL	:= all
 # Note that the user-global version is imported *after* the source directory,
 # so that you can use stuff like ?= to get proper override behavior.
 .PHONY: Makefile GNUmakefile Makefile.ini $(HOME)/.latex-makefile/Makefile.ini
 -include Makefile.ini
 -include $(HOME)/.latex-makefile/Makefile.ini
+# Better names for these things
+.PHONY: Variables.ini $(HOME)/.latex-makefile/Variables.ini
+-include Variables.ini
+-include $(HOME)/.latex-makefile/Variables.ini
 #
 # This can be pdflatex or latex - you can change this by adding the following line to your Makefile.ini:
 # BUILD_STRATEGY := latex
@@ -106,6 +111,43 @@ export LC_ALL		?= C
 #
 #
 # CHANGES:
+# Chris Monson (2011-05-20):
+# * Bumped version to 2.2.0 (release!)
+# Chris Monson (2011-05-19):
+# * Bumped version to 2.2.0-rc15
+# * Issue 125: infinite recursion with nomenclature files
+# * Issue 125: removed .d as a target for .nls in get-log-index
+# * Cleaned up invocation of run-makeindex to take an optional .ist instead of flags.
+# Chris Monson (2011-04-06):
+# * Bumped version to 2.2.0-rc14
+# * Issue 121: Added Targets.ini and corresponding help text for it.
+# * Issue 121: Added Variables.ini (Makefile.ini still works, though).
+# * Issue 121: Added .DEFAULT_GOAL optional setting.
+# * Issue 120: xindy compatibility
+# Chris Monson (2011-03-16):
+# * Bumped version to 2.2.0-rc13
+# * Fixed a bug in kspewhich invocation - random characters and a missing pipe.
+# * Added font embedding to gnuplot output.
+# Chris Monson (2011-03-15):
+# * Bumped version to 2.2.0-rc12
+# * Issue 119: Annoying warning from which if Gnuplot not installed.
+# * Fixed catchall error output to show more info from the log.  Cutting off the
+#     first line is too jarring.
+# * Issue 118: Better glossary support
+# Chris Monson (2011-03-03):
+# * Bumped version to 2.2.0-rc11
+# * Issue 112: Fixed regression introduced by use of cygpath (ugly warnings)
+# Chris Monson (2011-02-03):
+# * Bumped version to 2.2.0-rc10
+# * Issue 112: Added path normalization for cygwin systems
+# * Fixed a bug in get-missing-inputs where we weren't specifying target files
+# Chris Monson (2011-01-24):
+# * Issue 111: Added .jpeg as a possible image extension
+# Chris Monson (2011-01-21):
+# * Issue 110: Long filenames not produced correctly in .d file
+# * Fixed problem with unknown control sequence error parsing
+# * Fixed problem with \r in fatal output (was interpreted as LF by echo)
+# * Removed a spurious "hi"
 # Chris Monson (2011-01-14):
 # * Bumped version to 2.2.0-rc8
 # * Issue 107: Removed comment with embedded newline, fixing MinGW on Windows 7.
@@ -647,9 +689,12 @@ PDFLATEX	?= pdflatex
 XELATEX		?= xelatex
 EPSTOPDF	?= epstopdf
 MAKEINDEX	?= makeindex
+XINDY		?= xindy
 KPSEWHICH	?= kpsewhich
 GS		?= gs
 # = OPTIONAL PROGRAMS =
+# == For MikTex under Cygwin, to get path names right
+CYGPATH		?= cygpath
 # == Makefile Color Output ==
 TPUT		?= tput
 # == TeX Generation ==
@@ -675,6 +720,23 @@ VIEW_POSTSCRIPT	?= gv
 VIEW_PDF	?= xpdf
 VIEW_GRAPHICS	?= display
 
+# Xindy glossaries
+XINDYLANG	?= english
+XINDYENC	?= utf8
+
+# If cygpath is present, then we create a path-norm function that uses it,
+# otherwise the function is just a no-op.  Issue 112 has details.
+USE_CYGPATH := $(if $(shell $(WHICH) $(CYGPATH) 2>/dev/null),yes,)
+
+# $(call get-cygpath,<path>)
+define get-cygpath
+$(shell $(CYGPATH) -u "$(shell $(CYGPATH) -s -w $1)")
+endef
+
+define path-norm
+$(if $(USE_CYGPATH),$(call get-cygpath,$1),$1)
+endef
+
 # Command options for embedding fonts and postscript->pdf conversion
 PS_EMBED_OPTIONS	?= -dPDFSETTINGS=/printer -dEmbedAllFonts=true -dSubsetFonts=true -dMaxSubsetPct=100
 PS_COMPATIBILITY	?= 1.4
@@ -695,7 +757,7 @@ FIXED_ECHO	:= $(if $(findstring -n,$(shell $(ECHO) -n)),$(shell which echo),$(EC
 ECHO		:= $(if $(FIXED_ECHO),$(FIXED_ECHO),$(ECHO))
 
 define determine-gnuplot-output-extension
-$(if $(shell $(WHICH) $(GNUPLOT)),
+$(if $(shell $(WHICH) $(GNUPLOT) 2>/dev/null),
      $(if $(findstring unknown or ambiguous, $(shell $(GNUPLOT) -e "set terminal pdf" 2>&1)),
 	  eps, pdf),
      none)
@@ -1048,6 +1110,7 @@ all_files.xvg		?= $(wildcard *.xvg)
 all_files.svg		?= $(wildcard *.svg)
 all_files.png		?= $(wildcard *.png)
 all_files.jpg		?= $(wildcard *.jpg)
+all_files.jpeg		?= $(wildcard *.jpeg)
 all_files.eps.gz	?= $(wildcard *.eps.gz)
 all_files.eps		?= $(wildcard *.eps)
 
@@ -1094,6 +1157,7 @@ files.xvg	:= $(call filter-buildable,xvg)
 files.svg	:= $(call filter-buildable,svg)
 files.png	:= $(call filter-buildable,png)
 files.jpg	:= $(call filter-buildable,jpg)
+files.jpeg	:= $(call filter-buildable,jpeg)
 files.eps.gz	:= $(call filter-buildable,eps.gz)
 files.eps	:= $(call filter-buildable,eps)
 
@@ -1117,6 +1181,7 @@ default_files.xvg	:= $(call filter-default,xvg)
 default_files.svg	:= $(call filter-default,svg)
 default_files.png	:= $(call filter-default,png)
 default_files.jpg	:= $(call filter-default,jpg)
+default_files.jpeg	:= $(call filter-default,jpeg)
 default_files.eps.gz	:= $(call filter-default,eps.gz)
 default_files.eps	:= $(call filter-default,eps)
 
@@ -1153,6 +1218,7 @@ all_stems.xvg		:= $(call get-stems,xvg,all)
 all_stems.svg		:= $(call get-stems,svg,all)
 all_stems.png		:= $(call get-stems,png,all)
 all_stems.jpg		:= $(call get-stems,jpg,all)
+all_stems.jpeg		:= $(call get-stems,jpeg,all)
 all_stems.eps.gz	:= $(call get-stems,eps.gz,all)
 all_stems.eps		:= $(call get-stems,eps,all)
 
@@ -1169,6 +1235,7 @@ default_stems.xvg		:= $(call get-stems,xvg,default)
 default_stems.svg		:= $(call get-stems,svg,default)
 default_stems.png		:= $(call get-stems,png,default)
 default_stems.jpg		:= $(call get-stems,jpg,default)
+default_stems.jpeg		:= $(call get-stems,jpeg,default)
 default_stems.eps.gz		:= $(call get-stems,eps.gz,default)
 default_stems.eps		:= $(call get-stems,eps,default)
 
@@ -1185,6 +1252,7 @@ stems.xvg		:= $(call get-stems,xvg)
 stems.svg		:= $(call get-stems,svg)
 stems.png		:= $(call get-stems,png)
 stems.jpg		:= $(call get-stems,jpg)
+stems.jpeg		:= $(call get-stems,jpeg)
 stems.eps.gz		:= $(call get-stems,eps.gz)
 stems.eps		:= $(call get-stems,eps)
 
@@ -1201,18 +1269,18 @@ graphic_source_extensions	:= fig \
 				   eps.gz
 
 ifeq "$(strip $(BUILD_STRATEGY))" "latex"
-graphic_source_extensions	+= png jpg
+graphic_source_extensions	+= png jpg jpeg
 graphic_target_extensions	:= eps ps
 endif
 
 ifeq "$(strip $(BUILD_STRATEGY))" "pdflatex"
 graphic_source_extensions	+= eps
-graphic_target_extensions	:= pdf png jpg mps tif
+graphic_target_extensions	:= pdf png jpg jpeg mps tif
 endif
 
 ifeq "$(strip $(BUILD_STRATEGY))" "xelatex"
 graphic_source_extensions	+= eps
-graphic_target_extensions	:= pdf png jpg mps tif
+graphic_target_extensions	:= pdf png jpg jpeg mps tif
 endif
 
 all_stems_source	:= $(call concat-stems,tex,all)
@@ -1366,7 +1434,7 @@ endif
 # Extensions generated by LaTeX invocation that can be removed when complete
 rm_ext		:= \
 	log *.log aux $(pre_pdf_extensions) pdf blg bbl out nav snm toc lof lot lol pfg \
-	fls vrb idx ind ilg glg glo gls lox nls nlo nlg brf mtc maf brf
+	fls vrb idx ind ilg glg glo gls lox nls nlo nlg brf mtc maf brf ist
 backup_patterns	:= *~ *.bak *.backup body.tmp head.tmp
 
 graph_stem	:= _graph
@@ -1398,13 +1466,6 @@ gpi_global	:= $(strip \
 # be parsed, the second is a list of files that will show up as dependencies in
 # the new .d file created here.
 #
-# NOTE: BSD sed does not understand \|, so we have to do something more
-# clunky to extract suitable extensions.
-#
-# Also, we do a little bit of funny rewriting up front (TARGETS=) to make sure
-# that we can properly backslash-escape spaces in file names (e.g, on Cygwin
-# for tex distributions that have "Program Files" in their name).
-#
 # $(call get-inputs,<parsed file>,<target files>)
 define get-inputs
 $(SED) \
@@ -1419,8 +1480,8 @@ $(SED) \
 -e '/\.dot_t$$/b addtargets' \
 -e 'd' \
 -e ':addtargets' \
--e 's!^!$2: !' \
-$1 | $(SORT) | $(UNIQ)
+-e 's!.*!$2: $$(call path-norm,&)!' \
+'$1' | $(SORT) | $(UNIQ)
 endef
 
 # $(call get-missing-inputs,<log file>,<target files>)
@@ -1474,6 +1535,7 @@ $(SED) \
 -e '  s//\1/' \
 -e '  /Default extension: /!d' \
 -e '  s/.*File `\([^'"'"']*\)'"'"' not found.*/\1/' \
+-e '  s/[[:cntrl:]]//' \
 -e '  /\.tex/!s/$$/.tex/' \
 -e '  s/[[:space:]]/\\ /g' \
 -e '  h' \
@@ -1481,7 +1543,7 @@ $(SED) \
 -e '  p' \
 -e '  s/.*//' \
 -e '  x' \
--e '  s!^.*!TARGET_FILES: &!' \
+-e '  s!^.*!$2: $$(call path-norm,&)!' \
 -e '  p' \
 -e '}' \
 -e 'd' \
@@ -1711,7 +1773,7 @@ $(SED) \
 $1 | $(XARGS) $(KPSEWHICH) '#######' | \
 $(SED) \
 -e 's!^!$2: !' | \
-\$(SORT) | $(UNIQ)
+$(SORT) | $(UNIQ)
 endef
 
 # Makes a an aux file that only has stuff relevant to the target in it
@@ -1780,6 +1842,12 @@ endef
 #
 # Note that we only ignore file not found errors for things that we know how to
 # build, like graphics files.
+#
+# Also note that the output of this is piped through sed again to escape any
+# backslashes that might have made it through.  This is to avoid sending things
+# like "\right" to echo, which interprets \r as LF.  In bash, we could just do
+# ${var//\\/\\\\}, but in other popular sh variants (like dash), this doesn't
+# work.
 #
 # $(call colorize-latex-errors,<log file>)
 define colorize-latex-errors
@@ -1860,7 +1928,7 @@ $(SED) \
 -e '  s//\1 --- Are you trying to build an include file?/' \
 -e '  b error' \
 -e '}' \
--e '/^\(!!! .*Undefined control sequence\)[^[:cntrl:]]*\(.*\)/{' \
+-e '/.*\(!!! .*Undefined control sequence\)[^[:cntrl:]]*\(.*\)/{' \
 -e '  s//\1: \2/' \
 -e '  s/\nl\.[[:digit:]][^[:cntrl:]]*\(\\[^\\[:cntrl:]]*\).*/\1/' \
 -e '  b error' \
@@ -1868,12 +1936,10 @@ $(SED) \
 -e '/^\(!pdfTeX error:.*\)s*/{' \
 -e '  b error' \
 -e '}' \
--e '/^\(!!! [^[:cntrl:]]*\).*/{' \
--e '  s//\1.  See log for more information./' \
--e '  b error' \
--e '}' \
--e '/.*\n\(!!! [^[:cntrl:]]*\).*/{' \
--e '  s//\1.  See log for more information./' \
+-e '/.*\(!!! .*\)/{' \
+-e '  s//\1/' \
+-e '  s/[[:cntrl:]]//' \
+-e '  s/[[:cntrl:]]$$//' \
 -e '  b error' \
 -e '}' \
 -e 'd' \
@@ -1881,7 +1947,7 @@ $(SED) \
 -e 's/^!\(!! \)\{0,1\}\(.*\)/$(C_ERROR)\2$(C_RESET)/' \
 -e 'p' \
 -e 'd' \
-'$1'
+'$1' | $(SED) -e 's/\\\\/\\\\\\\\/g'
 endef
 
 # Colorize Makeindex errors
@@ -1892,6 +1958,15 @@ $(SED) \
 -e '  s/^.*$$/$(C_ERROR)&$(C_RESET)/' \
 -e '  p' \
 -e '}' \
+-e 'd' \
+'$1'
+endef
+
+# Colorize xindy errors
+# $(call colorize-xindy-errors,<log file>)
+define colorize-xindy-errors
+$(SED) \
+-e 's/^xindy:.*/$(C_ERROR)&$(C_RESET)/p' \
 -e 'd' \
 '$1'
 endef
@@ -2095,11 +2170,24 @@ run-latex	= $(latex_build_program) -interaction=batchmode -file-line-error $(if 
 # $(call latex-color-log,<LaTeX stem>)
 latex-color-log	= $(color_tex) $1.log
 
-# $(call run-makeindex,<input>,<output>,<log>,<extra flags>)
+# $(call run-makeindex,<input>,<output>,<log>,[.ist style file])
 define run-makeindex
 success=1; \
-if ! $(MAKEINDEX) -q $1 -t $3 -o $2 $4 > /dev/null || $(EGREP) -q '^!!' $3; then \
+if ! $(MAKEINDEX) -q $1 -t $3 -o $2 $(if $4,-s $4,) > /dev/null || $(EGREP) -q '^!!' $3; \
+then \
 	$(call colorize-makeindex-errors,$3); \
+	$(RM) -f '$2'; \
+	success=0; \
+fi; \
+[ "$$success" = "1" ] && $(sh_true) || $(sh_false);
+endef
+
+
+# $(call run-xindy,<input>,<output>,<module>,<log>)
+define run-xindy
+success=1; \
+if ! $(XINDY) -q -o $2 -L $(XINDYLANG) -C $(XINDYENC) -I xindy -M $3 -t $4 $1 > /dev/null || $(EGREP) -q '^xindy:' $4; then \
+	$(call colorize-xindy-errors,$4); \
 	$(RM) -f '$2'; \
 	success=0; \
 fi; \
@@ -2175,6 +2263,23 @@ $(call gpi-font-entry,$2,$(call gpi-fontsize,$1,$2)) \
 $(call gpi-monochrome,$1,$3)
 endef
 
+# $(call gpi-embed-pdf-fonts,<input file>,<output file>)
+#
+define gpi-embed-pdf-fonts
+$(GS) \
+	-q \
+	-dSAFER \
+	-dNOPAUSE \
+	-dBATCH \
+	-sDEVICE=$(if $(filter pdf,$(GPI_OUTPUT_EXTENSION)),pdfwrite,pswrite) \
+	-sOutputFile='$2' \
+	-sstdout=%stderr \
+	-dCompatibilityLevel=1.5 \
+	-dPDFSETTINGS=/prepress \
+	-c .setpdfwrite \
+	-f '$1'
+endef
+
 # $(call convert-gpi,<gpi file>,<output file>,[gray])
 #
 define convert-gpi
@@ -2190,6 +2295,12 @@ success=1; \
 if ! $(GNUPLOT) $$fnames 2>$1.log; then \
 	$(call colorize-gnuplot-errors,$1.log); \
 	success=0; \
+else \
+	if ! $(call gpi-embed-pdf-fonts,$2,$2.embed.make); then \
+		success = 0; \
+	else \
+		$(call move-if-exists,$2.embed.make,$2); \
+	fi; \
 fi; \
 $(if $(gpi_sed),$(call remove-temporary-files,$1.temp.make);,) \
 $(call remove-temporary-files,$1head.make); \
@@ -2213,7 +2324,7 @@ $(PNGTOPNM) "$1" \
 	> "$2"
 endef
 
-# Creation of .eps files from .jpg files
+# Creation of .eps files from .jpg/.jpeg files
 #
 # Thanks to brubakee for this solution.
 #
@@ -2241,7 +2352,7 @@ convert-dot-tex		= $(DOT2TEX) '$1' > '$2'
 
 # Converts svg files into .eps files
 #
-# $(call convert-svg,<svg file>,<eps file>,[gray])
+# $(call convert-svg,<svg file>,<eps/pdf file>,[gray])
 convert-svg	= $(INKSCAPE) --without-gui $(if $(filter %.pdf,$2),--export-pdf,--export-eps)='$2' '$1'
 
 # Converts xvg files into .eps files
@@ -2643,15 +2754,25 @@ endif
 	$(QUIET)$(call echo-build,$<,$@)
 	$(QUIET)$(call run-makeindex,$<,$@,$*.ilg)
 
-# Create the glossary file
-%.gls:	%.glo %.tex
+# Create a glossary file from a .ist file
+%.gls:	%.glo %.tex %.ist
 	$(QUIET)$(call echo-build,$<,$@)
-	$(QUIET)$(call run-makeindex,$<,$@,$*.glg,-s nomencl.ist)
+	$(QUIET)$(call run-makeindex,$<,$@,$*.glg,$*.ist)
+
+# Create a glossary file from a glossary input formatted for xindy
+%.gls:	%.glo %.tex %.xdy
+	$(QUIET)$(call echo-build,$<,$@)
+	$(QUIET)$(call run-xindy,$<,$@,$*,$*.glg)
+
+# Create the glossary file from a nomenclature file
+%.gls:	%.glo %.tex nomencl.ist
+	$(QUIET)$(call echo-build,$<,$@)
+	$(QUIET)$(call run-makeindex,$<,$@,$*.glg,nomencl.ist)
 
 # Create the nomenclature file
-%.nls:	%.nlo %.tex
+%.nls:	%.nlo %.tex nomencl.ist
 	$(QUIET)$(call echo-build,$<,$@)
-	$(QUIET)$(call run-makeindex,$<,$@,$*.nlg,-s nomencl.ist)
+	$(QUIET)$(call run-makeindex,$<,$@,$*.nlg,nomencl.ist)
 
 # SCRIPTED LaTeX TARGETS
 #
@@ -2762,6 +2883,10 @@ ifneq "$(default_graphic_extension)" "pdf"
 	$(QUIET)$(call echo-graphic,$^,$@)
 	$(QUIET)$(call convert-jpg,$<,$@,$(GRAY))
 
+%.eps: %.jpeg $(if $(GRAY),$(gray_eps_file))
+	$(QUIET)$(call echo-graphic,$^,$@)
+	$(QUIET)$(call convert-jpg,$<,$@,$(GRAY))
+
 %.eps: %.png $(if $(GRAY),$(gray_eps_file))
 	$(QUIET)$(call echo-graphic,$^,$@)
 	$(QUIET)$(call convert-png,$<,$@,$(GRAY))
@@ -2837,7 +2962,7 @@ endif
 	$(call get-missing-inputs,$*.log,$(addprefix $*.,aux aux.make d $(build_target_extension))) >> $*.d; \
 	$(ECHO) ".SECONDEXPANSION:" >> $*.d; \
 	$(call get-graphics,$*) >> $*.d; \
-	$(call get-log-index,$*,$(addprefix $*.,d aux aux.make)) >> $*.d; \
+	$(call get-log-index,$*,$(addprefix $*.,aux aux.make)) >> $*.d; \
 	$(call get-bibs,$*.aux.make,$(addprefix $*.,bbl aux aux.make)) >> $*.d; \
 	$(EGREP) -q "# MISSING" $*.d && $(SLEEP) 1 && $(RM) $*.pdf; \
 	$(call move-if-exists,$*.$(build_target_extension),$*.$(build_target_extension).1st.make); \
@@ -2918,7 +3043,6 @@ _all_programs:
 _check_programs:
 	$(QUIET)$(ECHO) "== Checking Makefile Dependencies =="; $(ECHO)
 	$(QUIET) \
-	$(ECHO) hi; \
 	allprogs=`\
 	 ($(call output-all-programs)) | \
 	 $(SED) \
@@ -3119,7 +3243,7 @@ define help_text
 #
 # STANDARD AUXILIARY FILES:
 #
-#      Makefile.ini
+#      Variables.ini (formerly Makefile.ini, which still works)
 #
 #          This file can contain variable declarations that override various
 #          aspects of the makefile.  For example, one might specify
@@ -3137,26 +3261,25 @@ define help_text
 #          There are numerous variables in this file that can be overridden in
 #          this way.  Search for '?=' to find them all.
 #
-#          Also, you can put arbitrary targets into it if, for example, you
-#          want your source built from something else, e.g.:
+#          The Variables.ini is imported before *anything else* is done, so go
+#          wild with your ideas for changes to this makefile in there.  It
+#          makes it easy to test them before submitting patches.
+#
+#          If you're adding rules or targets, however, see Targets.ini below.
+#
+#      Targets.ini
+#
+#          This is included much later in the makefile, after all variables and
+#          targets are defined.  This is where you would put new make rules,
+#          e.g.,
 #
 #          generated.tex: generating_script.weird_lang depA depB
 #             ./generating_script.weird_lang > $$@
 #
-#          Note that if you are not careful, you can override the default
-#          target (what happens when you type "make" without arguments), so if
-#          you do use Makefile.ini, you probably want to start it with
-#          something like the following line:
-#
-#          default: all
-#
-#          Since the first target in any makefile is automatically the default,
-#          and the makefile already has a sensible "all" target, this will do
-#          what you want.
-#
-#          The Makefile.ini is imported before *anything else* is done, so go
-#          wild with your ideas for changes to this makefile in there.  It
-#          makes it easy to test them before submitting patches.
+#          In this file, you have access to all of the variables that the
+#          makefile creates, like $(onlysources.tex).  While accessing those can
+#          be somewhat brittle (they are implementation details and may change),
+#          it is a great way to test your ideas when submitting feature requests.
 #
 # STANDARD ENVIRONMENT VARIABLES:
 #
@@ -3760,5 +3883,10 @@ define output-dependency-graph
 		$(ECHO) "Cannot determine the name of this makefile."; \
 	fi
 endef
+#
+.PHONY: Targets.ini $(HOME)/.latex-makefile/Targets.ini
+-include Targets.ini
+-include $(HOME)/.latex-makefile/Targets.ini
+#
 # vim: noet sts=0 sw=8 ts=8
 
