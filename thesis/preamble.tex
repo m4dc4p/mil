@@ -65,12 +65,13 @@
 \usepackage{abstract}
 
 %% GSO requires 12 pt font for all headings
-\usepackage[sf, bf, tiny]{titlesec}
-\titleformat{\chapter}[hang]{\vskip-\baselineskip}% format
- {\sffamily\bfseries\thechapter}
- {1em}
- {\sffamily\bfseries}
-%% {\vskip-\baselineskip}
+\usepackage[bf,sf,tiny,compact]{titlesec}
+\titleformat{\chapter}[display]
+            {}% format
+            {\sffamily\bfseries\chaptertitlename\ \thechapter}
+            {\baselineskip}
+            {\sffamily\bfseries}
+            {}
 
 \hyphenation{data-flow}
 
@@ -97,8 +98,12 @@
 \newcommand{\lamAbs}[2]{\ensuremath{\lambda#1.\ #2}}
 \newcommand{\lamApp}[2]{\ensuremath{#1\ #2}}
 \newcommand{\lamPApp}[2]{\ensuremath{(#1\ #2)}}
-\newcommand{\lamAppP}[2]{\ensuremath{(#1)\ #2}}
-\newcommand{\lamApPp}[2]{\ensuremath{#1\ (#2)}}
+\newcommand{\lamAPp}[2]{\ensuremath{(#1)\ #2}}
+\newcommand{\lamApP}[2]{\ensuremath{#1\ (#2)}}
+\newcommand{\lamAPP}[2]{\ensuremath{(#1)\ (#2)}}
+\let\lamApPp=\lamApP
+\let\lamAppP=\lamAPp
+
 \newcommand{\lamId}{\lamAbs{x}{x}}
 \newcommand{\lamCompose}{\lamAbs{f}{\lamAbs{g}{\lamAbs{x}{\lamApp{f}{(\lamApp{g}{x})}}}}}
 \newcommand{\machLam}{\ensuremath{M_\lambda}\xspace}
