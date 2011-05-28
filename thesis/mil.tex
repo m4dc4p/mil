@@ -22,7 +22,7 @@ Intermediate forms typically expose more detail about the
 implementation of a program, while at the same time making some
 optimization or transformation easier or even possible. 
 \emph{Three-address code}, one such intermediate form, translates the
-program into assembly-language like form, using \emph{registers} to
+program into assembly-language like form, using registers to
 hold values. Infinitely many registers can be named, making registers
 more like memory locations than registers in real hardware. Each
 instruction in the translated program has two operand registers and one
@@ -55,18 +55,12 @@ languages: the ability to treat functions as first-class values, and
 the representation of stateful computations in a monad.
 
 \subsection{Monads \& Functional Programming}
-Originally described by Moggi \citep{MoggiXX},
-and further developed by Wadler \citep{WaddlerXX}, \emph{monads} can be used
+As described by Wadler \citep{Wadler1990}, \emph{monads} can be used
 distinguish \emph{pure} and \emph{impure} functions. A \emph{pure}
-function has no side-effects: it will not print to the screen, throw an
-exception, write to disk, or in any other way change the state of the
-machine. An \emph{impure} function may change the machine's state. 
-
-%% Motivate monads ... too much?
-For example, consider the function @readInt@, which asks the user to
-enter an integer. 
-\emph{\dots Show difference between @readInt :: Int@ and
-  @readInt :: IO Int@ \dots}.
+function has no side-effects: it will not print to the screen, throw
+an exception, write to disk, or in any other way change the obversable
+state of the machine. An \emph{impure} function may change the
+machine's state.
 
 %% Presentation drawn from http://en.wikipedia.org/wiki/Monad_%28functional_programming%29, 
 %% accessed April 6 2010.
@@ -89,25 +83,28 @@ that do not.
 \subsection{MIL Example: $compose$}
 
 To give a sense of MIL, consider the definition of $compose$ given in
-Figure \ref{fig_mil1a}. Figure \ref{fig_mil1b} shows a fragment of this 
+Figure~\ref{fig_mil1a}. Figure~\ref{fig_mil1b} shows a fragment of this 
 expression in MIL. The \emph{block declaration}
-on line \ref{fig_mil1b_block_decl} gives the name of
+on Line~\ref{fig_mil1b_block_decl} gives the name of
 the block (#compose#) and arguments that will be passed in (#f#, #g#,
-and #x#). Line \ref{fig_mil1b_gofx} applies #g# to #x# and assigns
-the result to #t1#. The ``Enter'' operator (#@@#), represents function application.
-\footnote{So called because in the expression #g @@ x#, we ``enter'' function #g# with the argument #x#.}
-Of course, we assume #g# refers to a function (or, more precisely, a 
-\emph{closure}). The #<-# (``bind'') operator assigns the result of the operation
-on its right-hand side to the location on the left. In turn, line 
-\ref{fig_mil1b_fofx} applies #f# to #t1# and assigns the result
-to #t2#. The last line returns #t2#. Thus, the #compose# block returns
-the value of \lamPApp{f}{\lamApp{g}{x}}, just as in our original \lamA
-expression.
+and #x#). Line~\ref{fig_mil1b_gofx} applies #g# to #x# and assigns
+the result to #t1#. The ``enter'' operator (#@@#), represents function application.
+\footnote{So called because in the expression #g @@ x#, we ``enter''
+  function #g# with the argument #x#.}  We assume #g# refers to a
+function (or, more precisely, a \emph{closure}). The ``bind'' operator
+(#<-#) assigns the result of the operation on its right-hand side to
+the location on the left. In turn, Line~\ref{fig_mil1b_fofx} applies
+#f# to #t1# and assigns the result to #t2#. The last line returns
+#t2#. Thus, the #compose# block returns the value of
+\lamApPp{f}{\lamApp{g}{x}}, just as in our original \lamA expression.
 
 \begin{myfig}[t]
-  \subfloat[]{$compose = \lamCompose$%%
-      \label{fig_mil1a}}
-  \subfloat[]{\input{lst_mil1}\label{fig_mil1b}}
+  \begin{tabular}{cc}
+    \subfloat{$compose = \lamCompose$%%
+      \label{fig_mil1a}} & 
+    \subfloat{\input{lst_mil1}\label{fig_mil1b}} \\
+    \subref{fig_mil1a} & \subref{fig_mil1b}
+  \end{tabular} 
   \caption{\subref{fig_mil1a} gives a \lamA definition of the composition
     function; \subref{fig_mil1b} shows a fragment of the MIL program
     for $compose$.}
@@ -116,31 +113,39 @@ expression.
 
 %% Closures
 
-However, according to rules in Figure \ref{fig_lang2}, Chapter
-\ref{ref_chapter_languages} on page \pageref{fig_lang2}, evaluating an
-expression which applies $compose$ actually involves the creation of
-several intermediate values. Consider the expression 
+However, according to rules in Figure~\ref{lang_fig6},
+Chapter~\ref{ref_chapter_languages} on page~\pageref{lang_fig6},
+evaluating an expression which applies $compose$ actually involves the
+creation of several intermediate values. Consider the expression
 \begin{equation}
   main = \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}, \label{eqn_mil4}
 \end{equation}
 where $a$, $b$ and $c$ are given values elsewhere. Using the
-rules for call-by-value evaluation order from Figure \ref{fig_lang2} in 
+rules for call-by-value evaluation order from Figure~\ref{lang_fig6} in 
 Chapter \ref{ref_chapter_languages}, we can compute the value of the expression
 as follows:
-\begin{align}
+\begin{align*}
   main &= \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c} \\
-  &= \lamApp{\lamApp{\lamAppP{\lamCompose}{a}}{b}}{c} & \text{\emph{(Definition of compose)}} \\
-  &= \lamApp{\lamAppP{\lamAbs{g}{\lamAbs{x}{\lamApp{a}{\lamApp{g}{x}}}}}{b}}{c} & \text{\emph{(E-App)}} \\
-  &= \lamAppP{\lamAbs{x}{\lamApp{a}{\lamApp{b}{x}}}}{c} & \text{\emph{(E-App)}} \\
-  &= \lamApp{a}{\lamApp{b}{c}}. & \text{\emph{(E-App)}} 
-\end{align}
+  &= \lamApp{\lamApp{\lamAPp{\lamCompose}{a}}{b}}{c} & \text{\emph{Definition of |compose|.}} \\
+  &= \lamApp{\lamAPp{\lamAbs{g}{\lamAbs{x}{\lamApP{a}{\lamApp{g}{x}}}}}{b}}{c} & \text{\emph{E-App.}} \\
+  &= \lamAPp{\lamAbs{x}{\lamApP{a}{\lamApp{b}{x}}}}{c} & \text{\emph{E-App.}} \\
+  &= \lamApP{a}{\lamApp{b}{c}}. & \text{\emph{E-App.}} 
+\end{align*}
 
 We can capture each intermediate value created when evaluating this
 expression by assigning each result to a new variable. 
-We create our first intermediate value, $t_1$, by applying $compose$ to $a$:
-\begin{equation}
-  t_1 = \lamApp{compose}{a} = \lamAbs{g}{\lamAbs{x}{\lamApp{a}{\lamApp{g}{x}}}}. \label{eqn_mil1}
-\end{equation}
+
+\begin{align*}
+  main &= \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c} \\
+  &= \lamApp{\lamApp{\lamAPp{\lamCompose}{a}}{b}}{c} & \text{\emph{Definition of |compose|.}} \\
+  t_1 &\leftarrow \lamAbs{g}{\lamAbs{x}{\lamApP{a}{\lamApp{g}{x}}}} & \text{\emph{Result of E-App.}}\\
+  &= \lamApp{t_1}{\lamApp{b}{c}} \\
+  t_2 &\leftarrow \lamAbs{x}{\lamApP{a}{\lamApp{b}{x}}} & \text{\emph{Result of E-App.}} \\
+  &= \lamApp{t_2}{c} \\
+  t_3 &\leftarrow \lamApP{a}{\lamApp{b}{c}} & \text{\emph{Result of E-App.}} \\
+  &= t_3.
+\end{align*}
+
 We apply $t_1$ to $b$ to create our next intermediate value, $t_2$:
 \begin{equation}
   t_2 = \lamApp{t_1}{b} = \lamAbs{x}{\lamApp{a}{\lamApp{b}{x}}}. \label{eqn_mil2}
@@ -391,5 +396,8 @@ to optimizing those MIL programs using dataflow techniques.
 %% described. This scheme will give use our initial, unoptimized
 %% MIL program. An example (possibly |compose|, or |const3|) illustrates 
 %% our scheme.}
+
+\ifthenelse{\boolean{standaloneFlag}}
+           {\bibliography{thesis}}{}
 
 \end{document}
