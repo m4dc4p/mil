@@ -7,6 +7,14 @@
 \chapter{A Monadic Intermediate Language}
 \label{ref_chapter_mil}
 
+%% Compiling the lambda calculus - fundamentals
+
+%% MIL and Three Address Code
+
+%% * Motivate intermediate languages; motivate MIL thorugh three-address
+%%     code.
+%%    a. Describe details specific to functional languages
+
 %% What makes MIL cool and interesting? How is it unique? Why did
 %% we pick the features it has?
 %%
@@ -14,22 +22,182 @@
 %%  * Make allocation explicit.
 %%  * Make basic-blocks the default.
 %%
-%% * Motivate intermediate languages; motivate MIL thorugh three-address
-%%     code.
-%%    a. Describe details specific to functional languages
-%% * Compiling lambda-c to MIL. 
-%%    a. Closures, environments.
-%% * Syntax of MIL. 
-%% * Evaluating MIL (?)  
 
-%% What is an intermediate language? What is a ``Monadic'' one?
+%% Syntax/Examples of MIL
+
+%% Compiling LC to MIL
+%% Compiling lambda-c to MIL. 
+%%    a. Closures, environments.
+
+%% Evaluating MIL (?)  
+
 Most compilers do not generate executable machine code directly from a
-program source file. Rather, programs get translated into one or more
-\emph{intermediate forms}. The compiler may implement a pipeline of
-translations, each translating the program into a more detailed (i.e.,
-lower-level) representation. Frequently these intermediate forms are 
-also languages, with their own syntax, semantics, type-systems,
-and more. 
+program source file. Rather, the compiler translates programs into one
+or more \emph{intermediate languages}. Each intermediate language aids
+the compiler in some specific way (otherwise, why use it?). For
+example, an intermediate language may simplify register allocation,
+expose intermediate values, or make memory management explicit. The
+compiler may implement a pipeline of translations, each transforming
+the program into a more detailed (i.e., lower-level) representation.
+
+A number of intermediate languages have been described for both
+imperative and functional language compilers. A register transfer
+language (RTL) makes data movement between memory and processor
+registers explicit. The RTL aids in optimizing the use of registers,
+typically a scarce resource on most processors. There is no one RTL
+``language'' -- rather, RTL covers a family of languages and is
+described very well by \cite{Torczon2007}
+\citep{Torczon2007}. Single-static assignment form (described in
+detail by \cite{Muchnick1998} \citep{Muchnick1998}) appears similar to
+an RTL, but never re-uses a register assignment (thus, ``single-static
+assignment''). It is particularly useful for discovering constant
+values and for untangling register usage in the presence of complex
+control-flow. Administrative-Normal form (ANF), first described by
+\cite{Flanagan1993} \citep{Flanagan1993}, is an intermediate form for
+functional languages which makes all intermediate values explicit. It
+is useful for showing the exact order of evaluation for expressions.
+
+Our intermediate language, MIL (``monadic intermediate language''), is
+designed for functional languages but also has imperative-looking
+features. MIL directly supports function application and
+abstraction. It also specifies evaluation order and side-effects using
+a monadic programming style, making MIL programs look
+imperative. MIL's syntax also enforces basic-block structure on
+programs, making them ideal for dataflow analysis.
+
+We introduce MIL by first describing fundamental concepts necessary to
+compile the \lamA; namely, closures, function application, and the
+relationship between the two. We then introduce MIL by comparing and
+contrasting it with another intermediate form, ``three-address code.''
+MIL syntax and examples follow, to give a flavor of what MIL programs
+look like. We then show how to translate \lamC to MIL, without any
+optimizations. We sketch how MIL programs can be evaluated, using the
+same structure-operations semantics (SOS) style as used in
+Chapter~\ref{ref_chapter_languages}.
+
+%% Examples of intermediate forms: SSA, RTL, a-normal, bytecode
+
+%% MIL overture
+
+%% Plan of the chapter
+
+%% This chapter describes our intermediate language, MIL
+
+%% Our intermediate language, MIL (``monadic intermediate language''),
+%% directly supports several concepts fundamental to functional language
+%% compilers. 
+
+%% We describe our intermediate language, MIL (``monadic intermediate language''). Before
+%% introducing MIL, however, we first discuss  
+
+\section{Compiling the \LamA}
+\label{lang_sec1}
+
+%% Define which steps in compilation we're going to worry about
+Compiling even a language as simple as the \lamA involves a number of
+steps, such as defining a concrete syntax, parsing source programs
+into an abstract syntax tree (AST), and producing an executable
+program from the AST. For our purposes, however, we just focus on the
+\lamA' three fundamental operations:
+
+\begin{itemize}
+\item Naming values (\emph{variables}).
+\item Apply a function to an argument (\emph{application}).
+\item Create a new function (\emph{abstraction}). 
+\end{itemize}
+
+Any compiler for the \lamA must be able to produce executable programs
+which implement these operations. 
+
+\subsection{Variables}
+\label{mil_subsec1}
+
+A variable names a value -- in essence, it associates some storage
+location with a name, allowing our program to use a consistent label
+for some location. Our compiler must be able to associate names with
+locations.For example, consider this function (a fragment of the
+|compose| function given in Expression~\ref{lang_eq_const1}):
+\begin{equation}
+  \lamAbs{x}{\lamApP{f}{\lamApp{g}{x}}}.  \label{mil_eq1}
+\end{equation}
+We see three variables: $f$, $g$, and $x$. We say $x$ is \emph{bound},
+because it is given as an argument, and that $f$ and $g$ are
+\emph{free} because, in this context, they are not arguments in a 
+$\lambda$-abstraction. To evaluate this expression, though, we need
+a way to find the values of these terms.  
+
+We can describe where to find $f, g$ and $x$ in terms of memory
+locations. We can say that $x$ will appear in a special location,
+|arg|, because it is the argument to the function and we will always
+put arguments in the same place. We can further say that another
+special location, |clo|, will have two
+slots. The first will contain $g$ and the second will contain
+$f$. Conceptually, then, our expression can be represented as:
+\begin{center}
+  \begin{tabular}{c}
+    \begin{math}\begin{aligned}[b]
+      |arg| &= x, \\
+      |clo|[0] &= g, \\
+      |clo|[1] &= f 
+    \end{aligned}\text{\ in}\end{math} \\
+    \lamAbs{|arg|}{\lamApp{|clo|[1]}{\lamPApp{|clo|[0]}{arg}}}.
+  \end{tabular}
+\end{center}
+
+\par
+In general, the $|clo|$ location holds the \emph{environment} for our
+expression. For any given expression, we will be able to find all the
+free variables (i.e., all those except the argument) in the
+environment. The compiler will be responsible for ensuring the correct
+environment is available whenever a given expression is evaluated.
+
+Our machine, then, must have instructions for storing and retrieving
+values. #Store# and #Load# (from Table \ref{tbl_mil1}) serve this
+purpose. 
+
+\subsection{Function Application}
+\label{mil_subsec2}
+
+Associating locations with names is not enough, however. Looking again
+at expression \ref{mil_eq1}, $g$ clearly represents a function to
+which we pass the argument $x$. To compute the value of
+$\lamPApp{g}{x}$, we must be able to execute the code representing
+$g$. We already assigned a storage location for $g$ ($|clo|[0]$) -- now
+we just say that the value in $|clo|[0]$ is a \emph{label} that tells
+us where to find the code representing $g$. However, $g$ will need
+an environment of its own, to hold any free variables for $g$. Therefore,
+we pair the label indicating where to find $g$ with a list of free
+variables. We call this structure a \emph{closure}.
+
+Closures are the fundamental data structures used to compile
+functional languages. They may not have the exact form described here
+but they always have the same purpose: they pair a label with the free
+variables used in the function represented. 
+
+\subsection{Abstraction}
+\label{mil_subsec3}
+The \lamA lets us define functions which return new functions. We have
+seen how to access variables in the environment and how to execute
+unknown functions using closures. Now we come to the final element
+needed to compile the \lamA\ -- creating closures.
+
+Consider the following expression, where we apply the $|const|$ function (expression 
+\ref{mil_eq4}) to an argument:
+\begin{equation}
+  \begin{split}
+    |main| &= \lamApp{|const|}{s} \\
+         &= \lamAppP{\lamAbs{a}{\lamAbs{b}{a}}}{s}.
+  \end{split}
+\end{equation}
+In order to evaluate $|main|$, we need to apply the $|const|$ function
+to $s$. From the previous section we know that a closure is required to
+implement function application. It follows that
+\lamAbs{a}{\lamAbs{b}{a}} must create a closure which will
+then be used to execute the body of the $\lambda$-abstraction with the
+argument $s$. In fact, the ``value'' created by a
+$\lambda$-abstraction is always a closure. The closure will point to
+the body of the $\lambda$-abstraction and will hold the free variables
+necessary to evaluate it.
 
 \section{Three-address Code}
 
@@ -98,17 +266,17 @@ that do not.
 \subsection{MIL Example: $compose$}
 
 To give a sense of MIL, consider the definition of $compose$ given in
-Figure~\ref{fig_mil1a}. Figure~\ref{fig_mil1b} shows a fragment of this 
+Figure~\ref{mil_fig1a}. Figure~\ref{mil_fig1b} shows a fragment of this 
 expression in MIL. The \emph{block declaration}
-on Line~\ref{fig_mil1b_block_decl} gives the name of
+on Line~\ref{mil_block_decl_fig1b} gives the name of
 the block (#compose#) and arguments that will be passed in (#f#, #g#,
-and #x#). Line~\ref{fig_mil1b_gofx} applies #g# to #x# and assigns
+and #x#). Line~\ref{mil_gofx_fig1b} applies #g# to #x# and assigns
 the result to #t1#. The ``enter'' operator (#@@#), represents function application.
 \footnote{So called because in the expression #g @@ x#, we ``enter''
   function #g# with the argument #x#.}  We assume #g# refers to a
 function (or, more precisely, a \emph{closure}). The ``bind'' operator
 (#<-#) assigns the result of the operation on its right-hand side to
-the location on the left. In turn, Line~\ref{fig_mil1b_fofx} applies
+the location on the left. In turn, Line~\ref{mil_fofx_fig1b} applies
 #f# to #t1# and assigns the result to #t2#. The last line returns
 #t2#. Thus, the #compose# block returns the value of
 \lamApPp{f}{\lamApp{g}{x}}, just as in our original \lamA expression.
@@ -116,14 +284,14 @@ the location on the left. In turn, Line~\ref{fig_mil1b_fofx} applies
 \begin{myfig}[t]
   \begin{tabular}{cc}
     \subfloat{$compose = \lamCompose$%%
-      \label{fig_mil1a}} & 
-    \subfloat{\input{lst_mil1}\label{fig_mil1b}} \\
-    \subref{fig_mil1a} & \subref{fig_mil1b}
+      \label{mil_fig1a}} & 
+    \subfloat{\input{lst_mil1}\label{mil_fig1b}} \\
+    \subref{mil_fig1a} & \subref{mil_fig1b}
   \end{tabular} 
-  \caption{\subref{fig_mil1a} gives a \lamA definition of the composition
-    function; \subref{fig_mil1b} shows a fragment of the MIL program
+  \caption{\subref{mil_fig1a} gives a \lamA definition of the composition
+    function; \subref{mil_fig1b} shows a fragment of the MIL program
     for $compose$.}
-  \label{fig_mil1}
+  \label{mil_fig1}
 \end{myfig}
 
 %% Closures
@@ -133,7 +301,7 @@ Chapter~\ref{ref_chapter_languages} on page~\pageref{lang_fig6},
 evaluating an expression which applies $compose$ actually involves the
 creation of several intermediate values. Consider the expression
 \begin{equation}
-  main = \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}, \label{eqn_mil4}
+  main = \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}, \label{mil_eqn4}
 \end{equation}
 where $a$, $b$ and $c$ are given values elsewhere. Using the
 rules for call-by-value evaluation order from Figure~\ref{lang_fig6} in 
@@ -163,15 +331,15 @@ expression by assigning each result to a new variable.
 
 We apply $t_1$ to $b$ to create our next intermediate value, $t_2$:
 \begin{equation}
-  t_2 = \lamApp{t_1}{b} = \lamAbs{x}{\lamApp{a}{\lamApp{b}{x}}}. \label{eqn_mil2}
+  t_2 = \lamApp{t_1}{b} = \lamAbs{x}{\lamApp{a}{\lamApp{b}{x}}}. \label{mil_eqn2}
 \end{equation}
 Finally, we compute our final value, $main$, by applying $t_2$ to $c$:
 \begin{equation}
-  main = \lamApp{t_2}{c} = \lamApp{a}{\lamApp{b}{c}}. \label{eqn_mil3}  
+  main = \lamApp{t_2}{c} = \lamApp{a}{\lamApp{b}{c}}. \label{mil_eqn3}  
 \end{equation}
 
 Both $t_1$ and $t_2$ will hold \emph{closures} when evaluating
-expression \eqref{eqn_mil4}. As detailed in Section \ref{subsec_lang2}, a closure
+expression \eqref{mil_eqn4}. As detailed in Section \ref{mil_subsec2}, a closure
 holds a pointer to a body of code and any \emph{free variables}. In this case,
 $t_1$ holds $a$ and points to the code that evaulates to $t_2$. In turn, $t_2$
 holds $a$ and $b$, and points to the code which evaluates to $main$. The
@@ -181,12 +349,12 @@ holds $a$ and $b$, and points to the code which evaluates to $main$. The
   \input{lst_mil2}
   \caption{The MIL program which computes $main = \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}$. Note that $a$, $b$, and $c$ are assumed to be arguments given
     outside the program.}
-  \label{fig_mil2}
+  \label{mil_fig2}
 \end{myfig}
 
-Figure \ref{fig_mil2} shows the complete MIL program for $main =
+Figure \ref{mil_fig2} shows the complete MIL program for $main =
 \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}$. #k1#, #k2# and #k3#
-(lines \ref{fig_mil2_k1} -- \ref{fig_mil2_k3}) represent
+(lines \ref{mil_k1_fig2} -- \ref{mil_fig2_k3}) represent
 \emph{closure-capturing} blocks. As opposed to #main#, these blocks
 create new closures. In the definition #k1 {} f = k2 {f}#, the braces
 on the left-hand side represent variables expected in the closure
@@ -199,20 +367,20 @@ similarly. It expects to find one value in its closure (#{f}#) and
 returns a closure pointing to #k3# that copies the value #f# from the
 existing closure and adds the argument, #g# (#k3 {f,g}#). #k3#,
 however, does something new. Instead of returning a closure, it
-executes the #compose# block (defined in Figure \ref{fig_mil1b}) with
+executes the #compose# block (defined in Figure \ref{mil_fig1b}) with
 three arguments: #f#, #g#, and #x#. This does \emph{not} return a
 closure or ``enter'' a function. Instead, we jump directly to the
 block. The value returned by #k3# will be the value computed by
 #compose# with the arguments given.
 
-Returning to #main# on line \ref{fig_mil2_main} in Figure
-\ref{fig_mil2}, we can now see how MIL makes explicit the intemediate
+Returning to #main# on line \ref{mil_main_fig2} in Figure
+\ref{mil_fig2}, we can now see how MIL makes explicit the intemediate
 closures created while evaluating
 \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}. On line
-\ref{fig_mil2_t1}, we enter #k1# with the first argument, #a#. #t1#
+\ref{mil_t1_fig2}, we enter #k1# with the first argument, #a#. #t1#
 holds the closure returned. On the next line, we enter #t1# (which
 will point to #k2#) with the second argument, #b#. #t2# then holds the
-closure returned. Finally, on line \ref{fig_mil2_t3}, we enter #t2#
+closure returned. Finally, on line \ref{mil_t3_fig2}, we enter #t2#
 (which will point to #k3#) with the final argument, #c#. #k3# will directly
 execute #compose# with our specific arguments. #t3# holds the result returned
 by #compose#. On the last line of #main# we return the value computed, #t3#.
@@ -220,27 +388,27 @@ by #compose#. On the last line of #main# we return the value computed, #t3#.
 %% Syntax of MIL
 \subsection{MIL Syntax}
 
-Figure \ref{fig_mil3} gives the syntax for MIL.  A MIL program
+Figure \ref{mil_fig3} gives the syntax for MIL.  A MIL program
 consists of a number of \emph{blocks}: \emph{closure} blocks (line
-\ref{fig_mil3_k1}), basic blocks (line \ref{fig_mil3_b}) and top-level
-blocks (line \ref{fig_mil3_t}). Though the syntax for closure blocks
+\ref{mil_k1_fig3}), basic blocks (line \ref{mil_b_fig3}) and top-level
+blocks (line \ref{mil_t_fig3}). Though the syntax for closure blocks
 seems to allow any tail, in practice they can only do one of two
 things: either return a closure (\texttt{k \{\dots\}}) or jump to a
 basic block (\texttt{b(\dots)}). Top-level blocks (line
-\ref{fig_mil3_t}) provide an entry point for top-level functions --
+\ref{mil_t_fig3}) provide an entry point for top-level functions --
 they provide a closure which can be used to initially ``enter'' the
 function.
 
 \afterpage{\clearpage{\input{mil_syntax}}\clearpage}
 
-Basic blocks (line \ref{fig_mil3_body}) consist of a sequence of statements that
+Basic blocks (line \ref{mil_body_fig3}) consist of a sequence of statements that
 execute in order without any intra-block jumps or conditional
 branches. Each basic block ends with a branch: either they return a
 value (#done#) or take conditional branch (#case#). Conditional
 branches can specify multiple destinations, though at any given time
 only one will be taken.
 
-The #case# statement (line \ref{fig_mil3_case}) specifies a list of
+The #case# statement (line \ref{mil_case_fig3}) specifies a list of
 \emph{alternatives}, each of which matches a \emph{constructor} and
 binds new variables to the values held by the constructor. #case#
 examines the variable given (note, this cannot be an expression) and
@@ -250,17 +418,17 @@ not allow any other statement. The result of block called becomes the
 result of the #case#, which in turn becomese the result of the calling
 block.
 
-Only the binding statement (line \ref{fig_mil3_bind}) can appear multiple
+Only the binding statement (line \ref{mil_bind_fig3}) can appear multiple
 times in a block. Each binding assigns the result of the \emph{tail}
 on the right-hand side to a variable on the left. If a variable is
 bound more than once, later bindings will ``shadow'' previous
 bindings.
 
-The #done# statement (line \ref{fig_mil3_done}) ends a block and returns
+The #done# statement (line \ref{mil_done_fig3}) ends a block and returns
 the value of tail expression specified.
 
 \emph{Tail} expressions represent effects -- they create monadic
-values. #return# (line \ref{fig_mil3_return}) takes a variable and
+values. #return# (line \ref{mil_return_fig3}) takes a variable and
 makes its value monadic. Notice it can only take a variable, not an
 expression.  The ``enter'' operator, #@@#, expects a closure on its
 left and some value on the right. It will enter the function pointed
@@ -412,7 +580,6 @@ to optimizing those MIL programs using dataflow techniques.
 %% MIL program. An example (possibly |compose|, or |const3|) illustrates 
 %% our scheme.}
 
-\ifthenelse{\boolean{standaloneFlag}}
-           {\bibliography{thesis}}{}
+\standaloneBib
 
 \end{document}

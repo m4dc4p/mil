@@ -3,28 +3,28 @@
 \begin{center}
 \begin{minipage}{4in}
 \begin{AVerb}[numbers=left]
-  $block$ := k \{$v_1$, \dots, $v_n$\} $v$ = $tail$ \label{fig_mil3_k1} 
+  $block$ := k \{$v_1$, \dots, $v_n$\} $v$ = $tail$ \label{mil_k1_fig3} 
     | b($v_1$, \dots, $v_n$) = $body$ \label{fig_mil3_b} 
-    | t <- k \{\}  \label{fig_mil3_t} 
+    | t <- k \{\}  \label{mil_t_fig3} 
 
-  $body$ := do \label{fig_mil3_body}
+  $body$ := do \label{mil_body_fig3}
     $stmt$ 
     \dots 
     $stmt$
 
-  $stmt$ := $v$ <- $tail$ \label{fig_mil3_stmt}  \label{fig_mil3_bind}
-    | case $v$ of \label{fig_mil3_case}
+  $stmt$ := $v$ <- $tail$ \label{fig_mil3_stmt}  \label{mil_bind_fig3}
+    | case $v$ of \label{mil_case_fig3}
         $alt$
         \dots
         $alt$
-    | done $tail$ \label{fig_mil3_done}
+    | done $tail$ \label{mil_done_fig3}
 
-  $tail$ := return $v$ \label{fig_mil3_return}
-    | $v_1$ @ $v_2$ \label{fig_mil3_enter}
-    | k b \{$v_1$, \dots, $v_n$\} \label{fig_mil3_capture}
-    | b($v_1$, \dots, $v_n$) \label{fig_mil3_goto}
-    | C $v_1$ \dots $v_n$ \label{fig_mil3_const}
-    | p*($v_1$, \dots, $v_n$) \label{fig_mil3_prim}
+  $tail$ := return $v$ \label{mil_return_fig3}
+    | $v_1$ @ $v_2$ \label{mil_enter_fig3}
+    | k b \{$v_1$, \dots, $v_n$\} \label{mil_capture_fig3}
+    | b($v_1$, \dots, $v_n$) \label{mil_goto_fig3}
+    | C $v_1$ \dots $v_n$ \label{mil_const_fig3}
+    | p*($v_1$, \dots, $v_n$) \label{mil_prim_fig3}
 
   $alt$ := C $v_1$ \dots $v_n$ -> b(\dots) 
 \end{AVerb}
@@ -37,5 +37,5 @@
   values in $tail$ expressions and inspecting values in $alt$ arms. \\
 \end{tabular}
 \caption{MIL syntax.}
-\label{fig_mil3}
+\label{mil_fig3}
 \end{myfig}
