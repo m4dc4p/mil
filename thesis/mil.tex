@@ -94,20 +94,88 @@ Chapter~\ref{ref_chapter_languages}.
 \label{lang_sec1}
 
 %% Define which steps in compilation we're going to worry about
-Compiling even a language as simple as the \lamA involves a number of
+Compiling even a language as simple as \lamC involves a number of
 steps, such as defining a concrete syntax, parsing source programs
-into an abstract syntax tree (AST), and producing an executable
-program from the AST. For our purposes, however, we just focus on the
-\lamA' three fundamental operations:
+into an abstract syntax tree, and producing executable code. Problems
+such as run-time garbage collection, the interface with the underlying
+hardware, and error-handling must be solved. Even the implementation
+of (seemingly) simple operations like arithmetic must be carefully
+thought out. For our purposes, the preceding are just details. We can
+choose to do no garbage-collection (i.e., allocate until memory is
+exhausted); we can link a simple C routine for executing our program;
+and we can decide not to implement native arithmetic at all (e.g., we
+can implement arithmetic based on Peano numerals).
+
+However, we cannot avoid implementing at least two operations if
+we wish to compile \lamC to executable code (or even just to our MIL):
 
 \begin{itemize}
-\item Naming values (\emph{variables}).
-\item Apply a function to an argument (\emph{application}).
-\item Create a new function (\emph{abstraction}). 
+\item Creating a new function.
+\item Applying a function to an argument.
 \end{itemize}
 
-Any compiler for the \lamA must be able to produce executable programs
-which implement these operations. 
+Both of these operations use a data structure called a
+\emph{closure}. A closure pairs a location with a list of values. The
+location tells where to find the code implementing the body of the
+function. The list of values defines the \emph{environment} in which
+the code will execute. The value of each \emph{free variable} (those
+variables in the body that are not arguments), can be located in the
+environment.
+\footnote{The values are not necessarily stored in the
+  immediate environment. For example, \emph{static links} might be
+  used to follow a chain of environments. In any case the environment
+  is always used to find values for free variables, so we say they
+  ``can be located'' in the environment.}
+
+Closures are the fundamental data structures used to compile
+functional languages. They may not have the exact form described here
+but they always have the same purpose: they pair a label with the free
+variables used in the function represented.  In
+Section~\ref{mil_subsec4}we discuss in detail how closures are used
+when creating new functions. In Section~{mil_subsec5} we discuss how
+they are used to apply a function to an argument.
+
+\subsection{Creating Functions}
+\label{mil_subsec4}
+
+A closure always results when a new function is created. Closures can
+be created at at run-time (when a function returns a new function) or
+at compile-time (e.g., when a function takes no arguments). For
+example, consider the value that results when we apply the |compose|
+function to two arguments:
+\begin{equation}
+  \begin{align}
+    & \lamApp{compose}{\lamApp{a}{b}} \notag\\
+    & \dots \notag\\
+    t_1 &= \lamAbs{x}{\lamApP{\lamSubst{a}{f}}{\lamApp{\lamSubst{b}{g}}{x}}}.  \label{mil_eq1} \\ \notag\\\notag\\
+    \text{\sc CompL}:\ &= \lamCompose. \label{mil_eq5}
+  \end{align}
+\end{equation}
+Since we have not applied |compose| to three arguments,
+Expression~\eqref{mil_eq1} results in a function value, which we have
+assigned to the variable $t_1$. The notation \lamSubst{a}{f} means we
+substitute the value $a$ for the argument $f$. In
+Expression~\eqref{mil_eq1}, we say $x$ is \emph{bound}, because it is
+given as an argument, and that $f$ and $g$ are \emph{free} because
+they are not arguments. Expression~\eqref{mil_eq5} attaches the label
+\textsc{CompL} to the body of |compose|, suggesting that |compse|
+appears at fixed location in our program.
+
+At run-time, Expression~\eqref{mil_eq1} will assign a closure to
+$t_1$. Figure~\ref{mil_fig4} shows the values that the closure will
+contain.  The closure give the location of the implementation of
+|compose| (i.e., \textsc{CompL}) and will contain the values that
+should be used for the two free variables, $f$ and $g$: $a$ and $b$.
+
+\subsection{Function Application}
+\label{mil_subsec5}
+
+Applying a function to an argument is implemented using closures. At
+run-time, the closure is inspected in order to execute the function
+body it refers to. The compiler will implement a protocol so that the
+argument to the function can always be found when the function body
+executes.
+
 
 \subsection{Variables}
 \label{mil_subsec1}
@@ -115,7 +183,7 @@ which implement these operations.
 A variable names a value -- in essence, it associates some storage
 location with a name, allowing our program to use a consistent label
 for some location. Our compiler must be able to associate names with
-locations.For example, consider this function (a fragment of the
+locations. For example, consider this function (a fragment of the
 |compose| function given in Expression~\ref{lang_eq_const1}):
 \begin{equation}
   \lamAbs{x}{\lamApP{f}{\lamApp{g}{x}}}.  \label{mil_eq1}
