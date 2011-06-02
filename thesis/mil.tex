@@ -34,46 +34,43 @@
 Most compilers do not generate executable machine code directly from a
 program source file. Rather, the compiler translates programs into one
 or more \emph{intermediate languages}. Each intermediate language aids
-the compiler in some specific way (otherwise, why use it?). For
+the compiler in some specific way. For
 example, an intermediate language may simplify register allocation,
 expose intermediate values, or make memory management explicit. The
 compiler may implement a pipeline of translations, each transforming
 the program into a more detailed (i.e., lower-level) representation.
 
 A number of intermediate languages have been described for both
-imperative and functional language compilers. A register transfer
-language (RTL) makes data movement between memory and processor
-registers explicit. The RTL aids in optimizing the use of registers,
-typically a scarce resource on most processors. There is no one RTL
-``language'' -- rather, RTL covers a family of languages and is
-described very well by \cite{Torczon2007}
-\citep{Torczon2007}. Single-static assignment form (described in
-detail by \cite{Muchnick1998} \citep{Muchnick1998}) appears similar to
-an RTL, but never re-uses a register assignment (thus, ``single-static
-assignment''). It is particularly useful for discovering constant
-values and for untangling register usage in the presence of complex
-control-flow. Administrative-Normal form (ANF), first described by
-\cite{Flanagan1993} \citep{Flanagan1993}, is an intermediate form for
+imperative and functional language compilers. Register transfer
+languages (RTLs) makes data movement between memory and processor
+registers explicit. RTLs aids in optimizing the use of registers,
+typically a scarce resource on most processors. Single-static
+assignment form (described in detail by \citet[pg.~252]{Muchnick1998})
+appears similar to an RTL, but never re-uses a register assignment
+(thus, ``single-static assignment''). It is particularly useful for
+discovering constant values and for untangling register usage in the
+presence of complex control-flow. Administrative-Normal Form, first
+described by \citet{Flanagan1993}, is an intermediate form for
 functional languages which makes all intermediate values explicit. It
 is useful for showing the exact order of evaluation for expressions.
 
-Our intermediate language, MIL (``monadic intermediate language''), is
-designed for functional languages but also has imperative-looking
-features. MIL directly supports function application and
-abstraction. It also specifies evaluation order and side-effects using
-a monadic programming style, making MIL programs look
-imperative. MIL's syntax also enforces basic-block structure on
-programs, making them ideal for dataflow analysis.
+Our intermediate language, MIL (``monadic intermediate language''),
+specifically supports functional language features, but also follows
+the form of three-address code, an intermediate language more
+associated with imperative languages. MIL directly supports function
+application and abstraction. All intermediate values are named. MIL 
+specifies evaluation order and separates stateful computation using a
+monadic programming style. MIL's syntax enforces basic-block structure
+on programs, making them ideal for dataflow analysis.
 
-We introduce MIL by first describing fundamental concepts necessary to
-compile the \lamA; namely, closures, function application, and the
-relationship between the two. We then introduce MIL by comparing and
-contrasting it with another intermediate form, ``three-address code.''
-MIL syntax and examples follow, to give a flavor of what MIL programs
-look like. We then show how to translate \lamC to MIL, without any
-optimizations. We sketch how MIL programs can be evaluated, using the
-same structure-operations semantics (SOS) style as used in
-Chapter~\ref{ref_chapter_languages}.
+Section~\ref{mil_sec1} describes closures, a fundamental data
+structure used to implement functional languages. We then describe
+``three-address code,'' the intermediate form from which MIL partly
+derives, in Section~\ref{mil_sec2}.  MIL syntax and examples follow in
+Section~\ref{mil_sec3}. Section~\ref{mil_sec4} shows our compiler for
+translating \lamC to MIL. We sketch how MIL programs can be evaluated
+in Section~\ref{mil_sec5}, using the same structural operational
+semantics (SOS) style as in Chapter~\ref{ref_chapter_languages}.
 
 %% Examples of intermediate forms: SSA, RTL, a-normal, bytecode
 
@@ -90,226 +87,207 @@ Chapter~\ref{ref_chapter_languages}.
 %% We describe our intermediate language, MIL (``monadic intermediate language''). Before
 %% introducing MIL, however, we first discuss  
 
-\section{Compiling the \LamA}
-\label{lang_sec1}
+\section{Closures}
+\label{mil_sec1}
 
-%% Define which steps in compilation we're going to worry about
-Compiling even a language as simple as \lamC involves a number of
-steps, such as defining a concrete syntax, parsing source programs
-into an abstract syntax tree, and producing executable code. Problems
-such as run-time garbage collection, the interface with the underlying
-hardware, and error-handling must be solved. Even the implementation
-of (seemingly) simple operations like arithmetic must be carefully
-thought out. For our purposes, the preceding are just details. We can
-choose to do no garbage-collection (i.e., allocate until memory is
-exhausted); we can link a simple C routine for executing our program;
-and we can decide not to implement native arithmetic at all (e.g., we
-can implement arithmetic based on Peano numerals).
+Closures are the fundamental data structures used to implement
+functional languages. A closure always results when a function value is
+created. They may not have the exact form described here but they
+always have the same purpose: they pair a location with a list of
+values. The location tells where to find the code implementing the
+body of the function. The list of values defines the environment in
+which the code will execute. 
+\footnote{The values are not necessarily stored in the immediate
+  environment. For example, static links (described by
+  \citet[pg.~125]{Appel2003}) might be used to implement a chain of
+  environments. In any case the environment is always used to find
+  values for arguments, so we say they ``can be located'' in the
+  environment.} 
 
-However, we cannot avoid implementing at least two operations if
-we wish to compile \lamC to executable code (or even just to our MIL):
-
-\begin{itemize}
-\item Creating a new function.
-\item Applying a function to an argument.
-\end{itemize}
-
-Both of these operations use a data structure called a
-\emph{closure}. A closure pairs a location with a list of values. The
-location tells where to find the code implementing the body of the
-function. The list of values defines the \emph{environment} in which
-the code will execute. The value of each \emph{free variable} (those
-variables in the body that are not arguments), can be located in the
-environment.
-\footnote{The values are not necessarily stored in the
-  immediate environment. For example, static links might be
-  used to follow a chain of environments. In any case the environment
-  is always used to find values for free variables, so we say they
-  ``can be located'' in the environment.}
-
-Closures are the fundamental data structures used to compile
-functional languages. They may not have the exact form described here
-but they always have the same purpose: they pair a label with the free
-variables used in the function represented.  In
-Section~\ref{mil_subsec4} we discuss in detail how closures are used
-when creating new functions. In Section~\ref{mil_subsec5} we discuss how
-they are used to apply a function to an argument.
-
-\subsection{Creating Functions}
-\label{mil_subsec4}
-
-A closure always results when a new function is created. For
-example, consider the value that results when we apply the |compose|
+For example, consider the value created when we apply the |compose|
 function to two arguments:
-\begin{align}
-  & \lamApp{compose}{\lamApp{a}{b}} \notag\\
-  & \dots \notag\\
-  t_1 &= \lamAbs{x}{\lamApP{\lamSubst{a}{f}}{\lamApp{\lamSubst{b}{g}}{x}}}.  \label{mil_eq1} \\ \notag\\\notag\\
-  \text{\sc CompL}:\ & \lamCompose. \label{mil_eq5}
-\end{align}
-
-Since we applied |compose| to only two arguments,
-Expression~\eqref{mil_eq1} results in a function value, which we
-assign to the variable $t_1$. The notation \lamSubst{a}{f} means we
-substitute the value $a$ for the argument $f$. This notation lets us
-keep track of the original argument name, as well as the value we
-supplied for it in this instance. In Expression~\eqref{mil_eq1}, we
-say $x$ is \emph{bound}, because it is given as an argument, and that
-$f$ and $g$ are \emph{free} because they are not
-arguments. Expression~\eqref{mil_eq5} attaches the label
-\textsc{CompL} to the body of |compose|, suggesting that |compose|
-appears at fixed location in our program.
-
-When the compiler generates code to evaluate the |compose| function,
-it will ensure that the runtime environment (i.e., the closure) is
-constructed such that the function can execute with the correct
-arguments. One strategy the compiler can use is to put the function's
-arguments in the same location within the closure, simplifying the
-code in the function's body for locating arguments.
-
-Figure~\ref{mil_fig4} shows the closure represented by $t_1$ and the
-original definition of |compose|.  The arrows from $f$ and $g$ in the
-definition of |compose| show how the body of the function refers to
-fixed locations in the closure. The $x$ argument does not have an
-arrow since our term has only captured $f$ and $g$.
-
+\begin{equation}
+  \begin{split}
+    t_1 &= \lamApp{compose}{\lamApp{a}{b}} \\
+    &= \lamAPp{\lamCompose}{\lamApp{a}{b}} \\
+    & \dots \\
+    t_1 &= \lamAbs{x}{\lamApP{\lamSubst{a}{f}}{\lamApp{\lamSubst{b}{g}}{x}}}.
+  \end{split}\label{mil_eq1}
+\end{equation}
+The result of Expression~\eqref{mil_eq1}, $t_1$, is itself a
+function. We say $x$ is \emph{bound},
+because it is given as an argument, and that $f$ and $g$ are
+\emph{free} because they are not arguments (i.e., no
+$\lambda$-abstraction mentions them). The notation \lamSubst{a}{f} in
+$t_1$ means we substitute the value $a$ for the argument $f$. This
+lets us keep track of the original name of the argument as well as the
+value given for it.
 
 \begin{myfig}
-  \begin{tabular}{c}
-    \begin{minipage}{4in}\vbox to 1in {\vss\hbox to \textwidth{\hss
+  \begin{tabular}{m{1in}m{4in}}
+    \subref{mil_fig4a} & \subfloat{\label{mil_fig4a}}\begin{minipage}{4in}\vbox to .75in {\vss\hbox to \textwidth{\hss
       \begin{tikzpicture}[remember picture, overlay]
         \newbox\clobox
         \tikzstyle{clo}=[draw]
         \begin{pgfinterruptpicture}
           \global\setbox\clobox=\hbox{\normalfont\sc CompL}
         \end{pgfinterruptpicture}
-        \matrix (closure1)
-                {
-                  \node[clo,minimum height=3\ht\clobox] (compclo_l) {CompL}; & \node[clo,minimum height=3\ht\clobox] (compclo_f) {$f: a$}; & \node[clo,minimum height=3\ht\clobox] (compclo_g) {$g: b$}; \\
-                };
+
+        \node[clo,minimum height=3\ht\clobox] (compclo_l) {\sc CompL}; 
+        \node[clo,minimum height=3\ht\clobox, right=0.2in of compclo_l] (compclo_f) {$a$}; 
+        \node[clo,minimum height=3\ht\clobox, right=0.0in of compclo_f] (compclo_g) {$b$};
+        \draw (compclo_l.east) -- (compclo_f.west);
+
       \end{tikzpicture}\hss}\vss}
     \end{minipage} \\
-      \tikz[remember picture,overlay]{\node[invis] (comp_l) {}; \draw[->] (comp_l) -- (compclo_l.south);}\text{\sc CompL}:\ %%
+      \subref{mil_fig4b} & \subfloat{\label{mil_fig4b}}\tikz[remember picture,overlay]{\node[invis] (comp_l) {}; \draw[->] (compclo_l.west) -|| (comp_l.north) ;}\text{\sc CompL}:\ %%
       \lamAbs{f}{\lamAbs{g}{\lamAbs{x}{%%
-            \lamApp{\tikz[remember picture,overlay]{\node[invis] (comp_f) {}; \draw[->] (comp_f) -- (compclo_f.south);}f}%%
-                   {(\lamApp{\tikz[remember picture,overlay]{\node[invis] (comp_g) {}; \draw[->] (comp_g) -- (compclo_g.south);}g}%%
+            \lamApp{\tikz[remember picture,overlay]{\node[invis] (comp_f) {\phantom{\fbox{f}}}; \draw[->] (comp_f.north) -- (compclo_f.south);}\fbox{f}}%%
+                   {(\lamApp{\tikz[remember picture,overlay]{\node[invis] (comp_g) {\phantom{\fbox{g}}}; \draw[->] (comp_g.north) -- (compclo_g.south);}\fbox{g}}%%
                      {x})}}}}.
   \end{tabular}
-  \caption{A function value and its closure.}
+  \caption{\subref{mil_fig4a}
+    shows the closure representing function value
+    \lamAbs{x}{\lamApP{\lamSubst{a}{f}}{\lamApp{\lamSubst{b}{g}}{x}}}. The
+    definition of |compose| is given in \subref{mil_fig4b}. Arrows
+    from variables to their position in the closure show how argument
+    values are accessed when the function is evaluated.}
   \label{mil_fig4}
 \end{myfig}
 
-\subsection{Function Application}
-\label{mil_subsec5}
+The value referred to by $t_1$ will be a
+closure. Figure~\ref{mil_fig4} shows this closure and the original
+definition of |compose|. Figure~\ref{mil_fig4b} attaches the label
+\textsc{CompL} to the body of |compose|, suggesting that |compose|
+appears at fixed location in our program. The closure refers to the
+body of the |compose| function using \textsc{CompL}. The closure also
+holds values for the free variables $f$ and $g$. The arrows from $f$
+and $g$ show how the body of the function refers to fixed locations in
+the closure. In this case, the $x$ argument does not have an arrow
+since only $f$ and $g$ are free in $t_1$. When $t_1$ is applied to an
+argument, the implementation of |compose| will be able to refer to
+fixed locations within the closure to find the arguments originally
+supplied (i.e., $a$ and $b$).
 
-Applying a function to an argument is implemented using closures. At
-run-time, the closure is inspected in order to execute the function
-body it refers to. The compiler will implement a protocol so that the
-argument to the function can always be found when the function body
-executes.
+Closures are the ``value'' created by $\lambda$-abstractions. That is,
+when a function evaluates to a $\lambda$, a closure results. The
+closure refers to the location of the body of the $\lambda$ using a
+label, address or symbolic name. The closure also holds the current
+values for all free variables in the body of the $\lambda$. The code
+implementing the body of the $\lambda$ refers to fixed locations
+within the closure to find the values of free variables when that
+code executes.
 
+%% When the compiler generates code that implements the |compose| function,
+%% it ensures that the closure is constructed such that the function
+%% can execute with the correct arguments. One strategy the compiler can
+%% use is to put the function's arguments in the same location within the
+%% closure, simplifying the code in the function's body for locating
+%% arguments.
 
-\subsection{Variables}
-\label{mil_subsec1}
+%% can use is to put the function's arguments
+%% in the same location within the closure, simplifying the code in the
+%% function's body for locating arguments.  
 
-A variable names a value -- in essence, it associates some storage
-location with a name, allowing our program to use a consistent label
-for some location. Our compiler must be able to associate names with
-locations. For example, consider this function (a fragment of the
-|compose| function given in Expression~\ref{lang_eq_const1}):
-\begin{equation}
-  \lamAbs{x}{\lamApP{f}{\lamApp{g}{x}}}.  \label{mil_eq1}
-\end{equation}
-We see three variables: $f$, $g$, and $x$. We say $x$ is \emph{bound},
-because it is given as an argument, and that $f$ and $g$ are
-\emph{free} because, in this context, they are not arguments in a 
-$\lambda$-abstraction. To evaluate this expression, though, we need
-a way to find the values of these terms.  
+%% \subsection{Variables}
+%% \label{mil_subsec1}
 
-We can describe where to find $f, g$ and $x$ in terms of memory
-locations. We can say that $x$ will appear in a special location,
-|arg|, because it is the argument to the function and we will always
-put arguments in the same place. We can further say that another
-special location, |clo|, will have two
-slots. The first will contain $g$ and the second will contain
-$f$. Conceptually, then, our expression can be represented as:
-\begin{center}
-  \begin{tabular}{c}
-    \begin{math}\begin{aligned}[b]
-      |arg| &= x, \\
-      |clo|[0] &= g, \\
-      |clo|[1] &= f 
-    \end{aligned}\text{\ in}\end{math} \\
-    \lamAbs{|arg|}{\lamApp{|clo|[1]}{\lamPApp{|clo|[0]}{arg}}}.
-  \end{tabular}
-\end{center}
+%% A variable names a value -- in essence, it associates some storage
+%% location with a name, allowing our program to use a consistent label
+%% for some location. Our compiler must be able to associate names with
+%% locations. For example, consider this function (a fragment of the
+%% |compose| function given in Expression~\ref{lang_eq_const1}):
+%% \begin{equation}
+%%   \lamAbs{x}{\lamApP{f}{\lamApp{g}{x}}}.  \label{mil_eq1}
+%% \end{equation}
+%% We see three variables: $f$, $g$, and $x$. We say $x$ is \emph{bound},
+%% because it is given as an argument, and that $f$ and $g$ are
+%% \emph{free} because, in this context, they are not arguments in a 
+%% $\lambda$-abstraction. To evaluate this expression, though, we need
+%% a way to find the values of these terms.  
 
-\par
-In general, the $|clo|$ location holds the \emph{environment} for our
-expression. For any given expression, we will be able to find all the
-free variables (i.e., all those except the argument) in the
-environment. The compiler will be responsible for ensuring the correct
-environment is available whenever a given expression is evaluated.
+%% We can describe where to find $f, g$ and $x$ in terms of memory
+%% locations. We can say that $x$ will appear in a special location,
+%% |arg|, because it is the argument to the function and we will always
+%% put arguments in the same place. We can further say that another
+%% special location, |clo|, will have two
+%% slots. The first will contain $g$ and the second will contain
+%% $f$. Conceptually, then, our expression can be represented as:
+%% \begin{center}
+%%   \begin{tabular}{c}
+%%     \begin{math}\begin{aligned}[b]
+%%       |arg| &= x, \\
+%%       |clo|[0] &= g, \\
+%%       |clo|[1] &= f 
+%%     \end{aligned}\text{\ in}\end{math} \\
+%%     \lamAbs{|arg|}{\lamApp{|clo|[1]}{\lamPApp{|clo|[0]}{arg}}}.
+%%   \end{tabular}
+%% \end{center}
 
-Our machine, then, must have instructions for storing and retrieving
-values. #Store# and #Load# (from Table \ref{tbl_mil1}) serve this
-purpose. 
+%% \par
+%% In general, the $|clo|$ location holds the \emph{environment} for our
+%% expression. For any given expression, we will be able to find all the
+%% free variables (i.e., all those except the argument) in the
+%% environment. The compiler will be responsible for ensuring the correct
+%% environment is available whenever a given expression is evaluated.
 
-\subsection{Function Application}
-\label{mil_subsec2}
+%% Our machine, then, must have instructions for storing and retrieving
+%% values. #Store# and #Load# (from Table \ref{tbl_mil1}) serve this
+%% purpose. 
 
-Associating locations with names is not enough, however. Looking again
-at expression \ref{mil_eq1}, $g$ clearly represents a function to
-which we pass the argument $x$. To compute the value of
-$\lamPApp{g}{x}$, we must be able to execute the code representing
-$g$. We already assigned a storage location for $g$ ($|clo|[0]$) -- now
-we just say that the value in $|clo|[0]$ is a \emph{label} that tells
-us where to find the code representing $g$. However, $g$ will need
-an environment of its own, to hold any free variables for $g$. Therefore,
-we pair the label indicating where to find $g$ with a list of free
-variables. We call this structure a \emph{closure}.
+%% \subsection{Function Application}
+%% \label{mil_subsec2}
 
-Closures are the fundamental data structures used to compile
-functional languages. They may not have the exact form described here
-but they always have the same purpose: they pair a label with the free
-variables used in the function represented. 
+%% Associating locations with names is not enough, however. Looking again
+%% at expression \ref{mil_eq1}, $g$ clearly represents a function to
+%% which we pass the argument $x$. To compute the value of
+%% $\lamPApp{g}{x}$, we must be able to execute the code representing
+%% $g$. We already assigned a storage location for $g$ ($|clo|[0]$) -- now
+%% we just say that the value in $|clo|[0]$ is a \emph{label} that tells
+%% us where to find the code representing $g$. However, $g$ will need
+%% an environment of its own, to hold any free variables for $g$. Therefore,
+%% we pair the label indicating where to find $g$ with a list of free
+%% variables. We call this structure a \emph{closure}.
 
-\subsection{Abstraction}
-\label{mil_subsec3}
-The \lamA lets us define functions which return new functions. We have
-seen how to access variables in the environment and how to execute
-unknown functions using closures. Now we come to the final element
-needed to compile the \lamA\ -- creating closures.
+%% Closures are the fundamental data structures used to compile
+%% functional languages. They may not have the exact form described here
+%% but they always have the same purpose: they pair a label with the free
+%% variables used in the function represented. 
 
-Consider the following expression, where we apply the $|const|$ function (expression 
-\ref{mil_eq4}) to an argument:
-\begin{equation}
-  \begin{split}
-    |main| &= \lamApp{|const|}{s} \\
-         &= \lamAppP{\lamAbs{a}{\lamAbs{b}{a}}}{s}.
-  \end{split}
-\end{equation}
-In order to evaluate $|main|$, we need to apply the $|const|$ function
-to $s$. From the previous section we know that a closure is required to
-implement function application. It follows that
-\lamAbs{a}{\lamAbs{b}{a}} must create a closure which will
-then be used to execute the body of the $\lambda$-abstraction with the
-argument $s$. In fact, the ``value'' created by a
-$\lambda$-abstraction is always a closure. The closure will point to
-the body of the $\lambda$-abstraction and will hold the free variables
-necessary to evaluate it.
+%% \subsection{Abstraction}
+%% \label{mil_subsec3}
+%% The \lamA lets us define functions which return new functions. We have
+%% seen how to access variables in the environment and how to execute
+%% unknown functions using closures. Now we come to the final element
+%% needed to compile the \lamA\ -- creating closures.
+
+%% Consider the following expression, where we apply the $|const|$ function (expression 
+%% \ref{mil_eq4}) to an argument:
+%% \begin{equation}
+%%   \begin{split}
+%%     |main| &= \lamApp{|const|}{s} \\
+%%          &= \lamAppP{\lamAbs{a}{\lamAbs{b}{a}}}{s}.
+%%   \end{split}
+%% \end{equation}
+%% In order to evaluate $|main|$, we need to apply the $|const|$ function
+%% to $s$. From the previous section we know that a closure is required to
+%% implement function application. It follows that
+%% \lamAbs{a}{\lamAbs{b}{a}} must create a closure which will
+%% then be used to execute the body of the $\lambda$-abstraction with the
+%% argument $s$. In fact, the ``value'' created by a
+%% $\lambda$-abstraction is always a closure. The closure will point to
+%% the body of the $\lambda$-abstraction and will hold the free variables
+%% necessary to evaluate it.
 
 \section{Three-address Code}
+\label{mil_sec2}
 
-Intermediate forms typically expose more detail about the
-implementation of a program, while at the same time making some
-optimization or transformation easier or even possible. 
-\emph{Three-address code}, one such intermediate form, translates the
-program into assembly-language like form, using registers to
-hold values. Infinitely many registers can be named, making registers
-more like memory locations than registers in real hardware. Each
-instruction in the translated program has two operand registers and one
-destination register, thus the name ``three-address.'' 
+Three-address code represents programs in a form similar to assembly
+language, where named registers represent storage locations. Each
+instruction in the translated program has two operand registers and
+one destination register, thus the name ``three-address.'' Infinitely
+many registers are available, making them more like memory locations
+than registers in real hardware.
 
 Three-address code makes all intermediate expression values explicit, 
 by reducing complicated expressions to a series of assignments. 
@@ -327,21 +305,35 @@ where #s# and #t# are new temporaries created by the compiler. This
 representation makes it easier for the compiler to re-order expressions,
 unravel complex control-flow, and manipulate intermediate values. 
 
+Three-address code intends to simplify the analysis of programs while
+not revealing all details of the underlying hardware. Three-address
+code accomplishes these goals by reducing the all expressions to a
+uniform representation, exposing the intermediate values (and thus,
+memory operations) created while expressions are evaluated. It hides
+some details by deferring decisions about the actual location of
+values to some later stage of compilation. Finally, three-address code
+programs are easy to represent as basic blocks, which makes
+control-flow analysis much simpler.
+
 \section{Monadic Intermediate Language}
+\label{mil_sec3}
 
-Our intermediate language, MIL, serves the same purpose as
-three-address code and other intermediate forms: it exposes more
-detail about the implementation of a program, while making some
-optimizations simpler or even possible. In contrast to three-address
-code, however, our language supports features unique to functional
-languages: the ability to treat functions as first-class values, and
-the representation of stateful computations in a monad.
+Our intermediate language, MIL, serves the same purpose as any
+intermediate language: it simplifies the analysis of programs (for
+certain characteristics), while hiding details of the underlying
+hardware. MIL shares some of the same goals as three-address code, and
+accomplishes them in similar ways: programs are organized into basic
+blocks; all intermediate values are named; precise details of
+registers and memory locations used are deferred. In contrast to
+three-address code, however, our language supports features unique to
+functional languages: the ability to treat functions as first-class
+values, and the representation of stateful computations in a monad.
 
-\subsection{Monads \& Functional Programming}
-As described by Wadler \citep{Wadler1990}, \emph{monads} can be used
+\subsection*{Monads \& Functional Programming}
+As described by \citet{Wadler1990}, \emph{monads} can be used
 distinguish \emph{pure} and \emph{impure} functions. A \emph{pure}
 function has no side-effects: it will not print to the screen, throw
-an exception, write to disk, or in any other way change the obversable
+an exception, write to disk, or in any other way change the observable
 state of the machine. An \emph{impure} function may change the
 machine's state.
 
@@ -354,7 +346,7 @@ accessible -- they are ``wrapped'' in the monad. The only way
 to ``unwrap'' a monadic value is to execute the computation -- inside
 the monad! 
 
-\subsection{The Monad in MIL}
+\subsection*{The Monad in MIL}
 
 When designing MIL we wished to make all memory allocation
 explicit. Besides the obvious effect of reducing free memory
@@ -363,7 +355,7 @@ may fail, or a garbage-collection may occur. A monad allows us to
 separate computations which (potentially) allocate memory from those
 that do not.
 
-\subsection{MIL Example: $compose$}
+\subsection*{MIL Example: $compose$}
 
 To give a sense of MIL, consider the definition of $compose$ given in
 Figure~\ref{mil_fig1a}. Figure~\ref{mil_fig1b} shows a fragment of this 
@@ -441,7 +433,7 @@ Finally, we compute our final value, $main$, by applying $t_2$ to $c$:
 Both $t_1$ and $t_2$ will hold \emph{closures} when evaluating
 expression \eqref{mil_eqn4}. As detailed in Section \ref{mil_subsec2}, a closure
 holds a pointer to a body of code and any \emph{free variables}. In this case,
-$t_1$ holds $a$ and points to the code that evaulates to $t_2$. In turn, $t_2$
+$t_1$ holds $a$ and points to the code that evaluates to $t_2$. In turn, $t_2$
 holds $a$ and $b$, and points to the code which evaluates to $main$. The
 \lamA does not make this explicit, but our MIL does. 
 
@@ -474,7 +466,7 @@ block. The value returned by #k3# will be the value computed by
 #compose# with the arguments given.
 
 Returning to #main# on line \ref{mil_main_fig2} in Figure
-\ref{mil_fig2}, we can now see how MIL makes explicit the intemediate
+\ref{mil_fig2}, we can now see how MIL makes explicit the intermediate
 closures created while evaluating
 \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}. On line
 \ref{mil_t1_fig2}, we enter #k1# with the first argument, #a#. #t1#
@@ -486,7 +478,7 @@ execute #compose# with our specific arguments. #t3# holds the result returned
 by #compose#. On the last line of #main# we return the value computed, #t3#.
 
 %% Syntax of MIL
-\subsection{MIL Syntax}
+\subsection*{MIL Syntax}
 
 Figure \ref{mil_fig3} gives the syntax for MIL.  A MIL program
 consists of a number of \emph{blocks}: \emph{closure} blocks (line
@@ -515,7 +507,7 @@ examines the variable given (note, this cannot be an expression) and
 selects the alternative that matches the constructor
 found. Alternatives always branch immediately to some block -- they do
 not allow any other statement. The result of block called becomes the
-result of the #case#, which in turn becomese the result of the calling
+result of the #case#, which in turn becomes the result of the calling
 block.
 
 Only the binding statement (line \ref{mil_bind_fig3}) can appear multiple
@@ -547,37 +539,25 @@ variables. Primitives, which are not implemented in MIL, have the form
 implemented in MIL, however. 
 
 \section{Compiling \lamA to MIL}
+\label{mil_sec4}
 
 \emph{\dots Lots of text \dots}
 
-\section{Intermediate Languages, MIL, and Three-Address Code}
+\section{Evaluating MIL Programs}
+\label{mil_sec5}
 
-Intermediate langauges, and three-address code in particular, have at
-least two purposes: making certain optimizations simpler, and exposing
-more details about implementation. The intermediate language does
-\emph{not} expose all details about implementation -- only those the
-designers considered relevant. Three-address code accomplishes this
-first goal by reducing the complexity of expresssions that need to be
-analyzed. The second goal is achieved by deferring decisions about the
-actual location of values to some later stage of compilation.
-Finally, while not required, three-address code also easily adapts to
-organizing code into basic blocks, which makes control-flow analysis
-much simpler.
+\emph{\dots Lots of text \dots}
 
-Our MIL shares some of the same goals as three-address code, and
-accomplishes them in similar ways. Blocks do not have complex
-structure -- they either return a closure, jump to another block, or
-execute a series of statements followed by a return or branch. Tail
-expressions ensure that all intermediate values are named, and also 
-isolate monadic effects to one area of the language. Finally, the limited
-number of statements ensure control-flow is straightforward.
+%% \section{Intermediate Languages, MIL, and Three-Address Code}
 
-\section{Conclusion}
+
+\section{Summary}
+\label{mil_sec6}
 
 This chapter presented our Monadic Intermediate Language (MIL). Our
-MIL resembles three-address code in sevarl ways: infinitely many
+MIL resembles three-address code in several ways: infinitely many
 registers can be named, nested expressions are not allowed, and
-implementatino details are made explicit. The MIL's unique features
+implementation details are made explicit. The MIL's unique features
 include separate representations for \emph{closure-capturing} and
 basic blocks, and the use of monadic \emph{tail} expressions. We 
 presented a simple scheme for compiling the \lamA given in
@@ -683,3 +663,6 @@ to optimizing those MIL programs using dataflow techniques.
 \standaloneBib
 
 \end{document}
+
+% LocalWords:  RTL Torczon Muchnick ANF MIL's dataflow Appel eq clo CompL invis
+% LocalWords:  compclo stateful monad Monads Wadler monads eqn intra goto
