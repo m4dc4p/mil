@@ -13,7 +13,7 @@ i = 0
   \node[stmt, below=0.25in of assign] (test) {#i < cnt#\labelNode{\prefix test}};
   \node[labelfor=test] () {\refNode{\prefix test}};
 
-  \node[stmt, right=1.5in of test] (mult) {#n = val * m#\labelNode{\prefix mult}};
+  \node[stmt, right=1.5in of test] (mult) {#n += val * m#\labelNode{\prefix mult}};
   \node[labelfor=mult] () {\refNode{\prefix mult}};
 
   \node[stmt, below of=mult] (incr) {#i++#\labelNode{\prefix incr}};

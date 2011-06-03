@@ -156,13 +156,13 @@ basic blocks rather than statements from here forward.
 Kildall's dataflow algorithm provides a general-purpose mechanism for
 analyzing control-flow graphs of programs. The algorithm itself does
 not mandate a specific analysis. Rather, it is parameterized by the
-choice of \emph{facts}, \emph{lattice}, \emph{meet operator},
-\emph{transfer function}, and \emph{direction}. Facts, the lattice,
-and the meet operator are used to approximate some property of the
-program that we wish to analyze. The transfer function creates facts
-that mimic the flow of information in the control-flow graph. The
-direction is dictacted by the type of analysis -- each particular
-analysis runs \emph{forwards} or \emph{backwards}.
+choice of \emph{facts}, \emph{meet operator}, \emph{transfer
+  function}, and \emph{direction}. The facts and meet operator form a
+lattice. Together, they approximate some property of the program that
+we wish to analyze. The transfer function transforms facts to mimic
+the flow of information in the control-flow graph. The direction is
+dictated by the type of analysis -- each particular analysis runs
+\emph{forwards} or \emph{backwards}.
 
 %% Constant-propagation
 Consider Figure~\ref{fig_back7}, Part~\subref{fig_back7_initial}, which
@@ -187,10 +187,15 @@ repeatedly.
   \label{fig_back7}
 \end{myfig}
 
-The program in Figure~\ref{fig_back7_initial} can be improved by
-replacing the variable #m# with 10 in the loop body. We can use a
-dataflow analysis known as \emph{constant propagation} to implement
-this optimization. The constant propagation analysis recognizes when a
+This function is just used for illustration -- we do not expect anyone
+would actually write code this way (after all, #mult10# is just
+\texttt{10 * val * cnt}). In any case, the program in
+Figure~\ref{fig_back7_initial} can be transformed by replacing the
+variable #m# with 10 in the loop body. This may allow the compiler to
+generate code that directly multiplies #val# times 10 and saves using
+a register to hold the value of #m#. We can use a dataflow analysis
+known as \emph{constant propagation} to justify this
+transformation. The constant propagation analysis recognizes when a
 variable's value does not change in some context and then replaces
 references to the variable with the constant
 value. Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt} shows the
@@ -200,18 +205,20 @@ Line~\ref{fig_back7_opt_loop}.
 \subsection{Facts and Lattices} 
 \label{back_subsec_facts}
 
-Constant propagation analyzes how each variable's value changes during
-execution. The analysis \emph{approximates} the actual values of the
-variables, as we cannot in general determine their exact value. We
-will place the value of each variable into one of three categories at
-each point in the control-flow graph: \emph{unknown}, a \emph{known
-  constant}, or \emph{indeterminate}. \emph{Unknown}, represented by
-$\bot$ (``bottom''), is the initial value for all variables in our
-analysis. A \emph{known constant}, $C$, means our analysis identified
-that the variable was assigned a specific value. \emph{Indeterminate},
-indicated by $\top$ (``top''), means our analysis found that the
-variable might have more than one value at a given point. The values
-$\bot$, $C$, and $\top$ form a set which we will denote as \setLC.
+Constant propagation determines if each variable's value changes
+during execution. The analysis \emph{approximates} the actual values
+of the variables, as we cannot in general determine their exact
+value. We will place the value of each variable into one of three
+categories at each point in the control-flow graph: \emph{unknown}, a
+\emph{known integer constant}, or
+\emph{indeterminate}. \emph{Unknown}, represented by $\bot$
+(``bottom''), is the initial value for all variables in our
+analysis. A \emph{known integer constant}, $C \in Z$, means our analysis identified
+that the variable was assigned a specific value that does not
+change. \emph{Indeterminate}, indicated by $\top$ (``top''), means our
+analysis found that the variable might have more than one value at a
+given point. Together, $\{\bot, \top\} \cup C$ forms a set which we
+will denote as \setLC.
 
 \begin{myfig}[bth]
   \input{lst_back17}
@@ -224,11 +231,11 @@ $\bot$, $C$, and $\top$ form a set which we will denote as \setLC.
 \end{myfig}
 
 Figure~\ref{fig_back11} shows the control-flow graph of our program
-annotated with \emph{facts} before (\inE) and after (\out) select
-program points. Each \emph{fact} indicates our knowledge of a
-variable's value at that point in the program. For this analysis, our
-facts are sets of pairs, $(a,x)$, where $a$ is the name of a variable
-and $x$ a value in \setLC. 
+annotated with \emph{facts} before (\inE) and after (\out) a few
+program points. For this analysis, our facts are sets of pairs,
+$(a,x)$, where $a$ is the name of a variable and $x$ a value in
+\setLC. Each \emph{fact} indicates our knowledge of a variable's value
+at that point in the program.
 
 Constant propagation is a \emph{forwards} analysis, meaning the values
 for each \inE set are calculated based on the \out values of its
@@ -242,7 +249,7 @@ predecessors: \refNode{lst_back17_assign} and
 values to $i$: 0 and $\top$. To combine these values when computing
 \inB{lst_back17_test}, we use a \emph{meet operator}.
 
-The \emph{meet operator}, \lub (pronounced ``least upper bound'' or
+The \emph{meet operator}, \lub (also pronounced ``least upper bound'' or
 ``lub''), defines how we will combine values in
 \setLC. Table~\ref{tbl_back4} gives the definition of \lub. For any
 value of $x \in \setLC$, $\bot \lub x$ results in $x$. Conversely, $x
@@ -266,6 +273,53 @@ $C_2$, result in $\top$, while equal constants give the same constant.
     values.}
   \label{tbl_back4}
 \end{myfig}
+
+Our definition of \lub allows us to distinguish variables for which we
+have no information, such as \factC{a}{\bot}, from those with
+non-constant values. This matches the definition of the C language,
+where a variable that is not initialized has an undefined value. This
+allows us to legally transform some programs by assuming the undefined
+variable has the best possible value. For example,
+Figure~\ref{fig_back15} shows a block with two
+predecessors. \outB{fig_back15_b1} has the fact
+\factC{x}{1}, while \outB{fig_back15_b2} says
+\factC{x}{\bot}. Since \outB{fig_back15_b2} adds no
+information about $x$, we assume it is the best possible value and use
+\lub to determine that \inB{fig_back15_b3} should have
+\factC{x}{1 \lub \bot}, or \factC{x}{1}.
+
+\begin{myfig}
+  \begin{tikzpicture}
+    \node[stmt,on grid,align=center] (b1) at (0,3) {#x = 1#\labelNode{fig_back15_b1}};
+    \node[labelfor=b1] () {\refNode{fig_back15_b1}};
+    \node[fact, anchor=center] () at (-1,2) 
+         {\outFactsM{fig_back15_b1}{x/{1}}{0.5in}};
+
+    \node[stmt,on grid,align=center] (b2) at (2,3) {$\cdots$\labelNode{fig_back15_b2}};
+    \node[labelfor=b2] () {\refNode{fig_back15_b2}};
+    \node[fact, anchor=center] () at (4,2)
+         {\outFactsM{fig_back15_b2}{x/{\bot}}{1in}};
+
+    \node[stmt,on grid,align=center] (b3) at (1,0) {#y = x#\labelNode{fig_back15_b3}};
+    \node[labelfor=b3] () {\refNode{fig_back15_b3}};
+    \node[fact, anchor=west] () at (2,1)
+         {\inFactsM{fig_back15_b3}{x/{1 \lub\ \bot}}{1in}};
+
+    \draw[->] (b1.south) ||- (1,1) -- (b3.north);
+    \draw[->] (b2.south) ||- (1,1) -- (b3.north);
+    
+  \end{tikzpicture}
+  \caption{A control-flow graph illustrating the behavior of \protect\lub with
+    $\bot$ (i.e., undefined) values.}
+  \label{fig_back15}
+\end{myfig}
+
+This assumption would not hold if we wished to warn the programmer
+that a potentially unitialized variable could be used. If we were
+analyzing a Haskell or Java program, we also could not make the same
+assumption, because all variables are initialized to a known value
+(either explicitly or by the compiler). For this language, and our
+purposes, we will define \lub as in Table~\ref{tbl_back4}.
 
 We have defined \lub on elements in \setLC, but our facts are set of
 pairs $(a,x)$ where $a$ is a variable and $x$ a value in \setLC. To
