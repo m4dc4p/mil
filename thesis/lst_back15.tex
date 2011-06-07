@@ -1,36 +1,40 @@
-\begin{tikzpicture}[>=stealth, node distance=.75in]
+\begin{tikzpicture}[>=stealth, node distance=.75in and 2in]
   \def\prefix{lst_back15_}
+  \newbox\fboxA
+  \begin{pgfinterruptpicture}
+    \global\setbox\fboxA=\hbox{\facts{m/\bot,n/\bot,i/\bot}}
+  \end{pgfinterruptpicture}
 
   \input{lst_back16}
 
   \node[fact, above=5mm of assign, anchor=west] () 
-       {\inFactsM{\prefix assign}{m/\bot,n/\bot,i/\bot}{1.10in}};
+       {\inFactsM{\prefix assign}{m/\bot,n/\bot,i/\bot}{\wd\fboxA}};
 
   \node[fact, below=3mm of assign, anchor=west] () 
-       {\outFactsM{\prefix assign}{m/\bot,n/\bot,i/\bot}{1.10in}};
+       {\outFactsM{\prefix assign}{m/\bot,n/\bot,i/\bot}{\wd\fboxA}};
 
   \node[fact, above=5mm of test, anchor=west] () 
-       {\inFactsM{\prefix  test}{m/\bot,n/\bot,i/\bot}{1.10in}};
+       {\inFactsM{\prefix  test}{m/\bot,n/\bot,i/\bot}{\wd\fboxA}};
 
   \node[fact, below=3mm of test, anchor=west] () 
-       {\outFactsM{\prefix test}{m/\bot,n/\bot,i/\bot}{1.10in}};
+       {\outFactsM{\prefix test}{m/\bot,n/\bot,i/\bot}{\wd\fboxA}};
 
   \node[fact, above=5mm of mult, anchor=west] () 
-       {\inFactsM{\prefix mult}{m/\bot,n/\bot,i/\bot}{1.10in}};
+       {\inFactsM{\prefix mult}{m/\bot,n/\bot,i/\bot}{\wd\fboxA}};
 
   \node[fact, below=3mm of mult, anchor=west] () 
-       {\outFactsM{\prefix mult}{m/\bot,n/\bot,i/\bot}{1.10in}};
+       {\outFactsM{\prefix mult}{m/\bot,n/\bot,i/\bot}{\wd\fboxA}};
 
   \node[fact, above=5mm of incr, anchor=west] () 
-       {\inFactsM{\prefix incr}{m/\bot,n/\bot,i/\bot}{1.10in}};
+       {\inFactsM{\prefix incr}{m/\bot,n/\bot,i/\bot}{\wd\fboxA}};
 
   \node[fact, below=3mm of incr, anchor=west] () 
-       {\outFactsM{\prefix incr}{m/\bot,n/\bot,i/\bot}{1.10in}};
+       {\outFactsM{\prefix incr}{m/\bot,n/\bot,i/\bot}{\wd\fboxA}};
 
   \node[fact, above=5mm of return, anchor=west] () 
-       {\inFactsM{\prefix return}{m/\bot,n/\bot,i/\bot}{1.10in}};
+       {\inFactsM{\prefix return}{m/\bot,n/\bot,i/\bot}{\wd\fboxA}};
 
   \node[fact, below=3mm of return, anchor=west] () 
-       {\outFactsM{\prefix return}{m/\bot,n/\bot,i/\bot}{1.10in}};
+       {\outFactsM{\prefix return}{m/\bot,n/\bot,i/\bot}{\wd\fboxA}};
 
 \end{tikzpicture}

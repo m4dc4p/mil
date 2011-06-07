@@ -4,29 +4,7 @@
 \begin{document}
 \input{document.preamble}
 
-\newbox\factbox
-\setbox\factbox=\hbox{\factC{x}{1}}
-
-  \begin{tikzpicture}
-    \node[stmt,on grid,align=center] (b1) at (0,3) {#x = 1#\labelNode{fig_back15_b1}};
-    \node[labelfor=b1] () {\refNode{fig_back15_b1}};
-    \node[fact, anchor=center] () at (-1,2) 
-         {\outFactsM{fig_back15_b1}{x/{1}}{1.1\wd\factbox}};
-
-    \node[stmt,on grid,align=center] (b2) at (2,3) {$\cdots$\labelNode{fig_back15_b2}};
-    \node[labelfor=b2] () {\refNode{fig_back15_b2}};
-    \node[fact, anchor=center] () at (4,2)
-         {\outFactsM{fig_back15_b2}{x/{\bot}}{1in}};
-
-    \node[stmt,on grid,align=center] (b3) at (1,0) {#y = x#\labelNode{fig_back15_b3}};
-    \node[labelfor=b3] () {\refNode{fig_back15_b3}};
-    \node[fact, anchor=west] () at (2,1)
-         {\inFactsM{fig_back15_b3}{x/{1 \lub\ \bot}}{1in}};
-
-    \draw[->] (b1.south) |- (1,1) -- (b3.north);
-    \draw[->] (b2.south) |- (1,1) -- (b3.north);
-    
-  \end{tikzpicture}
-  
-
+\begin{singlespace}
+\input{lst_back17}
+\end{singlespace}
 \end{document}

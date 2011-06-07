@@ -213,14 +213,14 @@ categories at each point in the control-flow graph: \emph{unknown}, a
 \emph{known integer constant}, or
 \emph{indeterminate}. \emph{Unknown}, represented by $\bot$
 (``bottom''), is the initial value for all variables in our
-analysis. A \emph{known integer constant}, $C \in Z$, means our analysis identified
+analysis. A \emph{known integer constant}, $C \in \mathbb{Z}$, means our analysis identified
 that the variable was assigned a specific value that does not
 change. \emph{Indeterminate}, indicated by $\top$ (``top''), means our
 analysis found that the variable might have more than one value at a
 given point. Together, $\{\bot, \top\} \cup C$ forms a set which we
 will denote as \setLC.
 
-\begin{myfig}[bth]
+\begin{myfig}
   \input{lst_back17}
   \caption{Our program, annotated with facts partway through the
     analysis. Notice that \outB{lst_back17_assign} and
@@ -230,12 +230,13 @@ will denote as \setLC.
   \label{fig_back11}
 \end{myfig}
 
-Figure~\ref{fig_back11} shows the control-flow graph of our program
-annotated with \emph{facts} before (\inE) and after (\out) a few
-program points. For this analysis, our facts are sets of pairs,
-$(a,x)$, where $a$ is the name of a variable and $x$ a value in
-\setLC. Each \emph{fact} indicates our knowledge of a variable's value
-at that point in the program.
+Figure~\ref{fig_back11} shows the control-flow graph of our program,
+partly annotated with sets of \emph{facts} before (\inE) and after
+(\out) the nodes that reference the variable $i$. This analysis
+defines facts as pairs, $(a,x)$, where $a$ is the name of a variable
+and $x \in \setLC$. The \inE and \out annotations are sets of
+facts, representing our knowledge of each variable's value at that
+point in the program.
 
 Constant propagation is a \emph{forwards} analysis, meaning the values
 for each \inE set are calculated based on the \out values of its
@@ -275,35 +276,44 @@ $C_2$, result in $\top$, while equal constants give the same constant.
 \end{myfig}
 
 Our definition of \lub allows us to distinguish variables for which we
-have no information, such as \factC{a}{\bot}, from those with
-non-constant values. This matches the definition of the C language,
-where a variable that is not initialized has an undefined value. This
-allows us to legally transform some programs by assuming the undefined
-variable has the best possible value. For example,
-Figure~\ref{fig_back15} shows a block with two
-predecessors. \outB{fig_back15_b1} has the fact
-\factC{x}{1}, while \outB{fig_back15_b2} says
-\factC{x}{\bot}. Since \outB{fig_back15_b2} adds no
-information about $x$, we assume it is the best possible value and use
-\lub to determine that \inB{fig_back15_b3} should have
+have no information from those with non-constant values. This matches
+the definition of the C language, where a variable that is not
+initialized has an undefined value. This allows us to legally
+transform some programs by assuming the undefined variable has the
+best possible value. For example, Figure~\ref{fig_back15} shows a
+block with two predecessors. \OutB{fig_back15_b1} has the fact
+\factC{x}{1}, while \outB{fig_back15_b2} says \factC{x}{\bot}. Our
+definition of \lub intuitively says that, when we do not know anything
+about a variable, we can use the information we already have
+instead. \OutB{fig_back15_b2} adds no information about $x$; we can
+assume it is 1, the best possible value. Our definition of \lub
+follows that intuition and tells us that \inB{fig_back15_b3} should be
 \factC{x}{1 \lub \bot}, or \factC{x}{1}.
 
 \begin{myfig}
   \begin{tikzpicture}
+    \newbox\fboxA
+    \newbox\fboxB
+    \newbox\fboxC
+    \begin{pgfinterruptpicture}
+      \global\setbox\fboxA=\hbox{\facts{x/{1}}}
+      \global\setbox\fboxB=\hbox{\facts{x/{\bot}}}
+      \global\setbox\fboxC=\hbox{\facts{x/{1 \lub \bot}}}
+    \end{pgfinterruptpicture}
     \node[stmt,on grid,align=center] (b1) at (0,3) {#x = 1#\labelNode{fig_back15_b1}};
     \node[labelfor=b1] () {\refNode{fig_back15_b1}};
     \node[fact, anchor=center] () at (-1,2) 
-         {\outFactsM{fig_back15_b1}{x/{1}}{0.5in}};
+         {\outFactsM{fig_back15_b1}{x/{1}}{\wd\fboxA}};
 
     \node[stmt,on grid,align=center] (b2) at (2,3) {$\cdots$\labelNode{fig_back15_b2}};
     \node[labelfor=b2] () {\refNode{fig_back15_b2}};
     \node[fact, anchor=center] () at (4,2)
-         {\outFactsM{fig_back15_b2}{x/{\bot}}{1in}};
+         {\outFactsM{fig_back15_b2}{x/{\bot}}{\wd\fboxB}};
 
     \node[stmt,on grid,align=center] (b3) at (1,0) {#y = x#\labelNode{fig_back15_b3}};
     \node[labelfor=b3] () {\refNode{fig_back15_b3}};
     \node[fact, anchor=west] () at (2,1)
-         {\inFactsM{fig_back15_b3}{x/{1 \lub\ \bot}}{1in}};
+         {\inFactsM{fig_back15_b3}{x/{1 \lub \bot}}{\wd\fboxC}};
 
     \draw[->] (b1.south) ||- (1,1) -- (b3.north);
     \draw[->] (b2.south) ||- (1,1) -- (b3.north);
@@ -314,53 +324,52 @@ information about $x$, we assume it is the best possible value and use
   \label{fig_back15}
 \end{myfig}
 
-This assumption would not hold if we wished to warn the programmer
-that a potentially unitialized variable could be used. If we were
-analyzing a Haskell or Java program, we also could not make the same
-assumption, because all variables are initialized to a known value
-(either explicitly or by the compiler). For this language, and our
-purposes, we will define \lub as in Table~\ref{tbl_back4}.
+We would not make this assumption if we wished to warn the programmer
+that a potentially unitialized variable could be used. In that case,
+we would define \lub such that $x \lub \bot$ was $\bot$. Then, when
+the fact \factC{x}{\bot} appeared, we could warn that a variable might
+be used before being initialized. Similarly, if our language defined
+an initial value for all variables, our assumption would have no
+effect. We could use the same definition, but no variable would have
+the value $\bot$ -- each would have a known initial value. 
 
-We have defined \lub on elements in \setLC, but our facts are set of
-pairs $(a,x)$ where $a$ is a variable and $x$ a value in \setLC. To
-compute \inBa, we apply \lub set-wise to the values for matching
-variables in each \out set of $B$'s predecessors. We use the $\wedge$
-(``wedge'') operator to represent our meet over sets and pairs:
-\begin{align}\allowdisplaybreaks[0]
-    \inBa &= \bigwedge\limits_{\mathclap{P \in \mathit{pred}(B)}} \outXa{P} \label{eqn_back8}\\ 
-    B \bigwedge\ \,\mathclap{\emptyset}\phantom{C} &= B \notag\\*
-    B \bigwedge\ \,\mathclap{C}\phantom{C} &= \bigcup\limits_{(a,x) \in B}
-    \left(\bigcup\limits_{(b,y) \in C} (a,x) \wedge (b,y)\right) \label{eqn_back6}\\
-  (a,x) \wedge (b,y) &= 
-  \begin{cases}
-    (a,x \lub y) & \text{when}\ (a,x) \in B, (b,y) \in C,\ \text{\lub as in Table~\ref{tbl_back4}.}\\
-    (a,x) & \text{when}\ b \not\in \mathit{var}(B). \\
-    (b,y) & \text{when}\ a \not\in \mathit{var}(C). \\
-  \end{cases} \label{eqn_back7}
-\end{align}
+We have defined \lub on elements in \setLC, but our facts are pairs
+$(a,x)$ where $a$ is a variable and $x$ a value in \setLC; \inE and
+\out are sets of facts.  Therefore, we define the $\wedge$ (``wedge'')
+operator to apply \lub to sets of facts ($F_1$ and $F_2$ below):
+\begin{align*}\allowdisplaybreaks[0]
+  F_1 \wedge F_2 &= \setdef{(a, x_1 \lub x_2)}{(a,x_1) \in F_1, (a,x_2) \in F_2} \\
+  &\; \cup \setdef{(a,x_1)}{(a,x_1) \in F_1, a \not\in \mfun{dom}(F_2)} \\
+  &\; \cup \setdef{(a,x_2)}{(a,x_2) \in F_2, a \not\in \mfun{dom}(F_1)} \label{eqn_back18}\addtag\\
+  \mfun{dom}(F) &= \setdef{a}{(a,x) \in F} \addtag
+\end{align*}
+Our $\wedge$ operator acts like union when a variable in $F_1$ does
+not appear in the domain of $F_2$; likewise for a variable only in
+$F_2$. When a variable appears in both $F_1$ and $F_2$, the values for
+the variable are combined using \lub.
 
+To compute \inBa, we apply $\wedge$ to each \out set of $B$'s
+predecessors. We use a subscripted $\bigwedge$ to indicate we combine
+all of the \out sets into one using $\wedge$:
+\begin{equation}
+  \inBa = \bigwedge\limits_{\mathclap{P \in \mathit{pred}(B)}} \outXa{P} \label{eqn_back8}.
+\end{equation}
 
 Using these equations, we can show how the \inB{lst_back17_test}
 set in Figure~\ref{fig_back11} is derived:
-\begin{flalign*}\allowdisplaybreaks[0]
-    \inB{lst_back17_test} &= \bigwedge\limits_{\mathclap{P \in \mathit{pred}(\refNode{lst_back17_test})}} \outXa{P} 
-    \intertext{Predecessors of \refNode{lst_back17_test}; Equation~\eqref{eqn_back8}.} 
-    \inB{lst_back17_test} &= \outB{lst_back17_assign} \bigwedge \outB{lst_back17_incr} 
-    \intertext{Equation~\eqref{eqn_back6}.}
-    \inB{lst_back17_test} &= \bigcup\limits_{(a,x) \in \outB{lst_back17_assign}}
-      \left(\bigcup\limits_{(b,y) \in \outB{lst_back17_incr}} (a,x) \wedge (b,y)\right) 
-    \intertext{Definition of \outB{lst_back17_assign}, and \outB{lst_back17_incr} in Figure~\ref{fig_back11}.}
-    \inB{lst_back17_test} &= \bigcup\limits_{(a,x) \in \{\factC{i}{0}\}}
-      \left(\bigcup\limits_{(b,y) \in \{\factC{i}{\top}\}} (a,x) \wedge (b,y)\right) 
-    \intertext{Equation~\eqref{eqn_back6}.}
-    \inB{lst_back17_test} &= \{\factC{i}{0}\}\ \wedge \{\factC{i}{\top}\} 
-    \intertext{Equation~\eqref{eqn_back7}.}
-    \inB{lst_back17_test} &= \{\factC{i}{0 \lub \top}\}
-    \intertext{Definition of \lub from Table~\ref{tbl_back4}.} 
-    \inB{lst_back17_test} &= \{\factC{i}{\top}\} 
-    \intertext{Definition of \inB{lst_back17_test}.}
-    \{\factC{i}{\top}\} &= \{\factC{i}{\top}\}.
-\end{flalign*}
+\begin{align*}\allowdisplaybreaks[0]
+  \inB{lst_back17_test} &= \bigwedge\limits_{\mathclap{P \in \mathit{pred}(\refNode{lst_back17_test})}} \outXa{P} \\
+  \shortintertext{\hbox to 1\textwidth{\hfil\textit{Predecessors of \refNode{lst_back17_test}; Equation~\eqref{eqn_back8}.}}}
+  &= \outB{lst_back17_assign} \wedge \outB{lst_back17_incr} \\
+  \shortintertext{\hbox to 1\textwidth{\hfil\textit{Definition of \outB{lst_back17_assign} and \outB{lst_back17_incr}.}}}
+  &= \{\factC{i}{0}\} \wedge \{\factC{i}{\top}\} \\
+  \shortintertext{\hbox to 1\textwidth{\hfil\textit{Equation~\eqref{eqn_back18}.}}}
+  &= \{\factC{i}{0 \lub \top}\} \\
+  \shortintertext{\hbox to 1\textwidth{\hfil\textit{Definition of \lub from Table~\ref{tbl_back4}.}}}
+  &= \{\factC{i}{\top}\} \\
+  \shortintertext{\hbox to 1\textwidth{\hfil\textit{Definition of \inB{lst_back17_test}.}}}
+  \{\factC{i}{\top}\} &= \{\factC{i}{\top}\}.
+\end{align*}
 
 Together, \setLC and \lub form a \emph{lattice}.\footnote{The lattice
   can also have a \emph{join} operator, but for our purposes we solely
@@ -371,12 +380,12 @@ computes different facts, but those facts are always represented by a
 lattice.
 
 We have established that our analysis computes \emph{facts} at each
-node in our programs control-flow graph. The facts are defined using a
-\emph{lattice}. The lattice lets us assign the value $\bot$, $C$ (a
-constant), or $\top$ to each variable in the program, at each node in
-the graph. The lattice's \emph{meet operator} is used to combing
-conflicting values when computing \inBa from the \out sets of $B$'s
-predecessors. We next explore how \out facts are computed for each node.
+node in our programs control-flow graph. The facts assign the value
+$\bot$, $C \in \mathbb{Z}$, or $\top$ to each variable in the program,
+at each node in the graph. We defined a \emph{meet operator}, \lub,
+which is used to combing conflicting values when computing \inBa.  The
+facts and meet operator together define a \emph{lattice}. We next
+explore how \out facts are computed for each node.
 
 %% Figure~\ref{fig_back11} demonstrates how the lattice computes facts
 %% for constant propagation. The set \out{lst_back17_assign} indicates,
@@ -445,16 +454,13 @@ facts that were true \emph{before} a node executed.  In both cases,
 the transfer function also considers known facts (i.e., \inE facts for
 forwards, \out for backwards) as well as the statements in the node.
 
-Our constant propagation analysis determines, for each node in the
-control-flow graph, what value a given variable has: $\bot$, $C$ (an
-integer), or $\top$. We choose to use pairs $(a,x)$, where $a$ is
-variable in the program and $x$ a value in \setLC, as the facts for
-our analysis. We define our transfer function in terms of a single 
-pair (i.e., fact):
+We choose to use pairs $(a,x)$, where $a$ is variable in the program
+and $x$ a value in \setLC, as the facts for our analysis. We define
+our transfer function in terms of a single fact:
 \begin{equation}
   f (a,x) = 
   \begin{cases}
-    (a,x \lub C) & \text{when \texttt{a = \emph{C}}, where \texttt{\emph{C}} is an integer.} \\
+    (a,x \lub C) & \text{when \texttt{a = \emph{C}}, with \texttt{C} $\in \mathbb{Z}$.} \\
     (a,\top) & \text{when \texttt{a} updated}. \\
     (a,x) & \text{otherwise}. \\
   \end{cases}
@@ -494,7 +500,7 @@ so \outB{lst_back18_mult} contains \factC{n}{\top}. However,
 \refNode{lst_back18_mult}; the value from \inB{lst_back18_mult} is
 just copied to \outB{lst_back18_mult}.
 
-\afterpage{\clearpage\input{fig_back9}\clearpage}
+\input{fig_back9}
 
 Every dataflow analysis defines a \emph{transfer function} for
 creating (or updating) facts. The function is specific to both the

@@ -1,6 +1,12 @@
+\pgfkeysifdefined{/tikz/incr}{}{\pgfkeys{/tikz/incr/.append style={}}}
+\pgfkeysifdefined{/tikz/return}{}{\pgfkeys{/tikz/return/.append style={}}}
+\pgfkeysifdefined{/tikz/assign}{}{\pgfkeys{/tikz/assign/.append style={}}}
+\pgfkeysifdefined{/tikz/test}{}{\pgfkeys{/tikz/test/.append style={}}}
+\pgfkeysifdefined{/tikz/mult}{}{\pgfkeys{/tikz/mult/.append style={}}}
+
   \node[invis] (entry) {};
 
-  \node[stmt, below of=entry] (assign) {\begin{minipage}{0.5in}
+  \node[stmt, assign, below=0.2in of entry] (assign) {\begin{minipage}{0.5in}
       \begin{AVerb} 
 m = 10
 n = 1
@@ -10,19 +16,19 @@ i = 0
     \labelNode{\prefix assign}};
   \node[labelfor=assign] () {\refNode{\prefix assign}};
 
-  \node[stmt, below=0.25in of assign] (test) {#i < cnt#\labelNode{\prefix test}};
+  \node[stmt, test, below=of assign] (test) {#i < cnt#\labelNode{\prefix test}};
   \node[labelfor=test] () {\refNode{\prefix test}};
 
-  \node[stmt, right=1.5in of test] (mult) {#n += val * m#\labelNode{\prefix mult}};
+  \node[stmt, mult, right=of test] (mult) {#n += val * m#\labelNode{\prefix mult}};
   \node[labelfor=mult] () {\refNode{\prefix mult}};
 
-  \node[stmt, below of=mult] (incr) {#i++#\labelNode{\prefix incr}};
+  \node[stmt, incr, below=of mult] (incr) {#i++#\labelNode{\prefix incr}};
   \node[labelfor=incr] () {\refNode{\prefix incr}};
 
-  \node[stmt, below of=test] (return) {#return n#\labelNode{\prefix return}};
+  \node[stmt, return, below=of test] (return) {#return n#\labelNode{\prefix return}};
   \node[labelfor=return] () {\refNode{\prefix return}};
 
-  \node[invis, below of=return] (exit) {};
+  \node[invis, below=0.2in of return] (exit) {};
 
   \draw [->>] (entry) to (assign);
   \draw [->] (assign) to (test);

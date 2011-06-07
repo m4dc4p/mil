@@ -57,7 +57,7 @@
   %% Invisible node
   invis/.style={inner sep=0pt, 
     minimum height=0em}, 
-  table/.style={circle, fill=white,height=2mm}, 
+  table/.style={circle, fill=white,height=2mm}
 }
 
 %% GSO margins.
@@ -123,8 +123,10 @@
 \newcommand{\out}{\ensuremath{\mathit{out}}\xspace}
 \newcommand{\In}{\ensuremath{\mathit{In}}\xspace}
 \newcommand{\InBa}{\ensuremath{\mathit{In}(B)}\xspace}
-\newcommand{\Out}{\ensurmath{\mathit{Out}}\xspace}
-\newcommand{\OutBa}{\ensurmath{\mathit{Out}(B)}\xspace}
+\newcommand{\Out}{\ensuremath{\mathit{Out}}\xspace}
+%% Out(B_x) -- fact function for an named block.
+\newcommand{\OutB}[1]{\ensuremath{\mathit{Out}(B_{\ref{#1}})}\xspace}
+\newcommand{\OutBa}{\ensuremath{\mathit{Out}(B)}\xspace}
 %% in(B) -- fact function for an anonymous block.
 \newcommand{\inBa}{\ensuremath{\mathit{in}(B)}\xspace}
 %% in(X) -- fact function for an anonymous block, but using a different variable.
@@ -180,14 +182,14 @@
                   {\var}%%
       %% \tracingmacros=0%%
       \stepcounter{factctr}%%
-    }}\xspace%%
+    }}%%
 \endgroup}
 \newcommand{\factC}[2]{{\ensuremath{(\mathit{#1},#2)}}}
 \newcommand{\doFacts}[4]{\ensuremath{#3{#1}: %%
-    \left\{\hfil %%
+    \left\{ %%
     \begin{minipage}[c]{#4}%%
       \facts{#2} %%
-  \end{minipage}\hfil\right\}}}
+  \end{minipage}\kern -0.23em\right\}}}
 
 \ExplSyntaxOn
 \DeclareDocumentCommand \inFactsM {m m m} {\doFacts{#1}{#2}{\inB}{#3}}
@@ -236,3 +238,9 @@
                  \bibliography{thesis}
              \end{singlespace}}{}}
 
+%% Adds an equation number on demand.
+\newcommand\addtag{\refstepcounter{equation}\tag{\theequation}}
+%% For typesetting set definitions like {x | x \in f(y)}
+\newcommand\setdef[2]{\ensuremath{\{#1\ |\ #2\}}}
+%% For typesetting function names like dom(f) or out(b).
+\newcommand\mfun[1]{\ensuremath{\mathit{#1}}}

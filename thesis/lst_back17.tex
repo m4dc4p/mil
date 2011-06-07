@@ -1,7 +1,15 @@
-\begin{tikzpicture}[>=stealth, node distance=.5in]
+\begin{tikzpicture}[>=stealth, node distance=0.75in and 1in]
+  \newbox\fboxA
+  \newbox\fboxB
+  \begin{pgfinterruptpicture}
+    \global\setbox\fboxA=\hbox{\facts{i/0}}
+    \global\setbox\fboxB=\hbox{\facts{i/\top}}
+  \end{pgfinterruptpicture}
   \def\prefix{lst_back17_}
-  \input{lst_back16}
-  \node[fact, below=5mm of assign, anchor=west] () {\outFactsM{lst_back17_assign}{i/0}{0.4in}};
-  \node[fact, below=3mm of incr, anchor=west] () {\outFactsM{lst_back17_incr}{i/\top}{0.45in}};
-  \node[fact, above=3mm of test, anchor=west] () {\inFactsM{lst_back17_test}{i/\top}{0.45in}};
+  \pgfkeys{/tikz/incr/.style={node distance=0.25in},
+    /tikz/return/.style={node distance=0.25in}}
+  \input{lst_back16} 
+  \node[fact, below=5mm of assign, anchor=west] () {\outFactsM{lst_back17_assign}{i/0}{\wd\fboxA}};
+  \node[fact, below=3mm of incr, anchor=west] () {\outFactsM{lst_back17_incr}{i/\top}{\wd\fboxB}};
+  \node[fact, above=5mm of test, anchor=west] () {\inFactsM{lst_back17_test}{i/\top}{\wd\fboxB}};
 \end{tikzpicture}
