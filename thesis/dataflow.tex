@@ -291,34 +291,7 @@ follows that intuition and tells us that \inB{fig_back15_b3} should be
 \factC{x}{1 \lub \bot}, or \factC{x}{1}.
 
 \begin{myfig}
-  \begin{tikzpicture}
-    \newbox\fboxA
-    \newbox\fboxB
-    \newbox\fboxC
-    \begin{pgfinterruptpicture}
-      \global\setbox\fboxA=\hbox{\facts{x/{1}}}
-      \global\setbox\fboxB=\hbox{\facts{x/{\bot}}}
-      \global\setbox\fboxC=\hbox{\facts{x/{1 \lub \bot}}}
-    \end{pgfinterruptpicture}
-    \node[stmt,on grid,align=center] (b1) at (0,3) {#x = 1#\labelNode{fig_back15_b1}};
-    \node[labelfor=b1] () {\refNode{fig_back15_b1}};
-    \node[fact, anchor=center] () at (-1,2) 
-         {\outFactsM{fig_back15_b1}{x/{1}}{\wd\fboxA}};
-
-    \node[stmt,on grid,align=center] (b2) at (2,3) {$\cdots$\labelNode{fig_back15_b2}};
-    \node[labelfor=b2] () {\refNode{fig_back15_b2}};
-    \node[fact, anchor=center] () at (4,2)
-         {\outFactsM{fig_back15_b2}{x/{\bot}}{\wd\fboxB}};
-
-    \node[stmt,on grid,align=center] (b3) at (1,0) {#y = x#\labelNode{fig_back15_b3}};
-    \node[labelfor=b3] () {\refNode{fig_back15_b3}};
-    \node[fact, anchor=west] () at (2,1)
-         {\inFactsM{fig_back15_b3}{x/{1 \lub \bot}}{\wd\fboxC}};
-
-    \draw[->] (b1.south) ||- (1,1) -- (b3.north);
-    \draw[->] (b2.south) ||- (1,1) -- (b3.north);
-    
-  \end{tikzpicture}
+  \input{lst_back19}
   \caption{A control-flow graph illustrating the behavior of \protect\lub with
     $\bot$ (i.e., undefined) values.}
   \label{fig_back15}

@@ -1,8 +1,10 @@
 \begin{tikzpicture}[>=stealth, node distance=.75in and 2in]
   \def\prefix{lst_back15_}
   \newbox\fboxA
+  \newbox\fboxB
   \begin{pgfinterruptpicture}
     \global\setbox\fboxA=\hbox{\facts{m/\bot,n/\bot,i/\bot}}
+    \global\setbox\fboxB=\hbox{\,\facts{m/\bot,n/\bot}\,}
   \end{pgfinterruptpicture}
 
   \input{lst_back16}
@@ -13,11 +15,11 @@
   \node[fact, below=3mm of assign, anchor=west] () 
        {\outFactsM{\prefix assign}{m/\bot,n/\bot,i/\bot}{\wd\fboxA}};
 
-  \node[fact, above=5mm of test, anchor=west] () 
-       {\inFactsM{\prefix  test}{m/\bot,n/\bot,i/\bot}{\wd\fboxA}};
+  \node[fact, above=5mm of test, anchor=east] () 
+       {\inFactsM{\prefix  test}{m/\bot,n/\bot,i/\bot}{\wd\fboxB}};
 
-  \node[fact, below=3mm of test, anchor=west] () 
-       {\outFactsM{\prefix test}{m/\bot,n/\bot,i/\bot}{\wd\fboxA}};
+  \node[fact, below=3mm of test, anchor=east] () 
+       {\outFactsM{\prefix test}{m/\bot,n/\bot,i/\bot}{\wd\fboxB}};
 
   \node[fact, above=5mm of mult, anchor=west] () 
        {\inFactsM{\prefix mult}{m/\bot,n/\bot,i/\bot}{\wd\fboxA}};
