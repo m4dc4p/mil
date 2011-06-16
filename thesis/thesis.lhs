@@ -14,16 +14,16 @@
 \DefineShortVerb{\#}
 \doublespacing
              
-\input{front.f}
+\input{front}
 
 \pagenumbering{arabic}
-\input{intro.f}
+\input{intro}
 
-\input{dataflow.f}
+\input{dataflow}
 
-\input{languages.f}
+\input{languages}
 
-\input{mil.f}
+\input{mil}
 
 \chapter{The Hoopl Library}
 
@@ -32,9 +32,9 @@ it approaches dataflow analysis. Important concepts
 such as shape, transfer and rewrite functions, facts and
 lattices will be described. }
 
-\input{uncurrying.f}
+\input{uncurrying}
 
-\input{deadcode.f}
+\input{deadcode}
 
 \chapter{Monadic Optimizations}
 \emph{Describes optimizations based on the monad laws: bind/return collapse and

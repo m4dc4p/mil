@@ -540,7 +540,7 @@ implemented in MIL, however.
 \section{Compiling \lamA to MIL}
 \label{mil_sec4}
 
-\input{lamCComp.f}
+\input{lamCComp}
 
 \section{Evaluating MIL Programs}
 \label{mil_sec5}
