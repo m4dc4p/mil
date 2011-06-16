@@ -1,0 +1,40 @@
+\tracingonline 1\tracingmacros 1
+%% Apply a function to an
+%% argument.
+\def\App#1#2{#1 #2}
+
+\def\Var#1{\csname#1\endcsname}
+
+\def\Abs#1.{\begingroup%%
+  %% Make the argument (x) an active character and
+  \catcode`#1=\active 
+  %% capture body w/ active category code assigned
+  %% to argument x.
+  \def\Eval##1{
+      %% Capture the value given to x by making the
+      %% control sequence \getarg return the captured 
+      %% value ###1.
+      %%\def\getarg{###1} 
+      %% Evaluate the body with active character
+      %% and control sequence \x properly defined.
+      %%##1
+    \endgroup}
+  \edef\Body##1{
+    %% Assign control sequence to our active character 
+    %% so \Abs x.x becomes \Abs x. \getarg
+    \catcode`#1=\active
+    \let#1=\noexpand\getarg
+    \noexpand\Eval
+  }\Body}
+
+\def\Identity{\Abs x.x}
+
+\App\Identity x
+
+%% \def\Zero#1#2{\let\s=#1 \let\z=#2
+%%   \Abs\s.{\Abs\z.\z}}
+
+%% \def\Succ#1\s\z{\let\n=#1 
+%%   \Abs\s.{\Abs\
+
+
