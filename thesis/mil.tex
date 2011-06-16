@@ -4,7 +4,7 @@
 \begin{document}
 \input{document.preamble}
 
-\chapter{A Monadic Intermediate Language}
+\chapter{Compiling to a Monadic Intermediate Language}
 \label{ref_chapter_mil}
 
 %% Compiling the lambda calculus - fundamentals
@@ -32,13 +32,12 @@
 %% Evaluating MIL (?)  
 
 Most compilers do not generate executable machine code directly from a
-program source file. Rather, the compiler translates programs into one
-or more \emph{intermediate languages}. Each intermediate language aids
-the compiler in some specific way. For
-example, an intermediate language may simplify register allocation,
-expose intermediate values, or make memory management explicit. The
-compiler may implement a pipeline of translations, each transforming
-the program into a more detailed (i.e., lower-level) representation.
+program source file. Rather, the compiler typically implements of
+pipeline of \emph{intermediate languages}. The compiler analyzes and
+optionally transforms (e.g., for optimization) the program during each
+stage of the pipeline .Typically, each intermediate language exposes
+more details about the implementation of the program than the one
+before.
 
 A number of intermediate languages have been described for both
 imperative and functional language compilers. Register transfer
