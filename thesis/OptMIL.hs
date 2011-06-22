@@ -43,7 +43,7 @@ data BindVal = BindReturn Name -- ^ Return a variable with the given name.
              | BindGoto Dest [Name] -- ^ Goto block.
              | BindConstrM Name [Name] -- ^ Create value.
              | BindThunk Dest [Name] -- ^ Monadic thunk
-             | BindRun Name -- ^ Run a monadic computatino
+             -- | BindRun Name -- ^ Run a monadic computatino
              | BindPrim Name [Name] -- ^ Primitive call with teh given name and arguments.
   deriving (Eq, Show)
 
@@ -86,9 +86,10 @@ bindSubstTransfer = mkFTransfer fw
     fw (Bind v (Goto d ns)) m = Map.insert v (BindGoto d ns) m 
     fw (Bind v (ConstrM c ns)) m = Map.insert v (BindConstrM c ns) m 
     fw (Bind v (Thunk d ns)) m = Map.insert v (BindThunk d ns) m 
-    fw (Bind v (Run n)) m = Map.insert v (BindRun n) m 
+    -- fw (Bind v (Run n)) m = Map.insert v (BindRun n) m 
     fw (Bind v (Prim p vs)) m = Map.insert v (BindPrim p vs) m 
-    fw (Bind v (LitM _)) m = m 
+    fw (Bind _ (Run _)) m = m
+    fw (Bind _ (LitM _)) m = m 
     fw (BlockEntry _ _ _) m = m
     fw (CloEntry _ _ _ _) m = m
     fw (CaseM _ alts) m = 
@@ -133,7 +134,7 @@ bindSubstRewrite = iterFwdRw (mkFRewrite rewrite) -- deep rewriting used
         (Just (BindGoto d ns)) -> Just $ substNames f ns (\ns -> Goto d ns)
         (Just (BindConstrM c ns)) -> Just $ substNames f ns (\vs -> ConstrM c ns)
         (Just (BindThunk d ns)) -> Just $ substNames f ns (\ns -> Thunk d ns)
-        (Just (BindRun n)) -> Just $ substNames f [n] (\ [n] -> Run n)
+        -- (Just (BindRun n)) -> Just $ substNames f [n] (\ [n] -> Run n)
         (Just (BindPrim p vs)) -> Just $ substNames f vs (\vs -> Prim p vs)
         _ -> Nothing
 
@@ -517,7 +518,7 @@ optCollapse tops = deadCode . collapse
 inlineSimple tops = deadCode . bindSubst . inlineReturn 
 
 mostOpt :: [Name] -> ([Name], ProgM C C) -> ProgM C C -> ProgM C C
-mostOpt userTops prelude@(prims, _) body = 
+mostOpt userTops prelude@(prims, _) body = addLive tops .
     newTops deadBlocks . 
     inlineBlocks tops . 
     newTops deadBlocks .  

@@ -137,31 +137,20 @@ compileStmtM (ECase e lcAlts) ctx = do
       return (Goto dest [])
 
 compileStmtM (EApp e1 e2) ctx 
-  = 
-    let pure ctx = compVarM e1 $ \f ->
-                   compVarM e2 $ \g ->
-                     ctx (Enter f g)
-        monad ctx = pure $ \t -> do
-                  v <- fresh "v"
-                  rest <- ctx (Run v)
-                  return (mkMiddle (v `Bind` t) <*> rest)
-    in pure ctx `unlessMonad` monad ctx
+  = compVarM e1 $ \f ->
+    compVarM e2 $ \g ->
+      ctx (Enter f g)
 
 compileStmtM (EFatbar _ _) _ 
   = error "EFatbar not implemented."
 
 compileStmtM (EBind v _ b r) ctx = do
-  pushMonad
-  tops <- gets compT
-  let fvs = nub (free b ++ (free r \\ [v])) \\ tops 
-  command <- do
-    rest <- compileStmtM r (return . mkLast . Done)
-    prog <- compileStmtM b $ \body -> 
-            return (mkMiddle (v `Bind` body) <*> rest)
-    name <- newTop "monBody"
-    blockDefn name fvs prog
-  popMonad
-  ctx (Thunk command fvs)
+  rest <- compileStmtM r ctx
+  compileStmtM b $ \body -> do
+    t <- fresh "t"
+    return (mkMiddle (t `Bind` body) <*> 
+            mkMiddle (v `Bind` (Run t)) <*> 
+            rest)
 
 primDefn :: Name 
          -> Int 

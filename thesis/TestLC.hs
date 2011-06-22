@@ -112,6 +112,14 @@ lcmTest1 = ("lcmTest1"
                   (alt "True" [] (const $ x `plus` lit 1 `plus` y) .
                    alt "False" [] (const $ x `plus` lit 1 `plus` z)))
 
+-- Monadic compose (from mon6)
+kleisli = ("kleisli",
+           lam "f" $ \f ->
+           lam "g" $ \g ->
+           lam "x" $ \x ->
+             bindE "v1" (g `app` x) $ \v1 ->
+             bindE "v2" (f `app` v1) id)
+
 lcmTest2 = ("lcmTest2"
            , lam "x" $ \x ->
              lam "y" $ \y ->
