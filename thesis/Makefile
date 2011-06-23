@@ -30,7 +30,7 @@
 #
 fileinfo	:= LaTeX Makefile
 author		:= Chris Monson
-version		:= 2.2.1-alpha5
+version		:= 2.2.1-alpha6
 #
 .DEFAULT_GOAL	:= all
 # Note that the user-global version is imported *after* the source directory,
@@ -113,9 +113,14 @@ export LC_ALL		?= C
 #
 #
 # CHANGES:
+# Chris Monson (2011-06-23):
+# * Bumped version to 2.2.1-alpha6
+# * Issue 133: Set jobname to fix .fls generation to always have the source name
+# * Removed unnecessary (?) double-invocation of cygpath
 # Chris Monson (2011-06-16):
 # * Added support for keeping .rst and .lhs tex intermediates around.
 # * Separated scripts from source generation files (rst and lhs)
+# * Fixed run-script problem for lhs2tex (was invoked incorrectly)
 # * Issue 133: Fixed typo from literate Haskell support
 # Chris Monson (2011-06-13):
 # * Bumped version to 2.2.1-alpha5
@@ -760,13 +765,8 @@ XINDYENC	?= utf8
 # otherwise the function is just a no-op.  Issue 112 has details.
 USE_CYGPATH := $(if $(shell $(WHICH) $(CYGPATH) 2>/dev/null),yes,)
 
-# $(call get-cygpath,<path>)
-define get-cygpath
-$(shell $(CYGPATH) -u "$(shell $(CYGPATH) -s -w $1)")
-endef
-
 define path-norm
-$(if $(USE_CYGPATH),$(call get-cygpath,$1),$1)
+$(if $(USE_CYGPATH),$(shell $(CYGPATH) -u "$1"),$1)
 endef
 
 # Command options for embedding fonts and postscript->pdf conversion
@@ -2295,8 +2295,17 @@ endef
 
 # LaTeX invocations
 #
-# $(call latex,<tex file>,[<extra LaTeX args>])
-run-latex	= $(latex_build_program) -interaction=batchmode -file-line-error $(if $2,$2,) $1 > /dev/null
+# Note that we use
+#
+#  -recorder: generates .fls files for things that are input and output
+#  -jobname: to make sure that .fls files are named after the source that created them
+#  -file-line-error: to make sure that we have good line information for error output
+#  -interaction=batchmode: so that we don't stop on errors (we'll parse logs for that)
+#
+# $(call latex,<tex file stem, e.g., $*>,[extra LaTeX args])
+define run-latex
+$(latex_build_program) -jobname='$1' -interaction=batchmode -file-line-error $(if $2,$2,) $1 > /dev/null
+endef
 
 # $(call latex-color-log,<LaTeX stem>)
 latex-color-log	= $(color_tex) $1.log
@@ -2926,7 +2935,7 @@ endif
 %.fmt:	%.tex
 	$(QUIET)$(call echo-build,$<,$@)
 	$(QUIET)\
-	$(call run-latex,$*,-ini -jobname='$*' "&$(latex_build_program) $*.tex\dump"); \
+	$(call run-latex,$*,-ini "&$(latex_build_program) $*.tex\dump"); \
 	fatal=`$(call colorize-latex-errors,$*.log)`; \
 	if [ x"$$fatal" != x"" ]; then \
 		$(ECHO) "$$fatal"; \
@@ -3118,7 +3127,7 @@ endif
 %.$(build_target_extension).1st.make %.d %.aux %.aux.make %.fls: %.tex
 	$(QUIET)$(call echo-build,$<,$*.d $*.$(build_target_extension).1st.make,$(RESTARTS)-1)
 	$(QUIET)\
-	$(call run-latex,$<,-recorder) || $(sh_true); \
+	$(call run-latex,$*,-recorder) || $(sh_true); \
 	$(CP) '$*.log' '$*.$(RESTARTS)-1.log'; \
 	$(call die-on-import-sty,$*.log); \
 	$(call die-on-dot2tex,$*.log); \
