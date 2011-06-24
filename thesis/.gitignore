@@ -12,3 +12,14 @@
 !thesis.bib
 *.lof
 *.lot
+*.bcf
+dataflow.tex
+deadcode.tex
+lamCComp.tex
+lang_fig7_eval.tex
+lang_fig7_syntax.tex
+languages.tex
+mil.tex
+*.run.xml
+thesis.tex
+uncurrying.tex
