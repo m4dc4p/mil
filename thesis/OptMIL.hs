@@ -23,16 +23,19 @@ import Live
 import DeadBlocks
 
 -- From mon5.lhs
---     v <- return w; c  ==>  c       if v == w
---                       ==> [w/v] c  otherwise
---     Bind v (Return w) c  ==> c    if v==w
---                       c  ==> [w/v] c  otherwise
+--   v <- return w; c  
+--        ==>  c       if v == w
+--        ==> [w/v] c  otherwise 
+--
+-- in Hoopl/MIL terms:
+--
+--   Bind v (Return w) <*> c  
+--        ==> c    if v==w
+--        ==> [w/v] c  otherwise
 --
 
 -- | Associates a binding (the key) with the
--- value that should be substituted for it. Only
--- variables that are bound with the form v <- return w
--- end up here.
+-- value that should be substituted for it. 
 type BindFact = Map Name BindVal
 
 -- | Represents the right side of a bind, for possible
@@ -43,15 +46,15 @@ data BindVal = BindReturn Name -- ^ Return a variable with the given name.
              | BindGoto Dest [Name] -- ^ Goto block.
              | BindConstrM Name [Name] -- ^ Create value.
              | BindThunk Dest [Name] -- ^ Monadic thunk
-             -- | BindRun Name -- ^ Run a monadic computatino
-             | BindPrim Name [Name] -- ^ Primitive call with teh given name and arguments.
+             | BindRun Name -- ^ Run a monadic computatino
+             | BindPrim Name [Name] -- ^ Primitive call with the given name and arguments.
   deriving (Eq, Show)
 
 -- | Find "useless" bindings and remove them. Useless bindings 
 -- include:
 --
---   * bindings which return a value (x <- return y)
---   * bindings which are followed by a return.
+--   * bindings which return a value (x <- return y; c ==> [x/y] c)
+--   * bindings which are followed by a return. (x <- y; return x ==> y)
 --
 -- This function really does two separate optimizations (eliminating
 -- tails & removing useless binds) that should be separate.
@@ -86,10 +89,9 @@ bindSubstTransfer = mkFTransfer fw
     fw (Bind v (Goto d ns)) m = Map.insert v (BindGoto d ns) m 
     fw (Bind v (ConstrM c ns)) m = Map.insert v (BindConstrM c ns) m 
     fw (Bind v (Thunk d ns)) m = Map.insert v (BindThunk d ns) m 
-    -- fw (Bind v (Run n)) m = Map.insert v (BindRun n) m 
+    fw (Bind v (Run n)) m = Map.insert v (BindRun n) m 
     fw (Bind v (Prim p vs)) m = Map.insert v (BindPrim p vs) m 
-    fw (Bind _ (Run _)) m = m
-    fw (Bind _ (LitM _)) m = m 
+    fw (Bind v (LitM _)) m = Map.delete v m
     fw (BlockEntry _ _ _) m = m
     fw (CloEntry _ _ _ _) m = m
     fw (CaseM _ alts) m = 
@@ -97,11 +99,12 @@ bindSubstTransfer = mkFTransfer fw
     fw (Done t) m = 
       mkFactBase bindSubstLattice []
 
-
 bindSubstRewrite :: FuelMonad m => FwdRewrite m StmtM BindFact
-bindSubstRewrite = iterFwdRw (mkFRewrite rewrite) -- deep rewriting used
-                                                   -- so all possible
-                                                   -- substitutions occur
+bindSubstRewrite = 
+    -- deep rewriting used
+    -- so all possible
+    -- substitutions occur
+    iterFwdRw (mkFRewrite rewrite) 
   where
     rewrite :: FuelMonad m => forall e x. StmtM e x -> BindFact -> m (Maybe (ProgM e x))
     rewrite (Bind v t) f = bind v (rewriteTail f t)
