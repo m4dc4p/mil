@@ -1,4 +1,6 @@
-> {-# LANGUAGE GADTs #-}
+> {-# LANGUAGE GADTs, RankNTypes, TypeSynonymInstances
+>   , FlexibleInstances, MultiParamTypeClasses, UndecidableInstances
+>   , GeneralizedNewtypeDeriving #-}
 > -- Implements optimization to
 > -- trim bind/return pairs from the
 > -- end of MIL blocks.
@@ -6,6 +8,8 @@
 
 > where
 
+> import Control.Monad.State (State(..), MonadState(..))
+> import Data.Maybe (listToMaybe)
 > import Compiler.Hoopl
 
 > import Util
@@ -52,7 +56,9 @@ final binding of v due to earlier bindings.
 >       | t `uses` v' = Nothing -- Remove our fact if it is used in a tail.
 >       | otherwise = f -- no effect on our fact, just pass it along.
 >     bw (CaseM _ _) _ = Nothing -- Not a valid tail to trim
->     bw (CloEntry _ _ _ _) f = f 
+>     bw (CloEntry _ _ _ _) (Just (_, Nothing)) = Nothing -- Can occur if a used variable is a parameter.
+>     bw (BlockEntry _ _ _) (Just (_, Nothing)) = Nothing
+>     bw (CloEntry _ _ _ _) f = f
 >     bw (BlockEntry _ _ _) f = f
 >     
 >     uses :: TailM -> Name -> Bool
@@ -71,8 +77,37 @@ Our rewrite function will replace the final return with the tail found
 in the facts. It will then eliminate the binding of v by traversing the entire
 block backwards and removing the first possible binding.
 
+> newtype RewriteOnce a = R (State Bool a)
+>   deriving (Monad)
+>
+> instance MonadState s (CheckingFuelMonad RewriteOnce) where
+>   get = undefined
+>   put = undefined
+>
+> type FuelRewriter = CheckingFuelMonad RewriteOnce
+> rewriteTrim :: BwdRewrite FuelRewriter StmtM TrimFact
+> rewriteTrim = mkBRewrite rewriter
+>   where
+>     rewriter :: forall e x. StmtM e x -> Fact x TrimFact -> FuelRewriter (Maybe (ProgM e x))
+>     rewriter (Bind v _) (Just (v', _)) 
+>       | v == v' = do
+>         flag <- get
+>         if not flag
+>          then (do
+>            put True
+>            return $ Just emptyGraph)
+>          else return Nothing
+>     rewriter (Done (Return v)) fs = done (getTail v fs)
+>     rewriter (Bind _ _) _ = return Nothing
+>     rewriter (Done _) _ = return Nothing
+>     rewriter (CaseM _ _) _ = return Nothing
+>     rewriter (BlockEntry _ _ _) _ = return Nothing
+>     rewriter (CloEntry _ _ _ _) _ = return Nothing
+>     
+>     getTail :: Name -> FactBase TrimFact -> Maybe TailM
+>     getTail v fs = listToMaybe [t | Just (v', Just t) <- mapElems fs, 
+>                                                          v' == v]
 
 
-
-  
+ 
 
