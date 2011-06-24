@@ -35,7 +35,7 @@ Most compilers do not generate executable machine code directly from a
 program source file. Rather, the compiler typically implements of
 pipeline of \emph{intermediate languages}. The compiler analyzes and
 optionally transforms (e.g., for optimization) the program during each
-stage of the pipeline .Typically, each intermediate language exposes
+stage of the pipeline. Typically, each intermediate language exposes
 more details about the implementation of the program than the one
 before.
 

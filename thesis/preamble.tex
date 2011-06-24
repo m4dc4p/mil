@@ -23,8 +23,12 @@
 \usepackage{xifthen}
 \usepackage{mathtools}
 \usepackage{xparse}
-\usepackage{natbib}
-\bibliographystyle{plainnat}
+\usepackage[natbib=true,style=authoryear,backend=bibtex8]{biblatex}
+\setlength{\bibitemsep}{\bigskipamount}
+\addbibresource{thesis.bib}
+\usepackage{microtype}
+%%\usepackage{natbib}
+%%\bibliographystyle{plainnat}
 %% \usepackage{listings}
 %% \lstset{escapeinside=!!}
 
@@ -242,7 +246,7 @@
 \newcommand{\standaloneBib}{%%
   \ifthenelse{\boolean{standaloneFlag}}%%
              {\begin{singlespace}
-                 \bibliography{thesis}
+                \printbibliography
              \end{singlespace}}{}}
 
 %% Adds an equation number on demand.

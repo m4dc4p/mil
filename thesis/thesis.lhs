@@ -84,7 +84,7 @@ lattices will be described. }
 \emph{Where we started and where we wished we could have go to.}
 
 \begin{singlespace}
-  \bibliography{thesis}
+  \printbibliography
 \end{singlespace}
 
 \end{document}
