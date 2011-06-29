@@ -1,4 +1,4 @@
-> {-# LANGUAGE GADTs, RankNTypes, TypeFamilies #-}
+> {-# LANGUAGE GADTs, RankNTypes, TypeFamilies, ScopedTypeVariables #-}
 > -- Implements optimization to
 > -- trim bind/return pairs from the
 > -- end of MIL blocks.
@@ -117,32 +117,43 @@ in the facts. It will then eliminate the binding of v by traversing
 the entire block backwards and removing the first possible binding. A
 StateT monad is used to track if we've rewritten anything yet.
 
-> newtype RewriteOnce a = RW { unRw :: SimpleUniqueMonad a }
+> data RewriteOnce s a = RW { unRw :: s -> SimpleUniqueMonad (s, a) }
+> 
+> rBind :: RewriteOnce s a -> (a -> RewriteOnce s b) -> RewriteOnce s b
+> rBind (RW m) f = RW $ \s -> 
+>                  let (s', a) = runSimpleUniqueMonad (m s)
+>                      (RW m') = f a
+>                  in (m' s')
 
-> rBind :: RewriteOnce a -> (a -> RewriteOnce b) -> RewriteOnce b
-> rBind (RW m) f = f $ runSimpleUniqueMonad m
+> evalRw :: s -> RewriteOnce s a -> SimpleUniqueMonad a                      
+> evalRw s (RW m) = do
+>   (_, a) <- m s
+>   return a
 
-> instance Monad RewriteOnce where
+> instance Monad (RewriteOnce s) where
 >   (>>=) = rBind
->   return = RW . return 
+>   return a = RW $ \s -> return (s, a)
 
-> rCheckpoint :: RewriteOnce [Unique]
-> rCheckpoint = RW (return $ runSimpleUniqueMonad (checkpoint))
+> rCheckpoint :: RewriteOnce s (s, [Unique])
+> rCheckpoint = RW $ \s -> do
+>               us <- checkpoint
+>               return (s, (s, us))
 >                     
-> rRestart :: [Unique] -> RewriteOnce ()
-> rRestart us = RW (restart us >> return ())
+> rRestart :: (s, [Unique]) -> RewriteOnce s ()
+> rRestart (s, us) = RW (\_ -> restart us >> return (s, ()))
 
-> instance CheckpointMonad RewriteOnce where
->   type Checkpoint RewriteOnce = [Unique]
+> instance CheckpointMonad (RewriteOnce s) where
+>   type Checkpoint (RewriteOnce s) = (s, Checkpoint SimpleUniqueMonad)
 >   checkpoint = rCheckpoint
 >   restart = rRestart
 
-> trimRewrite :: BwdRewrite (CheckingFuelMonad RewriteOnce) StmtM TrimFact
+> trimRewrite :: BwdRewrite (CheckingFuelMonad (RewriteOnce s)) StmtM TrimFact
 > trimRewrite = mkBRewrite rewriter
 
-> rewriter :: FuelMonad m => forall e x. StmtM e x -> Fact x TrimFact -> m (Maybe (ProgM e x))
+> rewriter :: forall e x s. StmtM e x -> Fact x TrimFact -> CheckingFuelMonad (RewriteOnce s) (Maybe (ProgM e x))
 > rewriter (Bind v t) (Just (v', (Just t'))) 
->   | v == v' && t == t' = return $ Just emptyGraph
+>   | v == v' && t == t' = do
+>       return $ Just emptyGraph
 > rewriter (Done n l (Return v)) fs = done n l (getTail v (fromMaybe Nothing (mapLookup l fs)))
 > rewriter (Bind _ _) fs = return Nothing
 > rewriter (Done _ _ _) _ = return Nothing
@@ -159,7 +170,7 @@ facts that is associated with the returned variable, if any.
 > getTail _ _ = Nothing
 
 > trimTail :: ProgM C C -> ProgM C C
-> trimTail body = runSimpleUniqueMonad $ unRw $ runWithFuel infiniteFuel $ do
+> trimTail body = runSimpleUniqueMonad $ evalRw True $ runWithFuel infiniteFuel $ do
 >     (_, f, _) <- analyzeAndRewriteBwd bwd1 (JustC labels) body initial
 >     (body', _, _) <- analyzeAndRewriteBwd bwd2 (JustC labels) body f
 >     return body'
@@ -177,7 +188,7 @@ facts that is associated with the returned variable, if any.
 > noOpTransfer (CloEntry _ _ _ _) f = f
 > noOpTransfer (BlockEntry _ _ _) f = f
 
-> bwd2 :: BwdPass (CheckingFuelMonad RewriteOnce) StmtM TrimFact                           
+> bwd2 :: BwdPass (CheckingFuelMonad (RewriteOnce s)) StmtM TrimFact                           
 > bwd2 = BwdPass { bp_lattice = trimTailLattice 
 >                , bp_transfer = mkBTransfer noOpTransfer
 >                , bp_rewrite = trimRewrite }

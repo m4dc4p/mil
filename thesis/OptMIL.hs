@@ -21,7 +21,7 @@ import Util
 import MIL
 import Live
 import DeadBlocks
-import TrimTailX
+import TrimTail
 
 -- From mon5.lhs
 --   v <- return w; c  
