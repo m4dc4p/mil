@@ -108,7 +108,7 @@ to take the union of all variables used.
 \restorecolumns
 
 >     live (CaseM v alts) f = Set.insert v (Set.unions (map (setAlt f) alts))
->     live (Done t) f = tailVars t
+>     live (Done _ _ t) f = tailVars t
 
 |setAlt| gathers the variables used in each case alternative, and
 makes sure to remove any variables bound by pattern matching.
@@ -156,7 +156,7 @@ each type of tail expression.
 > addLiveRewriter = mkBRewrite rewrite
 >   where
 >     rewrite :: FuelMonad m => forall e x. StmtM e x -> Fact x LiveFact -> m (Maybe (ProgM e x))
->     rewrite (Done t) f = done (rewriteTail f t)
+>     rewrite (Done n l t) f = done n l (rewriteTail f t)
 >     rewrite (BlockEntry n l args) live 
 >       | live /= Set.fromList args = blockEntry n l (sort (Set.toList live))
 >     rewrite (CaseM n alts) f = _case n (rewriteAlt f) alts

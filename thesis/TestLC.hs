@@ -18,6 +18,7 @@ import OptMIL
 import LCToMIL
 import LCM
 
+progM :: [(Name, Expr)] -> ([Name], ProgM C C) -> IO ()
 progM progs prelude = do
     putStrLn "\n ========= Unoptimized ============"
     printResult progs (map (addLive tops) . map (compile tops prelude) . map (: []) $ progs)
@@ -119,6 +120,20 @@ kleisli = ("kleisli",
            lam "x" $ \x ->
              bindE "v1" (g `app` x) $ \v1 ->
              bindE "v2" (f `app` v1) id)
+
+threeBinds = ("threeBinds",
+              lam "f" $ \f ->
+              lam "g" $ \g ->
+              lam "h" $ \h ->
+                bindE "()" f $ \_ ->
+                bindE "()" g $ \_ -> 
+                bindE "()" h $ \_ -> mkUnit)
+
+printThree = [threeBinds, main]
+  where
+    main = ("main",
+              var "threeBinds" `app` mPrint `app` mPrint `app` mPrint)
+                
 
 lcmTest2 = ("lcmTest2"
            , lam "x" $ \x ->
@@ -230,11 +245,28 @@ factCP2S = [("factCPS"
           ,("main"
            , var "factCPS" `app` var "id")]
 
--- Test that multiple bindings within a block are elminiated correctly.
-multBindTest prog = render . printProgM . deadCode . addLive [] $ runSimple prog
+-- Optimize a hand-writen MIL program.
+milTest :: SimpleUniqueMonad (ProgM C C) -> IO ()
+milTest prog = do
+  let p = runSimpleUniqueMonad prog
+      blocks = map (fst . fst) . allBlocks  
+  putStrLn ("============== Original ================")
+  putStrLn (render . printProgM $ p)
+  putStrLn ("============== Optimized ===============")
+  putStrLn (render . printProgM . mostOpt (blocks p) prelude $ p)
 
-testProg :: UniqueMonad m => m (ProgM C C)
-testProg = do
+
+testTrimTail :: UniqueMonad m => m (ProgM C C)
+testTrimTail = do
+  l1 <- freshLabel
+  return $ mkFirst (BlockEntry "block1" l1 []) <*>
+           mkMiddle (Bind "a" (Run "m")) <*>
+           mkMiddle (Bind "a" (Run "m")) <*>
+           mkMiddle (Bind "b" (Run "m")) <*>
+           mkLast (Done "block1" l1 (Return "a"))
+
+testBindSubst :: UniqueMonad m => m (ProgM C C)
+testBindSubst = do
   -- blockX:
   --  a <- block1(c)
   --  b <- block1(a)
@@ -251,12 +283,13 @@ testProg = do
   -- correctly updated -- oops.
   l1 <- freshLabel 
   l2 <- freshLabel
-  let bl l = BlockEntry "block1" l []
-      bind (v, t) = Bind v (Goto ("block1", l2) [t])
-      done v = Done (Return v)
+  let blockName = "block1"
+      bl l = BlockEntry blockName  l []
+      bind (v, t) = Bind v (Goto (blockName, l2) [t])
+      done n l v = Done n l (Return v)
   return $ mkFirst (bl l1) <*>
          mkMiddles (map bind [("a", "c"), ("b", "a"), ("a", "c")]) <*>
-         mkLast (done "a")
+         mkLast (done blockName l1 "a")
 
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])

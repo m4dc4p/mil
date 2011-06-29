@@ -73,7 +73,9 @@ data StmtM e x where
     -> [Alt TailM] -- Case arms
     -> StmtM O C
       
-  Done :: TailM  -- Finish a block.
+  Done :: Name -- ^ Name of this block
+    -> Label -- ^ Label of this block
+    -> TailM  -- Finish a block.
     -> StmtM O C
 
 -- | TailM concludes a list of statements. Each block ends with a
@@ -114,7 +116,7 @@ printStmtM (CloEntry f _ clos arg) = text f <+> braces (commaSep text clos)
 printStmtM (CaseM v alts) = hang (text "case" <+> text v <+> text "of") 2 (vcat' $ map printAlt alts)
   where
     printAlt (Alt cons vs tailM) = text cons <+> hsep (texts vs) <+> text "->" <+> printTailM tailM
-printStmtM (Done t) = printTailM t
+printStmtM (Done _ _ t) = printTailM t
 
 printTailM :: TailM -> Doc
 printTailM (Return n) = text "return" <+> text n
@@ -144,7 +146,7 @@ instance NonLocal StmtM where
                         
 stmtSuccessors :: StmtM e C -> [Label]
 stmtSuccessors (CaseM _ alts) = [l | (Alt _ _ (Goto (_, l) _)) <- alts]
-stmtSuccessors (Done (Goto (_, l) _)) = [l]
+stmtSuccessors (Done _ _ (Goto (_, l) _)) = [l]
 stmtSuccessors _ = []
 
 tailSuccessors :: TailM -> [Dest]
@@ -232,8 +234,8 @@ allSuccessors prog =
       | otherwise = allSucc ds s
 
 -- | Create a Done statement if a Tail is given.
-done :: FuelMonad m => Maybe TailM -> m (Maybe (ProgM O C))
-done = return . maybe Nothing (Just . mkLast . Done)
+done :: Monad m => Name -> Label -> Maybe TailM -> m (Maybe (ProgM O C))
+done n l = return . maybe Nothing (Just . mkLast . Done n l)
 
 -- | Create a Bind statement if a Tail is given.
 bind :: FuelMonad m => Name -> Maybe TailM -> m (Maybe (ProgM O O))
@@ -293,11 +295,26 @@ binPrim name = do
   c1Label <- freshLabel
   let bodyName = name ++ "Body" 
       body = mkFirst (BlockEntry bodyName bodyLabel ["a", "b"]) <*>
-             mkLast (Done $ Prim name ["a", "b"])
+             mkLast (Done bodyName bodyLabel $ Prim name ["a", "b"])
       c2Name = name ++ "Clo2"
       c2 = mkFirst (CloEntry c2Name c2Label ["a"] "b") <*>
-           mkLast (Done $ Goto (bodyName, bodyLabel) ["a", "b"])
+           mkLast (Done c2Name c2Label $ Goto (bodyName, bodyLabel) ["a", "b"])
       c1 = mkFirst (CloEntry name c1Label [] "a") <*>
-           mkLast (Done $ Closure (c2Name, c2Label) ["a"])
+           mkLast (Done name c1Label $ Closure (c2Name, c2Label) ["a"])
   return (c1 |*><*| c2 |*><*| body)
+
+-- | Doesn't carry any useful information,
+-- used by our rewriter since it calculates no
+-- new facts.
+type EmptyFact = ()
+
+-- A no-op transfer function. Used during rewrite since we 
+-- don't gather any new facts.
+noOpTrans :: StmtM e x -> Fact x EmptyFact -> EmptyFact
+noOpTrans _ _ = ()
+
+emptyLattice :: DataflowLattice EmptyFact
+emptyLattice = DataflowLattice { fact_name = "Empty fact"
+                               , fact_bot = ()
+                               , fact_join = \ _ _ _ -> (NoChange, ()) }
 

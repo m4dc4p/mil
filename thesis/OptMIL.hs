@@ -21,6 +21,7 @@ import Util
 import MIL
 import Live
 import DeadBlocks
+import TrimTailX
 
 -- From mon5.lhs
 --   v <- return w; c  
@@ -96,7 +97,7 @@ bindSubstTransfer = mkFTransfer fw
     fw (CloEntry _ _ _ _) m = m
     fw (CaseM _ alts) m = 
       mkFactBase bindSubstLattice []
-    fw (Done t) m = 
+    fw (Done _ _ t) m = 
       mkFactBase bindSubstLattice []
 
 bindSubstRewrite :: FuelMonad m => FwdRewrite m StmtM BindFact
@@ -115,7 +116,7 @@ bindSubstRewrite =
           replaceAlt f (Alt c ns t) 
             | anyNamesIn f ns = Just $ substNames f ns (\ns -> Alt c ns t)
             | otherwise = maybe Nothing (Just . Alt c ns) (rewriteTail f t)
-    rewrite (Done t) f = done (rewriteTail f t)
+    rewrite (Done n l t) f = done n l (rewriteTail f t)
     rewrite _ _ = return Nothing
 
     rewriteTail :: BindFact -> TailM -> Maybe TailM
@@ -232,8 +233,8 @@ collapse body = runSimple $ do
     destOf body l = case blockOfLabel body l of
                    Just (_,  block) ->
                      case blockToNodeList' block of
-                       (JustC (CloEntry {}), [], JustC (Done (Goto d _))) -> Just (l, Jump d)
-                       (JustC (CloEntry _ _ _ arg), [], JustC (Done (Closure d args))) -> Just (l, Capture d (arg `elemIndex` args))
+                       (JustC (CloEntry {}), [], JustC (Done _ _ (Goto d _))) -> Just (l, Jump d)
+                       (JustC (CloEntry _ _ _ arg), [], JustC (Done _ _ (Closure d args))) -> Just (l, Capture d (arg `elemIndex` args))
                        _ -> Nothing
                    _ -> Nothing
     fwd = FwdPass { fp_lattice = collapseLattice
@@ -247,7 +248,7 @@ collapseTransfer = mkFTransfer fw
     fw (Bind v (Closure dest args)) bound = Map.insert v (PElem (CloVal dest args)) bound
     fw (Bind v _) bound = Map.insert v Top bound
     fw s@(CaseM _ alts) bound = mkFactBase collapseLattice (zip (stmtSuccessors s) (repeat bound))
-    fw s@(Done _) bound = mkFactBase collapseLattice  (zip (stmtSuccessors s) (repeat bound))
+    fw s@(Done _ _ _) bound = mkFactBase collapseLattice  (zip (stmtSuccessors s) (repeat bound))
     fw (BlockEntry _ _ _) f = f
     fw (CloEntry _ _ _ _) f = f
     
@@ -255,7 +256,7 @@ collapseRewrite :: FuelMonad m => Map Label DestOf -> FwdRewrite m StmtM Collaps
 collapseRewrite blocks = iterFwdRw (mkFRewrite rewriter)
   where
     rewriter :: FuelMonad m => forall e x. StmtM e x -> CollapseFact -> m (Maybe (ProgM e x))
-    rewriter (Done (Enter f x)) col = done (collapse col f x)
+    rewriter (Done n l (Enter f x)) col = done n l (collapse col f x)
     rewriter (Bind v (Enter f x)) col = bind v (collapse col f x)
     rewriter _ _ = return Nothing
 
@@ -328,7 +329,7 @@ inlineBlocks tops body =
     labels = entryLabels body
     initial = mkFactBase (bp_lattice bwd) (zip labels (repeat Nothing))
     bwd = BwdPass { bp_lattice = inlineLattice
-                  , bp_transfer = inlineTransfer preds body
+                  , bp_transfer = inlineTransfer preds 
                   , bp_rewrite = inlineRewrite preds body }
 
 
@@ -340,8 +341,8 @@ inlineLattice = DataflowLattice { fact_name = "Inline blocks"
     extend _ (OldFact old) (NewFact new) = (changeIf (old /= new)
                                            , new)
 
-inlineTransfer :: BlockPredecessors -> ProgM C C -> BwdTransfer StmtM InlineFact
-inlineTransfer preds prog = mkBTransfer bw
+inlineTransfer :: BlockPredecessors -> BwdTransfer StmtM InlineFact
+inlineTransfer preds = mkBTransfer bw
   where
     -- Find blocks which are the sole predecessor to another
     -- block. 
@@ -349,7 +350,7 @@ inlineTransfer preds prog = mkBTransfer bw
     bw (Bind v (Goto dest vs)) f = singlePred preds dest f 
     bw (Bind {}) f = f
     bw (CaseM {}) _ = Just False
-    bw (Done (Goto dest _)) f = Nothing -- singlePred preds dest Nothing -- not yet implemented
+    bw (Done _ _ (Goto dest _)) f = Nothing -- singlePred preds dest Nothing
     bw (Done {}) _ = Nothing
     bw (CloEntry {}) f = f
     bw (BlockEntry {}) f = f
@@ -364,7 +365,7 @@ inlineRewrite preds prog = mkBRewrite rewriter
   where
     rewriter :: FuelMonad m => forall e x. StmtM e x -> Fact x InlineFact -> m (Maybe (ProgM e x))
     rewriter (Bind v (Goto dest vs)) (Just True) = return (inlineBind v dest vs)
-    rewriter (Done (Goto dest vs)) _ = 
+    rewriter (Done _ _ (Goto dest vs)) _ = 
       case singlePred preds dest Nothing of
         Just True -> return (inlineDone dest vs)
         _ -> return Nothing
@@ -394,7 +395,7 @@ inlineRewrite preds prog = mkBRewrite rewriter
             | otherwise = (env, newProg)
             where
               newProg = prog <*> mkMiddle (Bind v (changeTail env tail))
-          rename (Done tail) (env, prog) = (env, prog <*> mkMiddle (Bind result (changeTail env tail)))
+          rename (Done _ _ tail) (env, prog) = (env, prog <*> mkMiddle (Bind result (changeTail env tail)))
           changeTail :: Map Name Name -> TailM -> TailM
           changeTail env (Return n) = Return (changeVar env n)
           changeTail env (Enter f x) = Enter (changeVar env f) (changeVar env x)
@@ -426,11 +427,6 @@ type ReturnPrimBlocks = Map Dest ReturnType
 -- | Used during analysis - indicates if
 -- a block can be inlined like we want.
 type ReturnPrimBlock = Maybe ReturnType
-
--- | Doesn't carry any useful information,
--- used by our rewriter since it calculates no
--- new facts.
-type EmptyFact = ()
 
 -- | Used to indicate what kind of instruction can be inlined
 -- from a block. 
@@ -476,17 +472,13 @@ inlineReturn body =
                                       , fact_bot = Nothing
                                       , fact_join = extend }
     extend _ (OldFact old) (NewFact new) = (changeIf (old /= new), new)
-    -- A no-op transfer function. Used during rewrite since we 
-    -- don't gather any new facts.
-    noOpTrans :: StmtM e x -> Fact x EmptyFact -> EmptyFact
-    noOpTrans _ _ = ()
 
 inlineReturnTransfer :: BwdTransfer StmtM ReturnPrimBlock
 inlineReturnTransfer = mkBTransfer bw
   where
     bw :: StmtM e x -> Fact x ReturnPrimBlock -> ReturnPrimBlock
-    bw (Done (Return v)) f = Just (AReturn v (-1))
-    bw (Done (Prim p vs)) f = Just (APrim p vs [])
+    bw (Done _ _ (Return v)) f = Just (AReturn v (-1))
+    bw (Done _ _ (Prim p vs)) f = Just (APrim p vs [])
     bw (BlockEntry name lab args) (Just (AReturn v _)) =
       case v `elemIndex` args of
         Just idx -> Just (AReturn v idx)
@@ -503,9 +495,9 @@ inlineReturnRewrite blocks = iterBwdRw (mkBRewrite rewriter)
       case dest `Map.lookup` blocks of
         Just at -> return (Just (mkMiddle (Bind v (newTail at vs))))
         _ -> return Nothing
-    rewriter (Done (Goto dest@(_, l) vs)) _ =
+    rewriter (Done n label (Goto dest@(_, l) vs)) _ =
       case dest `Map.lookup` blocks of
-        Just at -> return (Just (mkLast (Done (newTail at vs))))
+        Just at -> return (Just (mkLast (Done n label (newTail at vs))))
         _ -> return Nothing
     rewriter _ _ = return Nothing
 
@@ -522,6 +514,7 @@ inlineSimple tops = deadCode . bindSubst . inlineReturn
 
 mostOpt :: [Name] -> ([Name], ProgM C C) -> ProgM C C -> ProgM C C
 mostOpt userTops prelude@(prims, _) body = addLive tops .
+    trimTail .
     newTops deadBlocks . 
     inlineBlocks tops . 
     newTops deadBlocks .  

@@ -144,7 +144,7 @@ postTransfer early used = mkFTransfer fw
           (labels, posts) = unzip . catMaybes $ map altT alts
           fact = PP (Set.empty, intersections posts)
       in mapFromList (zip labels (repeat fact))
-    fw (Done t) (PP (use, post)) = 
+    fw (Done _ _ t) (PP (use, post)) = 
       let (labels, facts) = unzip $ maybeToList (tailSucc t post)
       in mapFromList (zip labels (map (\f -> PP (Set.empty, f)) facts))
 
@@ -219,7 +219,7 @@ availTransfer ant = mkFTransfer fw
           (labels, avails) = unzip . catMaybes $ map altT alts
           fact = AV (kill, intersections avails)
       in mapFromList (zip labels (repeat fact))
-    fw (Done t) av = mapFromList . maybeToList $ tailSucc t av
+    fw (Done _ _ t) av = mapFromList . maybeToList $ tailSucc t av
                      
     mkInitial :: Dest -> AvailFact -> AvailFact
     mkInitial (n, l) (AV (k, avIn)) = 
@@ -287,7 +287,7 @@ antTransfer = mkBTransfer anticipate
     anticipate (Bind v t) f = kill v (use t f)
     anticipate (BlockEntry _ _ args) f = mkAnticipated f args
     anticipate (CloEntry _ _ args arg) f = mkAnticipated f (args++[arg])
-    anticipate (Done t) f = use t (fromSucc t f)
+    anticipate (Done _ _ t) f = use t (fromSucc t f)
     anticipate (CaseM v alts) f =
       let antAlt (Alt _ vs t) = kills (use t (fromSucc t f)) vs
       in intersectFacts (map antAlt alts)

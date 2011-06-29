@@ -50,7 +50,7 @@ accumulated set untouched.
 >                                     `Set.union` liveBlocks
 >     live (CaseM _ alts) liveBlocks = Set.unions (map (Set.fromList . tailDest . altE) 
 >                                                  alts ++ mapElems liveBlocks)
->     live (Done tail) liveBlocks =  Set.unions (Set.fromList (tailDest tail) : 
+>     live (Done _ _ tail) liveBlocks =  Set.unions (Set.fromList (tailDest tail) : 
 >                                                mapElems liveBlocks)
 >     live (BlockEntry _ l _) liveBlocks = liveBlocks
 >     live (CloEntry _ l _ _) liveBlocks = liveBlocks

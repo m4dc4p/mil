@@ -80,11 +80,11 @@ compileM tops labelSeed def =
     newDefn :: Name -> Expr -> CompM ()
     newDefn name (ELam v _ b) = do
       let fvs = v `delete` free b \\ tops
-      prog <- compileStmtM b (return . mkLast . Done)
-      cloDefn name v fvs prog >> return ()
+      cloDefn name v fvs (\n l -> compileStmtM b (return . mkLast . Done n l)) 
+      return ()
     newDefn name body = do
-      prog <- compileStmtM body (return . mkLast . Done)
-      blockDefn name [] prog >> return ()
+      blockDefn name [] (\n l -> compileStmtM body (return . mkLast . Done n l))
+      return ()
 
 compileStmtM :: Expr 
   -> (TailM -> CompM (ProgM O C))
@@ -93,8 +93,7 @@ compileStmtM :: Expr
 compileStmtM (EVar v) ctx 
   = ctx (Return v) `unlessMonad` ctx (Run v)
 
-compileStmtM (EPrim _ _) _ 
-  = error "EPrim in compileStmtM."
+compileStmtM (EPrim p _) ctx = error "EPrim not implemented."
 
 compileStmtM (ELit (Lit n _)) ctx
   = ctx (LitM n)
@@ -109,9 +108,8 @@ compileStmtM e@(ELam v _ b) ctx = do
   tops <- gets compT
   let fvs = free e \\ tops
   f <- do
-    prog <- compileStmtM b (return . mkLast . Done)
     name <- newTop "absBody"
-    cloDefn name v fvs prog 
+    cloDefn name v fvs (\n l -> compileStmtM b (return . mkLast . Done n l))
   ctx (Closure f fvs)
 
 compileStmtM (ELet _ _) _ 
@@ -122,15 +120,15 @@ compileStmtM (ECase e lcAlts) ctx = do
       altMonadic = any isMonadic (map altE alts)
   pushWhen altMonadic
   r <- fresh "result"
-  f <- ctx (Return r) >>= callDefn "caseJoin" 
+  f <- ctx (Return r) >>= \rest -> callDefn "caseJoin" (\n l -> return rest)
   let compAlt (Alt cons vs body) = do
-        body' <- compileStmtM body (mkBind r f) >>= callDefn ("altBody" ++ cons)
+        body' <- callDefn ("altBody" ++ cons) (\n l -> compileStmtM body (mkBind n l r f))
         return (Alt cons vs body')
   altsM <- mapM compAlt alts
   popWhen altMonadic
   compVarM e $ \v -> return (mkLast (CaseM v altsM))
   where
-    callDefn :: String -> ProgM O C -> CompM TailM
+    callDefn :: String -> (Name -> Label -> CompM (ProgM O C)) -> CompM TailM
     callDefn name body = do 
       f <- newTop name
       dest <- blockDefn f [] body
@@ -146,10 +144,8 @@ compileStmtM (EFatbar _ _) _
 
 compileStmtM (EBind v _ b r) ctx = do
   rest <- compileStmtM r ctx
-  compileStmtM b $ \body -> do
-    t <- fresh "t"
-    return (mkMiddle (t `Bind` body) <*> 
-            mkMiddle (v `Bind` (Run t)) <*> 
+  compVarM b $ \body -> do
+    return (mkMiddle (v `Bind` (Run body)) <*> 
             rest)
 
 primDefn :: Name 
@@ -157,11 +153,11 @@ primDefn :: Name
          -> (Name -> CompM (ProgM O C)) 
          -> CompM (ProgM O C)
 primDefn p 1 ctx = do 
-  dest <- blockDefn p [] (mkLast . Done $ Prim p [])
+  dest <- blockDefn p [] (\n l -> return . mkLast . Done n l $ Prim p [])
   ctx p
 primDefn p n ctx = do
   let vs = take (n - 1) $ zipWith (++) (repeat "e") (map show [1..])
-  dest <- blockDefn p vs (mkLast . Done $ Prim p vs)
+  dest <- blockDefn p vs (\n l -> return . mkLast . Done n l $ Prim p vs)
   ctx p
 
   
@@ -177,7 +173,8 @@ compVarM e ctx = compileStmtM e $ \t -> do
   rest <- ctx v
   return (mkMiddle (v `Bind` t) <*> rest)
 
-mkBind r f t = return (mkMiddle (Bind r t) <*> mkLast (Done f))
+mkBind :: Name -> Label -> Name -> TailM -> TailM -> CompM (ProgM O C)
+mkBind n l r f t = return (mkMiddle (Bind r t) <*> mkLast (Done n l f))
 
 free :: Expr -> Free
 free = nub . free'
@@ -219,28 +216,35 @@ newTop name = do
   return f
 
 -- | Add a new block.
-blockDefn :: Name -> [Name] -> ProgM O C -> CompM Dest
+blockDefn :: Name -> [Name] -> (Name -> Label -> CompM (ProgM O C)) -> CompM Dest
 blockDefn name args progM = withNewLabel $ \l -> do
-  addProg (mkFirst (BlockEntry name l args) <*> progM)
+  rest <- progM name l
+  addProg (mkFirst (BlockEntry name l args) <*> rest)
   return (name, l)
   
 -- | Add a new closure-capturing block.
-cloDefn :: Name -> Name -> [Name] -> ProgM O C -> CompM Dest
-cloDefn name arg clos progM 
-  | not (isCapture progM) = withNewLabel $ \l -> do
-                          let args = clos ++ [arg]
-                          dest <- blockDefn ("block" ++ name) args progM
-                          addProg (mkFirst (CloEntry name l clos arg) <*>
-                                   mkLast (Done (Goto dest args)))
-                          return (name, l)
-  | otherwise = withNewLabel $ \l -> do
-                  addProg (mkFirst (CloEntry name l clos arg) <*> progM)
-                  return (name, l)
+cloDefn :: Name -> Name -> [Name] -> (Name -> Label -> CompM (ProgM O C)) -> CompM Dest
+cloDefn name arg clos progM = do
+    withNewLabel $ \t -> do
+      progTemp <- progM "foo" t
+      if isCapture progTemp
+       then captureDefn
+       else nonCaptureDefn
   where
+    captureDefn = withNewLabel $ \l -> do
+      let args = clos ++ [arg]
+      dest <- blockDefn ("block" ++ name) args progM
+      addProg (mkFirst (CloEntry name l clos arg) <*>
+               mkLast (Done name l (Goto dest args)))
+      return (name, l)
+    nonCaptureDefn = withNewLabel $ \l -> do
+      rest <- progM name l
+      addProg (mkFirst (CloEntry name l clos arg) <*> rest)
+      return (name, l)
     isCapture :: ProgM O C -> Bool
     isCapture (GMany (JustO block) _ _ ) = 
       case blockToNodeList' block of
-        (_, [], (JustC (Done (Closure _ _)))) -> True
+        (_, [], (JustC (Done _ _ (Closure _ _)))) -> True
         _ -> False
 
 -- | Add a program (C C block) to the list of blocks
