@@ -1,60 +1,97 @@
-> {-# LANGUAGE GADTs, RankNTypes, TypeSynonymInstances
->   , FlexibleInstances, MultiParamTypeClasses, UndecidableInstances
->   , GeneralizedNewtypeDeriving, ScopedTypeVariables #-}
+> {-# LANGUAGE GADTs, RankNTypes, TypeFamilies #-}
 > -- Implements optimization to
 > -- trim bind/return pairs from the
 > -- end of MIL blocks.
-> module TrimTail
+> module TrimTail 
 
 > where
 
-> import Control.Monad.State (State(..), MonadState(..))
-> import Data.Maybe (listToMaybe)
+> import Control.Monad.State (StateT, State(..), MonadState(..), evalStateT)
+> import Data.Maybe (listToMaybe, fromMaybe)
 > import Compiler.Hoopl
+> import Debug.Trace
 
 > import Util
 > import MIL
 
 This is a backwards analysis. We start at the end of a block and, when
-it is a return, we determine if that value has two properties:
+it is a return, we determine if that value has three properties:
 
   * It is not a parameter (i.e., bound locally)
   * It is not used before being bound.
+  * No monadic actions occur in-between "return" and "bind" for the
+    variable.
 
 In other words, we determine if the variable is used by any other
-statement besides the final "return" while it is live. If not, we know
-we can safely eliminate the binding and rewrite the return with the
-original tail from the binding.
+statement besides the final "return" while it is live. We also need to
+ensure that no monadic action occurs after the original "invoke". In
+that case, even though the result is not used, the side-effect of WHEN
+it occurs must be preserved. If neither is true, we know we can safely
+eliminate the binding and rewrite the return with the original tail
+from the binding.
 
-Our fact is then two pieces of information:
+Our fact is three pieces of information:
 
   * The variable is used in a return.
-  * The variable is not used anywhere else before being bound.
+  * The variable is not used anywhere else after being bound.
+  * No intervening monadic action occurs afer the variable is bound and
+    before it is returned.
+
+The third piece of information is represented by its absence: we will
+not rewrite a block where it is not true. Therefore, we reprent our
+fact using a Maybe value. If no variable exists that can be rewritten,
+our fact will be Nothing. Otherwise, it will contain a name and a tail
+expression. The tail expression will be "filled in" when the transfer
+function finds the variable's binding. If the binding is never found,
+the variable is a parameter. In that case, the fact reverts to
+Nothing.
 
 > type TrimFact = Maybe (Name, Maybe TailM)
 
+The lattice defined for our facts is simple: 
+
+  * Our bottom element is Nothing 
+  * Facts from successor blocks do not affect predecessors (i.e., we
+    have a trivial meet operator).
+
+> trimTailLattice :: DataflowLattice TrimFact
+> trimTailLattice = DataflowLattice { fact_name = "Trim bind/return tails"
+>                                       , fact_bot = Nothing
+>                                       , fact_join = extend }
+>   where
+>     extend _ (OldFact o) (NewFact n) = (changeIf (o /= n), n)
+
 Our transfer function has a couple of cases:
 
-  return v ==> Add v to facts.
-  bind v t ==> Associate t with v; mark it.
-  bind x t, where v appears in t and v is not "marked" ==> Delete v from 
-    our facts.
+  return v ==> Create our fact (Just v, Nothing). We have found a variable.
+  bind x m, where m is monadic ==> Set our fact back to Nothing. Sequences of
+    monadic action must be preserved. We cannot rewrite if a mondic
+    action happens in between "bind v" and "return v".
+  bind v t ==> Create our fact (Just v, Just t); this "marks" our fact and we won't delete it.
+  bind x t, where v appears in t and v is not "marked" ==> Set our fact to Nothing again;
+    the returned variable is used after being bound.
+  block/closure entry, where our fact is (Just v, Nothing) ==> Set our fact
+    to Nothing again. The returned variable is a parameter (i.e., no binding was
+    found in the block).
 
 In the second case, we "mark" v to indicate we found its binding and
 there was no intervening use. It's possible that v is boudn multiple
 times in the same block; we could miss the opportunity to rewrite the
 final binding of v due to earlier bindings.
 
-> transferTrim :: BwdTransfer StmtM TrimFact
-> transferTrim = mkBTransfer bw
+> trimTransfer :: BwdTransfer StmtM TrimFact
+> trimTransfer = mkBTransfer bw
 >   where
 >     bw :: StmtM e x -> Fact x TrimFact -> TrimFact
->     bw (Done (Return n)) f = Just (n, Nothing)
+>     bw (Done _ _ (Return n)) f = Just (n, Nothing)
 >     bw (Bind _ _) f@(Just (_, Just _)) = f -- We've already marked our fact, pass it along.
 >     bw (Bind v t) f@(Just (v', Nothing))
 >       | v == v' = Just (v, Just t) -- "mark" that v' is a valid fact; capture the tail.
 >       | t `uses` v' = Nothing -- Remove our fact if it is used in a tail.
->       | otherwise = f -- no effect on our fact, just pass it along.
+>       | visibleSideEffect t = Nothing -- Remove our fact, some intervening monadic action occurred.
+>       | otherwise = f
+>     bw (Bind _ _) _ = Nothing 
+>     bw (Done _ _ _) f = Nothing
 >     bw (CaseM _ _) _ = Nothing -- Not a valid tail to trim
 >     bw (CloEntry _ _ _ _) (Just (_, Nothing)) = Nothing -- Can occur if a used variable is a parameter.
 >     bw (BlockEntry _ _ _) (Just (_, Nothing)) = Nothing
@@ -70,39 +107,77 @@ final binding of v due to earlier bindings.
 >     uses (Run f) v = f == v
 >     uses (Prim _ vs) v = v `elem` vs
 >     uses _ _ = False
-
-Marking can also copy t to the facts so we can use to rewrite.
+>    
+>     visibleSideEffect :: TailM -> Bool
+>     visibleSideEffect (Run {}) = True
+>     visibleSideEffect _ = False
 
 Our rewrite function will replace the final return with the tail found
-in the facts. It will then eliminate the binding of v by traversing the entire
-block backwards and removing the first possible binding.
+in the facts. It will then eliminate the binding of v by traversing
+the entire block backwards and removing the first possible binding. A
+StateT monad is used to track if we've rewritten anything yet.
 
-> type RewriteOnce = CheckingFuelMonad (State Bool)
->
-> rewriteTrim :: BwdRewrite RewriteOnce StmtM TrimFact
-> rewriteTrim = mkBRewrite rewriter
+> newtype RewriteOnce a = RW { unRw :: SimpleUniqueMonad a }
+
+> rBind :: RewriteOnce a -> (a -> RewriteOnce b) -> RewriteOnce b
+> rBind (RW m) f = f $ runSimpleUniqueMonad m
+
+> instance Monad RewriteOnce where
+>   (>>=) = rBind
+>   return = RW . return 
+
+> rCheckpoint :: RewriteOnce [Unique]
+> rCheckpoint = RW (return $ runSimpleUniqueMonad (checkpoint))
+>                     
+> rRestart :: [Unique] -> RewriteOnce ()
+> rRestart us = RW (restart us >> return ())
+
+> instance CheckpointMonad RewriteOnce where
+>   type Checkpoint RewriteOnce = [Unique]
+>   checkpoint = rCheckpoint
+>   restart = rRestart
+
+> trimRewrite :: BwdRewrite (CheckingFuelMonad RewriteOnce) StmtM TrimFact
+> trimRewrite = mkBRewrite rewriter
+
+> rewriter :: FuelMonad m => forall e x. StmtM e x -> Fact x TrimFact -> m (Maybe (ProgM e x))
+> rewriter (Bind v t) (Just (v', (Just t'))) 
+>   | v == v' && t == t' = return $ Just emptyGraph
+> rewriter (Done n l (Return v)) fs = done n l (getTail v (fromMaybe Nothing (mapLookup l fs)))
+> rewriter (Bind _ _) fs = return Nothing
+> rewriter (Done _ _ _) _ = return Nothing
+> rewriter (CaseM _ _) _ = return Nothing
+> rewriter (BlockEntry _ _ _) _ = return Nothing
+> rewriter (CloEntry _ _ _ _) _ = return Nothing
+
+We look for a Return to rewrite by finding the tail in our incoming
+facts that is associated with the returned variable, if any. 
+
+> getTail :: Name -> TrimFact -> Maybe TailM
+> getTail v (Just (v', Just t))
+>   | v == v' = Just t
+> getTail _ _ = Nothing
+
+> trimTail :: ProgM C C -> ProgM C C
+> trimTail body = runSimpleUniqueMonad $ unRw $ runWithFuel infiniteFuel $ do
+>     (_, f, _) <- analyzeAndRewriteBwd bwd1 (JustC labels) body initial
+>     (body', _, _) <- analyzeAndRewriteBwd bwd2 (JustC labels) body f
+>     return body'
 >   where
->     rewriter :: forall e x. StmtM e x -> Fact x TrimFact -> RewriteOnce (Maybe (ProgM e x))
->     rewriter (Bind v _) (Just (v', _)) 
->       | v == v' = let x :: State Bool (Maybe (ProgM e x))
->                       x = get >>= \flag -> return $ Just emptyGraph
->                 in undefined
+>     labels = entryLabels body
+>     initial = mkFactBase (bp_lattice bwd1) (zip labels (repeat Nothing))
+>     bwd1 = BwdPass { bp_lattice = trimTailLattice 
+>                   , bp_transfer = trimTransfer 
+>                   , bp_rewrite = noBwdRewrite }
 
--- >     rewriter (Done (Return v)) fs = done (getTail v fs)
--- >     rewriter (Bind _ _) _ = return Nothing
--- >     rewriter (Done _) _ = return Nothing
--- >     rewriter (CaseM _ _) _ = return Nothing
--- >     rewriter (BlockEntry _ _ _) _ = return Nothing
--- >     rewriter (CloEntry _ _ _ _) _ = return Nothing
+> noOpTransfer :: StmtM e x -> Fact x TrimFact -> TrimFact
+> noOpTransfer (Bind _ _) f = f
+> noOpTransfer (Done _ l _) fs = fromMaybe Nothing (mapLookup l fs)
+> noOpTransfer (CaseM _ _) f = Nothing
+> noOpTransfer (CloEntry _ _ _ _) f = f
+> noOpTransfer (BlockEntry _ _ _) f = f
 
->     getTail :: Name -> FactBase TrimFact -> Maybe TailM
->     getTail v fs = listToMaybe [t | Just (v', Just t) <- mapElems fs, 
->                                                          v' == v]
-
-
-> checkFuel :: RewriteOnce a -> RewriteOnce ()
-> checkFuel = return $ do
->   flag <- get
->   return ()
- 
-
+> bwd2 :: BwdPass (CheckingFuelMonad RewriteOnce) StmtM TrimFact                           
+> bwd2 = BwdPass { bp_lattice = trimTailLattice 
+>                , bp_transfer = mkBTransfer noOpTransfer
+>                , bp_rewrite = trimRewrite }
