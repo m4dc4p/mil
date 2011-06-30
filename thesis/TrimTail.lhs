@@ -56,8 +56,8 @@ The lattice defined for our facts is simple:
 
 > trimTailLattice :: DataflowLattice TrimFact
 > trimTailLattice = DataflowLattice { fact_name = "Trim bind/return tails"
->                                       , fact_bot = Nothing
->                                       , fact_join = extend }
+>                                   , fact_bot = Nothing
+>                                   , fact_join = extend }
 >   where
 >     extend _ (OldFact o) (NewFact n) = (changeIf (o /= n), n)
 
@@ -147,48 +147,69 @@ StateT monad is used to track if we've rewritten anything yet.
 >   checkpoint = rCheckpoint
 >   restart = rRestart
 
-> trimRewrite :: BwdRewrite (CheckingFuelMonad (RewriteOnce s)) StmtM TrimFact
+> -- trimRewrite :: BwdRewrite (CheckingFuelMonad (RewriteOnce s)) StmtM TrimFact
+> trimRewrite :: BwdRewrite SimpleFuelMonad StmtM Trimmed
 > trimRewrite = mkBRewrite rewriter
 
-> rewriter :: forall e x s. StmtM e x -> Fact x TrimFact -> CheckingFuelMonad (RewriteOnce s) (Maybe (ProgM e x))
-> rewriter (Bind v t) (Just (v', (Just t'))) 
->   | v == v' && t == t' = do
->       return $ Just emptyGraph
-> rewriter (Done n l (Return v)) fs = done n l (getTail v (fromMaybe Nothing (mapLookup l fs)))
+> rewriter :: FuelMonad m => forall e x. StmtM e x -> Fact x Trimmed -> m (Maybe (ProgM e x))
+> rewriter (Bind v t) (ReplaceBind, Just (v', (Just t'))) 
+>   | v == v' && t == t' = return $ Just emptyGraph
+>   | otherwise = return Nothing
+> rewriter (Done n l (Return v)) fs = 
+>   case fromMaybe (End, Nothing) (mapLookup l fs) of
+>     (ReplaceDone, Just (v', Just t')) -> done n l (Just t')
+>     _ -> return Nothing
 > rewriter (Bind _ _) fs = return Nothing
 > rewriter (Done _ _ _) _ = return Nothing
 > rewriter (CaseM _ _) _ = return Nothing
 > rewriter (BlockEntry _ _ _) _ = return Nothing
 > rewriter (CloEntry _ _ _ _) _ = return Nothing
 
-We look for a Return to rewrite by finding the tail in our incoming
-facts that is associated with the returned variable, if any. 
+> type Trimmed = (TrimState, TrimFact)
+> data TrimState = Begin | ReplaceDone | ReplaceBind | End
+>   deriving (Eq, Show)
 
-> getTail :: Name -> TrimFact -> Maybe TailM
-> getTail v (Just (v', Just t))
->   | v == v' = Just t
-> getTail _ _ = Nothing
+> trimmedTransfer :: StmtM e x -> Fact x Trimmed -> Trimmed
+> trimmedTransfer (Bind v t) f@(ReplaceBind, Just (v', Just t'))
+>   | v == v' && t == t' = (End, Nothing)
+>   | otherwise = f
+> trimmedTransfer (Bind _ _) f = f
+> trimmedTransfer (Done _ l t) fs = 
+>   case fromMaybe (Begin, Nothing) (mapLookup l fs) of
+>     (Begin, f@(Just (_, Just t')))
+>       | t /= t' -> (ReplaceDone, f) -- haven't replaced tail yet
+>     (ReplaceDone, f) -> (ReplaceBind, f)
+>     (ReplaceBind, f) -> (End, Nothing)
+>     _ -> (End, Nothing)
+> trimmedTransfer (CaseM _ _) fs = (End, Nothing)
+> trimmedTransfer (CloEntry _ _ _ _) f = f
+> trimmedTransfer (BlockEntry _ _ _) f = f
+
+> trimmedLattice :: DataflowLattice Trimmed
+> trimmedLattice = DataflowLattice { fact_name = "Trimmed bind/return tails"
+>                                  , fact_bot = (Begin, Nothing)
+>                                  , fact_join = extend }
+>   where
+>     extend _ (OldFact o) (NewFact n) = (changeIf (o /= n), n)
+
+> -- bwd2 :: BwdPass (CheckingFuelMonad (RewriteOnce s)) StmtM TrimFact                           
+> bwd2 :: BwdPass SimpleFuelMonad StmtM Trimmed
+> bwd2 = BwdPass { bp_lattice = trimmedLattice 
+>                , bp_transfer = mkBTransfer trimmedTransfer
+>                , bp_rewrite = trimRewrite }
 
 > trimTail :: ProgM C C -> ProgM C C
-> trimTail body = runSimpleUniqueMonad $ evalRw True $ runWithFuel infiniteFuel $ do
+> -- trimTail body = runSimpleUniqueMonad $ evalRw True $ runWithFuel infiniteFuel $ do
+> trimTail body = runSimple $ do
 >     (_, f, _) <- analyzeAndRewriteBwd bwd1 (JustC labels) body initial
->     (body', _, _) <- analyzeAndRewriteBwd bwd2 (JustC labels) body f
+>     (body', _, _) <- analyzeAndRewriteBwd bwd2 (JustC labels) body (toTrimmed f)
 >     return body'
 >   where
 >     labels = entryLabels body
 >     initial = mkFactBase (bp_lattice bwd1) (zip labels (repeat Nothing))
+>     toTrimmed :: FactBase TrimFact -> FactBase Trimmed
+>     toTrimmed fs = mapMap (\f -> (Begin, f)) fs
 >     bwd1 = BwdPass { bp_lattice = trimTailLattice 
 >                   , bp_transfer = trimTransfer 
 >                   , bp_rewrite = noBwdRewrite }
 
-> noOpTransfer :: StmtM e x -> Fact x TrimFact -> TrimFact
-> noOpTransfer (Bind _ _) f = f
-> noOpTransfer (Done _ l _) fs = fromMaybe Nothing (mapLookup l fs)
-> noOpTransfer (CaseM _ _) f = Nothing
-> noOpTransfer (CloEntry _ _ _ _) f = f
-> noOpTransfer (BlockEntry _ _ _) f = f
-
-> bwd2 :: BwdPass (CheckingFuelMonad (RewriteOnce s)) StmtM TrimFact                           
-> bwd2 = BwdPass { bp_lattice = trimTailLattice 
->                , bp_transfer = mkBTransfer noOpTransfer
->                , bp_rewrite = trimRewrite }
