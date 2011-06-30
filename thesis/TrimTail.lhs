@@ -1,4 +1,5 @@
-> {-# LANGUAGE GADTs, RankNTypes, TypeFamilies, ScopedTypeVariables #-}
+> {-# LANGUAGE GADTs, RankNTypes, TypeFamilies, ScopedTypeVariables
+>   , FlexibleInstances, MultiParamTypeClasses #-}
 > -- Implements optimization to
 > -- trim bind/return pairs from the
 > -- end of MIL blocks.
@@ -6,7 +7,8 @@
 
 > where
 
-> import Control.Monad.State (StateT, State(..), MonadState(..), evalStateT)
+> import Control.Monad.State (StateT, State(..), MonadState(..), evalState)
+> import Control.Monad.Trans (MonadTrans(..))
 > import Data.Maybe (listToMaybe, fromMaybe)
 > import Compiler.Hoopl
 > import Debug.Trace
@@ -38,46 +40,46 @@ Our fact is three pieces of information:
     before it is returned.
 
 The third piece of information is represented by its absence: we will
-not rewrite a block where it is not true. Therefore, we reprent our
-fact using a Maybe value. If no variable exists that can be rewritten,
-our fact will be Nothing. Otherwise, it will contain a name and a tail
-expression. The tail expression will be "filled in" when the transfer
-function finds the variable's binding. If the binding is never found,
-the variable is a parameter. In that case, the fact reverts to
-Nothing.
+not rewrite a block where a monadic action intervened. Therefore, we
+represent our fact using a |Maybe| value. If no variable exists that can
+be rewritten, our fact will be |Nothing|. Otherwise, it will contain a
+name and a tail expression. The tail expression will be "filled in"
+when the transfer function finds the variable's binding. If the
+binding is never found, the variable is a parameter. In that case, the
+fact reverts to |Nothing|.
 
 > type TrimFact = Maybe (Name, Maybe TailM)
 
 The lattice defined for our facts is simple: 
 
-  * Our bottom element is Nothing 
+  * Our bottom element is |Nothing| 
   * Facts from successor blocks do not affect predecessors (i.e., we
     have a trivial meet operator).
 
 > trimTailLattice :: DataflowLattice TrimFact
 > trimTailLattice = DataflowLattice { fact_name = "Trim bind/return tails"
->                                   , fact_bot = Nothing
->                                   , fact_join = extend }
+>                                       , fact_bot = Nothing
+>                                       , fact_join = extend }
 >   where
 >     extend _ (OldFact o) (NewFact n) = (changeIf (o /= n), n)
 
 Our transfer function has a couple of cases:
 
-  return v ==> Create our fact (Just v, Nothing). We have found a variable.
-  bind x m, where m is monadic ==> Set our fact back to Nothing. Sequences of
-    monadic action must be preserved. We cannot rewrite if a mondic
-    action happens in between "bind v" and "return v".
-  bind v t ==> Create our fact (Just v, Just t); this "marks" our fact and we won't delete it.
-  bind x t, where v appears in t and v is not "marked" ==> Set our fact to Nothing again;
+  return v ==> Create our fact |Just (v, Nothing)|. We have found a variable.
+  x <- m, where m is monadic ==> Set our fact back to |Nothing|. Sequences of
+    monadic action must be preserved. We cannot rewrite if a monadic
+    action happens in between "v <- x" and "return v".
+  v <- t ==> Create our fact |Just (v, Just t)|; this "marks" our fact and we won't delete it.
+  x <- t, where |v| appears in |t| and |v| is not "marked" ==> Set our fact to |Nothing| again;
     the returned variable is used after being bound.
-  block/closure entry, where our fact is (Just v, Nothing) ==> Set our fact
-    to Nothing again. The returned variable is a parameter (i.e., no binding was
+  block/closure entry, where our fact is |Just (v, Nothing)| ==> Set our fact
+    to |Nothing| again. The returned variable is a parameter (i.e., no binding was
     found in the block).
 
-In the second case, we "mark" v to indicate we found its binding and
-there was no intervening use. It's possible that v is boudn multiple
+In the second case, we "mark" |v| to indicate we found its binding and
+there was no intervening use. It's possible that |v| is bound multiple
 times in the same block; we could miss the opportunity to rewrite the
-final binding of v due to earlier bindings.
+final binding of |v| due to earlier bindings.
 
 > trimTransfer :: BwdTransfer StmtM TrimFact
 > trimTransfer = mkBTransfer bw
@@ -113,103 +115,70 @@ final binding of v due to earlier bindings.
 >     visibleSideEffect _ = False
 
 Our rewrite function will replace the final return with the tail found
-in the facts. It will then eliminate the binding of v by traversing
-the entire block backwards and removing the first possible binding. A
-StateT monad is used to track if we've rewritten anything yet.
+in the facts. It will then eliminate the binding of |v| by traversing
+the entire block backwards and removing the first binding encountered. 
 
-> data RewriteOnce s a = RW { unRw :: s -> SimpleUniqueMonad (s, a) }
-> 
-> rBind :: RewriteOnce s a -> (a -> RewriteOnce s b) -> RewriteOnce s b
-> rBind (RW m) f = RW $ \s -> 
->                  let (s', a) = runSimpleUniqueMonad (m s)
->                      (RW m') = f a
->                  in (m' s')
+At least, that's the theory.
 
-> evalRw :: s -> RewriteOnce s a -> SimpleUniqueMonad a                      
-> evalRw s (RW m) = do
->   (_, a) <- m s
->   return a
+> mcheck :: (FuelMonad m, CheckpointMonad m, Monad m) => m a
+> mcheck = undefined
 
-> instance Monad (RewriteOnce s) where
->   (>>=) = rBind
->   return a = RW $ \s -> return (s, a)
-
-> rCheckpoint :: RewriteOnce s (s, [Unique])
-> rCheckpoint = RW $ \s -> do
->               us <- checkpoint
->               return (s, (s, us))
->                     
-> rRestart :: (s, [Unique]) -> RewriteOnce s ()
-> rRestart (s, us) = RW (\_ -> restart us >> return (s, ()))
-
-> instance CheckpointMonad (RewriteOnce s) where
->   type Checkpoint (RewriteOnce s) = (s, Checkpoint SimpleUniqueMonad)
->   checkpoint = rCheckpoint
->   restart = rRestart
-
-> -- trimRewrite :: BwdRewrite (CheckingFuelMonad (RewriteOnce s)) StmtM TrimFact
-> trimRewrite :: BwdRewrite SimpleFuelMonad StmtM Trimmed
-> trimRewrite = mkBRewrite rewriter
-
-> rewriter :: FuelMonad m => forall e x. StmtM e x -> Fact x Trimmed -> m (Maybe (ProgM e x))
-> rewriter (Bind v t) (ReplaceBind, Just (v', (Just t'))) 
->   | v == v' && t == t' = return $ Just emptyGraph
+> rewriter :: forall e x. StmtM e x -> Fact x TrimFact -> InfiniteFuelMonad (State Bool) (Maybe (ProgM e x))
+> rewriter (Bind v t) (Just (v', (Just t')))
+>   | v == v' && t == t' = do
+>     flag <- get
+>     if flag
+>      then do
+>        put False
+>        return $ Just emptyGraph
+>      else return Nothing
 >   | otherwise = return Nothing
-> rewriter (Done n l (Return v)) fs = 
->   case fromMaybe (End, Nothing) (mapLookup l fs) of
->     (ReplaceDone, Just (v', Just t')) -> done n l (Just t')
->     _ -> return Nothing
 > rewriter (Bind _ _) fs = return Nothing
+> rewriter (Done n l (Return v)) fs = 
+>   case fromMaybe Nothing (mapLookup l fs) of
+>     Just (v', t)
+>       | v == v' -> done n l t
+>     _ -> return Nothing
 > rewriter (Done _ _ _) _ = return Nothing
 > rewriter (CaseM _ _) _ = return Nothing
 > rewriter (BlockEntry _ _ _) _ = return Nothing
 > rewriter (CloEntry _ _ _ _) _ = return Nothing
 
-> type Trimmed = (TrimState, TrimFact)
-> data TrimState = Begin | ReplaceDone | ReplaceBind | End
->   deriving (Eq, Show)
-
-> trimmedTransfer :: StmtM e x -> Fact x Trimmed -> Trimmed
-> trimmedTransfer (Bind v t) f@(ReplaceBind, Just (v', Just t'))
->   | v == v' && t == t' = (End, Nothing)
->   | otherwise = f
-> trimmedTransfer (Bind _ _) f = f
-> trimmedTransfer (Done _ l t) fs = 
->   case fromMaybe (Begin, Nothing) (mapLookup l fs) of
->     (Begin, f@(Just (_, Just t')))
->       | t /= t' -> (ReplaceDone, f) -- haven't replaced tail yet
->     (ReplaceDone, f) -> (ReplaceBind, f)
->     (ReplaceBind, f) -> (End, Nothing)
->     _ -> (End, Nothing)
-> trimmedTransfer (CaseM _ _) fs = (End, Nothing)
-> trimmedTransfer (CloEntry _ _ _ _) f = f
-> trimmedTransfer (BlockEntry _ _ _) f = f
-
-> trimmedLattice :: DataflowLattice Trimmed
-> trimmedLattice = DataflowLattice { fact_name = "Trimmed bind/return tails"
->                                  , fact_bot = (Begin, Nothing)
->                                  , fact_join = extend }
->   where
->     extend _ (OldFact o) (NewFact n) = (changeIf (o /= n), n)
-
-> -- bwd2 :: BwdPass (CheckingFuelMonad (RewriteOnce s)) StmtM TrimFact                           
-> bwd2 :: BwdPass SimpleFuelMonad StmtM Trimmed
-> bwd2 = BwdPass { bp_lattice = trimmedLattice 
->                , bp_transfer = mkBTransfer trimmedTransfer
->                , bp_rewrite = trimRewrite }
-
 > trimTail :: ProgM C C -> ProgM C C
-> -- trimTail body = runSimpleUniqueMonad $ evalRw True $ runWithFuel infiniteFuel $ do
-> trimTail body = runSimple $ do
+> trimTail body = flip evalState True $ runWithFuel infiniteFuel $ do
 >     (_, f, _) <- analyzeAndRewriteBwd bwd1 (JustC labels) body initial
->     (body', _, _) <- analyzeAndRewriteBwd bwd2 (JustC labels) body (toTrimmed f)
+>     (body', _, _) <- analyzeAndRewriteBwd bwd2 (JustC labels) body f
 >     return body'
 >   where
 >     labels = entryLabels body
 >     initial = mkFactBase (bp_lattice bwd1) (zip labels (repeat Nothing))
->     toTrimmed :: FactBase TrimFact -> FactBase Trimmed
->     toTrimmed fs = mapMap (\f -> (Begin, f)) fs
 >     bwd1 = BwdPass { bp_lattice = trimTailLattice 
->                   , bp_transfer = trimTransfer 
->                   , bp_rewrite = noBwdRewrite }
+>                    , bp_transfer = trimTransfer 
+>                    , bp_rewrite = noBwdRewrite }
+>     bwd2 = BwdPass { bp_lattice = trimTailLattice 
+>                    , bp_transfer = mkBTransfer noOpTransfer
+>                    , bp_rewrite = trimRewrite }
+>     trimRewrite :: BwdRewrite (InfiniteFuelMonad (State Bool)) StmtM TrimFact
+>     trimRewrite = mkBRewrite rewriter
 
+> noOpTransfer :: StmtM e x -> Fact x TrimFact -> TrimFact
+> noOpTransfer (Bind _ _) f = f
+> noOpTransfer (Done _ l _) fs = fromMaybe Nothing (mapLookup l fs)
+> noOpTransfer (CaseM _ _) f = Nothing
+> noOpTransfer (CloEntry _ _ _ _) f = f
+> noOpTransfer (BlockEntry _ _ _) f = f
+
+> instance CheckpointMonad (State s) where
+>   type Checkpoint (State s) = s
+>   checkpoint = get
+>   restart s = put s
+
+> instance MonadState s (InfiniteFuelMonad (State s)) where
+>   put = infPut
+>   get = infGet
+
+> infPut :: s -> InfiniteFuelMonad (State s) ()
+> infPut = error "infPut"
+
+> infGet :: InfiniteFuelMonad (State s) s
+> infGet = error "infGet"
