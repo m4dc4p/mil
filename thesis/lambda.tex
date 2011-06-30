@@ -1,40 +1,27 @@
-\tracingonline 1\tracingmacros 1
+\tracingonline 1\tracingmacros 2
 %% Apply a function to an
 %% argument.
-\def\App#1#2{#1 #2}
+\def\App#1#2{#1\Eval {#2}}
 
-\def\Var#1{\csname#1\endcsname}
-
-\def\Abs#1.{\begingroup%%
-  %% Make the argument (x) an active character and
-  \catcode`#1=\active 
-  %% capture body w/ active category code assigned
-  %% to argument x.
+\def\Abs#1.#2{\begingroup%%
   \def\Eval##1{
-      %% Capture the value given to x by making the
-      %% control sequence \getarg return the captured 
-      %% value ###1.
-      %%\def\getarg{###1} 
-      %% Evaluate the body with active character
-      %% and control sequence \x properly defined.
-      %%##1
-    \endgroup}
-  \edef\Body##1{
-    %% Assign control sequence to our active character 
-    %% so \Abs x.x becomes \Abs x. \getarg
-    \catcode`#1=\active
-    \let#1=\noexpand\getarg
-    \noexpand\Eval
-  }\Body}
+      %% Evaluate the value given to x by making the
+      %% control sequence \x return the captured 
+      %% value ##1.
+      \expandafter\def\csname #1\endcsname{##1} %%
+      %% Evaluate the body with control sequence 
+      %% \x properly defined.
+      #2
+      \endgroup}}
 
-\def\Identity{\Abs x.x}
+\def\Identity{\Abs x.{\x}}
 
-\App\Identity x
+\App\Identity {yfoo}
 
-%% \def\Zero#1#2{\let\s=#1 \let\z=#2
-%%   \Abs\s.{\Abs\z.\z}}
+\def\Zero{\Abs s.{\Abs z.{\z}}}
+\App {\App\Zero {s}} z
 
-%% \def\Succ#1\s\z{\let\n=#1 
-%%   \Abs\s.{\Abs\
+\def\Succ{\Abs n.{\Abs s.{\Abs z. \App\s {\App\n {\App\s \z}}}}}
+\App {\App{\App\Succ \Zero} s} z}
 
 
