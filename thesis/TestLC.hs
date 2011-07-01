@@ -255,35 +255,6 @@ milTest prog = do
   putStrLn ("============== Optimized ===============")
   putStrLn (render . printProgM . mostOpt (blocks p) prelude $ p)
 
-{-
-============== Original ================
-block1 ():
-  a <- invoke m
-  a <- invoke m
-  return a
-============== Optimized ===============
-block1 (m):   
-  a <- invoke m
-  invoke m
--}
-testTrimTail4 :: UniqueMonad m => m (ProgM C C)
-testTrimTail4 = do
-  l1 <- freshLabel
-  return $ mkFirst (BlockEntry "block1" l1 []) <*>
-           mkMiddle (Bind "a" (Run "m")) <*>
-           mkMiddle (Bind "a" (Run "m")) <*>
-           mkLast (Done "block1" l1 (Return "a"))
-
-
-testTrimTail5 :: UniqueMonad m => m (ProgM C C)
-testTrimTail5 = do
-  l1 <- freshLabel
-  return $ mkFirst (BlockEntry "block1" l1 []) <*>
-           mkMiddle (Bind "a" (Run "m")) <*>
-           mkMiddle (Bind "b" (Run "m")) <*>
-           mkMiddle (Bind "a" (Run "m")) <*>
-           mkLast (Done "block1" l1 (Return "a"))
-
 {-- 
 Does not rewrite
 
@@ -295,8 +266,8 @@ Does not rewrite
 
 Can't rewrite the end because of an intervening
 invoke. --}
-testTrimTail1 :: UniqueMonad m => m (ProgM C C)
-testTrimTail1 = do
+testBindReturn1 :: UniqueMonad m => m (ProgM C C)
+testBindReturn1 = do
   l1 <- freshLabel
   return $ mkFirst (BlockEntry "block1" l1 []) <*>
            mkMiddle (Bind "a" (Run "m")) <*>
@@ -321,8 +292,8 @@ block1 ():
   invoke m
 
 -}
-testTrimTail2 :: UniqueMonad m => m (ProgM C C)
-testTrimTail2 = do
+testBindReturn2 :: UniqueMonad m => m (ProgM C C)
+testBindReturn2 = do
   l1 <- freshLabel
   return $ mkFirst (BlockEntry "block1" l1 []) <*>
            mkMiddle (Bind "a" (Run "m")) <*>
@@ -345,39 +316,84 @@ block1 ():
   invoke m
 
 -}
-testTrimTail3 :: UniqueMonad m => m (ProgM C C)
-testTrimTail3 = do
+testBindReturn3 :: UniqueMonad m => m (ProgM C C)
+testBindReturn3 = do
   l1 <- freshLabel
   return $ mkFirst (BlockEntry "block1" l1 []) <*>
            mkMiddle (Bind "a" (Run "m")) <*>
            mkMiddle (Bind "a" (Run "m")) <*>
            mkLast (Done "block1" l1 (Return "a"))
 
-testBindSubst :: UniqueMonad m => m (ProgM C C)
-testBindSubst = do
-  -- blockX:
-  --  a <- block1(c)
-  --  b <- block1(a)
-  --  a <- block1(c)
-  --  return a
-  --
-  -- becomes
-  --
-  -- block1 (b, c):
-  --  a <- block1(c)
-  --  return a
-  --
-  -- Notice that the live variables in the block are not
-  -- correctly updated -- oops.
-  l1 <- freshLabel 
-  l2 <- freshLabel
-  let blockName = "block1"
-      bl l = BlockEntry blockName  l []
-      bind (v, t) = Bind v (Goto (blockName, l2) [t])
-      done n l v = Done n l (Return v)
-  return $ mkFirst (bl l1) <*>
-         mkMiddles (map bind [("a", "c"), ("b", "a"), ("a", "c")]) <*>
-         mkLast (done blockName l1 "a")
+{-
+block1 ():
+  a <- m
+  b <- m
+  a <- m
+  return a
+
+becomes
+
+block1 (): 
+  a <- m
+  b <- m
+  m
+-}
+testBindReturn4 :: UniqueMonad m => m (ProgM C C)
+testBindReturn4 = do
+  l1 <- freshLabel
+  return $ mkFirst (BlockEntry "block1" l1 []) <*>
+           mkMiddle (Bind "a" (Run "m")) <*>
+           mkMiddle (Bind "b" (Run "m")) <*>
+           mkMiddle (Bind "a" (Run "m")) <*>
+           mkLast (Done "block1" l1 (Return "a"))
+
+{-
+block1 ():
+  a <- m
+  b <- return a
+  c <- return b
+  return c
+
+becomes
+
+block1 (): m
+
+-}
+testBindReturn5 :: UniqueMonad m => m (ProgM C C)
+testBindReturn5 = do
+  l1 <- freshLabel
+  return $ mkFirst (BlockEntry "block1" l1 []) <*>
+           mkMiddle (Bind "a" (Run "m")) <*>
+           mkMiddle (Bind "b" (Return "a")) <*>
+           mkMiddle (Bind "c" (Return "b")) <*>
+           mkLast (Done "block1" l1 (Return "c"))
+
+{-
+Shows how this interacts with dead-code elimination.
+
+block1 ():
+  a < - m
+  b <- return a
+  c <- return b
+  x <- clo block1 {}
+  z <- C [] 
+  return c
+
+becomes
+
+block1 (): m
+
+-}
+testBindReturn6 :: UniqueMonad m => m (ProgM C C)
+testBindReturn6 = do
+  l1 <- freshLabel
+  return $ mkFirst (BlockEntry "block1" l1 []) <*>
+           mkMiddle (Bind "a" (Run "m")) <*>
+           mkMiddle (Bind "b" (Return "a")) <*>
+           mkMiddle (Bind "c" (Return "b")) <*>
+           mkMiddle (Bind "x" (Closure ("block1", l1) [])) <*>
+           mkMiddle (Bind "z" (ConstrM "C" [])) <*>
+           mkLast (Done "block1" l1 (Return "c"))
 
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])

@@ -21,7 +21,7 @@ import Util
 import MIL
 import Live
 import DeadBlocks
-import TrimTail
+import BindReturnElim
 
 -- From mon5.lhs
 --   v <- return w; c  
@@ -514,12 +514,12 @@ inlineSimple tops = deadCode . bindSubst . inlineReturn
 
 mostOpt :: [Name] -> ([Name], ProgM C C) -> ProgM C C -> ProgM C C
 mostOpt userTops prelude@(prims, _) body = addLive tops .
-    trimTail .
     newTops deadBlocks . 
     inlineBlocks tops . 
     newTops deadBlocks .  
     inlineSimple tops . 
     newTops optCollapse . 
+    bindReturn . 
     deadCode . 
     bindSubst .
     addLive tops $ body
