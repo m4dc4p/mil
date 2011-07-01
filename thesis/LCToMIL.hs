@@ -5,7 +5,7 @@ module LCToMIL
 
 where
 
-import Control.Monad.State (State, execState, modify, gets, get)
+import Control.Monad.State (State, execState, modify, gets, get, put)
 import Text.PrettyPrint 
 import Data.List (sort, nub, delete, (\\))
 import Data.Maybe (fromMaybe, isJust, catMaybes)
@@ -24,8 +24,18 @@ import Util
 data CompS = C { compI :: Int -- ^ counter for fresh variables
                , compG :: ProgM C C -- ^ Program control-flow graph.
                , compT :: [Name] -- ^ top-level function names.
-               , monadic :: [()] } -- ^ Allows nested monadic computation. Empty list means no, 
-                                   -- anything else means yes.
+               , compM :: (Bool, [Bool]) } -- ^ Allows nested
+                                             -- monadic
+                                             -- computation. "Top"
+                                             -- value indicates if we
+                                             -- are compiling
+                                             -- monadically or
+                                             -- not. List serves as a
+                                             -- stack of previous
+                                             -- states. Starts non-monadic (False, []).
+
+-- | Create the initial state for our compiler.
+mkCompS i tops = C i emptyClosedGraph tops (False, [])
                
 type CompM = State CompS
 type Free = [Name]
@@ -59,30 +69,30 @@ prelude =
 
 compile :: [Name] -> ([Name], ProgM C C) -> [Def] -> ProgM C C
 compile userTops (primNames, predefined) defs = 
-    foldr (|*><*|) predefined . snd . foldr compileEach (100, []) $ defs
+    foldr (|*><*|) predefined . snd . foldr compileDef (100, []) $ defs
   where
+    -- Top level names 
     tops = primNames  ++ userTops
-    compileEach :: Def -> (Int, [ProgM C C]) -> (Int, [ProgM C C])
-    compileEach p (i, ps) = 
-      let (j, p') = compileM tops i p
-      in (j, p' : ps)
-
-compileM :: [Name] -> Int -> Def -> (Int, ProgM C C)
-compileM tops labelSeed def = 
-  let result = foldr compDef initial [def]
-  in (compI result + 1, compG result)
-  where
-    compDef p = execState (uncurry newDefn p)
-    initial = C labelSeed emptyClosedGraph tops []
-    -- | Creates a new function definition
+    -- Compiles a single LC definition and returns the compiler
+    -- state, to be used during the next definition.
+    compileDef :: Def -> (Int, [ProgM C C]) -> (Int, [ProgM C C])
+    compileDef p (i, ps) = 
+      let result = execState (newDefn p) (mkCompS i tops)
+      in (compI result + 1, compG result : ps)
+    -- Creates a new function definition
     -- using the arguments given and adds it
     -- to the control flow graph.    
-    newDefn :: Name -> Expr -> CompM ()
-    newDefn name (ELam v _ b) = do
+    newDefn :: (Name, Expr) -> CompM ()
+    newDefn (name, (ELam v _ b)) = do
       let fvs = v `delete` free b \\ tops
       cloDefn name v fvs (\n l -> compileStmtM b (return . mkLast . Done n l)) 
       return ()
-    newDefn name body = do
+    -- A monadic progam will always begin with EBind.
+    newDefn (name, body@(EBind v _ b r)) = do
+      let fvs = v `delete` (nub (free b ++ free r) \\ tops)
+      thunkDefn name fvs (\n l -> compileStmtM body (return . mkLast . Done n l))
+      return ()
+    newDefn (name, body) = do
       blockDefn name [] (\n l -> compileStmtM body (return . mkLast . Done n l))
       return ()
 
@@ -93,7 +103,7 @@ compileStmtM :: Expr
 compileStmtM (EVar v) ctx 
   = ctx (Return v) `unlessMonad` ctx (Run v)
 
-compileStmtM (EPrim p _) ctx = error "EPrim not implemented."
+compileStmtM (EPrim p _) ctx = ctx (Prim p [])
 
 compileStmtM (ELit (Lit n _)) ctx
   = ctx (LitM n)
@@ -117,15 +127,12 @@ compileStmtM (ELet _ _) _
 
 compileStmtM (ECase e lcAlts) ctx = do
   let alts = map toAlt lcAlts
-      altMonadic = any isMonadic (map altE alts)
-  pushWhen altMonadic
   r <- fresh "result"
   f <- ctx (Return r) >>= \rest -> callDefn "caseJoin" (\n l -> return rest)
   let compAlt (Alt cons vs body) = do
         body' <- callDefn ("altBody" ++ cons) (\n l -> compileStmtM body (mkBind n l r f))
         return (Alt cons vs body')
   altsM <- mapM compAlt alts
-  popWhen altMonadic
   compVarM e $ \v -> return (mkLast (CaseM v altsM))
   where
     callDefn :: String -> (Name -> Label -> CompM (ProgM O C)) -> CompM TailM
@@ -144,9 +151,9 @@ compileStmtM (EFatbar _ _) _
 
 compileStmtM (EBind v _ b r) ctx = do
   rest <- compileStmtM r ctx
-  compVarM b $ \body -> do
-    return (mkMiddle (v `Bind` (Run body)) <*> 
-            rest)
+  asMonadic (compVarM b $ \m -> do
+               return (mkMiddle (v `Bind` (Run m)) <*> 
+                       rest))
 
 primDefn :: Name 
          -> Int 
@@ -168,6 +175,7 @@ compVarM :: Expr
   -> (Name -> CompM (ProgM O C))
   -> CompM (ProgM O C)
 compVarM (EVar v) ctx = ctx v
+compVarM (EPrim p _) ctx = ctx p
 compVarM e ctx = compileStmtM e $ \t -> do
   v <- fresh "v"
   rest <- ctx v
@@ -215,6 +223,12 @@ newTop name = do
   addName f
   return f
 
+thunkDefn :: Name -> [Name] -> (Name -> Label -> CompM (ProgM O C)) -> CompM Dest
+thunkDefn name args progM = withNewLabel $ \m -> do
+  dest <- blockDefn ("block" ++ name) args progM
+  addProg (mkFirst (BlockEntry name m args) <*> mkLast (Done name m (Thunk dest args)))
+  return (name, m)
+
 -- | Add a new block.
 blockDefn :: Name -> [Name] -> (Name -> Label -> CompM (ProgM O C)) -> CompM Dest
 blockDefn name args progM = withNewLabel $ \l -> do
@@ -260,22 +274,20 @@ withNewLabel f = freshLabel >>= f
 addName :: Name -> CompM ()
 addName name = modify (\s@(C { compT }) -> s { compT = name : compT })
 
--- | Push monadic compilation "mode" to stack
-pushMonad :: CompM ()
-pushMonad = 
-  let f s@(C { monadic }) = s { monadic = () : monadic }
-  in modify f
-
--- | Pop monadic compilation "mode" from stack
-popMonad :: CompM ()
-popMonad = 
-  let f s@(C { monadic }) = s { monadic = drop 1 monadic }
-  in modify f
+-- | Run the compiler in monadic
+-- mode. Restore the previous mode when finished.
+asMonadic :: CompM a -> CompM a
+asMonadic m = do
+  modify (\s@(C _ _ _ (flag, stack)) -> s { compM = (True, flag : stack) })
+  a <- m
+  modify (\s@(C _ _ _ (_, (flag:stack))) -> s { compM = (flag,stack) })
+  return a
+  
 
 -- | Are we in monadic compilation mode?
 inMonad :: CompM Bool
 inMonad = 
-  let f s@(C { monadic }) = not (null monadic)
+  let f s@(C { compM }) = fst compM
   in gets f
 
 -- Run the left compilation, unless we
@@ -286,20 +298,6 @@ unlessMonad :: CompM (ProgM O C)
         -> CompM (ProgM O C)
 unlessMonad pure monad = 
   inMonad >>= \b -> if b then monad else pure
-
-pushWhen :: Bool -> CompM ()
-pushWhen True = pushMonad
-pushWhen _ = return ()
-
-popWhen :: Bool -> CompM ()
-popWhen True = popMonad
-popWhen _ = return ()
-
-isMonadic :: Expr -> Bool
-isMonadic (EBind _ _ _ _) = True
-isMonadic (ELet _ expr) = isMonadic expr
-isMonadic (ECase _ alts) = any isMonadic (map (altE . toAlt) alts)
-isMonadic _ = False
 
 toAlt :: LC.Alt -> Alt Expr
 toAlt (LC.Alt cons _ vs expr) = Alt cons vs expr
