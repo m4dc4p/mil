@@ -255,6 +255,34 @@ milTest prog = do
   putStrLn ("============== Optimized ===============")
   putStrLn (render . printProgM . mostOpt (blocks p) prelude $ p)
 
+{-
+============== Original ================
+block1 ():
+  a <- invoke m
+  a <- invoke m
+  return a
+============== Optimized ===============
+block1 (m):   
+  a <- invoke m
+  invoke m
+-}
+testTrimTail4 :: UniqueMonad m => m (ProgM C C)
+testTrimTail4 = do
+  l1 <- freshLabel
+  return $ mkFirst (BlockEntry "block1" l1 []) <*>
+           mkMiddle (Bind "a" (Run "m")) <*>
+           mkMiddle (Bind "a" (Run "m")) <*>
+           mkLast (Done "block1" l1 (Return "a"))
+
+
+testTrimTail5 :: UniqueMonad m => m (ProgM C C)
+testTrimTail5 = do
+  l1 <- freshLabel
+  return $ mkFirst (BlockEntry "block1" l1 []) <*>
+           mkMiddle (Bind "a" (Run "m")) <*>
+           mkMiddle (Bind "b" (Run "m")) <*>
+           mkMiddle (Bind "a" (Run "m")) <*>
+           mkLast (Done "block1" l1 (Return "a"))
 
 {-- 
 Does not rewrite
