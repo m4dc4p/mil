@@ -155,6 +155,7 @@ tailSuccessors _ = []
 
 tailDest :: TailM -> [Dest]
 tailDest (Closure dest _) = [dest]
+tailDest (Thunk dest _) = [dest]
 tailDest (Goto dest _) = [dest]
 tailDest _ = []
 
@@ -272,9 +273,12 @@ prims = [plusPrim
         , ltePrim
         , gtePrim
         , eqPrim
-        , neqPrim ]
+        , neqPrim
+        , printPrim ]
 
-plusPrim, minusPrim, timesPrim, divPrim, ltPrim, gtPrim, ltePrim, gtePrim, eqPrim, neqPrim :: UniqueMonad m => (Name, m (ProgM C C))
+printPrim, plusPrim, minusPrim, timesPrim, divPrim, ltPrim, gtPrim, ltePrim, gtePrim, eqPrim, neqPrim :: UniqueMonad m => (Name, m (ProgM C C))
+
+printPrim = ("print", unaryUnsafePrim "print")
 
 plusPrim = ("plus", binPrim "plus")
 minusPrim = ("minus", binPrim "minus")
@@ -287,6 +291,17 @@ ltePrim = ("lte", binPrim "lte")
 gtePrim = ("gte", binPrim "gte")
 eqPrim = ("eq", binPrim "eq")
 neqPrim = ("neq", binPrim "neq")
+
+unaryUnsafePrim :: UniqueMonad m => Name -> m (ProgM C C)
+unaryUnsafePrim name = do
+  bodyLabel <- freshLabel
+  c1Label <- freshLabel
+  let bodyName = name ++ "Body" 
+      body = mkFirst (BlockEntry bodyName bodyLabel ["a"]) <*>
+             mkLast (Done bodyName bodyLabel $ Prim name ["a"])
+      c1 = mkFirst (CloEntry name c1Label [] "a") <*>
+           mkLast (Done name c1Label $ Thunk (bodyName, bodyLabel) ["a"])
+  return (c1 |*><*| body)
                    
 binPrim :: UniqueMonad m => Name -> m (ProgM C C)
 binPrim name = do
