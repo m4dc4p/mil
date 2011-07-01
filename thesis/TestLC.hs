@@ -256,13 +256,73 @@ milTest prog = do
   putStrLn (render . printProgM . mostOpt (blocks p) prelude $ p)
 
 
-testTrimTail :: UniqueMonad m => m (ProgM C C)
-testTrimTail = do
+{-- 
+Does not rewrite
+
+  block1 (m):
+    a <- invoke m
+    a <- invoke m
+    b <- invoke m
+    return a
+
+Can't rewrite the end because of an intervening
+invoke. --}
+testTrimTail1 :: UniqueMonad m => m (ProgM C C)
+testTrimTail1 = do
   l1 <- freshLabel
   return $ mkFirst (BlockEntry "block1" l1 []) <*>
            mkMiddle (Bind "a" (Run "m")) <*>
            mkMiddle (Bind "a" (Run "m")) <*>
            mkMiddle (Bind "b" (Run "m")) <*>
+           mkLast (Done "block1" l1 (Return "a"))
+
+{-
+Should rewrite
+
+block1 ():
+  a <- invoke m
+  b <- invoke m
+  a <- invoke m
+  return a
+
+to
+
+block1 ():
+  a <- invoke m
+  b <- invoke m
+  invoke m
+
+-}
+testTrimTail2 :: UniqueMonad m => m (ProgM C C)
+testTrimTail2 = do
+  l1 <- freshLabel
+  return $ mkFirst (BlockEntry "block1" l1 []) <*>
+           mkMiddle (Bind "a" (Run "m")) <*>
+           mkMiddle (Bind "b" (Run "m")) <*>
+           mkMiddle (Bind "a" (Run "m")) <*>
+           mkLast (Done "block1" l1 (Return "a"))
+
+{-
+Should rewrite
+
+block1 ():
+  a <- invoke m
+  a <- invoke m
+  return a
+
+to
+
+block1 ():
+  a <- invoke m
+  invoke m
+
+-}
+testTrimTail3 :: UniqueMonad m => m (ProgM C C)
+testTrimTail3 = do
+  l1 <- freshLabel
+  return $ mkFirst (BlockEntry "block1" l1 []) <*>
+           mkMiddle (Bind "a" (Run "m")) <*>
+           mkMiddle (Bind "a" (Run "m")) <*>
            mkLast (Done "block1" l1 (Return "a"))
 
 testBindSubst :: UniqueMonad m => m (ProgM C C)
