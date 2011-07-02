@@ -20,8 +20,8 @@ import LCM
 
 progM :: [(Name, Expr)] -> ([Name], ProgM C C) -> IO ()
 progM progs prelude = do
-    putStrLn "\n ========= Unoptimized ============"
-    printResult progs (map (addLive tops) . map (compile tops prelude) . map (: []) $ progs)
+    -- putStrLn "\n ========= Unoptimized ============"
+    -- printResult progs (map (addLive tops) . map (compile tops prelude) . map (: []) $ progs)
 
     let optProgs = mostOpt tops prelude . (compile tops prelude) $ progs
 
@@ -395,6 +395,10 @@ testBindReturn6 = do
            mkMiddle (Bind "z" (ConstrM "C" [])) <*>
            mkLast (Done "block1" l1 (Return "c"))
 
+origExample2 = ("main", 
+                      _let "compose" composeDef $ \compose ->
+                      compose `app` var "foo" `app` var "bar" `app` var "x")
+
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
 
@@ -445,6 +449,10 @@ var = EVar
 
 lit :: Integer -> Expr
 lit n = ELit (Lit n typ)
+
+-- Allows a single name to be defined in a let.
+_let :: Name -> Expr -> (Expr -> Expr) -> Expr
+_let n body rest = ELet (Decls [[(n, typ, body)]]) (rest (var n))
 
 prim :: Name -> Int -> Expr
 -- prim n cnt = EPrim n (take (cnt + 1) $ repeat typ) 

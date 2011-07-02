@@ -71,30 +71,31 @@ compile :: [Name] -> ([Name], ProgM C C) -> [Def] -> ProgM C C
 compile userTops (primNames, predefined) defs = 
     foldr (|*><*|) predefined . snd . foldr compileDef (100, []) $ defs
   where
-    -- Top level names 
-    tops = primNames  ++ userTops
     -- Compiles a single LC definition and returns the compiler
     -- state, to be used during the next definition.
     compileDef :: Def -> (Int, [ProgM C C]) -> (Int, [ProgM C C])
     compileDef p (i, ps) = 
-      let result = execState (newDefn p) (mkCompS i tops)
+      let result = execState (newDefn p) (mkCompS i (primNames  ++ userTops))
       in (compI result + 1, compG result : ps)
-    -- Creates a new function definition
-    -- using the arguments given and adds it
-    -- to the control flow graph.    
-    newDefn :: (Name, Expr) -> CompM ()
-    newDefn (name, (ELam v _ b)) = do
-      let fvs = v `delete` free b \\ tops
-      cloDefn name v fvs (\n l -> compileStmtM b (return . mkLast . Done n l)) 
-      return ()
-    -- A monadic progam will always begin with EBind.
-    newDefn (name, body@(EBind v _ b r)) = do
-      let fvs = v `delete` (nub (free b ++ free r) \\ tops)
-      thunkDefn name fvs (\n l -> compileStmtM body (return . mkLast . Done n l))
-      return ()
-    newDefn (name, body) = do
-      blockDefn name [] (\n l -> compileStmtM body (return . mkLast . Done n l))
-      return ()
+
+-- Creates a new function definition
+-- using the arguments given and adds it
+-- to the control flow graph.    
+newDefn :: (Name, Expr) -> CompM ()
+newDefn (name, (ELam v _ b)) = do
+  tops <- gets compT
+  let fvs = v `delete` free b \\ tops
+  cloDefn name v fvs (\n l -> compileStmtM b (return . mkLast . Done n l)) 
+  return ()
+-- A monadic progam will always begin with EBind.
+newDefn (name, body@(EBind v _ b r)) = do
+  tops <- gets compT
+  let fvs = v `delete` (nub (free b ++ free r) \\ tops)
+  thunkDefn name fvs (\n l -> compileStmtM body (return . mkLast . Done n l))
+  return ()
+newDefn (name, body) = do
+  blockDefn name [] (\n l -> compileStmtM body (return . mkLast . Done n l))
+  return ()
 
 compileStmtM :: Expr 
   -> (TailM -> CompM (ProgM O C))
@@ -103,7 +104,7 @@ compileStmtM :: Expr
 compileStmtM (EVar v) ctx 
   = ctx (Return v) `unlessMonad` ctx (Run v)
 
-compileStmtM (EPrim p _) ctx = ctx (Prim p [])
+compileStmtM (EPrim p _) ctx = error "EPrim in statement context."
 
 compileStmtM (ELit (Lit n _)) ctx
   = ctx (LitM n)
@@ -122,8 +123,16 @@ compileStmtM e@(ELam v _ b) ctx = do
     cloDefn name v fvs (\n l -> compileStmtM b (return . mkLast . Done n l))
   ctx (Closure f fvs)
 
-compileStmtM (ELet _ _) _ 
-  = error "ELet statement not implemented."
+compileStmtM (ELet (Decls defs) body) ctx = do
+  let decls = concat defs
+      newName (name, _, body) = do
+        n <- newTop $ "let" ++ name
+        return (name, n)
+  names <- mapM newName decls
+  mapM_ (\(name, _, body) -> 
+           newDefn (fromMaybe (error $ "Name " ++ name ++ " not found.") $ 
+                    lookup name names, substNames names body)) decls
+  compVarM (substNames names body) $ \v -> ctx (Return v)
 
 compileStmtM (ECase e lcAlts) ctx = do
   let alts = map toAlt lcAlts
@@ -146,14 +155,50 @@ compileStmtM (EApp e1 e2) ctx
     compVarM e2 $ \g ->
       ctx (Enter f g)
 
-compileStmtM (EFatbar _ _) _ 
-  = error "EFatbar not implemented."
-
 compileStmtM (EBind v _ b r) ctx = do
   rest <- compileStmtM r ctx
   asMonadic (compVarM b $ \m -> do
                return (mkMiddle (v `Bind` (Run m)) <*> 
                        rest))
+
+compileStmtM (EFatbar _ _) _ 
+  = error "EFatbar not implemented."
+
+-- Takes an association list of (old, new) name pairs;
+-- Updates the expression given to use the new names.
+substNames :: [(Name, Name)] -> Expr -> Expr
+substNames = subst 
+  where
+    subst :: [(Name, Name)] -> Expr -> Expr
+    subst names (EVar v) = replace names EVar v
+    subst names (EPrim v tys) = replace names (\v' -> EPrim v' tys) v
+    subst names (ECon v tys exprs) = 
+      let exprs' = map (subst names) exprs
+      in replace names (\v' -> ECon v' tys exprs') v
+    subst names (ELam v ty expr) = 
+      let names' = remove v names
+      in ELam v ty (subst names' expr)
+    subst names (ELet (Decls decls) expr) =
+      let names' = removeMany names  . map (\(n, _, _) -> n) . concat $ decls
+          decls' = map (map (\(n, t, expr) -> (n, t, subst names' expr))) decls
+      in ELet (Decls decls') (subst names' expr)
+    subst names (ECase expr alts) = 
+      let substAlt (LC.Alt c ty vs expr) = LC.Alt c ty vs (subst (removeMany names vs) expr)
+      in ECase (subst names expr) (map substAlt alts)
+    subst names (EApp e1 e2) = EApp (subst names e1) (subst names e2)
+    subst names (EFatbar {}) = error "subst for EFatBar not defined." 
+    subst names (EBind v ty b r) = 
+      EBind v ty (subst names b) (subst (remove v names) r)
+    subst _ expr = expr
+    remove :: Name -> [(Name, Name)] -> [(Name, Name)]
+    remove n = filter (\(n', _) -> n /= n')
+    removeMany :: [(Name, Name)] -> [Name] -> [(Name, Name)]
+    removeMany = foldr remove 
+    replace :: [(Name, Name)] -> (Name -> Expr) -> Name -> Expr
+    replace names fexpr v = 
+      case lookup v names of
+        Just v' -> fexpr v'
+        _ -> fexpr v
 
 primDefn :: Name 
          -> Int 
@@ -192,7 +237,7 @@ free = nub . free'
     free' (ELit _) = []
     free' (ECon _ _ expr) = nub (concatMap free' expr)
     free' (ELam v _ expr) = v `delete` nub (free' expr)
-    free' (ELet _ _) = error "ELet free'."
+    free' (ELet (Decls decls) expr) = free' expr \\ (map (\(n,_,_) -> n) $ concat decls)
     free' (ECase expr alts) = nub (free' expr ++ concatMap (\(LC.Alt _ _ vs e) -> nub (free' e) \\ vs) alts)
     free' (EApp e1 e2) = nub (free' e1 ++ free' e2)
     free' (EFatbar e1 e2) = nub (free' e1 ++ free' e2)
