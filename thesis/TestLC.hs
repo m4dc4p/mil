@@ -20,8 +20,8 @@ import LCM
 
 progM :: [(Name, Expr)] -> ([Name], ProgM C C) -> IO ()
 progM progs prelude = do
-    -- putStrLn "\n ========= Unoptimized ============"
-    -- printResult progs (map (addLive tops) . map (compile tops prelude) . map (: []) $ progs)
+    putStrLn "\n ========= Unoptimized ============"
+    printResult progs (map (addLive tops) . map (compile tops prelude) . map (: []) $ progs)
 
     let optProgs = mostOpt tops prelude . (compile tops prelude) $ progs
 
@@ -395,9 +395,18 @@ testBindReturn6 = do
            mkMiddle (Bind "z" (ConstrM "C" [])) <*>
            mkLast (Done "block1" l1 (Return "c"))
 
+{-- Testing ELet --}
 origExample2 = ("main", 
                       _let "compose" composeDef $ \compose ->
                       compose `app` var "foo" `app` var "bar" `app` var "x")
+
+{-- From Mark
+f x = let g y = x + y
+       in g
+--}
+letPlus = ("f", 
+              lam "x" $ \x -> 
+              _let "g" (lam "y" $ \y -> x `plus` y) $ \g -> g)
 
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
