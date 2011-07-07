@@ -8,9 +8,10 @@ import qualified Data.Set as Set
 import qualified Data.Map as Map
 
 import qualified Printer.Common as PP
-
 import Printer.LambdaCase
 import Syntax.LambdaCase hiding (Alt)
+import qualified PrioSetLC as Prio
+
 import qualified Syntax.LambdaCase as LC
 import MIL hiding (_case)
 import Util
@@ -18,10 +19,14 @@ import OptMIL
 import LCToMIL
 import LCM
 
+fromProgram :: Program -> [(Name, Expr)]
+fromProgram (Program { decls = (Decls d)}) = 
+  map (\(Defn name _ expr) -> (name, expr)) . getDefns $ d
+
 progM :: [(Name, Expr)] -> ([Name], ProgM C C) -> IO ()
 progM progs prelude = do
-    putStrLn "\n ========= Unoptimized ============"
-    printResult progs (map (addLive tops) . map (compile tops prelude) . map (: []) $ progs)
+    -- putStrLn "\n ========= Unoptimized ============"
+    -- printResult progs (map (addLive tops) . map (compile tops prelude) . map (: []) $ progs)
 
     let optProgs = mostOpt tops prelude . (compile tops prelude) $ progs
 
@@ -415,15 +420,13 @@ alt :: Name -> [Name] -> ([Expr] -> Expr) -> [LC.Alt] -> [LC.Alt]
 alt cons vs f = (LC.Alt cons [] vs (f (map var vs)) :)
 
 mPrint = EPrim "print" []
-mkUnit = ECon "()" [] []
+mkUnit = ECon "Unit" [] 
 
 mkNil :: Expr
-mkNil = ECon "Nil" [] []
+mkNil = ECon "Nil" [] 
 
 bindE :: String -> Expr -> (Expr -> Expr) -> Expr
-bindE v body rest = 
-  let var = EVar v
-  in EBind v typ body (rest var)
+bindE v body rest = EBind v typ body (rest (var v))
 
 lam :: String -> (Expr -> Expr) -> Expr
 lam v body = ELam v typ (body (var v))
@@ -454,14 +457,14 @@ app :: Expr -> Expr -> Expr
 app f g = EApp f g
 
 var :: String -> Expr
-var = EVar
+var n = EVar n typ
 
 lit :: Integer -> Expr
-lit n = ELit (Lit n typ)
+lit n = ENat n 
 
 -- Allows a single name to be defined in a let.
 _let :: Name -> Expr -> (Expr -> Expr) -> Expr
-_let n body rest = ELet (Decls [[(n, typ, body)]]) (rest (var n))
+_let n body rest = ELet (Decls [Nonrec (Defn n typ body)]) (rest (var n))
 
 prim :: Name -> Int -> Expr
 -- prim n cnt = EPrim n (take (cnt + 1) $ repeat typ) 

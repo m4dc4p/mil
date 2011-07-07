@@ -1,4 +1,5 @@
-:set -i..\..\compiler\src
+:set -i..\..\compiler\src 
+:set -i..\..\priosetExample
 :def sl (\ _ -> return ":steplocal")
 :def st (\args -> return $ ":step " ++ args)
 :def sm (\ _ -> return ":stepmodule")

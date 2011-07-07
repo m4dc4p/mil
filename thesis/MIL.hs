@@ -6,6 +6,7 @@ module MIL
 where
 
 import Prelude hiding (abs)
+import Control.Monad (liftM)
 import Control.Monad.State (State, execState, modify, gets)
 import Text.PrettyPrint 
 import Data.List (sort)
@@ -263,6 +264,13 @@ primNames = map fst p
     p :: [(Name, SimpleUniqueMonad (ProgM C C))]
     p = prims
 
+compiledPrims :: UniqueMonad m => [(Name, m (ProgM C C))] -> m [(Name, ProgM C C)]
+compiledPrims [] = return []
+compiledPrims ((n, m):ms) = do
+  head <- m
+  rest <- compiledPrims ms
+  return ((n, head):rest)
+  
 prims :: UniqueMonad m => [(Name, m (ProgM C C))]
 prims = [plusPrim
         , minusPrim
@@ -274,26 +282,92 @@ prims = [plusPrim
         , gtePrim
         , eqPrim
         , neqPrim
-        , printPrim ]
+        , printPrim 
+        , ("mkData_Nil", mkDataPrim "Nil" 0)
+        , ("mkData_Cons", mkDataPrim "Cons" 2)
+        , ("mkData_Unit", mkDataPrim "Unit" 0)] ++ prioSetPrims
+  where
+    -- Primitives necessary to compile PrioSetLC.lhs in ..\..priosetExample
+    prioSetPrims = 
+      [("readRef", liftM snd $ monadic unaryPrim "readRef")
+      ,("primBitwiseDecIx", liftM snd $ monadic unaryPrim "primBitwiseDecIx")
+      ,("primIxShiftR", liftM snd $ monadic binPrim "primIxShiftR")
+      ,("primIxLt", liftM snd $ monadic binPrim "primIxLt")
+      ,("primBitwiseModIx", liftM snd $ monadic unaryPrim "primBitwiseModIx")
+      ,("primUnsignedPlus", liftM snd $ monadic binPrim "primUnsignedPlus")
+      ,("primIxToUnsigned", liftM snd $ monadic unaryPrim "primIxToUnsigned")
+      ,("primUnsignedTimes", liftM snd $ monadic binPrim "primUnsignedTimes")
+      ,("primLeqIx", liftM snd $ monadic binPrim "primLeqIx")
+      ,("constructBitdata", liftM snd $ monadic unaryPrim "constructBitdata")
+      ,("primBoolNot", liftM snd $ monadic unaryPrim "primBoolNot")
+      ,("primIxEq", liftM snd $ monadic binPrim "primIxEq")
+      ,("primUnsignedMinus", liftM snd $ monadic binPrim "primUnsignedMinus")
+      ,("primKReturn", liftM snd $ monadic unaryPrim "primKReturn")
+      ,("primUnsignedFromLiteral", liftM snd $ monadic unaryPrim "primUnsignedFromLiteral")
+      ,("primIxFromLiteral", liftM snd $ monadic unaryPrim "primIxFromLiteral")
+      ,("initArray", liftM snd $ monadic binPrim "initArray")
+      ,("primInitStored", liftM snd $ monadic binPrim "primInitStored")
+      ,("@", liftM snd $ monadic binPrim "@")
+      ,("writeRef", liftM snd $ monadic binPrim "writeRef")
+      ,("mkData_False", mkDataPrim "False" 0)
+      ,("mkData_True", mkDataPrim "True" 0)]
+  
+
 
 printPrim, plusPrim, minusPrim, timesPrim, divPrim, ltPrim, gtPrim, ltePrim, gtePrim, eqPrim, neqPrim :: UniqueMonad m => (Name, m (ProgM C C))
 
-printPrim = ("print", unaryUnsafePrim "print")
+printPrim = ("print", liftM snd $ monadic unaryPrim "print")
 
-plusPrim = ("plus", binPrim "plus")
-minusPrim = ("minus", binPrim "minus")
-timesPrim = ("times", binPrim "times")
-divPrim = ("div", binPrim "div")
+plusPrim = ("plus", liftM snd $ binPrim "plus")
+minusPrim = ("minus", liftM snd $ binPrim "minus")
+timesPrim = ("times", liftM snd $ binPrim "times")
+divPrim = ("div", liftM snd $ binPrim "div")
 
-ltPrim = ("lt", binPrim "lt")
-gtPrim = ("gt", binPrim "gt")
-ltePrim = ("lte", binPrim "lte")
-gtePrim = ("gte", binPrim "gte")
-eqPrim = ("eq", binPrim "eq")
-neqPrim = ("neq", binPrim "neq")
+ltPrim = ("lt", liftM snd $ binPrim "lt")
+gtPrim = ("gt", liftM snd $ binPrim "gt")
+ltePrim = ("lte", liftM snd $ binPrim "lte")
+gtePrim = ("gte", liftM snd $ binPrim "gte")
+eqPrim = ("eq", liftM snd $ binPrim "eq")
+neqPrim = ("neq", liftM snd $ binPrim "neq")
 
-unaryUnsafePrim :: UniqueMonad m => Name -> m (ProgM C C)
-unaryUnsafePrim name = do
+-- | Implements primitive to create data values. The argument
+-- specifies the number of values the constructor will take. The
+-- function defined here always takes one more argument, which will
+-- hold the tag for the value.
+mkDataPrim :: UniqueMonad m => Constructor -> Int -> m (ProgM C C)
+mkDataPrim tag numArgs = do
+  let name = "mkData_" ++ tag
+      -- Make the final closure & block for 
+      -- executing the "mkDataP" primitive with all the right arguments.
+      mkLam bName 0 vs = do
+        bLabel <- freshLabel
+        let bloConstr = mkFirst (BlockEntry bName bLabel vs) <*>
+              mkLast (Done bName bLabel (ConstrM tag vs))
+        return (bLabel, bloConstr)
+      mkLam cName n vs = do
+        cLabel <- freshLabel
+        let arg = "t" ++ show (length vs + 1)
+            capt = vs ++ [arg]
+            nextName = "Constr_" ++ tag ++ "_" ++ show (n - 1)
+        (nextLabel, prog) <- mkLam nextName (n - 1) capt
+        let cloConstr = mkFirst (CloEntry cName cLabel vs arg) <*>
+                        mkLast (Done cName cLabel (if n == 1 
+                                                    then Goto (nextName, nextLabel) capt
+                                                    else Closure (nextName, nextLabel) capt))
+        return (cLabel, cloConstr |*><*| prog)
+  (_, p) <- mkLam name numArgs []
+  return p
+
+monadic :: UniqueMonad m => (Name -> m (Dest, ProgM C C)) -> Name -> m (Dest, ProgM C C)
+monadic rest name  = do
+  thunkLabel <- freshLabel
+  (dest, prog) <- rest (name ++ "Thunk")
+  let thunkBody = mkFirst (BlockEntry name thunkLabel []) <*>
+                  mkLast (Done name thunkLabel (Thunk dest []))
+  return ((name, thunkLabel), thunkBody |*><*| prog)
+  
+unaryPrim :: UniqueMonad m => Name -> m (Dest, ProgM C C)
+unaryPrim name = do
   bodyLabel <- freshLabel
   c1Label <- freshLabel
   let bodyName = name ++ "Body" 
@@ -301,9 +375,9 @@ unaryUnsafePrim name = do
              mkLast (Done bodyName bodyLabel $ Prim name ["a"])
       c1 = mkFirst (CloEntry name c1Label [] "a") <*>
            mkLast (Done name c1Label $ Thunk (bodyName, bodyLabel) ["a"])
-  return (c1 |*><*| body)
+  return ((name, c1Label), c1 |*><*| body)
                    
-binPrim :: UniqueMonad m => Name -> m (ProgM C C)
+binPrim :: UniqueMonad m => Name -> m (Dest, ProgM C C)
 binPrim name = do
   bodyLabel <- freshLabel
   c2Label <- freshLabel
@@ -316,18 +390,19 @@ binPrim name = do
            mkLast (Done c2Name c2Label $ Goto (bodyName, bodyLabel) ["a", "b"])
       c1 = mkFirst (CloEntry name c1Label [] "a") <*>
            mkLast (Done name c1Label $ Closure (c2Name, c2Label) ["a"])
-  return (c1 |*><*| c2 |*><*| body)
+  return ((name, c1Label), c1 |*><*| c2 |*><*| body)
 
 -- | Doesn't carry any useful information,
--- used by our rewriter since it calculates no
+-- used by rewriters that calculate no
 -- new facts.
 type EmptyFact = ()
 
--- A no-op transfer function. Used during rewrite since we 
+-- | A no-op transfer function. Used by rewriters that
 -- don't gather any new facts.
 noOpTrans :: StmtM e x -> Fact x EmptyFact -> EmptyFact
 noOpTrans _ _ = ()
 
+-- | Lattice with only one element and no changes.
 emptyLattice :: DataflowLattice EmptyFact
 emptyLattice = DataflowLattice { fact_name = "Empty fact"
                                , fact_bot = ()
