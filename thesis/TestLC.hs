@@ -21,8 +21,11 @@ import LCM
 
 fromProgram :: Program -> [(Name, Expr)]
 fromProgram (Program { decls = (Decls d)}) = 
-  map (\(Defn name _ expr) -> (name, expr)) . getDefns $ d
-
+    map (\(Defn name _ expr) -> (name, expr)) . concatMap f $ d
+  where
+    f (Mutual decls) = decls
+    f (Nonrec decl) = [decl] 
+    
 progM :: [(Name, Expr)] -> ([Name], ProgM C C) -> IO ()
 progM progs prelude = do
     -- putStrLn "\n ========= Unoptimized ============"
