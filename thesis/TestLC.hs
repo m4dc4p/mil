@@ -25,12 +25,13 @@ fromProgram (Program { decls = (Decls d)}) =
 
 progM :: [(Name, Expr)] -> ([Name], ProgM C C) -> IO ()
 progM progs prelude = do
-    putStrLn "\n ========= Unoptimized ============"
-    printResult progs (map (addLive tops) . map (compile tops prelude) . map (: []) $ progs)
+    -- putStrLn "\n ========= Unoptimized ============"
+    -- printResult progs (map (addLive tops) . map (compile tops prelude) . map (: []) $ progs)
 
     let optProgs = mostOpt tops prelude . (compile tops prelude) $ progs
 
-    putStrLn "\n ========= Optimized Together ============="
+    putStrLn (render $ vcat (map printDef progs))
+    putStrLn "================================================================================"
     putStrLn (render $ printProgM optProgs)
 
     -- let (used, killed, ant) = anticipated optProgs
@@ -65,6 +66,9 @@ progM progs prelude = do
 
     printExprs = vcat . map printExprMap . Map.toList 
 
+    printDef :: Def -> Doc
+    printDef def = text (show (ppr def))
+
     printWithDef :: (Def, ProgM C C) -> Doc
     printWithDef (def, comp) = text (show (ppr def)) $+$ 
                                vcat' (maybeGraphCC empty printBlockM comp)
@@ -74,12 +78,44 @@ progM progs prelude = do
 
     printResult defs progs = putStrLn (render (vcat' (map ((text "" $+$) . printWithDef) (zip defs progs))))
 
-                     
-  
+-- Optimize a hand-writen MIL program.
+milTest :: SimpleUniqueMonad (ProgM C C) -> IO ()
+milTest prog = do
+  let p = runSimpleUniqueMonad prog
+      blocks = map (fst . fst) . allBlocks  
+  putStrLn ("============== Original ================")
+  putStrLn (render . printProgM $ p)
+  putStrLn ("============== Optimized ===============")
+  putStrLn (render . printProgM . mostOpt (blocks p) prelude $ p)
 
--- f g y [] = []
--- f g y (x:xs) = (g y) x (f g y xs)
+{-
+   
+   funny g y [] = []
+   funny g y (x:xs) = (g y) x (funny g y xs)
 
+===
+
+mkData_Nil (): Nil
+funny {} g: blockfunny(g)
+blockfunny (g): closure absBody261 {g}
+absBody261 {g} y: blockabsBody261(g, y)
+blockabsBody261 (g, y): closure absBody292 {g, y}
+absBody292 {g, y} xs:
+  case xs of
+    Nil -> altBodyNil310()
+    Cons x xs' -> altBodyCons312(g, x, xs', y)
+altBodyNil310 ():
+  result307 <- mkData_Nil()
+  mkData_Nil()
+altBodyCons312 (g, x, xs', y):
+  v314 <- g @ y
+  v315 <- v314 @ x
+  v316 <- blockfunny(g)
+  v317 <- v316 @ y
+  v318 <- v317 @ xs'
+  v315 @ v318
+
+-}
 funnyFold = ("funny", 
              lam "g" $ \g ->
              lam "y" $ \y ->
@@ -91,6 +127,20 @@ funnyFold = ("funny",
                                    ((((var "funny") `app` g) `app` y) `app`
                                       xs')))))
 
+{-
+
+compose f g x = f (g x)
+
+===
+
+compose {} f: blockcompose(f)
+blockcompose (f): closure absBody217 {f}
+absBody217 {f} g: blockabsBody217(f, g)
+blockabsBody217 (f, g): closure absBody226 {f, g}
+absBody226 {f, g} x:
+  v230 <- g @ x
+  f @ v230
+-}
 compose :: Def
 compose = ("compose", composeDef)
 
@@ -98,11 +148,159 @@ composeDef = lam "f" $ \f ->
               lam "g" $ \g ->
               lam "x" $ \x -> f `app` (g `app` x)
 
+{-
+
+main = compose foo bar x
+compose f g x = f (g x)
+
+===
+
+compose {} f: blockcompose(f)
+blockcompose (f): closure absBody217 {f}
+absBody217 {f} g: blockabsBody217(f, g)
+blockabsBody217 (f, g): closure absBody226 {f, g}
+absBody226 {f, g} x:
+  v230 <- g @ x
+  f @ v230
+main (bar, foo, x):
+  v233 <- blockcompose(foo)
+  v234 <- v233 @ bar
+  v234 @ x
+-}
 origExample = [("main", var "compose" `app` var "foo" `app` var "bar" `app` var "x")
               , compose]
+{-
+  hello = do
+    v <- print p
+    return ()
 
+===
+
+mkData_Unit (): Unit
+print (): thunk printThunk []
+printThunkBody (a): printThunk*(a)
+printThunk {} a: thunk printThunkBody [a]
+hello (p): thunk blockhello [p]
+blockhello (p):
+  v202 <- print()
+  v203 <- v202 @ p
+  v <- invoke v203
+  mkData_Unit()
+
+-}
 hello = ("hello", bindE "v" (mPrint `app` var "p") $ 
                   \v -> mkUnit)
+
+{- Monadic compose (from mon6)
+
+kleisli f g x = do
+  v1 <- g x
+  v2 <- f v1
+  return v2
+
+===
+
+kleisli {} f: blockkleisli(f)
+blockkleisli (f): closure absBody221 {f}
+absBody221 {f} g: blockabsBody221(f, g)
+blockabsBody221 (f, g): closure absBody232 {g, f}
+absBody232 {g, f} x:
+  v238 <- g @ x
+  v1 <- invoke v238
+  v237 <- f @ v1
+  invoke v237
+
+-}
+kleisli = ("kleisli",
+           lam "f" $ \f ->
+           lam "g" $ \g ->
+           lam "x" $ \x ->
+             bindE "v1" (g `app` x) $ \v1 ->
+             bindE "v2" (f `app` v1) id)
+
+{-
+  main = threeBinds print print print
+  threeBinds f g h = do
+    f
+    g
+    h
+    ()
+
+===
+
+mkData_Unit (): Unit
+print (): thunk printThunk []
+printThunkBody (a): printThunk*(a)
+printThunk {} a: thunk printThunkBody [a]
+main ():
+  v201 <- print()
+  v202 <- blockthreeBinds(v201)
+  v203 <- print()
+  v204 <- v202 @ v203
+  v205 <- print()
+  v204 @ v205
+threeBinds {} f: blockthreeBinds(f)
+blockthreeBinds (f): closure absBody220 {f}
+absBody220 {f} g: blockabsBody220(f, g)
+blockabsBody220 (f, g): closure absBody227 {f, g}
+absBody227 {f, g} h:
+  () <- invoke f
+  () <- invoke g
+  () <- invoke h
+  mkData_Unit()
+-}
+printTest1 = [threeBinds, main]
+  where
+    main = ("main",
+              var "threeBinds" `app` mPrint `app` mPrint `app` mPrint)
+    threeBinds = ("threeBinds",
+                  lam "f" $ \f ->
+                  lam "g" $ \g ->
+                  lam "h" $ \h ->
+                    bindE "()" f $ \_ ->
+                    bindE "()" g $ \_ -> 
+                    bindE "()" h $ \_ -> mkUnit)
+
+{-
+
+  main = threeBinds print print print
+  threeBinds f g h = do
+    f
+    g
+    h
+===
+
+print (): thunk printThunk []
+printThunkBody (a): printThunk*(a)
+printThunk {} a: thunk printThunkBody [a]
+main ():
+  v201 <- print()
+  v202 <- blockthreeBinds(v201)
+  v203 <- print()
+  v204 <- v202 @ v203
+  v205 <- print()
+  v204 @ v205
+threeBinds {} f: blockthreeBinds(f)
+blockthreeBinds (f): closure absBody220 {f}
+absBody220 {f} g: blockabsBody220(f, g)
+blockabsBody220 (f, g): closure absBody227 {f, g}
+absBody227 {f, g} h:
+  () <- invoke f
+  () <- invoke g
+  invoke h
+
+-}
+printTest2 = [doBinds, main]
+  where
+    main = ("main",
+              var "doBinds" `app` mPrint `app` mPrint `app` mPrint)
+    doBinds = ("doBinds",
+                  lam "f" $ \f ->
+                  lam "g" $ \g ->
+                  lam "h" $ \h ->
+                    bindE "()" f $ \_ ->
+                    bindE "()" g $ \_ -> 
+                    bindE "()" h $ \x -> x)
 
 {-
   if x > 10 
@@ -117,28 +315,6 @@ lcmTest1 = ("lcmTest1"
                _case (x `gt` lit 10) 
                   (alt "True" [] (const $ x `plus` lit 1 `plus` y) .
                    alt "False" [] (const $ x `plus` lit 1 `plus` z)))
-
--- Monadic compose (from mon6)
-kleisli = ("kleisli",
-           lam "f" $ \f ->
-           lam "g" $ \g ->
-           lam "x" $ \x ->
-             bindE "v1" (g `app` x) $ \v1 ->
-             bindE "v2" (f `app` v1) id)
-
-threeBinds = ("threeBinds",
-              lam "f" $ \f ->
-              lam "g" $ \g ->
-              lam "h" $ \h ->
-                bindE "()" f $ \_ ->
-                bindE "()" g $ \_ -> 
-                bindE "()" h $ \_ -> mkUnit)
-
-printThree = [threeBinds, main]
-  where
-    main = ("main",
-              var "threeBinds" `app` mPrint `app` mPrint `app` mPrint)
-                
 
 lcmTest2 = ("lcmTest2"
            , lam "x" $ \x ->
@@ -200,22 +376,85 @@ lcmTest7 = ("lcmTest6"
                      (alt "D" [] 
                       (const (var "foo" `app` a))))))))
                 
-compose2 = ("compose2"
+{-
+  compose2 x f g = g (f x) f
+
+===
+
+compose2 {} x: blockcompose2(x)
+blockcompose2 (x): closure absBody221 {x}
+absBody221 {x} f: blockabsBody221(x, f)
+blockabsBody221 (x, f): closure absBody232 {f, x}
+absBody232 {f, x} g:
+  v237 <- f @ x
+  v238 <- g @ v237
+  v238 @ f
+
+-}
+sortOfCompose = ("sortOfCompose"
            , lam "x" $ \x ->
              lam "f" $ \f ->
              lam "g" $ \g ->
              (g `app` (f `app` x) `app` f))
 
 -- Fully applied primitive
+{-
+primtest x y = x + y
+
+===
+
+primTest {} x: blockprimTest(x)
+blockprimTest (x): closure absBody208 {x}
+absBody208 {x} y: plus*(x, y)
+-}
 primTest1 = ("primTest"
             , lam "x" $ \x ->
               lam "y" $ \y -> plus x y)
          
 -- Partially apply primitive    
+{-
+primtest x = (x +)
+
+===
+
+plusClo2 {a} b: plus*(a, b)
+primTest {} x: closure plusClo2 {x}
+-}
 primTest2 = ("primTest"
             , lam "x" $ \x -> var "plus" `app` x)
              
 
+{-
+fact n a =
+    case n - 1 of
+      True -> a
+      False -> fact (n - 1) (n * a)
+
+main = fact 4 1
+===
+
+main ():
+  v201 <- num 4
+  v202 <- blockfact(v201)
+  v203 <- num 1
+  v202 @ v203
+fact {} n: blockfact(n)
+blockfact (n): closure absBody243 {n}
+absBody243 {n} a:
+  v276 <- num 1
+  v277 <- lt*(n, v276)
+  case v277 of
+    True -> altBodyTrue265(a)
+    False -> altBodyFalse267(a, n)
+altBodyTrue265 (a): return a
+altBodyFalse267 (a, n):
+  v270 <- num 1
+  v271 <- minus*(n, v270)
+  v272 <- blockfact(v271)
+  v274 <- times*(n, a)
+  v272 @ v274
+
+-}
 fact = [("fact"
         , lam "n" $ \n ->
           lam "a" $ \a ->
@@ -226,6 +465,42 @@ fact = [("fact"
         , var "fact" `app` lit 4 `app` lit 1)]
          
 
+{-
+factCPS n k = 
+    case n < 1 of
+      True -> k 1
+      False -> factCPS (n - 1) (\a -> k (n * a))
+
+main = factCPS 4 id
+id x = x
+===
+
+id {} x: return x
+main (id):
+  v204 <- num 4
+  v205 <- blockfactCPS(v204)
+  v205 @ id
+factCPS {} n: blockfactCPS(n)
+blockfactCPS (n): closure absBody259 {n}
+absBody259 {n} k:
+  v306 <- num 1
+  v307 <- lt*(n, v306)
+  case v307 of
+    True -> altBodyTrue288(k)
+    False -> altBodyFalse291(k, n)
+altBodyTrue288 (k):
+  v290 <- num 1
+  k @ v290
+altBodyFalse291 (k, n):
+  v294 <- num 1
+  v295 <- minus*(n, v294)
+  v296 <- blockfactCPS(v295)
+  v304 <- closure absBody297 {k, n}
+  v296 @ v304
+absBody297 {k, n} a:
+  v303 <- times*(n, a)
+  k @ v303
+-}
 factCPS = [("factCPS"
           , lam "n" $ \n ->
             lam "k" $ \k ->
@@ -239,26 +514,6 @@ factCPS = [("factCPS"
            , var "factCPS" `app` lit 4 `app` var "id")
           ,("id"
            , lam "x" $ \x -> x)]
-
-factCP2S = [("factCPS"
-          , lam "n" $ \n ->
-            lam "k" $ \k ->
-              _case n 
-                 (alt "False" [] (const (var "factCPS" `app` 
-                                         (n `minus` lit 1) `app` 
-                                         (lam "a" $ \a -> k)))))
-          ,("main"
-           , var "factCPS" `app` var "id")]
-
--- Optimize a hand-writen MIL program.
-milTest :: SimpleUniqueMonad (ProgM C C) -> IO ()
-milTest prog = do
-  let p = runSimpleUniqueMonad prog
-      blocks = map (fst . fst) . allBlocks  
-  putStrLn ("============== Original ================")
-  putStrLn (render . printProgM $ p)
-  putStrLn ("============== Optimized ===============")
-  putStrLn (render . printProgM . mostOpt (blocks p) prelude $ p)
 
 {-- 
 Does not rewrite
@@ -400,18 +655,128 @@ testBindReturn6 = do
            mkMiddle (Bind "z" (ConstrM "C" [])) <*>
            mkLast (Done "block1" l1 (Return "c"))
 
-{-- Testing ELet --}
+{-- 
+
+main foo bar x = 
+  let compse f g x = f (g x)
+  in compose foo bar x
+
+===
+
+main (bar, foo, x):
+  v234 <- blockabsBody201(foo)
+  v235 <- v234 @ bar
+  v235 @ x
+blockabsBody201 (f): closure absBody219 {f}
+absBody219 {f} g: blockabsBody219(f, g)
+blockabsBody219 (f, g): closure absBody228 {f, g}
+absBody228 {f, g} x:
+  v232 <- g @ x
+  f @ v232
+
+ --}
 origExample2 = ("main", 
                       _let "compose" composeDef $ \compose ->
                       compose `app` var "foo" `app` var "bar" `app` var "x")
 
 {-- From Mark
 f x = let g y = x + y
+
        in g
+
+===
+
+f {} x: closure absBody208 {x}
+absBody208 {x} y: plus*(x, y)
+
 --}
 letPlus = ("f", 
               lam "x" $ \x -> 
               _let "g" (lam "y" $ \y -> x `plus` y) $ \g -> g)
+
+{-- Mutually recursive -- will not compile correctly. No fix planned.
+h z = let f y = y + g y
+          g y = y + f y 
+      in f z
+
+===
+
+h {} z:
+  f <- closure absBody218 {g}
+  f @ z
+absBody218 {g} y:
+  v224 <- plus*(y, g)
+  v224 @ y
+--}
+letRec = ("h", 
+              lam "z" $ \z -> 
+              _let "f" (lam "y" $ \y -> y `plus` (var "g") `app` y) $ \f ->
+              _let "g" (lam "y" $ \y -> y `plus` (var "f") `app` y) $ \g ->
+              f `app` z)
+
+{-- Lambda-lifted mutually recursive version of the above.
+f y g = y + g y f
+g y f = y + f y g
+
+h z = f z g
+
+====
+
+h {} z:
+  v203 <- blockf(z)
+  v203 @ g
+g {} y: blockg(y)
+blockg (y): closure absBody217 {y}
+absBody217 {y} f:
+  v224 <- blockf(y)
+  v225 <- v224 @ g
+  plus*(y, v225)
+f {} y: blockf(y)
+blockf (y): closure absBody239 {y}
+absBody239 {y} g:
+  v246 <- blockg(y)
+  v247 <- v246 @ f
+  plus*(y, v247)
+
+--}
+letRecLifted = [("f", lam "y" $ \y -> lam "g" $ \g -> y `plus` (g `app` y `app` var "f"))
+               ,("g", lam "y" $ \y -> lam "f" $ \f -> y `plus` (f `app` y `app` var "g"))
+               ,("h", lam "z" $ \z -> var "f" `app` z `app` var "g")]
+
+{- 
+
+  map f [] = []
+  map f (x:xs) = f x : map f xs
+
+===
+
+mkData_Cons {} t1: closure Constr_Cons_1 {t1}
+Constr_Cons_1 {t1} t2: Constr_Cons_0(t1, t2)
+Constr_Cons_0 (t1, t2): Cons* t1 t2
+mkData_Nil (): Nil*
+map {} f: blockmap(f)
+blockmap (f): closure absBody230 {f}
+absBody230 {f} xs:
+  case xs of
+    Nil -> altBodyNil248()
+    Cons x xs -> altBodyCons250(f, x, xs)
+altBodyNil248 ():
+  result245 <- mkData_Nil()
+  mkData_Nil()
+altBodyCons250 (f, x, xs):
+  v252 <- mkData_Cons()
+  v253 <- f @ x
+  v254 <- v252 @ v253
+  v255 <- blockmap(f)
+  v256 <- v255 @ xs
+  v254 @ v256
+
+-}
+myMap = ("map",
+         lam "f" $ \f ->
+         lam "xs" $ \xs ->
+           _case xs $ (alt "Nil" [] (\_ -> mkNil) . 
+            (alt "Cons" ["x", "xs"] (\ [x, xs] -> mkCons `app` (f `app` x) `app` (var "map" `app` f `app` xs)))))
 
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
@@ -425,6 +790,9 @@ mkUnit = ECon "Unit" []
 mkNil :: Expr
 mkNil = ECon "Nil" [] 
 
+mkCons :: Expr
+mkCons = ECon "Cons" [typ, typ] 
+
 bindE :: String -> Expr -> (Expr -> Expr) -> Expr
 bindE v body rest = EBind v typ body (rest (var v))
 
@@ -434,7 +802,6 @@ lam v body = ELam v typ (body (var v))
 plus, minus, times, div :: Expr -> Expr -> Expr
 
 lt, gt, lte, gte, eq, neq :: Expr -> Expr -> Expr
-
 
 infixl 6 `plus`, `minus`
 infixl 7 `times`, `div`

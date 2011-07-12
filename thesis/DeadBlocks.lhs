@@ -102,5 +102,5 @@ rewritten graph is returned.
 >                  -> (ChangeFlag, ProgM C C)
 >     remove live (flag, prog) (dest@(name, _), block) 
 >       | dest `Set.member` live || name `elem` tops = (flag, blockGraph block |*><*| prog)
->       | otherwise = trace ("removed " ++ name) (SomeChange, prog)
+>       | otherwise = (SomeChange, prog)
 > 

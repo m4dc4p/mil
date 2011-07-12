@@ -36,9 +36,10 @@ data CompS = C { compI :: Int -- ^ counter for fresh variables
                                              -- states. Starts non-monadic (False, []).
 
 -- | Create the initial state for our compiler.
-mkCompS i predefined = 
-  let mkMap = Map.fromList . map ((\dest@(n, _) -> (n, Just dest)) . destOfEntry . snd) . entryPoints 
-  in C i emptyClosedGraph (mkMap predefined) (False, [])
+mkCompS i userTops predefined = 
+  let mkMap = map ((\dest@(n, _) -> (n, Just dest)) . destOfEntry . snd) . entryPoints 
+      tops = zip userTops (repeat Nothing)
+  in C i emptyClosedGraph (Map.fromList (tops ++ mkMap predefined)) (False, [])
                
 type CompM = State CompS
 type Free = [Name]
@@ -78,7 +79,7 @@ compile userTops (primNames, predefined) defs =
     -- state, to be used during the next definition.
     compileDef :: Def -> (Int, [ProgM C C]) -> (Int, [ProgM C C])
     compileDef p (i, ps) = 
-      let result = execState (newDefn p) (mkCompS i predefined)
+      let result = execState (newDefn p) (mkCompS i userTops predefined)
       in (compI result + 1, compG result : ps)
 
 -- Creates a new function definition
@@ -309,5 +310,5 @@ toAlt (LC.Alt cons _ vs expr) = Alt cons vs expr
 getDefns :: [Decl] -> [Defn]
 getDefns = concatMap f
   where
-    f (Mutual decls) = decls
+    f (Mutual decls) = error "Unable to compile mutually recursive Let declarations."
     f (Nonrec decl) = [decl]

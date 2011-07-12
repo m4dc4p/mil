@@ -516,7 +516,7 @@ inlineSimple tops = deadCode . bindSubst . inlineReturn
 
 mostOpt :: [Name] -> ([Name], ProgM C C) -> ProgM C C -> ProgM C C
 mostOpt tops prelude@(prims, _) = addLive tops .
-    deadBlocks tops . 
+    -- deadBlocks tops . 
     -- inlineBlocks tops . 
     deadBlocks tops .  
     inlineSimple tops . 
