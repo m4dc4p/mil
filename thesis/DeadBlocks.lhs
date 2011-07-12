@@ -2,7 +2,7 @@
 
 > {-# LANGUAGE TypeSynonymInstances, GADTs, RankNTypes
 >   , NamedFieldPuns, TypeFamilies, ScopedTypeVariables #-}
-> module DeadBlocks (deadBlocks, BlockPredecessors, findBlockPreds)
+> module DeadBlocks (deadBlocks, BlockPredecessors)
 >
 > where 
 >
@@ -24,121 +24,63 @@
 
 %endif
 
-Our first analysis finds all the blocks referenced within a 
-given block, which we call the |LiveBlock| set.
+Our analysis finds all the live blocks in the program. A block |p| is
+live if block |b| explicitly calls the block using a |Goto p|
+statement or returns a reference to it in a |Closure| or |Thunk|
+value. Our type |LiveBlocks| maps referred blocks to their
+referrers. Each block will appear in the map. If no other blocks refer
+to a given block, the list stored with that block will be empty.
 
-> type LiveBlock = Set Dest
+> type ReferrencedBlocks = Map Dest [Dest]
 
-To find the live blocks, we proceed backward over each
-block, collecting all the blocks called. This portion of
-the analysis does not do any rewriting, so there is no
-rewrite function to show.
-\savecolumns
+To find live blocks, we iterate over the statements in each block and
+discover all explicit block references in |Tail| expressions (as
+returned by the |tailDest| function). The set of these references
+are the live blocks.
 
-> liveBlockTransfer :: BwdTransfer StmtM LiveBlock
-> liveBlockTransfer = mkBTransfer live
+> findBlockReferences :: ProgM C C -> ReferrencedBlocks
+> findBlockReferences body = undefined -- foldl add Map.empty . allBlocks
+
 >   where
->     live :: StmtM e x -> Fact x LiveBlock -> LiveBlock
+>     add refMap (dest, block) = 
+>       let refs = nub . foldlBlock findRefs []
+>       in Map.insert dest (refs block) refMap
 
-|Bind|, |CaseM| and |Done| are treated nearly identically. We look in
-the tails and find all referenced blocks. Those are added to the
-accumulated |liveBlocks| set. Entry labels just transfer the
-accumulated set untouched.
-\restorecolumns
-
->     live (Bind v tail) liveBlocks = Set.fromList (tailDest tail) 
->                                     `Set.union` liveBlocks
->     live (CaseM _ alts) liveBlocks = Set.unions (map (Set.fromList . tailDest . altE) 
->                                                  alts ++ mapElems liveBlocks)
->     live (Done _ _ tail) liveBlocks =  Set.unions (Set.fromList (tailDest tail) : 
->                                                mapElems liveBlocks)
->     live (BlockEntry _ l _) liveBlocks = liveBlocks
->     live (CloEntry _ l _ _) liveBlocks = liveBlocks
-
-
-The facts gathered are converted to a map of blocks to predecessors. |BlockPredecessors|
-implements this map using the |Dest| type, which uniquely names a block.
-
-> type BlockPredecessors = Map Dest [Dest]
-
-
-The map is built by |findBlockPreds|. To get |LiveBlock| facts
-(indexed by label) from Hoopl, we pattern match on the result of
-|analyzeAndRewriteBwd|. That value, |f|, is then manipulated to get a
-map of blocks to their predecessors. We also must be sure that we do
-NOT eliminate top-level functions (which have no predecessors, but we
-don't want to eliminate them!). The |tops| argument makes sure we know
-which blocks those are.
-\savecolumns
-
-> findBlockPreds :: [Name] -> ProgM C C -> BlockPredecessors
-> findBlockPreds tops body = runSimple $ do
->     (_, f, _) <- analyzeAndRewriteBwd bwd (JustC labels) body initial
->     return $ Map.fromList (catMaybes (map convert (mapToList f)))
->   where
-
-To indicate to Hoopl that we are doing a backwards, analysis only,
-pass, we build a |BwdPass| value with a no-op rewrite function that
-Hoopl provides, |noBwdRewrite|. Our fact lattice is based on
-|LiveBlock| and will union facts together until no more
-changes occur. The transfer function, |liveBlockTransfer| is defined 
-above.
-\restorecolumns
-
->     bwd = BwdPass { bp_lattice = liveBlockLattice
->                   , bp_transfer = liveBlockTransfer
->                   , bp_rewrite = noBwdRewrite }
->     liveBlockLattice :: DataflowLattice LiveBlock
->     liveBlockLattice = DataflowLattice { fact_name = "Live blocks"
->                                        , fact_bot = Set.empty
->                                        , fact_join = extend }
->     extend _ (OldFact old) (NewFact new) = 
->       (changeIf (not (Set.null (Set.difference new old)))
->       , new)
-> 
-
-The remaining functions for |findBlockPreds| take care of converting our facts
-to a |BlockPredecessors| value.
-\restorecolumns
-
->     convert (label, set) = case blockOfLabel body label of
->                                  Just (dest, _) -> Just (dest, Set.toList set)
->                                  _ -> Nothing
->     labels = entryLabels body
->     initial = mkFactBase (bp_lattice bwd) 
->               (zip labels(repeat (Set.fromList (topLabels body))))
->     topLabels :: ProgM C C -> [Dest]
->     topLabels = filter (\(n, l) -> n `elem` tops) . map fst . allBlocks
-
+>     findRefs :: ReferrencedBlocks -> StmtM e x -> ReferrencedBlocks
+>     findRefs liveBlocks (Bind v tail) = tailDest tail ++ liveBlocks
+>     findRefs liveBlocks (CaseM _ alts) = concat (liveBlocks : map (tailDest . altE) alts)
+>     findRefs liveBlocks (Done _ _ tail) =  liveBlocks ++ tailDest tail
+>     findRefs liveBlocks (BlockEntry _ l _) = liveBlocks
+>     findRefs liveBlocks (CloEntry _ l _ _) = liveBlocks
 
 To remove dead blocks, we re-implement a small part of Hoopl's interleaved, 
-iterative analysis and rewriting. |deadBlocks| uses |findBlockPreds| to find
-predecessors for all blocks. |removeOrphans| eliminates any blocks without
-predecessors (that are not top-level blocks, of course). It will  return |SomeChange|
+iterative analysis and rewriting. |deadBlocks| uses |findBlockReferences| to find
+references for all blocks. |removeOrphans| eliminates any blocks without
+references (that are not top-level blocks, of course). It will  return |SomeChange|
 and the new graph if any blocks were eliminated. As long as |SomeChange| is returned,
-|deadBlocks| will continue to execute, looking for more blocks to execute. When no
+|deadBlocks| will continue to execute, looking for more blocks to eliminate. When no
 more changes occure, the rewritten graph is returned.
 
-> deadBlocks :: [Name] -> ProgM C C -> ProgM C C
-> deadBlocks tops prog = 
->   case removeOrphans (liveSet prog) prog of
+> deadBlocks :: Set Dest -> ProgM C C -> ProgM C C
+> deadBlocks tops prog = {-# SCC "deadBlocksQ" #-}
+>   case removeOrphans (concat . Map.elems . findBlockPreds $ prog) prog of
 >     (SomeChange, prog') -> deadBlocks tops prog'
 >     _ -> prog
 >   where
->     liveSet = Set.fromList . concat . Map.elems . findBlockPreds tops
-> 
->     removeOrphans :: LiveBlock 
+>     removeOrphans :: LiveBlocks 
 >                   -> ProgM C C 
 >                   -> (ChangeFlag, ProgM C C)
 >     removeOrphans live = foldl (remove live) 
 >                                (NoChange, emptyClosedGraph) . 
 >                                allBlocks
 > 
->     remove :: LiveBlock 
+>     remove :: LiveBlocks 
 >                  -> (ChangeFlag, ProgM C C) 
 >                  -> (Dest, Block StmtM C C) 
 >                  -> (ChangeFlag, ProgM C C)
->     remove live (flag, prog) (dest, block) 
->       | dest `Set.member` live = (flag, blockGraph block |*><*| prog)
+>     remove live (flag, prog) (dest, block) =
+>       case Map.lookup dest live of
+>         Just [] -> 
+>       | dest `Set.member` live || dest `Set.member` tops = (flag, blockGraph block |*><*| prog)
 >       | otherwise = (SomeChange, prog)
 > 
