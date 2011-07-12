@@ -312,20 +312,22 @@ collapseLattice = DataflowLattice { fact_name = "Closure collapse"
 -- it has only one caller).
 
 -- Nothing -- unknown
--- Maybe True - will inline
--- Maybe False - will not inline
+-- Just True - will inline
+-- Just False - will not inline
 type InlineFact = Maybe Bool
 
 inlineBlocks :: [Name] -> ProgM C C -> ProgM C C
 inlineBlocks tops body = 
   case runInline tops body of
-    (True, body') -> inlineBlocks tops (deadBlocks tops body')
+    (True, body') -> inlineBlocks tops body'
     (_, body') -> body'
+
+runInline :: [Name] -> ProgM C C -> (Bool, ProgM C C)
+runInline tops body = runSimple $ do
+    (body', f, _) <- analyzeAndRewriteBwd bwd (JustC labels) body initial
+    return (or (catMaybes (mapElems f)), body')
   where
-    runInline tops body = runSimple $ do
-      (body', f, _) <- analyzeAndRewriteBwd bwd (JustC labels) body initial
-      return (or (catMaybes (mapElems f)), body')
-    preds = findBlockPreds tops body
+    preds = findBlockReferrers body
     labels = entryLabels body
     initial = mkFactBase (bp_lattice bwd) (zip labels (repeat Nothing))
     bwd = BwdPass { bp_lattice = inlineLattice
@@ -341,13 +343,13 @@ inlineLattice = DataflowLattice { fact_name = "Inline blocks"
     extend _ (OldFact old) (NewFact new) = (changeIf (old /= new)
                                            , new)
 
-inlineTransfer :: BlockPredecessors -> BwdTransfer StmtM InlineFact
-inlineTransfer preds = mkBTransfer bw
+inlineTransfer :: BlockReferrers -> BwdTransfer StmtM InlineFact
+inlineTransfer referrers = mkBTransfer bw
   where
-    -- Find blocks which are the sole predecessor to another
+    -- Find blocks which are the sole referrer to another
     -- block. 
     bw :: StmtM e x -> Fact x InlineFact -> InlineFact
-    bw (Bind v (Goto dest vs)) f = singlePred preds dest f 
+    bw (Bind v (Goto dest vs)) f = singlePred referrers dest f 
     bw (Bind {}) f = f
     bw (CaseM {}) _ = Just False
     bw (Done _ _ (Goto dest _)) f = Nothing -- singlePred preds dest Nothing
@@ -355,18 +357,13 @@ inlineTransfer preds = mkBTransfer bw
     bw (CloEntry {}) f = f
     bw (BlockEntry {}) f = f
 
-singlePred :: BlockPredecessors -> Dest -> InlineFact -> InlineFact
-singlePred preds dest f 
-  | dest `Map.member` preds && null (drop 1 (preds ! dest)) = Just (maybe True (True &&) f)
-  | otherwise = f
-
-inlineRewrite :: FuelMonad m => BlockPredecessors -> ProgM C C -> BwdRewrite m StmtM InlineFact
-inlineRewrite preds prog = mkBRewrite rewriter
+inlineRewrite :: FuelMonad m => BlockReferrers -> ProgM C C -> BwdRewrite m StmtM InlineFact
+inlineRewrite referrers prog = mkBRewrite rewriter
   where
     rewriter :: FuelMonad m => forall e x. StmtM e x -> Fact x InlineFact -> m (Maybe (ProgM e x))
     rewriter (Bind v (Goto dest vs)) (Just True) = return (inlineBind v dest vs)
     rewriter (Done _ _ (Goto dest vs)) _ = 
-      case singlePred preds dest Nothing of
+      case singlePred referrers dest Nothing of
         Just True -> return (inlineDone dest vs)
         _ -> return Nothing
 
@@ -407,6 +404,11 @@ inlineRewrite preds prog = mkBRewrite rewriter
           changeTail env (Run v) = Run (changeVar env v)
           changeTail env (Prim p vs) = Prim p (map (changeVar env) vs)
           changeVar env f = Map.findWithDefault f f env
+
+singlePred :: BlockReferrers -> Dest -> InlineFact -> InlineFact
+singlePred referrers dest f 
+  | dest `Map.member` referrers && Set.size (referrers ! dest) == 1 = Just (maybe True (True &&) f)
+  | otherwise = f
 
 -- Goto/Return elimination
 -- When a Goto jumps to a block that immediately calls a primitive, or
@@ -513,21 +515,19 @@ optCollapse tops = deadCode . collapse
 inlineSimple tops = deadCode . bindSubst . inlineReturn 
 
 mostOpt :: [Name] -> ([Name], ProgM C C) -> ProgM C C -> ProgM C C
-mostOpt userTops prelude@(prims, _) body = addLive tops .
-    newTops deadBlocks . 
-    inlineBlocks tops . 
-    newTops deadBlocks .  
+mostOpt tops prelude@(prims, _) = addLive tops .
+    deadBlocks tops . 
+    -- inlineBlocks tops . 
+    deadBlocks tops .  
     inlineSimple tops . 
-    newTops optCollapse . 
+    optCollapse tops . 
     bindReturn . 
     deadCode . 
     bindSubst .
-    addLive tops $ body
-  where
-    newTops :: ([Name] -> ProgM C C -> ProgM C C) -> ProgM C C -> ProgM C C
-    newTops f b = f (userTops ++ primTops b) b
-    tops = userTops ++ primTops body
-    primTops :: ProgM C C -> [Name]
-    primTops body = 
-      let allLive = Set.unions . mapElems $ findLive [] body
-      in filter (`Set.member` allLive) prims
+    addLive tops 
+
+-- | Converts the names given to a set of Dest values. Any
+-- names which do not have corresponding entry points in the program
+-- given will not appear in the output set.
+namesToDests :: [Name] -> ProgM C C -> Set Dest
+namesToDests names = Set.fromList . filter (\(n, l) -> n `elem` names) . map fst . allBlocks

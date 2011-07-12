@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, RankNTypes #-}
 
 module Util
 
@@ -78,4 +78,15 @@ maybeGraphCC b f (GMany _ middles _) = map f . mapElems $ middles
 -- using the monad Hoopl provides.
 runSimple :: SimpleFuelMonad a -> a
 runSimple p = runSimpleUniqueMonad $ runWithFuel infiniteFuel p
+
+-- | Fold the function given to every node in the block. We call
+-- this foldFwd because we apply the function from the beginning of the
+-- block to the end.
+foldFwdBlock :: (forall e x. a -> n e x -> a) -> a -> Block n C C -> a
+foldFwdBlock f a b = 
+  case blockToNodeList' b of
+    (JustC entry, mids, JustC exit) ->
+      let one = f a entry
+          two = foldl f one mids
+      in f two exit
 

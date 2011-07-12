@@ -25,8 +25,8 @@ fromProgram (Program { decls = (Decls d)}) =
 
 progM :: [(Name, Expr)] -> ([Name], ProgM C C) -> IO ()
 progM progs prelude = do
-    -- putStrLn "\n ========= Unoptimized ============"
-    -- printResult progs (map (addLive tops) . map (compile tops prelude) . map (: []) $ progs)
+    putStrLn "\n ========= Unoptimized ============"
+    printResult progs (map (addLive tops) . map (compile tops prelude) . map (: []) $ progs)
 
     let optProgs = mostOpt tops prelude . (compile tops prelude) $ progs
 
