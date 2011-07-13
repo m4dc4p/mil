@@ -260,6 +260,7 @@ collapseRewrite blocks = iterFwdRw (mkFRewrite rewriter)
     rewriter (Bind v (Enter f x)) col = bind v (collapse col f x)
     rewriter _ _ = return Nothing
 
+    collapse :: CollapseFact -> Name -> Name -> Maybe TailM
     collapse col f x =       
       case Map.lookup f col of
         Just (PElem (CloVal dest@(_, l) vs)) -> -- Just (Closure dest (vs ++ [x]))
@@ -448,15 +449,15 @@ inlineReturn body =
       -- First we find all the blocks which we
       -- could inline
       (_, f, _) <- analyzeAndRewriteBwd bwdAnalysis (JustC labels) body (initial bwdAnalysis)
-    
-      -- Turn our facts into a proper map of Dest -> Fact, then
-      -- use those facts to rewrite and inline.
       let returnBlocks = Map.fromList . map toDest . filter (isJust . snd) .  mapToList $ f
           toDest (l, Just f) = (fromJust (labelToDest body l), f)
+      -- Turn our facts into a proper map of Dest -> Fact, then
+      -- use those facts to rewrite and inline.
       (body', _, _) <- analyzeAndRewriteBwd (bwdRewrite returnBlocks) (JustC labels) body (initial (bwdRewrite returnBlocks))
       return body'
   where              
     labels = entryLabels body
+    initial :: BwdPass SimpleFuelMonad StmtM a -> FactBase a
     initial bwd = mkFactBase (bp_lattice bwd) (zip labels (repeat (fact_bot (bp_lattice bwd))))
     bwdRewrite :: ReturnPrimBlocks -> BwdPass SimpleFuelMonad StmtM EmptyFact
     bwdRewrite returnBlocks = BwdPass { bp_lattice = rewriteLattice
@@ -465,7 +466,7 @@ inlineReturn body =
     rewriteLattice :: DataflowLattice EmptyFact
     rewriteLattice = DataflowLattice { fact_name = "Goto/Return"
                                      , fact_bot = ()
-                                     , fact_join = extend }
+                                     , fact_join = extend}
     bwdAnalysis :: BwdPass SimpleFuelMonad StmtM ReturnPrimBlock
     bwdAnalysis = BwdPass { bp_lattice = analysisLattice
                           , bp_transfer = inlineReturnTransfer 
@@ -473,7 +474,8 @@ inlineReturn body =
     analysisLattice = DataflowLattice { fact_name = "Goto/Return"
                                       , fact_bot = Nothing
                                       , fact_join = extend }
-    extend _ (OldFact old) (NewFact new) = (changeIf (old /= new), new)
+    extend :: (Eq a) => JoinFun a
+    extend _ (OldFact old) (NewFact new) = (changeIf (old /= new), new)   
 
 inlineReturnTransfer :: BwdTransfer StmtM ReturnPrimBlock
 inlineReturnTransfer = mkBTransfer bw
