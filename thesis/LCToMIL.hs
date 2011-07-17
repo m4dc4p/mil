@@ -86,21 +86,9 @@ compile userTops (primNames, predefined) defs =
 -- using the arguments given and adds it
 -- to the control flow graph.    
 newDefn :: (Name, Expr) -> CompM ()
-newDefn (name, (ELam v _ b)) = do
-  tops <- gets compT >>= return . Map.keys
-  let fvs = v `delete` free b \\ tops
-  cloDefn name v fvs (\n l -> compileStmtM b (return . mkLast . Done n l)) 
-  return ()
-
--- A monadic progam will always begin with EBind.
-newDefn (name, body@(EBind v _ b r)) = do
-  tops <- gets compT >>= return . Map.keys
-  let fvs = v `delete` (nub (free b ++ free r) \\ tops)
-  thunkDefn name fvs (\n l -> compileStmtM body (return . mkLast . Done n l))
-  return ()
-
-newDefn (name, body) = do
-  blockDefn name [] (\n l -> compileStmtM body (return . mkLast . Done n l))
+newDefn (name, body@(ELam v _ b)) = do
+  free <- getFree body
+  cloDefn name v free b 
   return ()
 
 compileStmtM :: Expr 
@@ -123,14 +111,13 @@ compileStmtM (ECon cons _) ctx = do
   when (isNothing dest) (error $ "Could not find '" ++ "mkData_" ++ cons ++ "' in predefined.")
   ctx (Goto (fromJust dest) [])
 
-compileStmtM e@(ELam v _ b) ctx = do
-  tops <- gets compT >>= return . Map.keys
-  let fvs = free e \\ tops
+compileStmtM body@(ELam v _ b) ctx = do
+  free <- getFree body
   (name, label) <- do
     name <- newTop "absBody"
-    cloDefn name v fvs (\n l -> compileStmtM b (return . mkLast . Done n l))
+    cloDefn name v free b 
   setDest name label
-  ctx (Closure (name, label) fvs)
+  ctx (Closure (name, label) free)
 
 compileStmtM (ELet (Decls defs) outerBody) ctx = compVars (getDefns defs)
   where
@@ -166,9 +153,8 @@ compileStmtM (EApp e1 e2) ctx
 
 compileStmtM (EBind v _ b r) ctx = do
   rest <- compileStmtM r ctx
-  asMonadic (compVarM b $ \m -> do
-               return (mkMiddle (v `Bind` (Run m)) <*> 
-                       rest))
+  asMonadic (compileStmtM b $ \t -> do
+    return (mkMiddle (v `Bind` t) <*> rest))
 
 compileStmtM (EFatbar _ _) _ 
   = error "EFatbar not implemented."
@@ -228,18 +214,21 @@ newTop name = do
     modify (\s@(C { compT }) -> s { compT = Map.insert f Nothing compT })
     return f
 
+-- | Gets free variables in the lambda, accounting
+-- for the current list of top-level names. e should
+-- be a lambda
+getFree :: Expr -> CompM [Name]
+getFree lam@(ELam _ _ _) = do
+  tops <- gets compT >>= return . Map.keys
+  return (free lam \\ tops)
+getFree _ = error "getFree called on non-lambda expression."
+
 setDest :: Name -> Label -> CompM ()
 setDest name label = 
   modify (\s@(C { compT }) -> s { compT = Map.insert name (Just (name, label)) compT })
 
 getDestOfName :: Name -> CompM (Maybe Dest)
 getDestOfName name = gets compT >>= return . fromMaybe Nothing . Map.lookup name
-
-thunkDefn :: Name -> [Name] -> (Name -> Label -> CompM (ProgM O C)) -> CompM Dest
-thunkDefn name args progM = withNewLabel $ \m -> do
-  dest <- blockDefn ("block" ++ name) args progM
-  addProg (mkFirst (BlockEntry name m args) <*> mkLast (Done name m (Thunk dest args)))
-  return (name, m)
 
 -- | Add a new block.
 blockDefn :: Name -> [Name] -> (Name -> Label -> CompM (ProgM O C)) -> CompM Dest
@@ -248,30 +237,28 @@ blockDefn name args progM = withNewLabel $ \l -> do
   addProg (mkFirst (BlockEntry name l args) <*> rest)
   return (name, l)
   
--- | Add a new closure-capturing block.
-cloDefn :: Name -> Name -> [Name] -> (Name -> Label -> CompM (ProgM O C)) -> CompM Dest
-cloDefn name arg clos progM = do
-    withNewLabel $ \t -> do
-      progTemp <- progM "foo" t
-      if isCapture progTemp
-       then captureDefn
-       else nonCaptureDefn
-  where
-    captureDefn = withNewLabel $ \l -> do
-      let args = clos ++ [arg]
-      dest <- blockDefn ("block" ++ name) args progM
-      addProg (mkFirst (CloEntry name l clos arg) <*>
-               mkLast (Done name l (Goto dest args)))
-      return (name, l)
-    nonCaptureDefn = withNewLabel $ \l -> do
-      rest <- progM name l
-      addProg (mkFirst (CloEntry name l clos arg) <*> rest)
-      return (name, l)
-    isCapture :: ProgM O C -> Bool
-    isCapture (GMany (JustO block) _ _ ) = 
-      case blockToNodeList' block of
-        (_, [], (JustC (Done _ _ (Closure _ _)))) -> True
-        _ -> False
+-- | Compile a lambda expression. Name, arg, and fvs
+-- all refer to the enclosing lambda. body is the *body*
+-- of the lambda.
+cloDefn :: Name -> Name -> [Name] -> Expr -> CompM Dest
+cloDefn name arg fvs body@(ELam v _ b) = withNewLabel $ \l -> do
+  let args = fvs ++ [arg]
+  dest <- cloDefn ("absBody" ++ name) v args b
+  addProg (mkFirst (CloEntry name l fvs arg) <*>
+           mkLast (Done name l (Closure dest args)))
+  return (name, l)
+cloDefn name arg fvs body@(EBind _ _ _ _) = withNewLabel $ \l -> do
+  let args = fvs ++ [arg]
+  dest <- blockDefn ("block" ++ name) args (\n l -> compileStmtM body (return . mkLast . Done n l))
+  addProg (mkFirst (CloEntry name l fvs arg) <*>
+           mkLast (Done name l (Thunk dest args)))
+  return (name, l)
+cloDefn name arg fvs body = withNewLabel $ \l -> do
+  let args = fvs ++ [arg]
+  dest <- blockDefn ("block" ++ name) args (\n l -> compileStmtM body (return . mkLast . Done n l))
+  addProg (mkFirst (CloEntry name l fvs arg) <*>
+           mkLast (Done name l (Goto dest args)))
+  return (name, l)
 
 -- | Add a program (C C block) to the list of blocks
 -- maintained by the monad.
