@@ -1,0 +1,105 @@
+* Compiler Sketch
+My compiler, CompM, translates from LambdaCase (LC) programs to
+Monadic Intermediate Language (MIL) programs. It first pre-processes
+all top-level definitions in the LC program and creates known
+locations for them. CompM imports a "prelude" of pre-defined MIL
+primitives using the same technique. CompM then translates each
+top-level LC definition into a MIL definition. Free variables found
+must refer to top-level definitions in the same program (i.e., other LC
+definitions or MIL primitives).
+
+CompM uses a State monad to generate new names, store translated
+definitions, find top-level definitions, and to track if the current
+expression is monadic or not. The CompS data type represents these
+items:
+
+  data CompS = 
+    C { compI :: Int -- For fresh names.
+      , compG :: ProgM C C -- ^ Translated expressions.
+      , compT :: Map Name (Maybe Dest) -- ^ top-level definitions.
+      , compM :: (Bool, [Bool]) } -- Currently compiling a monadic expression?
+
+CompM create unique names using the compI counter. The compG value
+stores the translated program as a HOOPL control-flow graph. The compT
+dictionary associates top-level names with their location in the
+translated program. The compM field controls how expressions are
+interpreted and will be treated later.
+
+** Compiling in "Context"
+
+CompM compiles each definition using a "context." Remember that CompM
+translates only one definition at a time. The context represents the
+portion of the definition translated so far. Each expression
+translated extends the current context.
+
+For example, the code for compiling "EVar" (i.e., a variable
+reference) is:
+
+  compileStmtM (EVar v _) ctx 
+    = ctx (Return v) 
+
+We translate "EVar v" by extending the context ("ctx") with "Return
+v". The variable "v" may be used in any number of ways by the source
+language (e.g., in a function application, as a discriminant, a
+reference to an argument, etc.), but the compiler does not care. The
+compiler already previously translated everything needed to use "v" in
+the right way -- here, we just translate how to get to the value "v"
+represents.
+
+Lambda expressions (i.e., anonymous functions) spawn a new compilation
+"context." CompM translates the body of the lambda in a new context,
+and determines location (i.e., address) of the new definition. A
+closure represents the lambda-expression's "value." CompM extends the
+"old" context with instructions to create a closure which refer to the
+lambda-expression. 
+
+Consider this fragment, showing how to compile an "ELam" (i.e.,
+anonymous function) term:
+
+  compileStmtM body@(ELam v _ b) ctx = do
+    ...
+    (name, label) <- do
+      name <- newTop "absBody"
+      cloDefn name v free b 
+    ...
+    ctx (Closure (name, label) free)
+
+The embedded "do" statement:
+
+    (name, label) <- do
+      ...
+
+creates a new "context," compiles the lambda's body, and returns the
+location where that body can be found. CompM extends the "context" on
+the last line:
+
+    ctx (Closure (name, label) free)
+
+with an instruction to create a closure. Thus, an anonymous function
+generates a new definition (in a "new" context), and also code to create
+a value representing the lambda (i.e., a closure).
+
+This structure follows Andrew Kennedy's paper "Compiling with
+Continuations, Continued." He did not write a paper about this
+structure; rather, he just uses it within that paper to implement his
+work.
+
+** Compiler Monad
+  
+* Target Language (Overview & Table)
+** Statment vs Tail Expressions
+** Declarations
+*** Closure capturing versus blocks
+*** Top-level functions
+** Safe & Unsafe Side Effects
+** Table of MIL Elements
+
+* Source Language
+** Overview 
+*** Declarations (Global & Local)
+*** Monadic Programs
+*** Patterns, Guards, and Cases
+**** FatBar
+** Table of LC Language Elements
+
+* Compiling LC to MIL
