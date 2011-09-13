@@ -5,21 +5,18 @@ import Compiler.Hoopl
 
 collapse :: Graph StmtM C C -> Graph StmtM C C
 collapse body = 
-  let f = runStateX $ do
+  let opt = runInfinite $ do
         (p, _, _) <- analyzeAndRewriteFwd fwd (undefined :: MaybeC C [Label]) body undefined
         return p
       fwd = FwdPass { fp_lattice = undefined
                     , fp_transfer = undefined
                     , fp_rewrite = iterFwdRw (mkFRewrite rewriter)  }
-      rewriter :: forall e x. StmtM e x -> () -> StateX (Fuel, Int) (Maybe (Graph StmtM e x))
+      rewriter :: (FuelMonadT m, FuelMonad (m (StateX Bool))) => forall e x. StmtM e x -> () -> (m (StateX Bool)) (Maybe (Graph StmtM e x))
       rewriter Done col = do
-                        (f, z) :: (Fuel, Int) <- getX
-                        f :: Fuel <- getFuelX
-                        f <- getFuel
-                        setFuel f
-                        setX (f, z)
-                        return Nothing
-  in fst $ f (1, 100) 
+        f <- liftFuel getX
+        liftFuel (setX (not f))
+        return Nothing
+  in fst $ (runStateX opt) True
 
 newtype StateX s a = X { runStateX :: s -> (a, s) }
 instance Monad (StateX s) where
@@ -41,26 +38,22 @@ setX s = X $ \_ -> ((), s)
 getX :: StateX s s
 getX = X $ \s -> (s, s)
 
-instance FuelMonad (StateX (Fuel, s)) where
-  getFuel = getFuelX
-  setFuel = setFuelX
+runInfinite :: (Monad m) => InfiniteFuelMonad m a -> m a
+runInfinite fm = runWithFuel infiniteFuel $ fm
 
-getFuelX :: StateX (Fuel,s) Fuel
-getFuelX = X $ \(f, s) -> (f, (f,s))
+runChecked :: (Monad m) => Fuel -> CheckingFuelMonad m a -> m a
+runChecked fuel fm = runWithFuel fuel $ fm
 
-setFuelX :: Fuel -> StateX (Fuel, s) ()
-setFuelX f = X $ \(_,s) -> ((), (f,s))
-
-instance CheckpointMonad (StateX (Fuel, s)) where
-  type Checkpoint (StateX (Fuel, s)) = (Fuel, s)
+instance CheckpointMonad (StateX s) where
+  type Checkpoint (StateX s) = s
   checkpoint = checkpointX
   restart = restartX
 
-checkpointX :: StateX (Fuel, s) (Fuel, s)
-checkpointX = X $ \(f, s) -> ((f,s), (f,s))
+checkpointX :: StateX s s
+checkpointX = X $ \s -> (s, s)
 
-restartX :: (Fuel, s) -> StateX (Fuel, s) ()
-restartX (f, s) = X $ \_ -> ((), (f, s))
+restartX :: s -> StateX s ()
+restartX s = X $ \_ -> ((), s)
 
 data StmtM e x where
   Done :: StmtM O C
