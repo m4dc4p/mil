@@ -1,4 +1,5 @@
 * Compiler Sketch
+** Introduction
 My compiler, CompM, translates from LambdaCase (LC) programs to
 Monadic Intermediate Language (MIL) programs. It first pre-processes
 all top-level definitions in the LC program and creates known
