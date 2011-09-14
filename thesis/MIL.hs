@@ -272,7 +272,8 @@ compiledPrims ((n, m):ms) = do
   return ((n, head):rest)
   
 prims :: UniqueMonad m => [(Name, m (ProgM C C))]
-prims = [plusPrim
+prims = [printPrim 
+        , plusPrim
         , minusPrim
         , timesPrim
         , divPrim
@@ -282,10 +283,10 @@ prims = [plusPrim
         , gtePrim
         , eqPrim
         , neqPrim
-        , printPrim 
         , ("mkData_Nil", mkDataPrim "Nil" 0)
         , ("mkData_Cons", mkDataPrim "Cons" 2)
-        , ("mkData_Unit", mkDataPrim "Unit" 0)] ++ prioSetPrims
+        , ("mkData_Unit", mkDataPrim "Unit" 0)
+        ] ++ prioSetPrims
   where
     -- Primitives necessary to compile PrioSetLC.lhs in ..\..priosetExample
     prioSetPrims = 
@@ -311,12 +312,10 @@ prims = [plusPrim
       ,("writeRef", liftM snd $ monadic binPrim "writeRef")
       ,("mkData_False", mkDataPrim "False" 0)
       ,("mkData_True", mkDataPrim "True" 0)]
-  
-
 
 printPrim, plusPrim, minusPrim, timesPrim, divPrim, ltPrim, gtPrim, ltePrim, gtePrim, eqPrim, neqPrim :: UniqueMonad m => (Name, m (ProgM C C))
 
-printPrim = ("print", liftM snd $ monadic unaryPrim "print")
+printPrim = ("print", liftM snd $ unaryPrim "print")
 
 plusPrim = ("plus", liftM snd $ binPrim "plus")
 minusPrim = ("minus", liftM snd $ binPrim "minus")
