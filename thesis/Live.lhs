@@ -14,7 +14,8 @@
 > import qualified Data.Map as Map
 > import Data.Set (Set)
 > import qualified Data.Set as Set
-> 
+> import Debug.Trace
+
 > import Compiler.Hoopl
 > 
 > import Util
@@ -45,7 +46,7 @@ are live at any point. Our ``fact'' is then a set of variables:
 > 
 > -- | Used to apply different rewriters which all require 
 > -- live variable analysis.
-> usingLive :: (forall m. FuelMonad m => BwdRewrite m StmtM LiveFact) -- ^ Rewrite to use
+> usingLive :: (forall m. FuelMonad m => Set Name -> BwdRewrite m StmtM LiveFact) -- ^ Rewrite to use
 >           -> [Name] -- ^ Top-level variables
 >           -> ProgM C C -- ^ Program to rewrite
 >           -> (ProgM C C, FactBase LiveFact) -- Results
@@ -53,17 +54,17 @@ are live at any point. Our ``fact'' is then a set of variables:
 >       (p, f, _) <- analyzeAndRewriteBwd bwd (JustC (entryLabels body)) body mapEmpty
 >       return (p, f)
 >   where
->     bwd = BwdPass { bp_lattice = liveLattice "live statements" :: DataflowLattice LiveFact
+>     bwd = BwdPass { bp_lattice = liveLattice (undefined :: Name) "live statements"
 >                   , bp_transfer = liveTransfer (Set.fromList tops)
->                   , bp_rewrite = rewriter } 
+>                   , bp_rewrite = rewriter (Set.fromList tops) } 
 > 
 > -- | Initial setup for liveness analysis.
-> liveLattice :: Ord a => String -> DataflowLattice (Set a)
-> liveLattice name = DataflowLattice { fact_name = name
+> liveLattice :: Ord a => a -> String -> DataflowLattice (Set a)
+> liveLattice _ name = DataflowLattice { fact_name = name
 >                               , fact_bot = Set.empty
 >                               , fact_join = extend }
 >   where
->     extend _ (OldFact old) (NewFact new) = (changeIf (not (Set.null (Set.difference new old)))
+>     extend _ (OldFact old) (NewFact new) = (changeIf (new /= old)
 >                                            , new)
 > 
 > -- | Transfer liveness backwards across nodes.                                         
@@ -87,13 +88,12 @@ dead-code elimination this doesn't have any effect.
 
 
 Our analysis treats each type of statement seperately. Entry labels do
-not add any live variables, so they just pass on the facts found so
-far. |woTops| removes any top-level names that might have been found
-from the list of live variables.
+not add any live variables, but they remove live variables which match
+their arguments.
 \restorecolumns
 
->     live (BlockEntry _ _ _) f = woTops f 
->     live (CloEntry _ _ _ _) f = woTops f
+>     live (BlockEntry n _ args) f = Set.difference (Set.difference f (Set.fromList args)) tops
+>     live (CloEntry n _ _ arg) f = Set.delete arg f
 
 A binding will add the variables (|tailVars t|) used and eliminate the bound
 variable (|v|). We must elminate variables as they are bound because analysis
@@ -117,14 +117,10 @@ makes sure to remove any variables bound by pattern matching.
 >     setAlt :: FactBase LiveFact -> Alt TailM -> Set Name
 >     setAlt f (Alt _ ns e) = Set.difference (tailVars e) (Set.fromList ns)
 
-For completeness, we show |woTops| and |tailVars| below. |woTops| removes
-top-level names from the set given, and |tailVars| gathers the names used in
+For completeness, we show |tailVars| below. |tailVars| gathers the names used in
 each type of tail expression.
 \restorecolumns
 
->     woTops :: LiveFact -> LiveFact
->     woTops live = live `Set.difference` tops
->     
 >     tailVars :: TailM -> Set Name
 >     tailVars (Closure _ vs) = Set.fromList vs 
 >     tailVars (Goto _ vs) = Set.fromList vs
@@ -148,17 +144,17 @@ each type of tail expression.
 > findLive :: [Name] -- ^ Top-level variables
 >          -> ProgM C C -- ^ Program to analyze
 >          -> FactBase LiveFact -- Results
-> findLive tops = snd . usingLive noBwdRewrite tops 
+> findLive tops = snd . usingLive (const noBwdRewrite) tops 
 > 
 > -- | Adds live variables to Goto and BlockEntry instructions. Not
 > -- filled in by the compiler - added in this pass instead.
-> addLiveRewriter :: FuelMonad m => BwdRewrite m StmtM LiveFact
-> addLiveRewriter = mkBRewrite rewrite
+> addLiveRewriter :: FuelMonad m => Set Name -> BwdRewrite m StmtM LiveFact
+> addLiveRewriter tops = mkBRewrite rewrite
 >   where
 >     rewrite :: FuelMonad m => forall e x. StmtM e x -> Fact x LiveFact -> m (Maybe (ProgM e x))
 >     rewrite (Done n l t) f = done n l (rewriteTail f t)
 >     rewrite (BlockEntry n l args) live 
->       | live /= Set.fromList args = blockEntry n l (sort (Set.toList live))
+>       | Set.difference live tops /= Set.fromList args = blockEntry n l (sort (Set.toList live))
 >     rewrite (CaseM n alts) f = _case n (rewriteAlt f) alts
 >     -- Why do I not need to worry about Bind here? What shows I can't have a 
 >     -- Goto in the tail?
@@ -204,8 +200,8 @@ indicates it will possibly rewrite statements to graphs of the same
 shape.
 \savecolumns
 
-> deadRewriter :: FuelMonad m => BwdRewrite m StmtM LiveFact
-> deadRewriter = mkBRewrite rewrite
+> deadRewriter :: FuelMonad m => Set Name -> BwdRewrite m StmtM LiveFact
+> deadRewriter _ = mkBRewrite rewrite
 >   where
 >     rewrite :: FuelMonad m => forall e x. StmtM e x 
 >                -> Fact x LiveFact 
