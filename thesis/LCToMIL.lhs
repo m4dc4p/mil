@@ -1,7 +1,4 @@
-> {-# LANGUAGE TypeSynonymInstances, GADTs, RankNTypes
->   , NamedFieldPuns, TypeFamilies, ScopedTypeVariables
->   , FlexibleInstances #-}
-
+> {-# LANGUAGE TypeSynonymInstances, GADTs, RankNTypes, NamedFieldPuns, TypeFamilies, ScopedTypeVariables, FlexibleInstances #-}
 > module LCToMIL
 
 > where
@@ -50,28 +47,11 @@ produce different code to deal with LC monadic "computations" versus
 pure expresssions. The differences will be highlighted I describe the
 relevant portions of compileStmtM.
 
-We first look at the EPrim term. This LC term evaluates a
-primitive function, presumably implemented in the runtime system. 
-
-> compileStmtM (EPrim p _) ctx = do 
-
-We use the getDestOfName utility function to find the label associated
-with the primitive. If the label doesn't exist, we exit with an error.
-
->   dest <- getDestOfName p
->   when (isNothing dest) (error $ "Could not find primitive '" ++ p ++ "' in predefined.")
-
-Otherwise, we construct a Goto value with the destination found and
-pass it to our context.  Note that we don't worry about the location
-of the result of evaluating the primitive -- the context already knows
-where the result will go.
-
->   ctx (Goto (fromJust dest) [])
+> compileStmtM (EPrim p _) ctx = error "Primitive in non-var position"
 
 The ECon term creates a data value. We implement ECon using a
 series of pre-generated primitives, one for each constructor of each
-known data type. Really, ECon compiles to almost the same MIL code as
-EPrim.
+known data type. 
 
 > compileStmtM (ECon cons _) ctx = do 
 >   dest <- getDestOfName ("mkData_" ++ cons)
@@ -126,8 +106,8 @@ term. We pass this closure to our context.
 
 > compileStmtM (EBind v _ b r) ctx = do
 >   rest <- compileStmtM r ctx
->   asMonadic (compileStmtM b $ \t -> do
->     return (mkMiddle (v `Bind` t) <*> rest))
+>   asMonadic (compVarM b $ \n -> do
+>     return (mkMiddle (v `Bind` (Run n)) <*> rest))
 
 > compileStmtM (ELet (Decls defs) outerBody) ctx = compVars (getDefns defs)
 >   where
@@ -209,14 +189,18 @@ term. We pass this closure to our context.
 > newDefn :: (Name, Expr) -> CompM ()
 > newDefn (name, body@(ELam v _ b)) = do
 >   free <- getFree body
->   cloDefn name v free b 
+>   cloDefn name v free b
 >   return ()
-
+> newDefn (name, body) = do
+>   free <- getFree body
+>   blockDefn name free (\n l -> compileStmtM body (return . mkLast . Done n l))
+>   return ()
 
 > compVarM :: Expr 
 >   -> (Name -> CompM (ProgM O C))
 >   -> CompM (ProgM O C)
 > compVarM (EVar v _) ctx = ctx v
+> compVarM (EPrim v _) ctx = ctx v
 > compVarM e ctx = compileStmtM e $ \t -> do
 >   v <- fresh "v"
 >   rest <- ctx v
@@ -229,7 +213,7 @@ term. We pass this closure to our context.
 > free = nub . free'
 >   where
 >     free' (EVar v _) = [v]
->     free' (EPrim v _) = []
+>     free' (EPrim v _) = [v]
 >     free' (ENat _) = []
 >     free' (EBits _ _) = []
 >     free' (ECon _ _) = []
@@ -265,14 +249,12 @@ term. We pass this closure to our context.
 >     modify (\s@(C { compT }) -> s { compT = Map.insert f Nothing compT })
 >     return f
 
-> -- | Gets free variables in the lambda, accounting
-> -- for the current list of top-level names. e should
-> -- be a lambda
+> -- | Gets free variables in the expression, accounting
+> -- for the current list of top-level names.
 > getFree :: Expr -> CompM [Name]
-> getFree lam@(ELam _ _ _) = do
+> getFree expr = do
 >   tops <- gets compT >>= return . Map.keys
->   return (free lam \\ tops)
-> getFree _ = error "getFree called on non-lambda expression."
+>   return (free expr \\ tops)
 
 > setDest :: Name -> Label -> CompM ()
 > setDest name label = 
@@ -350,7 +332,7 @@ term. We pass this closure to our context.
 > getDefns :: [Decl] -> [Defn]
 > getDefns = concatMap f
 >   where
->     f (Mutual decls) = error "Unable to compile mutually recursive Let declarations."
+>     f (Mutual decls) = decls -- error "Unable to compile mutually recursive Let declarations."
 >     f (Nonrec decl) = [decl]
 
 > -- Required so we can generate
