@@ -27,59 +27,59 @@ fromProgram (Program { decls = (Decls d)}) =
     f (Nonrec decl) = [decl] 
     
 progM :: [(Name, Expr)] -> ([Name], ProgM C C) -> IO ()
-progM progs prelude = do
-    -- putStrLn "\n ========= Unoptimized ============"
-    -- printResult progs (map (addLive tops) . map (compile tops prelude) . map (: []) $ progs)
+progM progs prelude@(prims, _) = do
+  -- putStrLn "\n ========= Unoptimized ============"
+  -- printResult progs (map (addLive (tops ++ prims)) . map (compile tops prelude) . map (: []) $ progs)
 
-    let optProgs = mostOpt tops prelude . (compile tops prelude) $ progs
+  let optProgs = mostOpt tops prelude . (compile tops prelude) $ progs
 
-    putStrLn (render $ vcat (map printDef progs))
-    putStrLn "================================================================================"
-    putStrLn (render $ printProgM optProgs)
+  putStrLn (render $ vcat (map printDef progs))
+  putStrLn "================================================================================"
+  putStrLn (render $ printProgM optProgs)
 
-    -- let (used, killed, ant) = anticipated optProgs
-    --     avail = available ant killed optProgs
-    --     early = earliest ant avail
-    --     postpone = postponable early used optProgs
-    --     late = latest early postpone used (allSuccessors optProgs)
+  -- let (used, killed, ant) = anticipated optProgs
+  --     avail = available ant killed optProgs
+  --     early = earliest ant avail
+  --     postpone = postponable early used optProgs
+  --     late = latest early postpone used (allSuccessors optProgs)
+           
+  -- putStrLn "\n ========= Used Expressions ============="
+  -- putStrLn (render $ printExprs used)
+           
+  -- putStrLn "\n ========= Killed Expressions ============="
+  -- putStrLn (render $ printExprs killed)
+           
+  -- putStrLn "\n ========= Anticipated Expressions ============="
+  -- putStrLn (render $ printExprs ant)
+           
+  -- putStrLn "\n ========= Available Expressions ============="
+  -- putStrLn (render $ printExprs avail)
+           
+  -- putStrLn "\n ========= Earliest Expressions ============="
+  -- putStrLn (render $ printExprs early)
 
-    -- putStrLn "\n ========= Used Expressions ============="
-    -- putStrLn (render $ printExprs used)
+  -- putStrLn "\n ========= Postponable Expressions ============="
+  -- putStrLn (render $ printExprs postpone)
+           
+  -- putStrLn "\n ========= Latest Expressions ============="
+  -- putStrLn (render $ printExprs late)
+           
+    where
+      tops = map fst progs
 
-    -- putStrLn "\n ========= Killed Expressions ============="
-    -- putStrLn (render $ printExprs killed)
+      printExprs = vcat . map printExprMap . Map.toList 
+                          
+      printDef :: Def -> Doc
+      printDef def = text (show (ppr def))
 
-    -- putStrLn "\n ========= Anticipated Expressions ============="
-    -- putStrLn (render $ printExprs ant)
-
-    -- putStrLn "\n ========= Available Expressions ============="
-    -- putStrLn (render $ printExprs avail)
-
-    -- putStrLn "\n ========= Earliest Expressions ============="
-    -- putStrLn (render $ printExprs early)
-
-    -- putStrLn "\n ========= Postponable Expressions ============="
-    -- putStrLn (render $ printExprs postpone)
-
-    -- putStrLn "\n ========= Latest Expressions ============="
-    -- putStrLn (render $ printExprs late)
-
-  where
-    tops = map fst progs
-
-    printExprs = vcat . map printExprMap . Map.toList 
-
-    printDef :: Def -> Doc
-    printDef def = text (show (ppr def))
-
-    printWithDef :: (Def, ProgM C C) -> Doc
-    printWithDef (def, comp) = text (show (ppr def)) $+$ 
-                               vcat' (maybeGraphCC empty printBlockM comp)
+      printWithDef :: (Def, ProgM C C) -> Doc
+      printWithDef (def, comp) = text (show (ppr def)) $+$ 
+                                 vcat' (maybeGraphCC empty printBlockM comp)
                                      
-    printExprMap ((n, _), exprs) = brackets $ text n <> colon <+> commaSep printTailM (Set.elems exprs)
-    showTails = commaSep printTailM 
+      printExprMap ((n, _), exprs) = brackets $ text n <> colon <+> commaSep printTailM (Set.elems exprs)
+      showTails = commaSep printTailM 
 
-    printResult defs progs = putStrLn (render (vcat' (map ((text "" $+$) . printWithDef) (zip defs progs))))
+      printResult defs progs = putStrLn (render (vcat' (map ((text "" $+$) . printWithDef) (zip defs progs))))
 
 -- Optimize a hand-writen MIL program.
 milTest :: SimpleUniqueMonad (ProgM C C) -> IO ()
@@ -196,6 +196,8 @@ hello = ("hello", bindE "v" (mPrint `app` var "p") $
 
 {- Monadic compose (from mon6)
 
+kleisli :: (b -> m c) -> (a -> m b) -> a -> m c
+
 kleisli f g x = do
   v1 <- g x
   v2 <- f v1
@@ -222,40 +224,17 @@ kleisli = ("kleisli",
              bindE "v2" (f `app` v1) id)
 
 {-
-  main = threeBinds print print print
-  threeBinds f g h = do
-    f
-    g
-    h
-    ()
 
 ===
 
-mkData_Unit (): Unit
-print (): thunk printThunk []
-printThunkBody (a): printThunk*(a)
-printThunk {} a: thunk printThunkBody [a]
-main ():
-  v201 <- print()
-  v202 <- blockthreeBinds(v201)
-  v203 <- print()
-  v204 <- v202 @ v203
-  v205 <- print()
-  v204 @ v205
-threeBinds {} f: blockthreeBinds(f)
-blockthreeBinds (f): closure absBody220 {f}
-absBody220 {f} g: blockabsBody220(f, g)
-blockabsBody220 (f, g): closure absBody227 {f, g}
-absBody227 {f, g} h:
-  () <- invoke f
-  () <- invoke g
-  () <- invoke h
-  mkData_Unit()
 -}
 printTest1 = [threeBinds, main]
   where
     main = ("main",
-              var "threeBinds" `app` mPrint `app` mPrint `app` mPrint)
+              var "threeBinds" `app` 
+                    (mPrint `app` var "a") `app` 
+                    (mPrint `app` var "a") `app` 
+                    (mPrint `app` var "a"))
     threeBinds = ("threeBinds",
                   lam "f" $ \f ->
                   lam "g" $ \g ->
@@ -305,6 +284,36 @@ printTest2 = [doBinds, main]
                     bindE "()" g $ \_ -> 
                     bindE "()" h $ \x -> x)
 
+printTest3 = [threeBinds, main]
+  where
+    main = ("main",
+              lam "x" $ \x -> 
+                bindE "()" (var "threeBinds" `app` 
+                    (mPrint `app` var "a") `app` 
+                    (mPrint `app` var "a") `app` 
+                    (mPrint `app` var "a")) $ \_ -> x)
+    threeBinds = ("threeBinds",
+                  lam "f" $ \f ->
+                  lam "g" $ \g ->
+                  lam "h" $ \h ->
+                    bindE "()" f $ \_ ->
+                    bindE "()" g $ \_ -> 
+                    bindE "()" h $ \_ -> mkUnit)
+
+printTest4 = [threeBinds, main]
+  where
+    main = ("main",
+            bindE "()" (var "threeBinds" `app` 
+                        (mPrint `app` var "a") `app` 
+                        (mPrint `app` var "a") `app` 
+                        (mPrint `app` var "a")) $ \_ -> mkUnit)
+    threeBinds = ("threeBinds",
+                  lam "f" $ \f ->
+                  lam "g" $ \g ->
+                  lam "h" $ \h ->
+                    bindE "()" f $ \_ ->
+                    bindE "()" g $ \_ -> 
+                    bindE "()" h $ \_ -> mkUnit)
 {-
   if x > 10 
   then x + 1 + y
