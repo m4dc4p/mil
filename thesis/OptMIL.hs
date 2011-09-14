@@ -517,16 +517,16 @@ optCollapse tops = deadCode . collapse
 inlineSimple tops = deadCode . bindSubst . inlineReturn 
 
 mostOpt :: [Name] -> ([Name], ProgM C C) -> ProgM C C -> ProgM C C
-mostOpt tops prelude@(prims, _) = addLive tops .
+mostOpt tops prelude@(prims, _) = addLive (tops ++ prims) .
     -- deadBlocks tops . 
     -- inlineBlocks tops . 
-    deadBlocks tops .  
-    inlineSimple tops . 
+    deadBlocks (tops ++ prims) .  
+    -- inlineSimple (tops ++ prims) . 
     optCollapse tops . 
     bindReturn . 
     deadCode . 
     bindSubst .
-    addLive tops 
+    addLive (tops ++ prims)
 
 -- | Converts the names given to a set of Dest values. Any
 -- names which do not have corresponding entry points in the program
