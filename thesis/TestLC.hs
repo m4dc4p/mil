@@ -28,8 +28,8 @@ fromProgram (Program { decls = (Decls d)}) =
     
 progM :: [(Name, Expr)] -> ([Name], ProgM C C) -> IO ()
 progM progs prelude@(prims, _) = do
-  -- putStrLn "\n ========= Unoptimized ============"
-  -- printResult progs (map (addLive (tops ++ prims)) . map (compile tops prelude) . map (: []) $ progs)
+  putStrLn "\n ========= Unoptimized ============"
+  printResult progs (map (addLive (tops ++ prims)) . map (compile tops prelude) . map (: []) $ progs)
 
   let optProgs = mostOpt tops prelude . (compile tops prelude) $ progs
 
@@ -789,6 +789,32 @@ myMap = ("map",
          lam "xs" $ \xs ->
            _case xs $ (alt "Nil" [] (\_ -> mkNil) . 
             (alt "Cons" ["x", "xs"] (\ [x, xs] -> mkCons `app` (f `app` x) `app` (var "map" `app` f `app` xs)))))
+
+-- A function that return a variable directly
+myId = ("id", lam "x" $ \x -> x)
+-- A function that executes a monadic primitive
+-- directly, with no function applicatin
+constPrim = ("simplePrint", lam "x" $ \_ -> random)
+  where
+    random = EPrim "random" []
+
+-- A function where the result of a Case statement is
+-- applied to an argument
+caseApp = ("caseApp",
+           lam "f" $ \f ->
+           lam "g" $ \g ->
+           lam "x" $ \x ->
+             (_case x $ (alt "True" [] (\_ -> f)) .
+               (alt "False" [] (\_ -> g))) `app` x)
+
+-- A case statement on the right side of a bind
+-- that evaluates to one of two monadic functions.
+caseAppM = ("caseAppM",
+           lam "f" $ \f ->
+           lam "g" $ \g ->
+           lam "x" $ \x ->
+             bindE "()" ((_case x $ (alt "True" [] (\_ -> f)) .
+               (alt "False" [] (\_ -> g))) `app` x) $ \_ -> mkUnit)
 
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
