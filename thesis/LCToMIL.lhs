@@ -40,21 +40,17 @@ context's result is retured by compileStmtM directly. In other cases,
 it is used to produce out-of-line blocks that are managed by the
 compiler monad and not returned directly. '
 
-The CompM monad in which compileStmtM executes carries a flag that
-represents if the current LC expression should be evaluated as a
-side-effecting compuation or as a pure expression. compileStmtM must
-produce different code to deal with LC monadic "computations" versus
-pure expresssions. The differences will be highlighted I describe the
-relevant portions of compileStmtM.
-
-> compileStmtM (EPrim p _) ctx = error "Primitive in non-var position"
-
 The ECon term creates a data value. We implement ECon using a
 series of pre-generated primitives, one for each constructor of each
 known data type. 
 
 > compileStmtM (ECon cons _) ctx = do 
 >   dest <- getDestOfName ("mkData_" ++ cons)
+
+Therefore, we first look for the primitive with a 
+special, pre-determined name. We then add a "Goto" instruction to
+execute the body of the primitive.
+
 >   when (isNothing dest) (error $ "Could not find '" ++ "mkData_" ++ cons ++ "' in predefined.")
 >   ctx (Goto (fromJust dest) [])
 
@@ -83,10 +79,79 @@ term. We pass this closure to our context.
 
 >   ctx (Closure (name, label) free)
 
+EBind evaluates its right-hand side as a monadic value. Therefore, the 
+translated code for the monadic expression will evaluate to a monadic
+thunk. We apply
+
+> compileStmtM (EBind v _ b r) ctx = do
+
+EBind sequences computation by placing the "rest" of the program in
+the r binding above. I first compile the "rest" of the program. 
+
+>   rest <- compileStmtM r ctx
+
+Now we need to compile the monadic expression. compVarM guarntees that
+it will compile a given expression and bind it to a variable. We don't know
+what the expression contains, but we do know we need to name its result. 
+
+>   compVarM b $ \n -> do
+
+I next assign the result of the monadic expression, n,  to v, using
+the Bind instructin. I know that n contains a monadic thunk, so I also
+must apply the Run instruction to n in order to "run" or "invoke" the
+computation. 
+
+Finally, the type of ctx above means that rest will contain an
+"open/closed" program. Our binding must occur before the "rest" of the program, so
+we add it to the front and return the result.
+
+>     return (mkMiddle (v `Bind` (Run n)) <*> rest)
+
+An EVar term, in this case, must appear in "variable" position or it 
+would be handled by EApp, EBind, or other terms. Therefore, we apply
+the Return instruction to variable in order to "wrap" the value and 
+place it in context. 
+
+> compileStmtM (EVar v _) ctx 
+>   = ctx (Return v) 
+
+The EApp term evaluates both its arguments using compVarM, giving
+names to the locations holding the values represented by the arguments
+to EApp. 
+
+> compileStmtM (EApp e1 e2) ctx 
+>   = compVarM e1 $ \f ->
+>     compVarM e2 $ \g ->
+
+Now, I apply the Enter instruction to the two variables produced by the
+preceding. The first variable will always represent a closure or primitive
+-- assuming the LC program given is type-correct, of course!
+
+>       ctx (Enter f g)
+
+ECase looks very complicated but mostly its a lot of bookkeeping. 
+
 > compileStmtM (ECase e lcAlts) ctx = do
 >   let alts = map toAlt lcAlts
+
+I first create a location to hold the result of whichever arm of the case
+the program evaluates. 
+
 >   r <- fresh "result"
+
+The result of the case expression must be given to the "rest" of the
+program. I first apply the Return instruction to the result locatin
+and pass it to the context so the "rest" of the program can access the
+result value. I then create a "caseJoin" function which will contain
+(or at least, jump to) the "rest" of the program. 
+
 >   f <- ctx (Return r) >>= \rest -> callDefn "caseJoin" (\n l -> return rest)
+
+Each case arm will call the "caseJoin" function to pass its
+particular value to the "rest" of the program. The code that follows
+creates blocks for each arm, ensures "caseJoin" is called, and finally generates
+a CaseM instruction that will evaulate the discriminant and select an arm.
+
 >   let compAlt (Alt cons vs body) = do
 >         body' <- callDefn ("altBody" ++ cons) (\n l -> compileStmtM body (mkBind n l r f))
 >         return (Alt cons vs body')
@@ -99,15 +164,13 @@ term. We pass this closure to our context.
 >       setDest name label
 >       return (Goto (name, label) [])
 
-> compileStmtM (EApp e1 e2) ctx 
->   = compVarM e1 $ \f ->
->     compVarM e2 $ \g ->
->       ctx (Enter f g)
+EPrim should only appear in "variable" position, by 
+which I mean part of a function application or on the right-hand side of
+an EBind statement. The cases for EApp and EBind handle EPrim through the compVarM
+function. Therefore, we should not see an EPrim by itself, so I report
+an error if the situation occurs.
 
-> compileStmtM (EBind v _ b r) ctx = do
->   rest <- compileStmtM r ctx
->   asMonadic (compVarM b $ \n -> do
->     return (mkMiddle (v `Bind` (Run n)) <*> rest))
+> compileStmtM (EPrim p _) ctx = error "Primitive in non-var position"
 
 > compileStmtM (ELet (Decls defs) outerBody) ctx = compVars (getDefns defs)
 >   where
@@ -119,9 +182,6 @@ term. We pass this closure to our context.
 >       rest <- compVars ds 
 >       compVarM letBody $ \v -> do
 >         return (mkMiddle (Bind name (Return v)) <*> rest)
-
-> compileStmtM (EVar v _) ctx 
->   = ctx (Return v) `unlessMonad` ctx (Run v)
 
 > compileStmtM (ENat n) ctx
 >   = ctx (LitM n)
@@ -135,22 +195,23 @@ term. We pass this closure to our context.
 > -- | Compiler state. 
 > data CompS = C { compI :: Int -- ^ counter for fresh variables
 >                , compG :: ProgM C C -- ^ Program control-flow graph.
->                , compT :: Map Name (Maybe Dest) -- ^ top-level function names and their location.
->                , compM :: (Bool, [Bool]) } -- ^ Allows nested
->                                              -- monadic
->                                              -- computation. "Top"
->                                              -- value indicates if we
->                                              -- are compiling
->                                              -- monadically or
->                                              -- not. List serves as a
->                                              -- stack of previous
->                                              -- states. Starts non-monadic (False, []).
+>                , compT :: Map Name (Maybe Dest) } -- ^ top-level function names and their location.
+
+> compVarM :: Expr 
+>   -> (Name -> CompM (ProgM O C))
+>   -> CompM (ProgM O C)
+> compVarM (EVar v _) ctx = ctx v
+> compVarM (EPrim v _) ctx = ctx v
+> compVarM e ctx = compileStmtM e $ \t -> do
+>   v <- fresh "v"
+>   rest <- ctx v
+>   return (mkMiddle (v `Bind` t) <*> rest)
 
 > -- | Create the initial state for our compiler.
 > mkCompS i userTops predefined = 
 >   let mkMap = map ((\dest@(n, _) -> (n, Just dest)) . destOfEntry . snd) . entryPoints 
 >       tops = zip userTops (repeat Nothing)
->   in C i emptyClosedGraph (Map.fromList (tops ++ mkMap predefined)) (False, [])
+>   in C i emptyClosedGraph (Map.fromList (tops ++ mkMap predefined))
                
 > type CompM = State CompS
 > type Free = [Name]
@@ -195,16 +256,6 @@ term. We pass this closure to our context.
 >   free <- getFree body
 >   blockDefn name free (\n l -> compileStmtM body (return . mkLast . Done n l))
 >   return ()
-
-> compVarM :: Expr 
->   -> (Name -> CompM (ProgM O C))
->   -> CompM (ProgM O C)
-> compVarM (EVar v _) ctx = ctx v
-> compVarM (EPrim v _) ctx = ctx v
-> compVarM e ctx = compileStmtM e $ \t -> do
->   v <- fresh "v"
->   rest <- ctx v
->   return (mkMiddle (v `Bind` t) <*> rest)
 
 > mkBind :: Name -> Label -> Name -> TailM -> TailM -> CompM (ProgM O C)
 > mkBind n l r f t = return (mkMiddle (Bind r t) <*> mkLast (Done n l f))
@@ -304,28 +355,6 @@ term. We pass this closure to our context.
 > withNewLabel :: UniqueMonad m => (Label -> m a) -> m a
 > withNewLabel f = freshLabel >>= f
   
-> -- | Run the compiler in monadic
-> -- mode. Restore the previous mode when finished.
-> asMonadic :: CompM a -> CompM a
-> asMonadic m = do
->   modify (\s@(C _ _ _ (flag, stack)) -> s { compM = (True, flag : stack) })
->   a <- m
->   modify (\s@(C _ _ _ (_, (flag:stack))) -> s { compM = (flag,stack) })
->   return a
-  
-> -- | Run the left (pure) compilation, unless we
-> -- are compiling monadically. Run the right
-> -- in that case.
-> unlessMonad :: CompM (ProgM O C)
->         -> CompM (ProgM O C)
->         -> CompM (ProgM O C)
-> unlessMonad pure monad = inMonad >>= \b -> if b then monad else pure
->   where
->     -- | Are we in monadic compilation mode?
->     inMonad :: CompM Bool
->     inMonad = let f (C { compM }) = fst compM
->               in gets f
-
 > toAlt :: LC.Alt -> Alt Expr
 > toAlt (LC.Alt cons _ vs expr) = Alt cons vs expr
 
