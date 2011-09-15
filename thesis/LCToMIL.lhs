@@ -192,11 +192,6 @@ an error if the situation occurs.
 > compileStmtM (EBits _ _) _ 
 >   = error "EBits not implemented."
 
-> -- | Compiler state. 
-> data CompS = C { compI :: Int -- ^ counter for fresh variables
->                , compG :: ProgM C C -- ^ Program control-flow graph.
->                , compT :: Map Name (Maybe Dest) } -- ^ top-level function names and their location.
-
 > compVarM :: Expr 
 >   -> (Name -> CompM (ProgM O C))
 >   -> CompM (ProgM O C)
@@ -206,6 +201,97 @@ an error if the situation occurs.
 >   v <- fresh "v"
 >   rest <- ctx v
 >   return (mkMiddle (v `Bind` t) <*> rest)
+
+cloDefn creates blocks that will return a closure, a thunk, or
+jump directly to a block. cloDefn is only called when compiling an ELam
+expression. The |body| argument represents the body of that lambda, not
+the lambda itself. cloDefn also gets a list of free variables
+and the lambda's argument, bound as |fvs| and |arg| below. 
+
+When the given body is a lambda, cloDefn generates a "closure
+capturing" block. This code implements our function application
+strategy, which assumes all functions take a closure and one argument
+and return some value. 
+
+> cloDefn :: Name -> Name -> [Name] -> Expr -> CompM Dest
+> cloDefn name arg fvs body@(ELam v _ b) = withNewLabel $ \l -> do
+
+The "closure capturing" block really just
+gathers arguments. It creates a new closure the refers to the body of
+the lambda (bound as |b|), copies all variables from the
+existing closure to the new closure, and returns the closure value.
+
+The free variables in |b| are the free variables given (fvs), plus the
+argument to our lambda (boudd as |arg|). cloDefn is called to
+generate the code for |b|. The free variables passed are those given
+(|fvs|) plus the argument to our enclosing labmda (|arg|). The argument
+given to cloDefn is |v|, the argument for the lambda bound to |body|. 
+
+>   let bfvs = fvs ++ [arg]
+>   dest <- cloDefn ("absBody" ++ name) v bfvs b
+
+Now I generate code for the enclosing lambda. Our entry label
+specifies the free variables and arguments given originally. The body
+of the block returns a closure pointing to the location of |b| and
+containing the free variables for |b|, namely the free variables
+orignally given plus the argument to our enclosing lambda. Notice that
+we do NOT refer to |v| here - that argument is used when the closure
+returned here is applied to a value.
+
+>   addProg (mkFirst (CloEntry name l fvs arg) <*>
+>            mkLast (Done name l (Closure dest bfvs)))
+>   return (name, l)
+
+If the body of our enclosing lambda begins with an |EBind| statement,
+we assume the function represents a monadic computation. cloDefn will
+generate a code that create a monadic thunk rather than code that
+executes the body immediately.  
+
+> cloDefn name arg fvs body@(EBind _ _ _ _) = withNewLabel $ \l -> do
+
+cloDefn first creates a block representing the monadic computation. This thunk
+returned then refers to this block. When the thunk is evaluated the block
+will execute.
+
+>   let args = fvs ++ [arg]
+>   dest <- blockDefn ("block" ++ name) args (\n l -> compileStmtM body (return . mkLast . Done n l))
+
+The generated code that creates the monadic thunk is almost identical
+to that for a closure above, so I don't go into it any further.
+
+>   addProg (mkFirst (CloEntry name l fvs arg) <*>
+>            mkLast (Done name l (Thunk dest args)))
+>   return (name, l)
+
+Finally, when the body of the lambda is not an |EBind| or |ELam|,
+cloDefn generates a final "closure" block that immediately jumps to
+the body of the function. This indirection allows all function
+application to behave the same, even when the function is "fully"
+applied. 
+
+> cloDefn name arg fvs body = withNewLabel $ \l -> do
+
+The code generated will need to (ultimately) execute the body of the
+function, so I first create a new block representing |body|. The block
+will be able to refer to all the free variables given as well as the
+argument this closure recevied.
+
+>   let args = fvs ++ [arg]
+>   dest <- blockDefn ("block" ++ name) args (\n l -> compileStmtM body (return . mkLast . Done n l))
+
+I now generate the body of this final "closure" block. It will jump
+immedietaly to the code generated for |body|. This strategy lends itself
+to tail-call optimization, as the result of |body| becomes the result of
+this block.
+
+>   addProg (mkFirst (CloEntry name l fvs arg) <*>
+>            mkLast (Done name l (Goto dest args)))
+>   return (name, l)
+
+> -- | Compiler state. 
+> data CompS = C { compI :: Int -- ^ counter for fresh variables
+>                , compG :: ProgM C C -- ^ Program control-flow graph.
+>                , compT :: Map Name (Maybe Dest) } -- ^ top-level function names and their location.
 
 > -- | Create the initial state for our compiler.
 > mkCompS i userTops predefined = 
@@ -256,6 +342,13 @@ an error if the situation occurs.
 >   free <- getFree body
 >   blockDefn name free (\n l -> compileStmtM body (return . mkLast . Done n l))
 >   return ()
+
+> -- | Add a new block.
+> blockDefn :: Name -> [Name] -> (Name -> Label -> CompM (ProgM O C)) -> CompM Dest
+> blockDefn name args progM = withNewLabel $ \l -> do
+>   rest <- progM name l
+>   addProg (mkFirst (BlockEntry name l args) <*> rest)
+>   return (name, l)
 
 > mkBind :: Name -> Label -> Name -> TailM -> TailM -> CompM (ProgM O C)
 > mkBind n l r f t = return (mkMiddle (Bind r t) <*> mkLast (Done n l f))
@@ -313,38 +406,6 @@ an error if the situation occurs.
 
 > getDestOfName :: Name -> CompM (Maybe Dest)
 > getDestOfName name = gets compT >>= return . fromMaybe Nothing . Map.lookup name
-
-> -- | Add a new block.
-> blockDefn :: Name -> [Name] -> (Name -> Label -> CompM (ProgM O C)) -> CompM Dest
-> blockDefn name args progM = withNewLabel $ \l -> do
->   rest <- progM name l
->   addProg (mkFirst (BlockEntry name l args) <*> rest)
->   return (name, l)
-  
-> -- | Compile a lambda expression. Name, arg, and fvs
-> -- all refer to the enclosing lambda. body is the *body*
-> -- of the lambda.
-> cloDefn :: Name -> Name -> [Name] -> Expr -> CompM Dest
-> cloDefn name arg fvs body@(ELam v _ b) = withNewLabel $ \l -> do
->   let args = fvs ++ [arg]
->   dest <- cloDefn ("absBody" ++ name) v args b
->   addProg (mkFirst (CloEntry name l fvs arg) <*>
->            mkLast (Done name l (Closure dest args)))
->   return (name, l)
-
-> cloDefn name arg fvs body@(EBind _ _ _ _) = withNewLabel $ \l -> do
->   let args = fvs ++ [arg]
->   dest <- blockDefn ("block" ++ name) args (\n l -> compileStmtM body (return . mkLast . Done n l))
->   addProg (mkFirst (CloEntry name l fvs arg) <*>
->            mkLast (Done name l (Thunk dest args)))
->   return (name, l)
-
-> cloDefn name arg fvs body = withNewLabel $ \l -> do
->   let args = fvs ++ [arg]
->   dest <- blockDefn ("block" ++ name) args (\n l -> compileStmtM body (return . mkLast . Done n l))
->   addProg (mkFirst (CloEntry name l fvs arg) <*>
->            mkLast (Done name l (Goto dest args)))
->   return (name, l)
 
 > -- | Add a program (C C block) to the list of blocks
 > -- maintained by the monad.
