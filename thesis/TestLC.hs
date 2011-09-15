@@ -300,26 +300,79 @@ printTest3 = [threeBinds, main]
                     bindE "()" g $ \_ -> 
                     bindE "()" h $ \_ -> mkUnit)
 
+{-
+threeBinds = (\h :: #.t -> (\g :: #.t -> (\f :: #.t -> () :: #.t <- f;
+                                                       () :: #.t <- g;
+                                                       () :: #.t <- h;
+                                                       Unit{})))
+main = () :: #.t <- (((threeBinds ((print{} z))) ((print{} y))) ((print{} x)));
+       Unit{}
+================================================================================
+printBody (a): print*(a)
+print {} a: thunk printBody [a]
+main (z, y, x):
+  v201 <- print @ z
+  v203 <- print @ y
+  v204 <- closure absBodyabsBodythreeBinds {v201, v203}
+  v205 <- print @ x
+  v206 <- v204 @ v205
+  () <- invoke v206
+  mkData_Unit()
+threeBinds {} h: closure absBodythreeBinds {h}
+absBodythreeBinds {h} g: closure absBodyabsBodythreeBinds {h, g}
+absBodyabsBodythreeBinds {h, g} f:
+  thunk blockabsBodyabsBodythreeBinds [h, g, f]
+blockabsBodyabsBodythreeBinds (h, g, f):
+  () <- invoke f
+  () <- invoke g
+  () <- invoke h
+  mkData_Unit()
+-}
 printTest4 = [threeBinds, main]
   where
     main = ("main",
             bindE "()" (var "threeBinds" `app` 
-                        (mPrint `app` var "a") `app` 
-                        (mPrint `app` var "a") `app` 
-                        (mPrint `app` var "a")) $ \_ -> mkUnit)
+                        (mPrint `app` var "z") `app` 
+                        (mPrint `app` var "y") `app` 
+                        (mPrint `app` var "x")) $ \_ -> mkUnit)
     threeBinds = ("threeBinds",
-                  lam "f" $ \f ->
-                  lam "g" $ \g ->
                   lam "h" $ \h ->
+                  lam "g" $ \g ->
+                  lam "f" $ \f ->
                     bindE "()" f $ \_ ->
                     bindE "()" g $ \_ -> 
                     bindE "()" h $ \_ -> mkUnit)
+
+{-
+main = ((oneBind print{}) a)
+oneBind = (\z :: #.t -> (\a :: #.t -> () :: #.t <- (z a);
+                                      Unit{}))
+================================================================================
+printBody (a): print*(a)
+print {} a: thunk printBody [a]
+oneBind {} z: closure absBodyoneBind {z}
+absBodyoneBind {z} a: thunk blockabsBodyoneBind [z, a]
+blockabsBodyoneBind (z, a):
+  v203 <- z @ a
+  () <- invoke v203
+  mkData_Unit()
+main (a):
+  v206 <- closure absBodyoneBind {print}
+  v206 @ a
+-}
+printTest5 = [main, oneBind]
+  where
+    main = ("main",
+            var "oneBind" `app` mPrint `app` var "a")
+    oneBind = ("oneBind",
+               lam "z" $ \z ->
+               lam "a" $ \a ->
+                 bindE "()" (z `app` a) $ \_ -> mkUnit)
 {-
   if x > 10 
   then x + 1 + y
   else x + 1 + z
 -}
-
 lcmTest1 = ("lcmTest1"
            , lam "x" $ \x ->
              lam "y" $ \y ->
@@ -792,6 +845,7 @@ myMap = ("map",
 
 -- A function that return a variable directly
 myId = ("id", lam "x" $ \x -> x)
+
 -- A function that executes a monadic primitive
 -- directly, with no function applicatin
 constPrim = ("simplePrint", lam "x" $ \_ -> random)

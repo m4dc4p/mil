@@ -13,6 +13,7 @@
 > import Data.Set (Set)
 > import qualified Data.Set as Set
 > import Compiler.Hoopl
+> import Debug.Trace
 
 > import MIL
 > import Syntax.LambdaCase hiding (Alt)
@@ -133,25 +134,8 @@ ECase looks very complicated but mostly its a lot of bookkeeping.
 
 > compileStmtM (ECase e lcAlts) ctx = do
 >   let alts = map toAlt lcAlts
-
-I first create a location to hold the result of whichever arm of the case
-the program evaluates. 
-
 >   r <- fresh "result"
-
-The result of the case expression must be given to the "rest" of the
-program. I first apply the Return instruction to the result locatin
-and pass it to the context so the "rest" of the program can access the
-result value. I then create a "caseJoin" function which will contain
-(or at least, jump to) the "rest" of the program. 
-
 >   f <- ctx (Return r) >>= \rest -> callDefn "caseJoin" (\n l -> return rest)
-
-Each case arm will call the "caseJoin" function to pass its
-particular value to the "rest" of the program. The code that follows
-creates blocks for each arm, ensures "caseJoin" is called, and finally generates
-a CaseM instruction that will evaulate the discriminant and select an arm.
-
 >   let compAlt (Alt cons vs body) = do
 >         body' <- callDefn ("altBody" ++ cons) (\n l -> compileStmtM body (mkBind n l r f))
 >         return (Alt cons vs body')
@@ -164,11 +148,11 @@ a CaseM instruction that will evaulate the discriminant and select an arm.
 >       setDest name label
 >       return (Goto (name, label) [])
 
-EPrim should only appear in "variable" position, by 
-which I mean part of a function application or on the right-hand side of
-an EBind statement. The cases for EApp and EBind handle EPrim through the compVarM
-function. Therefore, we should not see an EPrim by itself, so I report
-an error if the situation occurs.
+EPrim should only appear in "variable" position, by which I mean part
+of a function application or on the right-hand side of an EBind
+statement. The cases for EApp and EBind handle EPrim through the
+compVarM function. Therefore, we should not see an EPrim by itself, so
+I report an error if the situation occurs.
 
 > compileStmtM (EPrim p _) ctx = error "Primitive in non-var position"
 
@@ -288,6 +272,26 @@ this block.
 >            mkLast (Done name l (Goto dest args)))
 >   return (name, l)
 
+> -- Creates a new function definition
+> -- using the arguments given and adds it
+> -- to the control flow graph.    
+> newDefn :: (Name, Expr) -> CompM ()
+> newDefn (name, body@(ELam v _ b)) = do
+>   free <- getFree body
+>   cloDefn name v free b
+>   return ()
+> newDefn (name, body) = do
+>   free <- getFree body
+>   blockDefn name free (\n l -> compileStmtM body (return . mkLast . Done n l))
+>   return ()
+
+> -- | Add a new block.
+> blockDefn :: Name -> [Name] -> (Name -> Label -> CompM (ProgM O C)) -> CompM Dest
+> blockDefn name args progM = withNewLabel $ \l -> do
+>   rest <- progM name l
+>   addProg (mkFirst (BlockEntry name l args) <*> rest)
+>   return (name, l)
+
 > -- | Compiler state. 
 > data CompS = C { compI :: Int -- ^ counter for fresh variables
 >                , compG :: ProgM C C -- ^ Program control-flow graph.
@@ -329,26 +333,6 @@ this block.
 >     compileDef p (i, ps) = 
 >       let result = execState (newDefn p) (mkCompS i userTops predefined)
 >       in (compI result + 1, compG result : ps)
-
-> -- Creates a new function definition
-> -- using the arguments given and adds it
-> -- to the control flow graph.    
-> newDefn :: (Name, Expr) -> CompM ()
-> newDefn (name, body@(ELam v _ b)) = do
->   free <- getFree body
->   cloDefn name v free b
->   return ()
-> newDefn (name, body) = do
->   free <- getFree body
->   blockDefn name free (\n l -> compileStmtM body (return . mkLast . Done n l))
->   return ()
-
-> -- | Add a new block.
-> blockDefn :: Name -> [Name] -> (Name -> Label -> CompM (ProgM O C)) -> CompM Dest
-> blockDefn name args progM = withNewLabel $ \l -> do
->   rest <- progM name l
->   addProg (mkFirst (BlockEntry name l args) <*> rest)
->   return (name, l)
 
 > mkBind :: Name -> Label -> Name -> TailM -> TailM -> CompM (ProgM O C)
 > mkBind n l r f t = return (mkMiddle (Bind r t) <*> mkLast (Done n l f))
