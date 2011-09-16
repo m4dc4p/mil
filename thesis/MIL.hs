@@ -272,7 +272,8 @@ compiledPrims ((n, m):ms) = do
   return ((n, head):rest)
   
 prims :: UniqueMonad m => [(Name, m (ProgM C C))]
-prims = [printPrim 
+prims = [printPrim
+        , readCharPrim
         , plusPrim
         , minusPrim
         , timesPrim
@@ -313,9 +314,10 @@ prims = [printPrim
       ,("mkData_False", mkDataPrim "False" 0)
       ,("mkData_True", mkDataPrim "True" 0)]
 
-printPrim, plusPrim, minusPrim, timesPrim, divPrim, ltPrim, gtPrim, ltePrim, gtePrim, eqPrim, neqPrim :: UniqueMonad m => (Name, m (ProgM C C))
+printPrim, readCharPrim, plusPrim, minusPrim, timesPrim, divPrim, ltPrim, gtPrim, ltePrim, gtePrim, eqPrim, neqPrim :: UniqueMonad m => (Name, m (ProgM C C))
 
 printPrim = ("print", liftM snd $ unaryPrim "print")
+readCharPrim = ("readChar", liftM snd $ nullaryPrim "readChar")
 
 plusPrim = ("plus", liftM snd $ binPrim "plus")
 minusPrim = ("minus", liftM snd $ binPrim "minus")
@@ -364,7 +366,14 @@ monadic rest name  = do
   let thunkBody = mkFirst (BlockEntry name thunkLabel []) <*>
                   mkLast (Done name thunkLabel (Thunk dest []))
   return ((name, thunkLabel), thunkBody |*><*| prog)
-  
+
+nullaryPrim :: UniqueMonad m => Name -> m (Dest, ProgM C C)
+nullaryPrim name = do
+  bodyLabel <- freshLabel
+  let body = mkFirst (BlockEntry name bodyLabel []) <*>
+             mkLast (Done name bodyLabel $ Prim name [])
+  return ((name, bodyLabel), body)
+
 unaryPrim :: UniqueMonad m => Name -> m (Dest, ProgM C C)
 unaryPrim name = do
   bodyLabel <- freshLabel

@@ -6,7 +6,7 @@
 > import Control.Monad.State (State, execState, modify, gets, get, put)
 > import Control.Monad (when)
 > import Text.PrettyPrint 
-> import Data.List (sort, nub, delete, (\\))
+> import Data.List (sort, nub, delete, (\\), isInfixOf)
 > import Data.Maybe (fromMaybe, isJust, isNothing, catMaybes, fromJust)
 > import Data.Map (Map, (!))
 > import qualified Data.Map as Map
@@ -82,31 +82,19 @@ term. We pass this closure to our context.
 
 EBind evaluates its right-hand side as a monadic value. Therefore, the 
 translated code for the monadic expression will evaluate to a monadic
-thunk. We apply
+thunk. 
 
-> compileStmtM (EBind v _ b r) ctx = do
-
-EBind sequences computation by placing the "rest" of the program in
-the r binding above. I first compile the "rest" of the program. 
-
->   rest <- compileStmtM r ctx
-
-Now we need to compile the monadic expression. compVarM guarntees that
-it will compile a given expression and bind it to a variable. We don't know
-what the expression contains, but we do know we need to name its result. 
-
->   compVarM b $ \n -> do
-
-I next assign the result of the monadic expression, n,  to v, using
-the Bind instructin. I know that n contains a monadic thunk, so I also
-must apply the Run instruction to n in order to "run" or "invoke" the
-computation. 
-
-Finally, the type of ctx above means that rest will contain an
-"open/closed" program. Our binding must occur before the "rest" of the program, so
-we add it to the front and return the result.
-
->     return (mkMiddle (v `Bind` (Run n)) <*> rest)
+> compileStmtM bind@(EBind _ _ _ _) ctx = do
+>   fvs <- getFree bind
+>   name <- newTop "bindBody"
+>   dest <- blockDefn name fvs $ \n l -> do
+>     let compM (EBind v _ b r) = do
+>           rest <- compM r 
+>           compVarM b $ \n -> return (mkMiddle (v `Bind` (Run n)) <*> rest)
+>         compM (ELet _ _) = undefined
+>         compM e = compileStmtM e (\t -> return (mkLast (Done n l t)))
+>     compM bind 
+>   ctx (Thunk dest fvs)
 
 An EVar term, in this case, must appear in "variable" position or it 
 would be handled by EApp, EBind, or other terms. Therefore, we apply
@@ -137,7 +125,7 @@ ECase looks very complicated but mostly its a lot of bookkeeping.
 >   r <- fresh "result"
 >   f <- ctx (Return r) >>= \rest -> callDefn "caseJoin" (\n l -> return rest)
 >   let compAlt (Alt cons vs body) = do
->         body' <- callDefn ("altBody" ++ cons) (\n l -> compileStmtM body (mkBind n l r f))
+>         body' <- callDefn (mkName "altBody" cons) (\n l -> compileStmtM body (mkBind n l r f))
 >         return (Alt cons vs body')
 >   altsM <- mapM compAlt alts
 >   compVarM e $ \v -> return (mkLast (CaseM v altsM))
@@ -212,7 +200,8 @@ generate the code for |b|. The free variables passed are those given
 given to cloDefn is |v|, the argument for the lambda bound to |body|. 
 
 >   let bfvs = fvs ++ [arg]
->   dest <- cloDefn ("absBody" ++ name) v bfvs b
+>   name' <- newTop (mkName "absBody" name)
+>   dest <- cloDefn name' v bfvs b
 
 Now I generate code for the enclosing lambda. Our entry label
 specifies the free variables and arguments given originally. The body
@@ -224,27 +213,6 @@ returned here is applied to a value.
 
 >   addProg (mkFirst (CloEntry name l fvs arg) <*>
 >            mkLast (Done name l (Closure dest bfvs)))
->   return (name, l)
-
-If the body of our enclosing lambda begins with an |EBind| statement,
-we assume the function represents a monadic computation. cloDefn will
-generate a code that create a monadic thunk rather than code that
-executes the body immediately.  
-
-> cloDefn name arg fvs body@(EBind _ _ _ _) = withNewLabel $ \l -> do
-
-cloDefn first creates a block representing the monadic computation. This thunk
-returned then refers to this block. When the thunk is evaluated the block
-will execute.
-
->   let args = fvs ++ [arg]
->   dest <- blockDefn ("block" ++ name) args (\n l -> compileStmtM body (return . mkLast . Done n l))
-
-The generated code that creates the monadic thunk is almost identical
-to that for a closure above, so I don't go into it any further.
-
->   addProg (mkFirst (CloEntry name l fvs arg) <*>
->            mkLast (Done name l (Thunk dest args)))
 >   return (name, l)
 
 Finally, when the body of the lambda is not an |EBind| or |ELam|,
@@ -261,7 +229,7 @@ will be able to refer to all the free variables given as well as the
 argument this closure recevied.
 
 >   let args = fvs ++ [arg]
->   dest <- blockDefn ("block" ++ name) args (\n l -> compileStmtM body (return . mkLast . Done n l))
+>   dest <- blockDefn (mkName "block" name) args (\n l -> compileStmtM body (return . mkLast . Done n l))
 
 I now generate the body of this final "closure" block. It will jump
 immedietaly to the code generated for |body|. This strategy lends itself
@@ -422,3 +390,7 @@ this block.
 >     modify (\(n, g, j) -> (n, g, j + 1))
 >     return (intToUnique i)
 
+> mkName :: Name -> Name -> Name
+> mkName prefix name  
+>   | prefix `isInfixOf` name = name
+>   | otherwise = prefix ++ name

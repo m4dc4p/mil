@@ -119,16 +119,16 @@ altBodyCons312 (g, x, xs', y):
   v315 @ v318
 
 -}
-funnyFold = ("funny", 
-             lam "g" $ \g ->
-             lam "y" $ \y ->
-             lam "xs" $ \xs ->
-               _case xs (alt "Nil" [] (const mkNil) .
-                         alt "Cons" ["x", "xs'"] 
-                               (\ [x, xs'] ->
-                                  (((g `app` y) `app` x) `app`
-                                   ((((var "funny") `app` g) `app` y) `app`
-                                      xs')))))
+funnyFold = [("funny", 
+              lam "g" $ \g ->
+              lam "y" $ \y ->
+              lam "xs" $ \xs ->
+                _case xs (alt "Nil" [] (const mkNil) .
+                          alt "Cons" ["x", "xs'"] 
+                                (\ [x, xs'] ->
+                                   (((g `app` y) `app` x) `app`
+                                    ((((var "funny") `app` g) `app` y) `app`
+                                     xs')))))]
 
 {-
 
@@ -144,9 +144,7 @@ absBody226 {f, g} x:
   v230 <- g @ x
   f @ v230
 -}
-compose :: Def
-compose = ("compose", composeDef)
-
+compose = [("compose", composeDef)]
 composeDef = lam "f" $ \f -> 
               lam "g" $ \g ->
               lam "x" $ \x -> f `app` (g `app` x)
@@ -170,8 +168,12 @@ main (bar, foo, x):
   v234 <- v233 @ bar
   v234 @ x
 -}
-origExample = [("main", var "compose" `app` var "foo" `app` var "bar" `app` var "x")
-              , compose]
+origExample = [("main", 
+                var "compose" `app` 
+                    var "foo" `app` 
+                    var "bar" `app` 
+                    var "x")
+              , head compose]
 {-
   hello = do
     v <- print p
@@ -191,8 +193,7 @@ blockhello (p):
   mkData_Unit()
 
 -}
-hello = ("hello", bindE "v" (mPrint `app` var "p") $ 
-                  \v -> mkUnit)
+hello = [("hello", bindE "v" (mPrint `app` var "p") $ \v -> mkUnit)]
 
 {- Monadic compose (from mon6)
 
@@ -216,12 +217,12 @@ absBody232 {g, f} x:
   invoke v237
 
 -}
-kleisli = ("kleisli",
-           lam "f" $ \f ->
-           lam "g" $ \g ->
-           lam "x" $ \x ->
-             bindE "v1" (g `app` x) $ \v1 ->
-             bindE "v2" (f `app` v1) id)
+kleisli = [("kleisli",
+            lam "f" $ \f ->
+            lam "g" $ \g ->
+            lam "x" $ \x ->
+              bindE "v1" (g `app` x) $ \v1 ->
+              bindE "v2" (f `app` v1) id)]
 
 {-
 
@@ -373,28 +374,28 @@ printTest5 = [main, oneBind]
   then x + 1 + y
   else x + 1 + z
 -}
-lcmTest1 = ("lcmTest1"
-           , lam "x" $ \x ->
-             lam "y" $ \y ->
-             lam "z" $ \z ->
-               _case (x `gt` lit 10) 
-                  (alt "True" [] (const $ x `plus` lit 1 `plus` y) .
-                   alt "False" [] (const $ x `plus` lit 1 `plus` z)))
+lcmTest1 = [("lcmTest1"
+            , lam "x" $ \x ->
+              lam "y" $ \y ->
+              lam "z" $ \z ->
+                _case (x `gt` lit 10) 
+                   (alt "True" [] (const $ x `plus` lit 1 `plus` y) .
+                    alt "False" [] (const $ x `plus` lit 1 `plus` z)))]
 
-lcmTest2 = ("lcmTest2"
-           , lam "x" $ \x ->
-             lam "y" $ \y ->
-             lam "z" $ \z ->
-               _case (x `gt` lit 10)
-                  (alt "True" [] (const (var "foo" `app` x `app` y)) .
-                   alt "False" [] (const (var "foo" `app` x `app` z))))
+lcmTest2 = [("lcmTest2"
+            , lam "x" $ \x ->
+              lam "y" $ \y ->
+              lam "z" $ \z ->
+                _case (x `gt` lit 10)
+                   (alt "True" [] (const (var "foo" `app` x `app` y)) .
+                    alt "False" [] (const (var "foo" `app` x `app` z))))]
 
 -- Test that we recognized (f x) as anticipatable.
-lcmTest3 = ("lcmTest3"
-           , lam "x" $ \x ->
-             lam "f" $ \f ->
-             lam "g" $ \g ->
-             (g `app` (f `app` x) `app` (f `app` x)))
+lcmTest3 = [("lcmTest3"
+            , lam "x" $ \x ->
+              lam "f" $ \f ->
+              lam "g" $ \g ->
+                (g `app` (f `app` x) `app` (f `app` x)))]
 
 
 -- Test anticipatibility across procedures.
@@ -405,21 +406,21 @@ lcmTest4 = [("main", var "lcmTest3" `app` lit 2 `app` var "plus" `app` var "time
                 lam "g" $ \g ->
                   (g `app` (f `app` x `app` x) `app` (f `app` x `app` x)))]
             
-lcmTest5 = ("lcmTest5"
-           , lam "x" $ \x ->
-             lam "y" $ \y ->
-             lam "z" $ \z ->
-               _case (y `gt` z)
-                (alt "True" [] (const (var "foo" `app` x)) .
-                 (alt "False" [] (const (_case (x `gt` z)
-                                         (alt "True" [] (const (var "foo" `app` x `app` y)) .
-                                          (alt "False" [] (const (var "foo" `app` x `app` z)))))))))
+lcmTest5 = [("lcmTest5"
+            , lam "x" $ \x ->
+              lam "y" $ \y ->
+              lam "z" $ \z ->
+                _case (y `gt` z)
+                   (alt "True" [] (const (var "foo" `app` x)) .
+                    (alt "False" [] (const (_case (x `gt` z)
+                                            (alt "True" [] (const (var "foo" `app` x `app` y)) .
+                                             (alt "False" [] (const (var "foo" `app` x `app` z)))))))))]
 
 -- A program where anticipatability of "foo @ a" oscillates
 -- throughout. It is anticipated after ``lam "a" $ \a ->''
 -- not anticipated after ``_case (var "foo" `app` a)'', and
 -- anticipated again ``alt "D" ''.
-lcmTest6 = ("lcmTest6"
+lcmTest6 = [("lcmTest6"
             , lam "a" $ \a ->
               _case (var "foo" `app` a)
                  (alt "A" [] 
@@ -428,9 +429,9 @@ lcmTest6 = ("lcmTest6"
                     (alt "C" [] 
                      (const a) .
                      (alt "D" [] 
-                      (const (var "foo" `app` a))))))))
+                      (const (var "foo" `app` a))))))))]
 
-lcmTest7 = ("lcmTest6"
+lcmTest7 = [("lcmTest6"
             , lam "a" $ \a ->
               _case a
                  (alt "A" [] 
@@ -439,7 +440,7 @@ lcmTest7 = ("lcmTest6"
                     (alt "C" [] 
                      (const a) .
                      (alt "D" [] 
-                      (const (var "foo" `app` a))))))))
+                      (const (var "foo" `app` a))))))))]
                 
 {-
   compose2 x f g = g (f x) f
@@ -456,11 +457,11 @@ absBody232 {f, x} g:
   v238 @ f
 
 -}
-sortOfCompose = ("sortOfCompose"
-           , lam "x" $ \x ->
-             lam "f" $ \f ->
-             lam "g" $ \g ->
-             (g `app` (f `app` x) `app` f))
+sortOfCompose = [("sortOfCompose"
+                 , lam "x" $ \x ->
+                   lam "f" $ \f ->
+                   lam "g" $ \g ->
+                     (g `app` (f `app` x) `app` f))]
 
 -- Fully applied primitive
 {-
@@ -472,9 +473,9 @@ primTest {} x: blockprimTest(x)
 blockprimTest (x): closure absBody208 {x}
 absBody208 {x} y: plus*(x, y)
 -}
-primTest1 = ("primTest"
+primTest1 = [("primTest"
             , lam "x" $ \x ->
-              lam "y" $ \y -> plus x y)
+              lam "y" $ \y -> plus x y)]
          
 -- Partially apply primitive    
 {-
@@ -485,8 +486,8 @@ primtest x = (x +)
 plusClo2 {a} b: plus*(a, b)
 primTest {} x: closure plusClo2 {x}
 -}
-primTest2 = ("primTest"
-            , lam "x" $ \x -> var "plus" `app` x)
+primTest2 = [("primTest"
+            , lam "x" $ \x -> var "plus" `app` x)]
              
 
 {-
@@ -740,9 +741,9 @@ absBody228 {f, g} x:
   f @ v232
 
  --}
-origExample2 = ("main", 
+origExample2 = [("main", 
                       _let "compose" composeDef $ \compose ->
-                      compose `app` var "foo" `app` var "bar" `app` var "x")
+                      compose `app` var "foo" `app` var "bar" `app` var "x")]
 
 {-- From Mark
 f x = let g y = x + y
@@ -755,9 +756,9 @@ f {} x: closure absBody208 {x}
 absBody208 {x} y: plus*(x, y)
 
 --}
-letPlus = ("f", 
+letPlus = [("f", 
               lam "x" $ \x -> 
-              _let "g" (lam "y" $ \y -> x `plus` y) $ \g -> g)
+              _let "g" (lam "y" $ \y -> x `plus` y) $ \g -> g)]
 
 {-- Mutually recursive -- will not compile correctly. No fix planned.
 h z = let f y = y + g y
@@ -773,11 +774,11 @@ absBody218 {g} y:
   v224 <- plus*(y, g)
   v224 @ y
 --}
-letRec = ("h", 
+letRec = [("h", 
               lam "z" $ \z -> 
               _let "f" (lam "y" $ \y -> y `plus` (var "g") `app` y) $ \f ->
               _let "g" (lam "y" $ \y -> y `plus` (var "f") `app` y) $ \g ->
-              f `app` z)
+              f `app` z)]
 
 {-- Lambda-lifted mutually recursive version of the above.
 f y g = y + g y f
@@ -837,38 +838,52 @@ altBodyCons250 (f, x, xs):
   v254 @ v256
 
 -}
-myMap = ("map",
+myMap = [("map",
          lam "f" $ \f ->
          lam "xs" $ \xs ->
            _case xs $ (alt "Nil" [] (\_ -> mkNil) . 
-            (alt "Cons" ["x", "xs"] (\ [x, xs] -> mkCons `app` (f `app` x) `app` (var "map" `app` f `app` xs)))))
+            (alt "Cons" ["x", "xs"] (\ [x, xs] -> mkCons `app` (f `app` x) `app` (var "map" `app` f `app` xs)))))]
 
 -- A function that return a variable directly
 myId = ("id", lam "x" $ \x -> x)
 
 -- A function that executes a monadic primitive
 -- directly, with no function applicatin
-constPrim = ("simplePrint", lam "x" $ \_ -> random)
+constPrim = [("simplePrint", lam "x" $ \_ -> random)]
   where
     random = EPrim "random" []
 
 -- A function where the result of a Case statement is
 -- applied to an argument
-caseApp = ("caseApp",
+caseApp = [("caseApp",
            lam "f" $ \f ->
            lam "g" $ \g ->
            lam "x" $ \x ->
              (_case x $ (alt "True" [] (\_ -> f)) .
-               (alt "False" [] (\_ -> g))) `app` x)
+               (alt "False" [] (\_ -> g))) `app` x)]
 
 -- A case statement on the right side of a bind
 -- that evaluates to one of two monadic functions.
-caseAppM = ("caseAppM",
+caseAppM = [("caseAppM",
            lam "f" $ \f ->
            lam "g" $ \g ->
            lam "x" $ \x ->
              bindE "()" ((_case x $ (alt "True" [] (\_ -> f)) .
-               (alt "False" [] (\_ -> g))) `app` x) $ \_ -> mkUnit)
+               (alt "False" [] (\_ -> g))) `app` x) $ \_ -> mkUnit)]
+
+-- Ensure we don't evaulate monadic
+-- expressions during function application.
+mCase = [("mCase", 
+          (lam "f" $ \f ->
+           lam "readChar" $ \readChar ->
+             f `app` (bindE "x" readChar $ \x -> x)) `app` (lam "_" $ \_ -> lit 42) `app` mPrint)]
+
+monadTest1 = [("monadTest1"
+              , bindE "c" mReadChar $ \c -> mPrint `app` c)]
+
+monadTest2 = [("monadTest2"
+              , bindE "c" mReadChar $ \c -> 
+                _case c $ (alt "c" [] (\_ -> mPrint `app` c)))]
 
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
@@ -877,6 +892,7 @@ alt :: Name -> [Name] -> ([Expr] -> Expr) -> [LC.Alt] -> [LC.Alt]
 alt cons vs f = (LC.Alt cons [] vs (f (map var vs)) :)
 
 mPrint = EPrim "print" []
+mReadChar = EPrim "readChar" []
 mkUnit = ECon "Unit" [] 
 
 mkNil :: Expr
