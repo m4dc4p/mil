@@ -17,6 +17,7 @@ import MIL hiding (_case)
 import Util
 import OptMIL
 import LCToMIL
+import DeadBlocks
 import LCM
 
 fromProgram :: Program -> [(Name, Expr)]
@@ -29,7 +30,7 @@ fromProgram (Program { decls = (Decls d)}) =
 progM :: [(Name, Expr)] -> ([Name], ProgM C C) -> IO ()
 progM progs prelude@(prims, _) = do
   putStrLn "\n ========= Unoptimized ============"
-  printResult progs (map (addLive (tops ++ prims)) . map (compile tops prelude) . map (: []) $ progs)
+  printResult progs (map (deadBlocks tops . compile tops prelude) . map (: []) $ progs)
 
   let optProgs = mostOpt tops prelude . (compile tops prelude) $ progs
 
@@ -232,17 +233,17 @@ kleisli = [("kleisli",
 printTest1 = [threeBinds, main]
   where
     main = ("main",
-              var "threeBinds" `app` 
-                    (mPrint `app` var "a") `app` 
-                    (mPrint `app` var "a") `app` 
-                    (mPrint `app` var "a"))
+              bindE "()" (var "threeBinds" `app` 
+                          (mPrint `app` var "a") `app` 
+                          (mPrint `app` var "a") `app` 
+                          (mPrint `app` var "a")) id)
     threeBinds = ("threeBinds",
                   lam "f" $ \f ->
                   lam "g" $ \g ->
                   lam "h" $ \h ->
                     bindE "()" f $ \_ ->
                     bindE "()" g $ \_ -> 
-                    bindE "()" h $ \_ -> mkUnit)
+                    bindE "()" h $ id)
 
 {-
 
@@ -283,7 +284,7 @@ printTest2 = [doBinds, main]
                   lam "h" $ \h ->
                     bindE "()" f $ \_ ->
                     bindE "()" g $ \_ -> 
-                    bindE "()" h $ \x -> x)
+                    bindE "()" h $ id)
 
 printTest3 = [threeBinds, main]
   where
@@ -368,7 +369,7 @@ printTest5 = [main, oneBind]
     oneBind = ("oneBind",
                lam "z" $ \z ->
                lam "a" $ \a ->
-                 bindE "()" (z `app` a) $ \_ -> mkUnit)
+                 bindE "()" (z `app` a) $ id)
 {-
   if x > 10 
   then x + 1 + y
@@ -855,7 +856,7 @@ constPrim = [("simplePrint", lam "x" $ \_ -> random)]
 
 -- A function where the result of a Case statement is
 -- applied to an argument
-caseApp = [("caseApp",
+caseTest1 = [("caseTest1",
            lam "f" $ \f ->
            lam "g" $ \g ->
            lam "x" $ \x ->
@@ -864,26 +865,37 @@ caseApp = [("caseApp",
 
 -- A case statement on the right side of a bind
 -- that evaluates to one of two monadic functions.
-caseAppM = [("caseAppM",
+caseTest2 = [("caseTest2",
            lam "f" $ \f ->
            lam "g" $ \g ->
            lam "x" $ \x ->
              bindE "()" ((_case x $ (alt "True" [] (\_ -> f)) .
                (alt "False" [] (\_ -> g))) `app` x) $ \_ -> mkUnit)]
 
+caseTest3 = [("caseTest3",
+               lam "x" $ \x ->
+               _case x $ (alt "True" [] (const mReadChar)) .
+                (alt "False" [] (const (ret (lit 42)))))]
+
+
 -- Ensure we don't evaulate monadic
 -- expressions during function application.
-mCase = [("mCase", 
-          (lam "f" $ \f ->
-           lam "readChar" $ \readChar ->
-             f `app` (bindE "x" readChar $ \x -> x)) `app` (lam "_" $ \_ -> lit 42) `app` mPrint)]
+mCase = [("mCase"
+         , (lam "f" $ \f ->
+            lam "readChar" $ \r ->
+            f `app` (bindE "x" r $ \x -> x)) `app` 
+          (lam "_" $ \_ -> lit 42) `app` 
+          mPrint)]
 
 monadTest1 = [("monadTest1"
-              , bindE "c" mReadChar $ \c -> mPrint `app` c)]
+              , bindE "c" mReadChar $ \c -> 
+                bindE "()" (mPrint `app` c) ret)]
 
+-- We run the monadic action
+-- in the case arm.
 monadTest2 = [("monadTest2"
               , bindE "c" mReadChar $ \c -> 
-                _case c $ (alt "c" [] (\_ -> mPrint `app` c)))]
+                _case c $ (alt "c" [] (\_ -> bindE "()" (mPrint `app` c) ret)))]
 
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
@@ -894,6 +906,7 @@ alt cons vs f = (LC.Alt cons [] vs (f (map var vs)) :)
 mPrint = EPrim "print" []
 mReadChar = EPrim "readChar" []
 mkUnit = ECon "Unit" [] 
+ret = (EPrim "return" [] `app`)
 
 mkNil :: Expr
 mkNil = ECon "Nil" [] 
