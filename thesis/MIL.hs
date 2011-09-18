@@ -273,6 +273,7 @@ compiledPrims ((n, m):ms) = do
   
 prims :: UniqueMonad m => [(Name, m (ProgM C C))]
 prims = [printPrim
+        , returnPrim
         , readCharPrim
         , plusPrim
         , minusPrim
@@ -314,10 +315,11 @@ prims = [printPrim
       ,("mkData_False", mkDataPrim "False" 0)
       ,("mkData_True", mkDataPrim "True" 0)]
 
-printPrim, readCharPrim, plusPrim, minusPrim, timesPrim, divPrim, ltPrim, gtPrim, ltePrim, gtePrim, eqPrim, neqPrim :: UniqueMonad m => (Name, m (ProgM C C))
+printPrim, readCharPrim, returnPrim, plusPrim, minusPrim, timesPrim, divPrim, ltPrim, gtPrim, ltePrim, gtePrim, eqPrim, neqPrim :: UniqueMonad m => (Name, m (ProgM C C))
 
-printPrim = ("print", liftM snd $ unaryPrim "print")
-readCharPrim = ("readChar", liftM snd $ nullaryPrim "readChar")
+printPrim = ("print", liftM snd $ mkMonadicPrim "print" 1)
+readCharPrim = ("readChar", liftM snd $ mkMonadicPrim "readChar" 0)
+returnPrim = ("return", liftM snd $ mkMonadicPrim "return" 1)
 
 plusPrim = ("plus", liftM snd $ binPrim "plus")
 minusPrim = ("minus", liftM snd $ binPrim "minus")
@@ -367,6 +369,39 @@ monadic rest name  = do
                   mkLast (Done name thunkLabel (Thunk dest []))
   return ((name, thunkLabel), thunkBody |*><*| prog)
 
+mkMonadicPrim :: UniqueMonad m => Name -> Int -> m (Dest, ProgM C C)
+mkMonadicPrim name numArgs 
+  | numArgs == 0 = mkPrim name []
+  | otherwise = do
+    (next, rest) <- prim' (numArgs - 1) ["a"]
+    dest@(n, l) <- newDest name
+    return (dest
+           , (mkFirst (BlockEntry n l []) <*>
+              mkLast (Done n l $ Closure next [])) |*><*| 
+            rest)
+  where
+    prim' 0 args = mkPrim (name ++ "mon") args 
+    prim' n args = do
+      let arg = "a" ++ show n
+          args' = args ++ [arg]
+      (next, rest) <- prim' (n - 1) args'
+      dest@(n, l) <- newDest (name ++ "clo" ++ show n)
+      return (dest
+             , (mkFirst (CloEntry n l args arg) <*>
+                mkLast (Done n l $ Closure next args')) |*><*| 
+              rest)
+    mkPrim monName args = do
+      dest1@(n1, l1) <- newDest monName
+      dest2@(n2, l2) <- newDest (name ++ "body")
+      return (dest1
+             , (mkFirst (BlockEntry n1 l1 args) <*>
+                mkLast (Done n1 l1 (Thunk dest2 args))) |*><*|
+              (mkFirst (BlockEntry n2 l2 args) <*>
+               mkLast (Done n2 l2 (Prim name args))))
+    newDest name = do
+      l <- freshLabel
+      return (name, l)
+
 nullaryPrim :: UniqueMonad m => Name -> m (Dest, ProgM C C)
 nullaryPrim name = do
   bodyLabel <- freshLabel
@@ -378,12 +413,16 @@ unaryPrim :: UniqueMonad m => Name -> m (Dest, ProgM C C)
 unaryPrim name = do
   bodyLabel <- freshLabel
   c1Label <- freshLabel
+  c2Label <- freshLabel
   let bodyName = name ++ "Body" 
+      c1Name = name ++ "c1"
       body = mkFirst (BlockEntry bodyName bodyLabel ["a"]) <*>
              mkLast (Done bodyName bodyLabel $ Prim name ["a"])
-      c1 = mkFirst (CloEntry name c1Label [] "a") <*>
-           mkLast (Done name c1Label $ Thunk (bodyName, bodyLabel) ["a"])
-  return ((name, c1Label), c1 |*><*| body)
+      c1 = mkFirst (CloEntry c1Name c1Label [] "a") <*>
+           mkLast (Done c1Name c1Label $ Thunk (bodyName, bodyLabel) ["a"])
+      c2 = mkFirst (BlockEntry name c2Label []) <*>
+           mkLast (Done name c2Label $ Closure (c1Name, c1Label) [])
+  return ((name, c2Label), c2 |*><*| c1 |*><*| body)
                    
 binPrim :: UniqueMonad m => Name -> m (Dest, ProgM C C)
 binPrim name = do
