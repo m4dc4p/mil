@@ -1,5 +1,5 @@
 > {-# LANGUAGE TypeSynonymInstances, GADTs, RankNTypes, NamedFieldPuns, TypeFamilies, ScopedTypeVariables, FlexibleInstances #-}
-> module LCToMIL
+> module LCToMIL (compile, Def, prelude)
 
 > where
 
@@ -25,7 +25,7 @@ This module implements a compiler from LC programs to MIL programs.
 The compilStmtM function implements the majority of the translation
 from LC to MIL:
 
-> compileStmtM :: Expr 
+> compileStmt :: Expr 
 >   -> (TailM -> CompM (ProgM O C))
 >   -> CompM (ProgM O C)
 
@@ -33,11 +33,11 @@ The first argument represents the LC expression to translate. The
 result uses our compiler monad to create a MIL basic block. I call the
 second argument the "compilation context". The context represents
 everything translated so far, except for a hole where our current
-expression's translation should go. Therefore, compileStmtM translates
+expression's translation should go. Therefore, compileStmt translates
 its first argument into a TailM value and passes it the context. 
 
 Notice the context itself produces a basic block. In some cases, the
-context's result is retured by compileStmtM directly. In other cases,
+context's result is retured by compileStmt directly. In other cases,
 it is used to produce out-of-line blocks that are managed by the
 compiler monad and not returned directly. '
 
@@ -45,7 +45,7 @@ The ECon term creates a data value. We implement ECon using a
 series of pre-generated primitives, one for each constructor of each
 known data type. 
 
-> compileStmtM (ECon cons _) ctx = do 
+> compileStmt (ECon cons _) ctx = do 
 >   dest <- getDestOfName ("mkData_" ++ cons)
 
 Therefore, we first look for the primitive with a 
@@ -60,7 +60,7 @@ creates a value representing the function. Compiling this term
 requires that we accomplish two tasks: create a new function
 definition, and generate code to create the value representing the function.
 
-> compileStmtM body@(ELam v _ b) ctx = do
+> compileStmt body@(ELam v _ b) ctx = withFree (const (setFree body)) $ \free -> do
 
 To create a new function definition, we essentially create a new
 "compilation context." The call to cloDefn generates a new MIL basic
@@ -68,7 +68,6 @@ block that holds the translated body of the lambda. cloDefn also generates code
 which can retrieve the lambda body's free variables. cloDefn
 returns a name and label which can be used to call the new function.
 
->   free <- getFree body
 >   (name, label) <- do
 >     name <- newTop "absBody"
 >     cloDefn name v free b 
@@ -84,33 +83,87 @@ EBind evaluates its right-hand side as a monadic value. Therefore, the
 translated code for the monadic expression will evaluate to a monadic
 thunk. 
 
-> compileStmtM bind@(EBind _ _ _ _) ctx = do
->   fvs <- getFree bind
+> compileStmt bind@(EBind v _ _ _) ctx = withFree (return . delete v) $ \bfvs -> do
 >   name <- newTop "bindBody"
->   dest <- blockDefn name fvs $ \n l -> do
->     let compM (EBind v _ b r) = do
+>   dest <- blockDefn name bfvs $ \n l -> do
+
+  [| v <- e;
+     a      |] (EVar)
+==>
+  t <- [|e|]
+  v <- invoke t
+  invoke a
+
+  [| v <- e;
+     case x of as |] (ECase)
+==>
+  t <- [|e|]
+  v <- invoke t
+  t <- |[case x of as |]
+  invoke t
+
+  [| v <- e;
+     f*     |] (EPrim)
+==>
+  t <- [|e|]
+  v <- invoke t
+  invoke f*
+
+  [| v <- e;
+     let x1 = d1 ... x2 = d2 ... in r |] (ELet)
+==>
+  t <- [|e|]
+  v <- invoke t
+  x1, x2, ... <- [|d1, d2, ...|]
+  t <- [|r|]
+  invoke r
+
+  [| v <- e;
+     f @ a  |] (EApp)
+==>
+  t <- [|e|]
+  v <- invoke t
+  t <- f @ a
+  invoke t
+
+  [| v <- e;
+     v1 <- e1; |] (EBind)
+==>
+  t <- [|e|]
+  v <- invoke t
+  t <- [|e1|]
+  v1 <- invoke t
+    
+illegal
+
+  1 0 1 ... (EBits)
+  5 (ENat)
+  \x -> .. (ELam)
+  C (ECon)
+  a || b (EFatBar)    
+
+>     let compM (EBind v _ b r) = withFree (return . delete v) $ \_ -> do
 >           rest <- compM r 
->           compVarM b $ \n -> return (mkMiddle (v `Bind` (Run n)) <*> rest)
->         compM (ELet _ _) = undefined
->         compM e = compileStmtM e (\t -> return (mkLast (Done n l t)))
+>           compResultVar b $ \n -> return (mkMiddle (v `Bind` (Run n)) <*> rest)
+>         compM e = compResultVar e (\v -> return (mkLast (Done n l (Run v))))
 >     compM bind 
->   ctx (Thunk dest fvs)
+>   ctx (Thunk dest bfvs)
 
 An EVar term, in this case, must appear in "variable" position or it 
 would be handled by EApp, EBind, or other terms. Therefore, we apply
 the Return instruction to variable in order to "wrap" the value and 
 place it in context. 
 
-> compileStmtM (EVar v _) ctx 
+> compileStmt (EVar v _) ctx 
 >   = ctx (Return v) 
 
-The EApp term evaluates both its arguments using compVarM, giving
+The EApp term evaluates both its arguments using compResultVar, giving
 names to the locations holding the values represented by the arguments
 to EApp. 
 
-> compileStmtM (EApp e1 e2) ctx 
->   = compVarM e1 $ \f ->
->     compVarM e2 $ \g ->
+> compileStmt (EApp e1 e2) ctx 
+>   = compResultVar e1 $ \f ->
+>     compResultVar e2 $ \g ->
 
 Now, I apply the Enter instruction to the two variables produced by the
 preceding. The first variable will always represent a closure or primitive
@@ -120,56 +173,61 @@ preceding. The first variable will always represent a closure or primitive
 
 ECase looks very complicated but mostly its a lot of bookkeeping. 
 
-> compileStmtM (ECase e lcAlts) ctx = do
+> compileStmt expr@(ECase e lcAlts) ctx = do
 >   let alts = map toAlt lcAlts
 >   r <- fresh "result"
->   f <- ctx (Return r) >>= \rest -> callDefn "caseJoin" (\n l -> return rest)
->   let compAlt (Alt cons vs body) = do
->         body' <- callDefn (mkName "altBody" cons) (\n l -> compileStmtM body (mkBind n l r f))
+>   f <- ctx (Return r) >>= \rest -> withFree (return . ([r] ++)) $ \fvs -> do
+>     caseJoin <- newTop "caseJoin" 
+>     callDefn caseJoin fvs (\n l -> return rest)
+>   let compAlt (Alt cons vs body) = withFree (\fvs -> getFree body >>= \bfvs -> return (nub (bfvs ++ fvs))) $ \fvs -> do
+>         altName <- newTop (mkName "altBody" cons) 
+>         body' <- callDefn altName fvs (\n l -> compileStmt body (mkBind n l r f))
 >         return (Alt cons vs body')
 >   altsM <- mapM compAlt alts
->   compVarM e $ \v -> return (mkLast (CaseM v altsM))
+>   compResultVar e $ \v -> return (mkLast (CaseM v altsM))
 >   where
->     callDefn :: String -> (Name -> Label -> CompM (ProgM O C)) -> CompM TailM
->     callDefn n body = do 
->       (name, label) <- newTop n >>= \f -> blockDefn f [] body
+>     callDefn :: Name -> [Name] -> (Name -> Label -> CompM (ProgM O C)) -> CompM TailM
+>     callDefn n fvs body = do 
+>       (name, label) <- blockDefn n fvs body
 >       setDest name label
->       return (Goto (name, label) [])
+>       return (Goto (name, label) fvs)
 
 EPrim should only appear in "variable" position, by which I mean part
 of a function application or on the right-hand side of an EBind
 statement. The cases for EApp and EBind handle EPrim through the
-compVarM function. Therefore, we should not see an EPrim by itself, so
+compResultVar function. Therefore, we should not see an EPrim by itself, so
 I report an error if the situation occurs.
 
-> compileStmtM (EPrim p _) ctx = error "Primitive in non-var position"
+> compileStmt (EPrim p _) ctx = do
+>   dest <- getDestOfName p
+>   when (isNothing dest) (error $ "primitive " ++ p ++ " not defined.")
+>   ctx (Goto (fromJust dest) [])
 
-> compileStmtM (ELet (Decls defs) outerBody) ctx = compVars (getDefns defs)
+> compileStmt (ELet (Decls defs) outerBody) ctx = compVars (getDefns defs)
 >   where
 >     compVars [Defn name _ letBody] = 
->       compVarM letBody $ \v -> do
->         rest <- compileStmtM outerBody ctx
+>       compResultVar letBody $ \v -> do
+>         rest <- compileStmt outerBody ctx
 >         return (mkMiddle (Bind name (Return v)) <*> rest)
 >     compVars (Defn name _ letBody : ds) = do
 >       rest <- compVars ds 
->       compVarM letBody $ \v -> do
+>       compResultVar letBody $ \v -> do
 >         return (mkMiddle (Bind name (Return v)) <*> rest)
 
-> compileStmtM (ENat n) ctx
+> compileStmt (ENat n) ctx
 >   = ctx (LitM n)
 
-> compileStmtM (EFatbar _ _) _ 
+> compileStmt (EFatbar _ _) _ 
 >   = error "EFatbar not implemented."
 
-> compileStmtM (EBits _ _) _ 
+> compileStmt (EBits _ _) _ 
 >   = error "EBits not implemented."
 
-> compVarM :: Expr 
+> compResultVar :: Expr 
 >   -> (Name -> CompM (ProgM O C))
 >   -> CompM (ProgM O C)
-> compVarM (EVar v _) ctx = ctx v
-> compVarM (EPrim v _) ctx = ctx v
-> compVarM e ctx = compileStmtM e $ \t -> do
+> compResultVar (EVar v _) ctx = ctx v
+> compResultVar e ctx = compileStmt e $ \t -> do
 >   v <- fresh "v"
 >   rest <- ctx v
 >   return (mkMiddle (v `Bind` t) <*> rest)
@@ -215,11 +273,10 @@ returned here is applied to a value.
 >            mkLast (Done name l (Closure dest bfvs)))
 >   return (name, l)
 
-Finally, when the body of the lambda is not an |EBind| or |ELam|,
-cloDefn generates a final "closure" block that immediately jumps to
-the body of the function. This indirection allows all function
-application to behave the same, even when the function is "fully"
-applied. 
+Wwhen the body of the lambda is not an |ELam|, cloDefn generates a
+final "closure" block that immediately jumps to the body of the
+function. This indirection allows all function application to behave
+the same, even when the function is "fully" applied.
 
 > cloDefn name arg fvs body = withNewLabel $ \l -> do
 
@@ -229,7 +286,8 @@ will be able to refer to all the free variables given as well as the
 argument this closure recevied.
 
 >   let args = fvs ++ [arg]
->   dest <- blockDefn (mkName "block" name) args (\n l -> compileStmtM body (return . mkLast . Done n l))
+>   dest <- blockDefn (mkName "block" name) args (\n l -> do
+>     usingFree args $ compileStmt body (return . mkLast . Done n l))
 
 I now generate the body of this final "closure" block. It will jump
 immedietaly to the code generated for |body|. This strategy lends itself
@@ -245,12 +303,12 @@ this block.
 > -- to the control flow graph.    
 > newDefn :: (Name, Expr) -> CompM ()
 > newDefn (name, body@(ELam v _ b)) = do
->   free <- getFree body
+>   free <- setFree body
 >   cloDefn name v free b
 >   return ()
 > newDefn (name, body) = do
->   free <- getFree body
->   blockDefn name free (\n l -> compileStmtM body (return . mkLast . Done n l))
+>   free <- setFree body
+>   blockDefn name free (\n l -> compileStmt body (return . mkLast . Done n l))
 >   return ()
 
 > -- | Add a new block.
@@ -263,13 +321,14 @@ this block.
 > -- | Compiler state. 
 > data CompS = C { compI :: Int -- ^ counter for fresh variables
 >                , compG :: ProgM C C -- ^ Program control-flow graph.
->                , compT :: Map Name (Maybe Dest) } -- ^ top-level function names and their location.
+>                , compT :: Map Name (Maybe Dest)  -- ^ top-level function names and their location.
+>                , compF :: [Name] } -- ^ Currently free variables.
 
 > -- | Create the initial state for our compiler.
 > mkCompS i userTops predefined = 
 >   let mkMap = map ((\dest@(n, _) -> (n, Just dest)) . destOfEntry . snd) . entryPoints 
 >       tops = zip userTops (repeat Nothing)
->   in C i emptyClosedGraph (Map.fromList (tops ++ mkMap predefined))
+>   in C i emptyClosedGraph (Map.fromList (tops ++ mkMap predefined)) []
                
 > type CompM = State CompS
 > type Free = [Name]
@@ -351,6 +410,34 @@ this block.
 > getFree expr = do
 >   tops <- gets compT >>= return . Map.keys
 >   return (free expr \\ tops)
+
+> -- | Gets the currently known free variables.
+> currFree :: CompM [Name]
+> currFree = do
+>   tops <- gets compT >>= return . Map.keys
+>   free <- gets compF
+>   return (free \\ tops)
+
+> -- | Sets the currently known free variables.
+> setFree :: Expr -> CompM [Name]
+> setFree expr = do
+>   tops <- gets compT >>= return . Map.keys
+>   modify (\s@(C { compF }) -> s { compF = free expr \\ tops })
+>   gets compF
+
+> withFree :: ([Name] -> CompM [Name]) -> ([Name] -> CompM a) -> CompM a
+> withFree updfvs p = do
+>   oldfvs <- gets compF
+>   tops <- gets compT >>= return . Map.keys
+>   fvs <- updfvs oldfvs
+>   modify (\s@(C { compF }) -> s { compF = fvs \\ tops })
+>   a <- p fvs
+>   tops <- gets compT >>= return . Map.keys
+>   modify (\s@(C { compF }) -> s { compF = oldfvs \\ tops })
+>   return a
+
+> usingFree :: [Name] -> CompM a -> CompM a
+> usingFree fvs p = withFree (const (return fvs)) (\_ -> p)
 
 > setDest :: Name -> Label -> CompM ()
 > setDest name label = 
