@@ -10,7 +10,7 @@ import qualified Data.Map as Map
 import qualified Printer.Common as PP
 import Printer.LambdaCase
 import Syntax.LambdaCase hiding (Alt)
-import qualified PrioSetLC as Prio
+-- import qualified PrioSetLC as Prio
 
 import qualified Syntax.LambdaCase as LC
 import MIL hiding (_case)
@@ -20,13 +20,6 @@ import LCToMIL
 import DeadBlocks
 import LCM
 
-fromProgram :: Program -> [(Name, Expr)]
-fromProgram (Program { decls = (Decls d)}) = 
-    map (\(Defn name _ expr) -> (name, expr)) . concatMap f $ d
-  where
-    f (Mutual decls) = decls
-    f (Nonrec decl) = [decl] 
-    
 progM :: [(Name, Expr)] -> ([Name], ProgM C C) -> IO ()
 progM progs prelude@(prims, _) = do
   putStrLn "\n ========= Unoptimized ============"
@@ -194,7 +187,7 @@ blockhello (p):
   mkData_Unit()
 
 -}
-hello = [("hello", bindE "v" (mPrint `app` var "p") $ \v -> mkUnit)]
+hello = [("hello", bindE "v" (mPrint `app` var "p") $ \v -> ret mkUnit)]
 
 {- Monadic compose (from mon6)
 
@@ -223,7 +216,7 @@ kleisli = [("kleisli",
             lam "g" $ \g ->
             lam "x" $ \x ->
               bindE "v1" (g `app` x) $ \v1 ->
-              bindE "v2" (f `app` v1) id)]
+              bindE "v2" (f `app` v1) ret)]
 
 {-
 
@@ -896,6 +889,28 @@ monadTest1 = [("monadTest1"
 monadTest2 = [("monadTest2"
               , bindE "c" mReadChar $ \c -> 
                 _case c $ (alt "c" [] (\_ -> bindE "()" (mPrint `app` c) ret)))]
+
+-- Ensure we don't evaulate monadic arguments with
+-- function application.
+monadTest3 = [("monadTest3"
+              , var "f" `app` (bindE "()" (mPrint `app` lit 1) ret))
+             ,("f" 
+              , lam "x" $ \_ -> lit 1)]
+
+monadTest4 = [("monadTest4"
+               , _let "f" (bindE "()" (mPrint `app` lit 1) ret) $ \_ ->
+                 mPrint `app` lit 2)]
+
+-- Optimization goes really wrong here.
+monadTest5 = [("monadTest5"
+               , _let "f" (bindE "()" (mPrint `app` lit 1) ret) $ \f ->
+                 _let "g" (lam "x" $ \_ -> bindE "()" (mPrint `app` lit 2) ret) $ \g ->
+                 bindE "()" (g `app` f) ret)]
+
+monadTest6 = [("monadTest6"
+               , _let "f" (bindE "()" (mPrint `app` lit 1) ret) $ \f ->
+                 _let "g" (lam "x" $ \_ -> bindE "()" (mPrint `app` lit 2) ret) $ \g ->
+                 g `app` f)]
 
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
