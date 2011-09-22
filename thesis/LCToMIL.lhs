@@ -1,5 +1,5 @@
 > {-# LANGUAGE TypeSynonymInstances, GADTs, RankNTypes, NamedFieldPuns, TypeFamilies, ScopedTypeVariables, FlexibleInstances #-}
-> module LCToMIL (compile, Def, prelude)
+> module LCToMIL (compile, Def, prelude, fromProgram)
 
 > where
 
@@ -83,71 +83,15 @@ EBind evaluates its right-hand side as a monadic value. Therefore, the
 translated code for the monadic expression will evaluate to a monadic
 thunk. 
 
-> compileStmt bind@(EBind v _ _ _) ctx = withFree (return . delete v) $ \bfvs -> do
+> compileStmt bind@(EBind v _ _ _) ctx = withFree (return . delete v) $ \fvs -> do
 >   name <- newTop "bindBody"
->   dest <- blockDefn name bfvs $ \n l -> do
-
-  [| v <- e;
-     a      |] (EVar)
-==>
-  t <- [|e|]
-  v <- invoke t
-  invoke a
-
-  [| v <- e;
-     case x of as |] (ECase)
-==>
-  t <- [|e|]
-  v <- invoke t
-  t <- |[case x of as |]
-  invoke t
-
-  [| v <- e;
-     f*     |] (EPrim)
-==>
-  t <- [|e|]
-  v <- invoke t
-  invoke f*
-
-  [| v <- e;
-     let x1 = d1 ... x2 = d2 ... in r |] (ELet)
-==>
-  t <- [|e|]
-  v <- invoke t
-  x1, x2, ... <- [|d1, d2, ...|]
-  t <- [|r|]
-  invoke r
-
-  [| v <- e;
-     f @ a  |] (EApp)
-==>
-  t <- [|e|]
-  v <- invoke t
-  t <- f @ a
-  invoke t
-
-  [| v <- e;
-     v1 <- e1; |] (EBind)
-==>
-  t <- [|e|]
-  v <- invoke t
-  t <- [|e1|]
-  v1 <- invoke t
-    
-illegal
-
-  1 0 1 ... (EBits)
-  5 (ENat)
-  \x -> .. (ELam)
-  C (ECon)
-  a || b (EFatBar)    
-
+>   dest <- blockDefn name fvs $ \n l -> do
 >     let compM (EBind v _ b r) = withFree (return . delete v) $ \_ -> do
 >           rest <- compM r 
 >           compResultVar b $ \n -> return (mkMiddle (v `Bind` (Run n)) <*> rest)
 >         compM e = compResultVar e (\v -> return (mkLast (Done n l (Run v))))
 >     compM bind 
->   ctx (Thunk dest bfvs)
+>   ctx (Thunk dest fvs)
 
 An EVar term, in this case, must appear in "variable" position or it 
 would be handled by EApp, EBind, or other terms. Therefore, we apply
@@ -481,3 +425,11 @@ this block.
 > mkName prefix name  
 >   | prefix `isInfixOf` name = name
 >   | otherwise = prefix ++ name
+
+> fromProgram :: Program -> [(Name, Expr)]
+> fromProgram (Program { decls = (Decls d)}) = 
+>     map (\(Defn name _ expr) -> (name, expr)) . concatMap f $ d
+>   where
+>     f (Mutual decls) = decls
+>     f (Nonrec decl) = [decl] 
+    
