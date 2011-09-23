@@ -362,7 +362,7 @@ printTest5 = [main, oneBind]
     oneBind = ("oneBind",
                lam "z" $ \z ->
                lam "a" $ \a ->
-                 bindE "()" (z `app` a) $ id)
+                 bindE "()" (z `app` a) $ ret)
 {-
   if x > 10 
   then x + 1 + y
