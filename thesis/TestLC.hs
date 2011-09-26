@@ -843,9 +843,7 @@ myId = ("id", lam "x" $ \x -> x)
 
 -- A function that executes a monadic primitive
 -- directly, with no function applicatin
-constPrim = [("simplePrint", lam "x" $ \_ -> random)]
-  where
-    random = EPrim "random" []
+simplePrint = [("simplePrint", lam "x" $ \x -> mPrint `app` x)]
 
 -- A function where the result of a Case statement is
 -- applied to an argument
@@ -875,7 +873,7 @@ caseTest3 = [("caseTest3",
 -- expressions during function application.
 mCase = [("mCase"
          , (lam "f" $ \f ->
-            lam "readChar" $ \r ->
+            lam "r" $ \r ->
             f `app` (bindE "x" r $ \x -> x)) `app` 
           (lam "_" $ \_ -> lit 42) `app` 
           mPrint)]
