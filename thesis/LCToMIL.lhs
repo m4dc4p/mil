@@ -131,26 +131,76 @@ preceding. The first variable will always represent a closure or primitive
 
 >       ctx (Enter f g)
 
+> compileStmt _case@(ECase e lcAlts) ctx = do
 
-> compileStmt (ECase e lcAlts) ctx = do
->   let alts = map toAlt lcAlts
->   r <- fresh "result"
->   f <- withFree (return . ([r] ++)) $ \fvs -> do
->     rest <- ctx (Return r) 
->     caseJoin <- newTop "caseJoin" 
->     callDefn caseJoin fvs (\n l -> return rest)
->   let compAlt (Alt cons vs body) = withFree (const (setFree body)) $ \fvs -> do
->         altName <- newTop (mkName "altBody" cons) 
->         body' <- callDefn altName fvs (\n l -> compileStmt body (mkBind n l r f))
->         return (Alt cons vs body')
->   altsM <- mapM compAlt alts
->   compResultVar e $ \v -> return (mkLast (CaseM v altsM))
+The strategy for |ECase| evaluates the case expression and selects
+an arm  in a separate block, created by the |compileCase|
+function (explained below). 
+
+>     caseEval <- compileCase 
+
+The result of that block is the result of the case expression. I put
+that result in a new variable and pass it to the context provided
+initially. 
+
+>     r <- fresh "result"
+>     rest <- ctx (Return r)
+
+The context returns the rest of the program. Now I bind the
+value of the case expression to the fresh variable and put it in
+front of the rest of the program, guaranteeing the variable will hold
+a value before the rest of the program executes.
+
+>     return (mkMiddle (r `Bind` caseEval) <*> rest)
 >   where
->     callDefn :: Name -> [Name] -> (Name -> Label -> CompM (ProgM O C)) -> CompM TailM
->     callDefn n fvs body = do 
->       (name, label) <- blockDefn n fvs body
->       setDest name label
->       return (Goto (name, label) fvs)
+
+|compileCase| creates a new block for our case expression, as well as
+a block for each arm. The block for the case expression (|_case|)
+needs access to all free variables; |free _case| calculates the free
+variables in |_case|, and |withFree| makes them available to the code
+that will compile the case expression.
+
+>   compileCase = withFree (const (return $ free _case)) $ \fvs -> do
+
+|compAlt| compiles creates a block for each arm and returns an |CompM Alt|
+value representing the arm. The MIL |CaseM| instruction takes a list
+of |Alt| values, each of which represents a block for a particular
+case arm. We monadically compile each arm and collect the |CompM Alt| values
+into a list.
+
+>     altsM <- mapM compAlt (map toAlt lcAlts)
+
+Now the block for evaluating the case expression is generated. The
+block takes all free variables in the entire case expression
+(including all arms).
+
+>     dest <- blockDefn (mkName "caseEval" "") fvs 
+>             (\_ _ -> 
+
+The body of block evaluates the case expression and puts the result
+in the variable represented by |v|. The block ends with the MIL |CaseM|
+instruction, which will select the appropriate arm based on the value 
+found in the variable represented by |v|.
+
+>                compResultVar e $ \v -> return (mkLast (CaseM v altsM)))
+>     return (Goto dest fvs)
+
+|compAlt| creates a block for a case arm. The block only takes free variables
+present in the current arm, so |compAlt| starts with a call to |setFree body|
+so compiliation of the body sees the appropriate free variables.
+
+>   compAlt (Alt cons vs body) = withFree (const (setFree body)) $ \afvs -> do
+>     altDest <- blockDefn (mkName "altBody" cons) afvs $ \n l -> do
+
+The block for the arm evaulates the body of the arm and places it in
+a new variable. The block ends by returning the value of that variable.
+
+>       compResultVar body (return . mkLast . Done n l . Return)
+
+Once a block for the arm has been created, I wrap it up in an |Alt| value
+and return it.
+
+>     return (Alt cons vs (Goto altDest afvs))
 
 EPrim should only appear in "variable" position, by which I mean part
 of a function application or on the right-hand side of an EBind
