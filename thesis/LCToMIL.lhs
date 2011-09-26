@@ -39,28 +39,39 @@ its first argument into a TailM value and passes it the context.
 Notice the context itself produces a basic block. In some cases, the
 context's result is retured by compileStmt directly. In other cases,
 it is used to produce out-of-line blocks that are managed by the
-compiler monad and not returned directly. '
+compiler monad and not returned directly. 
 
-The ECon term creates a data value. We implement ECon using a
-series of pre-generated primitives, one for each constructor of each
-known data type. 
+I will describe the translation of each LC expression into MIL
+instructions, starting with ECon. The ECon term creates a data
+value. 
 
 > compileStmt (ECon cons _) ctx = do 
+
+We implement ECon using a series of pre-generated primitives, one for
+each constructor of each known data type. Therefore, we first look for
+the primitive with a special, pre-determined name. |getDestOfName| looks
+up the name of a MIL block and returns a |Maybe Dest| value, indicating
+if the name exists in the current program.
+
 >   dest <- getDestOfName ("mkData_" ++ cons)
-
-Therefore, we first look for the primitive with a 
-special, pre-determined name. We then add a "Goto" instruction to
-execute the body of the primitive.
-
 >   when (isNothing dest) (error $ "Could not find '" ++ "mkData_" ++ cons ++ "' in predefined.")
+
+Assuming the name exists, compileStmt puts |Goto| instruction to
+execute the body of the primitive. Notice no arguments are given
+to |Goto|. If the constructor takes arguments, the block referred
+to here will return a closure and normal function application
+will take care of gatehring arguments up and eventually executing
+the data constructor primitive.
+
 >   ctx (Goto (fromJust dest) [])
 
 The ELam term defines an anonymous function, and when evaulated it
 creates a value representing the function. Compiling this term
 requires that we accomplish two tasks: create a new function
-definition, and generate code to create the value representing the function.
+definition, and generate code to create the closure representing the
+function.
 
-> compileStmt body@(ELam v _ b) ctx = withFree (const (setFree body)) $ \_ -> woTops $ \free -> do
+> compileStmt body@(ELam v _ b) ctx = withFree (const (setFree body)) $ \free -> do
 
 To create a new function definition, we essentially create a new
 "compilation context." 
@@ -83,7 +94,7 @@ EBind evaluates its right-hand side as a monadic value. Therefore, the
 translated code for the monadic expression will evaluate to a monadic
 thunk. 
 
-> compileStmt bind@(EBind v _ _ _) ctx = withFree (return . delete v) $ \_ -> woTops $ \fvs -> do
+> compileStmt bind@(EBind v _ _ _) ctx = withFree (return . delete v) $ \fvs -> do
 >   name <- newTop "bindBody"
 >   dest <- blockDefn name fvs $ \n l -> do
 >     let compM (EBind v _ b r) = withFree (return . delete v) $ \_ -> do
@@ -120,15 +131,15 @@ preceding. The first variable will always represent a closure or primitive
 
 >       ctx (Enter f g)
 
-ECase looks very complicated but mostly its a lot of bookkeeping. 
 
-> compileStmt expr@(ECase e lcAlts) ctx = do
+> compileStmt (ECase e lcAlts) ctx = do
 >   let alts = map toAlt lcAlts
 >   r <- fresh "result"
->   f <- ctx (Return r) >>= \rest -> withFree (return . ([r] ++)) $ \_ -> woTops $ \fvs -> do
+>   f <- withFree (return . ([r] ++)) $ \fvs -> do
+>     rest <- ctx (Return r) 
 >     caseJoin <- newTop "caseJoin" 
 >     callDefn caseJoin fvs (\n l -> return rest)
->   let compAlt (Alt cons vs body) = withFree (const (setFree body)) $ \_ -> woTops $ \fvs -> do
+>   let compAlt (Alt cons vs body) = withFree (const (setFree body)) $ \fvs -> do
 >         altName <- newTop (mkName "altBody" cons) 
 >         body' <- callDefn altName fvs (\n l -> compileStmt body (mkBind n l r f))
 >         return (Alt cons vs body')
@@ -231,9 +242,9 @@ I report an error if the situation occurs.
 >     -- to the control flow graph.    
 >     newDefn :: (Name, Expr) -> CompM ()
 >     newDefn (name, body) = do
->       free <- setFree body
->       woTops $ \free -> do
->         blockDefn name free (\n l -> compileStmt body (return . mkLast . Done n l))
+>       _ <- setFree body
+>       withFree return $ \fvs -> do
+>         blockDefn name fvs (\n l -> compileStmt body (return . mkLast . Done n l))
 >         return ()
 >     -- Create initial locations for all top level functions.
 >     initialDefs :: (Int, Map Name (Maybe Dest))
@@ -306,20 +317,16 @@ I report an error if the situation occurs.
 >    then gets compT >>= return . maybe Nothing id . Map.lookup name 
 >    else return Nothing
 
-> -- | Remove top leve names from the list
-> -- of variables given.
-> woTops :: ([Name] -> CompM a) -> CompM a
-> woTops f = do
->   fvs <- currFree
->   tops <- gets compT >>= return . Map.keys
->   f (fvs \\ tops)
-
+> -- | Modifies the free variables using the update function, then
+> -- passes the new list of free variables to the action given. Top-level
+> -- free variables are removed from the list, as well.
 > withFree :: ([Name] -> CompM [Name]) -> ([Name] -> CompM a) -> CompM a
 > withFree upd p = do
 >   oldfvs <- gets compF
 >   fvs <- upd oldfvs
+>   tops <- gets compT >>= return . Map.keys
 >   modify (\s@(C { compF }) -> s { compF = fvs})
->   a <- p fvs
+>   a <- p (fvs \\ tops)
 >   modify (\s@(C { compF }) -> s { compF = oldfvs })
 >   return a
 
@@ -363,7 +370,7 @@ I report an error if the situation occurs.
 > getDefns :: [Decl] -> [Defn]
 > getDefns = concatMap f
 >   where
->     f (Mutual decls) = decls -- error "Unable to compile mutually recursive Let declarations."
+>     f (Mutual decls) = error "Unable to compile mutually recursive Let declarations."
 >     f (Nonrec decl) = [decl]
 
 > -- Required so we can generate
