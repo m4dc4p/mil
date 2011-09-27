@@ -22,7 +22,7 @@ b(...):
 
 We will implement this optimization by recursing over each block in
 the program, looking for the pattern above and rewriting it.  We
-recurse to eliminate chains for bind/return paris, such as:
+recurse to eliminate chains for bind/return pairs, such as:
 
 b(...):
   a <- m
@@ -61,8 +61,11 @@ pattern-matching rather than the |last| function to get the final
 >       | v == v' = rw bs (Done n l t)
 >     rw binds done = mkMiddles (reverse binds) <*> mkLast done
 
-To rewrite all the blocks, we break each block in the program into a tuple containing 
-then entry statement, a list of middle statements, and the final exit statemnet. We apply |rewriteBlock| to the appropriate values and reconsstruct the block. We then fold all the blocks together to reconstruct the entire program.
+To rewrite all the blocks, we break each block in the program into a
+tuple containing then entry statement, a list of middle statements,
+and the final exit statemnet. We apply |rewriteBlock| to the
+appropriate values and reconstruct the block. We then fold all the
+blocks together to reconstruct the entire program.
 
 > bindReturn :: ProgM C C -> ProgM C C
 > bindReturn (GMany _ blocks _) = 
@@ -83,5 +86,5 @@ Where |x <- C a b c| is a pure statement (i.e., it could be a
 primitive call as well). However, to be a valid transformation, the
 intervening statements must be dead code. They cannot have side
 effects and any values created cannot be used. We rely on dead-code
-eliminatino to clean up the program before attemping bind/return
+elimination to clean up the program before attemping bind/return
 elimination, and therefore we don't worry about this case here.

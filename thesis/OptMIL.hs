@@ -37,19 +37,7 @@ import BindReturnElim
 
 -- | Associates a binding (the key) with the
 -- value that should be substituted for it. 
-type BindFact = Map Name BindVal
-
--- | Represents the right side of a bind, for possible
--- substitution.
-data BindVal = BindReturn Name -- ^ Return a variable with the given name.
-             | BindEnter Name Name -- ^ Enter function with argument.
-             | BindClosure Dest [Name] -- ^ Create value.
-             | BindGoto Dest [Name] -- ^ Goto block.
-             | BindConstrM Name [Name] -- ^ Create value.
-             | BindThunk Dest [Name] -- ^ Monadic thunk
-             | BindRun Name -- ^ Run a monadic computatino
-             | BindPrim Name [Name] -- ^ Primitive call with the given name and arguments.
-  deriving (Eq, Show)
+type BindFact = Map Name TailM
 
 -- | Find "useless" bindings and remove them. Useless bindings 
 -- include:
@@ -84,15 +72,13 @@ bindSubstTransfer :: FwdTransfer StmtM BindFact
 bindSubstTransfer = mkFTransfer fw
   where
     fw :: StmtM e x -> BindFact -> Fact x BindFact
-    fw (Bind v (Return w)) m = Map.insert v (BindReturn w) m 
-    fw (Bind v (Enter f x)) m = Map.insert v (BindEnter f x) m 
-    fw (Bind v (Closure d ns)) m = Map.insert v (BindClosure d ns) m 
-    fw (Bind v (Goto d ns)) m = Map.insert v (BindGoto d ns) m 
-    fw (Bind v (ConstrM c ns)) m = Map.insert v (BindConstrM c ns) m 
-    fw (Bind v (Thunk d ns)) m = Map.insert v (BindThunk d ns) m 
-    fw (Bind v (Run n)) m = Map.insert v (BindRun n) m 
-    fw (Bind v (Prim p vs)) m = Map.insert v (BindPrim p vs) m 
-    fw (Bind v (LitM _)) m = Map.delete v m
+    fw (Bind v t@(Return {})) m = Map.insert v t m 
+    fw (Bind v t@(Closure {})) m = Map.insert v t m 
+    fw (Bind v t@(ConstrM {})) m = Map.insert v t m 
+    fw (Bind v t@(Thunk {})) m = Map.insert v t m 
+    -- Why is LitM treated special here?
+    fw (Bind v (LitM {})) m = Map.delete v m
+    fw (Bind v _) m = m
     fw (BlockEntry _ _ _) m = m
     fw (CloEntry _ _ _ _) m = m
     fw (CaseM _ alts) m = 
@@ -102,13 +88,12 @@ bindSubstTransfer = mkFTransfer fw
 
 bindSubstRewrite :: FuelMonad m => FwdRewrite m StmtM BindFact
 bindSubstRewrite = 
-    -- deep rewriting used
-    -- so all possible
-    -- substitutions occur
+    -- deep rewriting used so all possible substitutions occur
     iterFwdRw (mkFRewrite rewrite) 
   where
     rewrite :: FuelMonad m => forall e x. StmtM e x -> BindFact -> m (Maybe (ProgM e x))
-    rewrite (Bind v t) f = bind v (rewriteTail f t)
+    rewrite (Bind v t) f 
+      | Map.member v f = bind v (rewriteTail f t)
     rewrite (CaseM v alts) f 
         | maybe False isNameBind (Map.lookup v f) = _case (substName f v) Just alts
         | otherwise = _case v (replaceAlt f) alts
@@ -132,14 +117,14 @@ bindSubstRewrite =
     substReturn :: BindFact -> Name -> Maybe TailM
     substReturn f v =
       case Map.lookup v f of
-        (Just (BindReturn n)) -> Just $ Return n
-        (Just (BindEnter fn x)) -> Just $ substNames f [fn, x] (\ [fn, x] -> Enter fn x)
-        (Just (BindClosure d ns)) -> Just $ substNames f ns (\ns -> Closure d ns)
-        (Just (BindGoto d ns)) -> Just $ substNames f ns (\ns -> Goto d ns)
-        (Just (BindConstrM c ns)) -> Just $ substNames f ns (\vs -> ConstrM c ns)
-        (Just (BindThunk d ns)) -> Just $ substNames f ns (\ns -> Thunk d ns)
+        (Just (Return n)) -> Just $ Return n
+        (Just (Enter fn x)) -> Just $ substNames f [fn, x] (\ [fn, x] -> Enter fn x)
+        (Just (Closure d ns)) -> Just $ substNames f ns (\ns -> Closure d ns)
+        (Just (Goto d ns)) -> Just $ substNames f ns (\ns -> Goto d ns)
+        (Just (ConstrM c ns)) -> Just $ substNames f ns (\vs -> ConstrM c ns)
+        (Just (Thunk d ns)) -> Just $ substNames f ns (\ns -> Thunk d ns)
         -- (Just (BindRun n)) -> Just $ substNames f [n] (\ [n] -> Run n)
-        (Just (BindPrim p vs)) -> Just $ substNames f vs (\vs -> Prim p vs)
+        (Just (Prim p vs)) -> Just $ substNames f vs (\vs -> Prim p vs)
         _ -> Nothing
 
     -- | Find the name to substitue for the one
@@ -147,7 +132,7 @@ bindSubstRewrite =
     -- if no substitution applies.
     substName :: BindFact -> Name -> Name
     substName f v = case Map.lookup v f of
-                      (Just (BindReturn v')) -> v'
+                      (Just (Return v')) -> v'
                       _ -> v
 
     -- | Rewrite the names given according to facts, if those
@@ -163,13 +148,13 @@ bindSubstRewrite =
     anyNamesIn :: BindFact -> [Name] -> Bool
     anyNamesIn f ns = any (\n -> maybe False isNameBind $ Map.lookup n f) ns
 
-    isNameBind (BindReturn _) = True
+    isNameBind (Return _) = True
     isNameBind _ = False
 
 printBindFacts :: FactBase BindFact -> Doc
 printBindFacts = printFB printFact
   where
-    printFact :: (Label, Map Name BindVal) -> Doc
+    printFact :: (Label, Map Name TailM) -> Doc
     printFact (l, ns) = text (show l) <> text ":" <+> commaSep (text . show) (Map.toList ns)
 
 -- Closure/App collapse (aka "Beta-Fun" from "Compiling with
