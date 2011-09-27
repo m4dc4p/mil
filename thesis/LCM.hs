@@ -22,6 +22,9 @@ lcm body = undefined
   where
     (used, killed, ant) = anticipated body
 
+-- | Sets of Tail values.
+type Exprs = Set TailM
+
 -- | Used expressions appear in the block but
 -- their operands are not defined there.
 type Used = Map Dest Exprs
@@ -62,7 +65,6 @@ type Latest = Map Dest Exprs
 type Successors = Map Dest (Set Dest)
 
 type Env = [Name]
-type Exprs = Set TailM
 
 newtype PostFact = PP (Exprs {- used -}
                       , Exprs {- postponable -})
@@ -243,8 +245,10 @@ availTransfer ant = mkFTransfer fw
 --
 -- Environment helps with renaming across blocks but
 -- is not used after the analysis has finished.
-newtype AntFact = AF ((Exprs {- used -}, Exprs {- killed -})
-                     , (Env, Exprs {- anticipated -}))
+data AntFact = AF { afUsed :: Exprs {- used -}
+                  , afKilled :: Exprs {- killed -}
+                  , afEnv :: Env
+                  , afAnt :: Exprs {- anticipated -} }
   deriving (Eq)
 
 anticipated :: ProgM C C -> (Used, Killed, Anticipated)
@@ -252,7 +256,7 @@ anticipated body = runSimple $ do
     (_, f, _) <- analyzeAndRewriteBwd bwd (JustC (entryLabels body)) body mapEmpty
     return $ foldr mk (Map.empty, Map.empty, Map.empty) (mapToList f)
   where
-    mk (l, AF ((u, k), (_, a))) (used, killed, ant) = 
+    mk (l, (AF u k _ a)) (used, killed, ant) = 
       let d = fromJust (labelToDest body l)
       in (Map.insert d u used
          , Map.insert d k killed
@@ -270,10 +274,10 @@ antLattice = DataflowLattice { fact_name = "Anticipated/available expressions"
 
 -- | Initial anticipated expressions. 
 emptyAntFact :: AntFact
-emptyAntFact = AF ((Set.empty {- used -}
-                   , Set.empty {- killed -})
-                  ,([] {- args passed to block -}
-                   , Set.empty {- anticipated exprs -}))
+emptyAntFact = AF Set.empty {- used -}
+                  Set.empty {- killed -}
+                  [] {- args passed to block -}
+                  Set.empty {- anticipated exprs -}
 
 -- We will determine available expressions within 
 -- a block by inspecting all tails and tracking the
@@ -296,18 +300,18 @@ antTransfer = mkBTransfer anticipate
     -- any. Rename those facts to match local names as well.
     fromSucc :: TailM -> FactBase AntFact -> AntFact
     fromSucc (Goto (_, l) args) facts = 
-      let succFact f@(AF (_, (_, ants))) = renameFact (mkRenamer args f) f
+      let succFact f@(AF _ _ _ ants) = renameFact (mkRenamer args f) f
       in maybe emptyAntFact succFact (lookupFact l facts)
     fromSucc _ _ = emptyAntFact
 
     -- | Kill expressions that use the argument
     kill :: Name -> AntFact -> AntFact
-    kill v (AF ((used, killed), ant)) = 
+    kill v (AF used killed env ant) = 
       -- "uses" is more general than necessary since not
       -- all Tail instructions will appear in the
       -- use/kill sets.
       let toKill = Set.filter (uses v) used
-      in AF ((used, killed `Set.union` toKill), ant)
+      in AF used (killed `Set.union` toKill) env ant
 
     kills :: AntFact -> [Name] -> AntFact
     kills = foldr kill
@@ -329,8 +333,8 @@ antTransfer = mkBTransfer anticipate
 
     -- | Add the tail to the used expression list.
     use :: TailM -> AntFact -> AntFact
-    use t f@(AF ((used, killed), ant)) 
-      | useable t = AF ((Set.insert t used, killed), ant)
+    use t f@(AF used killed env ant)
+      | useable t = AF (Set.insert t used) killed env ant
       | otherwise = f
 
     -- | Fix up final Anticipated value on exit from the
@@ -338,31 +342,29 @@ antTransfer = mkBTransfer anticipate
     -- anticipated expressions and add our environment for other
     -- blocks to rename with.
     mkAnticipated :: AntFact -> Env -> AntFact
-    mkAnticipated (AF ((used, killed), (_, ant))) env = 
-      AF ((used, killed)
-         , (env, Set.union ant (Set.difference used killed)))
+    mkAnticipated (AF used killed _ ant) env = 
+      AF used killed env (Set.union ant (Set.difference used killed))
 
     intersectFacts :: [AntFact] -> AntFact
     intersectFacts [] = emptyAntFact
     intersectFacts fs = foldr1 intersect fs
       where
-        intersect (AF ((_, _), (_, ant1))) (AF ((_, _), (_, ant2))) =
-          AF ((Set.empty, Set.empty), ([], ant1 `Set.intersection` ant2))
+        intersect (AF _ _ _ ant1) (AF _ _ _ ant2) =
+          AF Set.empty Set.empty [] (ant1 `Set.intersection` ant2)
 
     -- | Create a function which will rename
     -- successor expressions and facts with
     -- the local block names. The renaming 
     -- function will return the name in this block
     -- or the original name, if no renaming occurred.
-    mkRenamer :: Env -> AntFact -> (Name -> Name)
-    mkRenamer env (AF (_, (succEnv, ant))) = 
+    mkRenamer :: Env -> AntFact -> Name -> Name
+    mkRenamer env (AF _ _ succEnv ant) n = 
       let succMap = Map.fromList (zip succEnv env)
-      in \n -> maybe n id (Map.lookup n succMap)
+      in maybe n id (Map.lookup n succMap)
 
     -- | Rename anticipatable facts.
     renameFact :: (Name -> Name) -> AntFact -> AntFact
-    renameFact r (AF (_, (_, ants))) = AF ((Set.empty, Set.empty)
-                                          ,([], renameTails r ants))
+    renameFact r (AF _ _ _ ants) = AF Set.empty Set.empty [] (renameTails r ants)
 
     -- | Rename set of tail expressions.
     renameTails :: (Name -> Name) -> Set TailM -> Set TailM
@@ -395,7 +397,7 @@ instance Show AntFact where
   show = showAnt
 
 showAnt :: AntFact -> String
-showAnt (AF (_, (env, ant))) = "(" ++ show env ++ ", " ++ 
+showAnt (AF _ _ env ant) = "(" ++ show env ++ ", " ++ 
                                   show (Set.elems ant) ++ ")"
 
 -- | This defines the expressions we consider for LCM.
@@ -406,3 +408,35 @@ useable (Thunk {}) = True
 useable (Prim {}) = True
 useable (LitM {}) = True
 useable _ = False
+
+botUnion :: WithBot Exprs -> Exprs -> WithBot Exprs
+botUnion Bot s = Bot
+botUnion (PElem s) s' = PElem (Set.union s s')
+
+botIntersect :: WithBot Exprs -> Exprs -> WithBot Exprs
+botIntersect Bot s = PElem s
+botIntersect (PElem s) s' = PElem (Set.intersection s s')
+
+-- | Compute expressions used in each block.
+used :: ProgM C C -> Used
+used = undefined
+  where
+    uses d (BlockEntry {}) u = u
+    uses d (CloEntry {}) u = u
+    uses d (Bind _ expr) u = Map.insertWith Set.union d (Set.singleton expr) u
+    uses d (CaseM {}) u = emptyExprs
+    uses d (Done {}) u = emptyExprs
+
+-- | Compute expressions killed in each block.
+killed :: ProgM C C -> Killed
+killed = undefined -- fold backward over each block ...
+  where
+    kills :: forall e x. StmtM e x -> Exprs -> (Exprs, Exprs)
+    kills (BlockEntry {}) k u = k
+    kills (CloEntry {}) k u = k
+    kills (Bind v _) (k, u) = k `Set.difference` (usedBy v u)
+    kills (CaseM {}) k u = k
+    kills (Done {}) k u = k
+
+    usedBy :: Name -> Exprs -> Exprs
+    usedBy = undefine
