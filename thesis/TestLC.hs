@@ -26,10 +26,17 @@ progM progs prelude@(prims, _) = do
   printResult progs (map (deadBlocks tops . compile tops prelude) . map (: []) $ progs)
 
   let optProgs = mostOpt tops prelude . (compile tops prelude) $ progs
+      killedIn progs = killed progs
+      usedIn progs = used progs
 
-  putStrLn (render $ vcat (map printDef progs))
   putStrLn "================================================================================"
   putStrLn (render $ printProgM optProgs)
+
+  putStrLn "\n ========= Killed Expressions ============="
+  putStrLn (render $ printExprs (killedIn optProgs))
+
+  putStrLn "\n ========= Used Expressions ============="
+  putStrLn (render $ printExprs (usedIn optProgs))
 
   -- let (used, killed, ant) = anticipated optProgs
   --     avail = available ant killed optProgs
@@ -40,8 +47,6 @@ progM progs prelude@(prims, _) = do
   -- putStrLn "\n ========= Used Expressions ============="
   -- putStrLn (render $ printExprs used)
            
-  -- putStrLn "\n ========= Killed Expressions ============="
-  -- putStrLn (render $ printExprs killed)
            
   -- putStrLn "\n ========= Anticipated Expressions ============="
   -- putStrLn (render $ printExprs ant)
@@ -229,14 +234,14 @@ printTest1 = [threeBinds, main]
               bindE "()" (var "threeBinds" `app` 
                           (mPrint `app` var "a") `app` 
                           (mPrint `app` var "a") `app` 
-                          (mPrint `app` var "a")) id)
+                          (mPrint `app` var "a")) ret)
     threeBinds = ("threeBinds",
                   lam "f" $ \f ->
                   lam "g" $ \g ->
                   lam "h" $ \h ->
                     bindE "()" f $ \_ ->
                     bindE "()" g $ \_ -> 
-                    bindE "()" h $ id)
+                    bindE "()" h $ ret)
 
 {-
 
@@ -916,10 +921,10 @@ _case c f = ECase c (f [])
 alt :: Name -> [Name] -> ([Expr] -> Expr) -> [LC.Alt] -> [LC.Alt]
 alt cons vs f = (LC.Alt cons [] vs (f (map var vs)) :)
 
-mPrint = EPrim "print" []
-mReadChar = EPrim "readChar" []
+mPrint = EPrim "print" typ []
+mReadChar = EPrim "readChar" typ []
 mkUnit = ECon "Unit" [] 
-ret = (EPrim "return" [] `app`)
+ret = (EPrim "return" typ [] `app`)
 
 mkNil :: Expr
 mkNil = ECon "Nil" [] 
@@ -965,7 +970,7 @@ lit n = ENat n
 
 -- Allows a single name to be defined in a let.
 _let :: Name -> Expr -> (Expr -> Expr) -> Expr
-_let n body rest = ELet (Decls [Nonrec (Defn n typ body)]) (rest (var n))
+_let n body rest = ELet (Decls [Nonrec (Defn n typ (Right body))]) (rest (var n))
 
 prim :: Name -> Int -> Expr
 -- prim n cnt = EPrim n (take (cnt + 1) $ repeat typ) 

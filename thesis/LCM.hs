@@ -418,25 +418,39 @@ botIntersect Bot s = PElem s
 botIntersect (PElem s) s' = PElem (Set.intersection s s')
 
 -- | Compute expressions used in each block.
-used :: ProgM C C -> Used
-used = undefined
+used :: ProgM C C -> Map Dest Exprs
+used = Map.fromListWith Set.union . map destUses . allBlocks
   where
-    uses d (BlockEntry {}) u = u
-    uses d (CloEntry {}) u = u
-    uses d (Bind _ expr) u = Map.insertWith Set.union d (Set.singleton expr) u
-    uses d (CaseM {}) u = emptyExprs
-    uses d (Done {}) u = emptyExprs
+    destUses :: (Dest, Block StmtM C C) -> (Dest, Exprs)
+    destUses (dest, block) = (dest, foldFwdBlock uses Set.empty block)
+                             
+    uses :: forall e x. Exprs -> StmtM e x -> Exprs
+    uses u (BlockEntry {}) = u
+    uses u (CloEntry {}) = u
+    uses u (Bind _ t) = Set.insert t u
+    uses u (CaseM {}) = u
+    uses u (Done n l t) = Set.insert t u 
 
 -- | Compute expressions killed in each block.
-killed :: ProgM C C -> Killed
-killed = undefined -- fold backward over each block ...
+killed :: ProgM C C -> Map Dest Exprs
+killed = Map.fromListWith Set.union . map destKills . allBlocks
   where
-    kills :: forall e x. StmtM e x -> Exprs -> (Exprs, Exprs)
-    kills (BlockEntry {}) k u = k
-    kills (CloEntry {}) k u = k
-    kills (Bind v _) (k, u) = k `Set.difference` (usedBy v u)
-    kills (CaseM {}) k u = k
-    kills (Done {}) k u = k
+    destKills :: (Dest, Block StmtM C C) -> (Dest, Exprs)
+    destKills (dest, block) = 
+      let (killed, _) = foldBwdBlock kills (Set.empty, Map.empty) block
+      in (dest, killed)
 
-    usedBy :: Name -> Exprs -> Exprs
-    usedBy = undefine
+    kills :: forall e x. StmtM e x -> (Exprs, Map Name Exprs) -> (Exprs, Map Name Exprs)
+    kills (BlockEntry {}) (k, u) = (k, u)
+    kills (CloEntry {}) (k, u) = (k, u)
+    kills (Bind v t) (k, u) = 
+      let updatedUses = Map.delete v u
+      in (k `Set.union` Map.findWithDefault Set.empty v u
+         , newUses t updatedUses)
+    kills (CaseM {}) (k, u) = (k, u)
+    kills (Done n l t) (k, u) = (k, newUses t u)
+
+    newUses t old = 
+      let new = Map.fromList $ zip (vars t) (repeat $ Set.singleton t)
+      in Map.unionWith Set.union new old
+
