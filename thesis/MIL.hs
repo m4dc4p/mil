@@ -253,8 +253,20 @@ _case v f alts
     altZip _ (Just a) = a
     altZip a _ = a
 
+-- | Retrieve the name associated with a block (entry statemen).
 nameOfEntry :: StmtM C O -> Name
 nameOfEntry = fst . destOfEntry
+
+-- | Retrieve all variables mentioned in a tail value.
+vars :: TailM -> [Name]
+vars (Enter f x) = [f, x]
+vars (Closure _ vs) = vs
+vars (Goto _ vs) = vs
+vars (ConstrM _ vs) = vs
+vars (Thunk _ vs) = vs
+vars (Run v) = [v]
+vars (Prim _ vs) = vs
+vars _ = []
 
 -- Primitives
 

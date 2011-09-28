@@ -90,3 +90,12 @@ foldFwdBlock f a b =
           two = foldl f one mids
       in f two exit
 
+-- | Fold the function given over every node in the block, from 
+-- end to beginning.
+foldBwdBlock :: (forall e x. n e x -> a -> a) -> a -> Block n C C -> a
+foldBwdBlock f a b = 
+  case blockToNodeList' b of
+    (JustC entry, mids, JustC exit) ->
+      let one = f exit a 
+          two = foldr f one mids
+      in f entry two 
