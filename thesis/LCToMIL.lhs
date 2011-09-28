@@ -208,20 +208,23 @@ statement. The cases for EApp and EBind handle EPrim through the
 compResultVar function. Therefore, we should not see an EPrim by itself, so
 I report an error if the situation occurs.
 
-> compileStmt (EPrim p _) ctx = do
+> compileStmt (EPrim p _ _) ctx = do
 >   dest <- getDestOfName p
 >   when (isNothing dest) (error $ "primitive " ++ p ++ " not defined.")
 >   ctx (Goto (fromJust dest) [])
 
 > compileStmt (ELet (Decls defs) outerBody) ctx = compVars (getDefns defs)
 >   where
+>     compBody (Right body) = compResultVar body 
+>     compBody (Left (prim, typs)) = 
+>       compResultVar (EPrim prim (error "evaluated type") (error "evaluated types"))
 >     compVars [Defn name _ letBody] = 
->       compResultVar letBody $ \v -> do
+>       compBody letBody $ \v -> do
 >         rest <- compileStmt outerBody ctx
 >         return (mkMiddle (Bind name (Return v)) <*> rest)
 >     compVars (Defn name _ letBody : ds) = do
 >       rest <- compVars ds 
->       compResultVar letBody $ \v -> do
+>       compBody letBody $ \v -> do
 >         return (mkMiddle (Bind name (Return v)) <*> rest)
 
 > compileStmt (ENat n) ctx
@@ -387,7 +390,7 @@ I report an error if the situation occurs.
 > free = nub . free'
 >   where
 >     free' (EVar v _) = [v]
->     free' (EPrim v _) = [v]
+>     free' (EPrim v _ _) = [v]
 >     free' (ENat _) = []
 >     free' (EBits _ _) = []
 >     free' (ECon _ _) = []
@@ -442,8 +445,7 @@ I report an error if the situation occurs.
 >   | otherwise = prefix ++ name
 
 > fromProgram :: Program -> [(Name, Expr)]
-> fromProgram (Program { decls = (Decls d)}) = 
->     map (\(Defn name _ expr) -> (name, expr)) . concatMap f $ d
+> fromProgram (Program { decls = (Decls d)}) = [(name, expr) | decl <- d, (Defn name _ (Right expr)) <- f decl] 
 >   where
 >     f (Mutual decls) = decls
 >     f (Nonrec decl) = [decl] 
