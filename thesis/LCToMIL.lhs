@@ -296,9 +296,12 @@ I report an error if the situation occurs.
 >     newDefn :: (Name, Expr) -> CompM ()
 >     newDefn (name, body) = do
 >       _ <- setFree body
->       withFree return $ \fvs -> do
->         blockDefn name fvs (\n l -> compileStmt body (return . mkLast . Done n l))
->         return ()
+>       withFree return $ \args -> do
+>         -- This ugliness makes sure we re-use the label
+>         -- assigned to the top-level function. 
+>         Just (_, label) <- gets compT >>= return . maybe Nothing id . Map.lookup name 
+>         rest <- compileStmt body (return . mkLast . Done name label)
+>         addProg (mkFirst (BlockEntry name label args) <*> rest)
 >     -- Create initial locations for all top level functions.
 >     initialDefs :: (Int, Map Name (Maybe Dest))
 >     initialDefs = 
