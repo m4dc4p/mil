@@ -33,14 +33,14 @@ progM progs prelude@(prims, _) = do
   putStrLn "================================================================================"
   putStrLn (render $ printProgM optProgs)
 
-  putStrLn "\n ========= Killed Expressions ============="
-  putStrLn (render $ printExprs killedIn)
+  -- putStrLn "\n ========= Killed Expressions ============="
+  -- putStrLn (render $ printExprs killedIn)
 
-  putStrLn "\n ========= Used Expressions ============="
-  putStrLn (render $ printExprs usedIn)
+  -- putStrLn "\n ========= Used Expressions ============="
+  -- putStrLn (render $ printExprs usedIn)
 
-  putStrLn "\n ========= Anticipated Expressions ============="
-  putStrLn (render $ printExprs antIn)
+  -- putStrLn "\n ========= Anticipated Expressions ============="
+  -- putStrLn (render $ printExprs antIn)
 
   -- let (used, killed, ant) = anticipated optProgs
   --     avail = available ant killed optProgs
@@ -918,6 +918,37 @@ monadTest6 = [("monadTest6"
                , _let "f" (bindE "()" (mPrint `app` lit 1) ret) $ \f ->
                  _let "g" (lam "x" $ \_ -> bindE "()" (mPrint `app` lit 2) ret) $ \g ->
                  g `app` f)]
+
+{-
+
+From http://blog.omega-prime.co.uk/?p=135
+
+main :: IO ()
+main = do
+    arr <- newArray_ (0, 200)
+    go arr 2 0 100
+
+go :: IOUArray Int Int -> Int -> Int -> Int -> IO ()
+go arr stride x y | x < y     = do unsafeWrite arr (x * stride) 1337
+                                   go arr stride (x + 1) y
+                  | otherwise = return ()
+-}
+arrExample = [("main"
+              , bindE "arr" (mNewArray 0 200) $ \arr ->
+                var "go" `app` lit 2 `app` lit 0 `app` lit 100)
+             ,("go", 
+               lam "arr" $ \arr -> 
+               lam "stride" $ \stride ->
+               lam "x" $ \x ->
+               lam "y" $ \y ->
+                 _case (x `lt` y) $ 
+                   (alt "True" [] $ \_ -> 
+                      bindE "()" (mUnsafeWrite arr (x `times` stride) 1337) $ \_ ->
+                        bindE "()" (var "go" `app` arr `app` stride `app` (x `plus` lit 1) `app` y) $ \v -> ret v) .
+                   (alt "False" [] $ \_ -> ret mkUnit))]
+  where
+    mUnsafeWrite a i n = EPrim "unsafeWrite" typ [] `app` a `app` i `app` lit n
+    mNewArray i l = EPrim "newArray_" typ [] `app` lit i `app` lit l
 
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
