@@ -5,7 +5,7 @@ module LCM
 
 where
 
-import Data.Map (Map)
+import Data.Map (Map, (!))
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -20,7 +20,7 @@ import MIL
 lcm :: ProgM C C -> ProgM C C
 lcm body = undefined
   where
-    (used, killed, ant) = anticipated body
+    ant = anticipated (used body) (killed body) body
 
 -- | Sets of Tail values.
 type Exprs = Set TailM
@@ -245,24 +245,20 @@ availTransfer ant = mkFTransfer fw
 --
 -- Environment helps with renaming across blocks but
 -- is not used after the analysis has finished.
-data AntFact = AF { afUsed :: Exprs {- used -}
-                  , afKilled :: Exprs {- killed -}
-                  , afEnv :: Env
+data AntFact = AF { afEnv :: Env
                   , afAnt :: Exprs {- anticipated -} }
   deriving (Eq)
 
-anticipated :: ProgM C C -> (Used, Killed, Anticipated)
-anticipated body = runSimple $ do
+anticipated :: Used -> Killed -> ProgM C C -> Anticipated
+anticipated used killed body = runSimple $ do
     (_, f, _) <- analyzeAndRewriteBwd bwd (JustC (entryLabels body)) body mapEmpty
-    return $ foldr mk (Map.empty, Map.empty, Map.empty) (mapToList f)
+    return $ foldr mk Map.empty (mapToList f)
   where
-    mk (l, (AF u k _ a)) (used, killed, ant) = 
+    mk (l, (AF _ a)) ant = 
       let d = fromJust (labelToDest body l)
-      in (Map.insert d u used
-         , Map.insert d k killed
-         , Map.insert d a ant)
+      in Map.insert d a ant
     bwd = BwdPass { bp_lattice = antLattice
-                  , bp_transfer = antTransfer 
+                  , bp_transfer = antTransfer used killed
                   , bp_rewrite = noBwdRewrite } 
 
 antLattice :: DataflowLattice AntFact
@@ -274,100 +270,53 @@ antLattice = DataflowLattice { fact_name = "Anticipated/available expressions"
 
 -- | Initial anticipated expressions. 
 emptyAntFact :: AntFact
-emptyAntFact = AF Set.empty {- used -}
-                  Set.empty {- killed -}
-                  [] {- args passed to block -}
+emptyAntFact = AF [] {- args passed to block -}
                   Set.empty {- anticipated exprs -}
 
--- We will determine available expressions within 
--- a block by inspecting all tails and tracking the
--- arguments used. If those arguments are unchanged on
--- entry to the block, then the expression will be added
--- to the set of anticipated expressions for that block.
-antTransfer :: BwdTransfer StmtM AntFact
-antTransfer = mkBTransfer anticipate
+antTransfer :: Used -> Killed -> BwdTransfer StmtM AntFact
+antTransfer uses kills = mkBTransfer anticipate
   where
     anticipate :: StmtM e x -> Fact x AntFact -> AntFact
-    anticipate (Bind v t) f = kill v (use t f)
-    anticipate (BlockEntry _ _ args) f = mkAnticipated f args
-    anticipate (CloEntry _ _ args arg) f = mkAnticipated f (args++[arg])
-    anticipate (Done _ _ t) f = use t (fromSucc t f)
-    anticipate (CaseM v alts) f =
-      let antAlt (Alt _ vs t) = kills (use t (fromSucc t f)) vs
-      in intersectFacts (map antAlt alts)
+    anticipate (BlockEntry n l args) f = mkAnticipated (n, l) f args
+    anticipate (CloEntry n l args arg) f = mkAnticipated (n, l) f (args++[arg])
+
+    anticipate (Bind _ _) f = f
+
+    anticipate (CaseM _ alts) f = 
+      let tails = [(l, args) | (Alt _ _ (Goto (_, l) args)) <- alts]
+      in AF [] (Set.unions . map (fromSucc f) $ tails)
+    anticipate (Done _ _ (Goto (_, l) args)) f = AF [] (fromSucc f (l, args))
+    anticipate (Done _ _ _) _ = emptyAntFact
 
     -- | Get anticpated expression facts from our successor, if 
     -- any. Rename those facts to match local names as well.
-    fromSucc :: TailM -> FactBase AntFact -> AntFact
-    fromSucc (Goto (_, l) args) facts = 
-      let succFact f@(AF _ _ _ ants) = renameFact (mkRenamer args f) f
-      in maybe emptyAntFact succFact (lookupFact l facts)
-    fromSucc _ _ = emptyAntFact
-
-    -- | Kill expressions that use the argument
-    kill :: Name -> AntFact -> AntFact
-    kill v (AF used killed env ant) = 
-      -- "uses" is more general than necessary since not
-      -- all Tail instructions will appear in the
-      -- use/kill sets.
-      let toKill = Set.filter (uses v) used
-      in AF used (killed `Set.union` toKill) env ant
-
-    kills :: AntFact -> [Name] -> AntFact
-    kills = foldr kill
-
-    -- | True if the tail uses the name given.
-    uses :: Name -> TailM -> Bool
-    uses v t = v `elem` names t
-
-    -- | Extract variable names from a tail.
-    names :: TailM -> [Name]
-    names (Enter f x) = [f, x]
-    names (Closure _ vs) = vs
-    names (Goto _ vs) = vs
-    names (ConstrM _ vs) = vs
-    names (Thunk _ vs) = vs
-    names (Run v) = [v]
-    names (Prim _ vs) = vs
-    names _ = []
-
-    -- | Add the tail to the used expression list.
-    use :: TailM -> AntFact -> AntFact
-    use t f@(AF used killed env ant)
-      | useable t = AF (Set.insert t used) killed env ant
-      | otherwise = f
+    fromSucc :: FactBase AntFact -> (Label, Env) -> Exprs
+    fromSucc facts (l, env) = 
+      let succExprs (AF succEnv ant) = renameFact (mkRenamer env succEnv) ant
+      in maybe Set.empty succExprs (lookupFact l facts)
 
     -- | Fix up final Anticipated value on exit from the
-    -- block. Compute (Used `union` Killed), union with any existing
-    -- anticipated expressions and add our environment for other
-    -- blocks to rename with.
-    mkAnticipated :: AntFact -> Env -> AntFact
-    mkAnticipated (AF used killed _ ant) env = 
-      AF used killed env (Set.union ant (Set.difference used killed))
-
-    intersectFacts :: [AntFact] -> AntFact
-    intersectFacts [] = emptyAntFact
-    intersectFacts fs = foldr1 intersect fs
-      where
-        intersect (AF _ _ _ ant1) (AF _ _ _ ant2) =
-          AF Set.empty Set.empty [] (ant1 `Set.intersection` ant2)
+    -- block. 
+    mkAnticipated :: Dest -> AntFact -> Env -> AntFact
+    mkAnticipated dest (AF _ ant) env = 
+      AF env ((uses ! dest) `Set.union` (ant `Set.difference` (kills ! dest)))
 
     -- | Create a function which will rename
     -- successor expressions and facts with
     -- the local block names. The renaming 
     -- function will return the name in this block
     -- or the original name, if no renaming occurred.
-    mkRenamer :: Env -> AntFact -> Name -> Name
-    mkRenamer env (AF _ _ succEnv ant) n = 
+    mkRenamer :: Env -> Env -> Name -> Name
+    mkRenamer env succEnv n = 
       let succMap = Map.fromList (zip succEnv env)
       in maybe n id (Map.lookup n succMap)
 
     -- | Rename anticipatable facts.
-    renameFact :: (Name -> Name) -> AntFact -> AntFact
-    renameFact r (AF _ _ _ ants) = AF Set.empty Set.empty [] (renameTails r ants)
+    renameFact :: (Name -> Name) -> Exprs -> Exprs
+    renameFact r ants = renameTails r ants
 
     -- | Rename set of tail expressions.
-    renameTails :: (Name -> Name) -> Set TailM -> Set TailM
+    renameTails :: (Name -> Name) -> Exprs -> Exprs
     renameTails rename = Set.map (renameTail rename)
 
     -- | Rename all variables used in anticipatable 
@@ -397,7 +346,7 @@ instance Show AntFact where
   show = showAnt
 
 showAnt :: AntFact -> String
-showAnt (AF _ _ env ant) = "(" ++ show env ++ ", " ++ 
+showAnt (AF env ant) = "(" ++ show env ++ ", " ++ 
                                   show (Set.elems ant) ++ ")"
 
 -- | This defines the expressions we consider for LCM.

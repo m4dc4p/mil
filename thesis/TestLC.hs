@@ -26,17 +26,21 @@ progM progs prelude@(prims, _) = do
   printResult progs (map (deadBlocks tops . compile tops prelude) . map (: []) $ progs)
 
   let optProgs = mostOpt tops prelude . (compile tops prelude) $ progs
-      killedIn progs = killed progs
-      usedIn progs = used progs
+      killedIn = killed optProgs
+      usedIn = used optProgs
+      antIn = anticipated usedIn killedIn optProgs
 
   putStrLn "================================================================================"
   putStrLn (render $ printProgM optProgs)
 
   putStrLn "\n ========= Killed Expressions ============="
-  putStrLn (render $ printExprs (killedIn optProgs))
+  putStrLn (render $ printExprs killedIn)
 
   putStrLn "\n ========= Used Expressions ============="
-  putStrLn (render $ printExprs (usedIn optProgs))
+  putStrLn (render $ printExprs usedIn)
+
+  putStrLn "\n ========= Anticipated Expressions ============="
+  putStrLn (render $ printExprs antIn)
 
   -- let (used, killed, ant) = anticipated optProgs
   --     avail = available ant killed optProgs
