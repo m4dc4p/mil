@@ -14,6 +14,7 @@ import Data.Map (Map, (!))
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Debug.Trace
 
 import Compiler.Hoopl
 
@@ -410,27 +411,19 @@ singlePred referrers dest f
 
 -- | Blocks we can inline will be stored in the map, by 
 -- label/name. 
-type ReturnPrimBlocks = Map Dest ReturnType
+type ReturnPrimBlocks = Map Dest (TailM, Env)
 
--- | Used during analysis - indicates if
--- a block can be inlined like we want.
-type ReturnPrimBlock = Maybe ReturnType
-
--- | Used to indicate what kind of instruction can be inlined
+-- | Indicates what kind of instruction can be inlined
 -- from a block. 
-data ReturnType = TmpRet Name 
-    | TmpPrim Name [Name] 
-    | AReturn Name Int 
-    | APrim Name [Name] [Int]
-  deriving (Eq, Show)
+type ReturnType = Maybe (TailM, Env)
 
--- | Inline blocks that call primitives or
--- only return a value.
+-- | Inline blocks that immediately return a
+-- tail. Closure entry blocks are NOT inlined
+-- because they need to capture an argument. Only
+-- BlockEntry blocks can be considered.
 inlineReturn :: ProgM C C -> ProgM C C
 inlineReturn body = 
     runSimple $ do
-      fresh <- freshLabel
-
       -- First we find all the blocks which we
       -- could inline
       (_, f, _) <- analyzeAndRewriteBwd bwdAnalysis (JustC labels) body (initial bwdAnalysis)
@@ -452,7 +445,7 @@ inlineReturn body =
     rewriteLattice = DataflowLattice { fact_name = "Goto/Return"
                                      , fact_bot = ()
                                      , fact_join = extend}
-    bwdAnalysis :: BwdPass SimpleFuelMonad StmtM ReturnPrimBlock
+    bwdAnalysis :: BwdPass SimpleFuelMonad StmtM ReturnType
     bwdAnalysis = BwdPass { bp_lattice = analysisLattice
                           , bp_transfer = inlineReturnTransfer 
                           , bp_rewrite = noBwdRewrite }
@@ -462,51 +455,41 @@ inlineReturn body =
     extend :: (Eq a) => JoinFun a
     extend _ (OldFact old) (NewFact new) = (changeIf (old /= new), new)   
 
-inlineReturnTransfer :: BwdTransfer StmtM ReturnPrimBlock
+inlineReturnTransfer :: BwdTransfer StmtM ReturnType
 inlineReturnTransfer = mkBTransfer bw
   where
-    bw :: StmtM e x -> Fact x ReturnPrimBlock -> ReturnPrimBlock
-    bw (Done _ _ (Return v)) f = Just (AReturn v (-1))
-    bw (Done _ _ (Prim p vs)) f = Just (APrim p vs [])
-    bw (BlockEntry name lab args) (Just (AReturn v _)) =
-      case v `elemIndex` args of
-        Just idx -> Just (AReturn v idx)
-        _ -> Nothing
-    bw (BlockEntry name lab args) (Just (APrim p vs _)) =
-      Just (APrim p vs (catMaybes $ map (`elemIndex` args) vs))
+    bw :: StmtM e x -> Fact x ReturnType -> ReturnType
+    bw (Done _ _ t) f = Just (t, [])
+    bw block@(BlockEntry _ _ args) (Just (t, _)) = Just (t, args)
     bw _ _ = Nothing
 
 inlineReturnRewrite :: FuelMonad m => ReturnPrimBlocks -> BwdRewrite m StmtM EmptyFact
 inlineReturnRewrite blocks = iterBwdRw (mkBRewrite rewriter)
   where
     rewriter :: FuelMonad m => forall e x. StmtM e x -> Fact x EmptyFact -> m (Maybe (ProgM e x))
-    rewriter (Bind v (Goto dest vs)) _ =
+    rewriter (Bind v (Goto dest vs)) _ = 
       case dest `Map.lookup` blocks of
-        Just at -> return (Just (mkMiddle (Bind v (newTail at vs))))
+        Just (t, succEnv) -> return (Just (mkMiddle (Bind v (renameTail (mkRenamer vs succEnv) t))))
         _ -> return Nothing
     rewriter (Done n label (Goto dest@(_, l) vs)) _ =
       case dest `Map.lookup` blocks of
-        Just at -> return (Just (mkLast (Done n label (newTail at vs))))
+        Just (t, succEnv) -> return (Just (mkLast (Done n label (renameTail (mkRenamer vs succEnv) t))))
         _ -> return Nothing
     rewriter _ _ = return Nothing
-
-    newTail (AReturn _ i) vs = Return (vs !! i)
-    newTail (APrim p _ idxs) vs = Prim p (map (vs !!) idxs)
 
 -- | Collapse closures, then elminate dead assignments
 -- in blocks.
 optCollapse tops = deadCode . collapse
 
--- | Inline blocks which only return or call a primitive, then
--- eliminate dead code within blocks.
-inlineSimple tops = deadCode . bindSubst . inlineReturn 
-
 mostOpt :: [Name] -> ([Name], ProgM C C) -> ProgM C C -> ProgM C C
-mostOpt tops prelude@(prims, _) = 
+mostOpt tops prelude@(prims, _) = id .
     -- deadBlocks tops . 
     -- inlineBlocks tops . 
     deadBlocks tops .  
-    inlineSimple (tops ++ prims) . 
+    optCollapse tops . 
+    deadCode . 
+    bindSubst . 
+    inlineReturn .
     optCollapse tops . 
     bindReturn . 
     deadCode . 
