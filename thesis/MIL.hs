@@ -21,6 +21,7 @@ import Util
 
 type ProgM = Graph StmtM
 type Dest = (Name, Label)
+type Env = [Name]
 
 {-
 
@@ -131,7 +132,7 @@ printTailM (Prim p vs) = text p <> text "*" <> parens (commaSep text vs)
 printTailM (LitM n) = text ("num " ++ show n)
 
 printDest :: Dest -> Doc
-printDest (name, _) = text name
+printDest (name, _) = text name 
 
 printProgM :: ProgM C C -> Doc
 printProgM = vcat' . maybeGraphCC empty printBlockM
@@ -287,6 +288,8 @@ prims :: UniqueMonad m => [(Name, m (ProgM C C))]
 prims = [printPrim
         , returnPrim
         , readCharPrim
+        , unsafeWritePrim
+        , newArrayPrim
         , plusPrim
         , minusPrim
         , timesPrim
@@ -327,12 +330,22 @@ prims = [printPrim
       ,("mkData_False", mkDataPrim "False" 0)
       ,("mkData_True", mkDataPrim "True" 0)]
 
-printPrim, readCharPrim, returnPrim, plusPrim, minusPrim, timesPrim, divPrim, ltPrim, gtPrim, ltePrim, gtePrim, eqPrim, neqPrim :: UniqueMonad m => (Name, m (ProgM C C))
-
+printPrim :: UniqueMonad m => (Name, m (ProgM C C))
 printPrim = ("print", liftM snd $ mkMonadicPrim "print" 1)
+
+readCharPrim :: UniqueMonad m => (Name, m (ProgM C C))
 readCharPrim = ("readChar", liftM snd $ mkMonadicPrim "readChar" 0)
+
+returnPrim :: UniqueMonad m => (Name, m (ProgM C C))
 returnPrim = ("return", liftM snd $ mkMonadicPrim "return" 1)
 
+unsafeWritePrim :: UniqueMonad m => (Name, m (ProgM C C))
+unsafeWritePrim = ("unsafeWrite", liftM snd $ mkMonadicPrim "unsafeWrite"  3)
+
+newArrayPrim :: UniqueMonad m => (Name, m (ProgM C C))
+newArrayPrim = ("newArray_", liftM snd $ mkMonadicPrim "newArray_" 2)
+
+plusPrim, minusPrim, timesPrim, divPrim, ltPrim, gtPrim, ltePrim, gtePrim, eqPrim, neqPrim :: UniqueMonad m => (Name, m (ProgM C C))
 plusPrim = ("plus", liftM snd $ binPrim "plus")
 minusPrim = ("minus", liftM snd $ binPrim "minus")
 timesPrim = ("times", liftM snd $ binPrim "times")
@@ -466,4 +479,30 @@ emptyLattice :: DataflowLattice EmptyFact
 emptyLattice = DataflowLattice { fact_name = "Empty fact"
                                , fact_bot = ()
                                , fact_join = \ _ _ _ -> (NoChange, ()) }
+
+-- | Create a function which maps names NEW names
+-- to ORIGINAL names. If a given name does not appear
+-- in the new name list, this functoin returns the name
+-- unchanged.
+--
+-- The function assumes the two lists given correspond.
+mkRenamer :: Env -- ^ Original names.
+          -> Env -- ^ New names.
+          -> (Name -> Name) -- ^ A function mapping new to original.
+mkRenamer orig new n = 
+  let new2orig = Map.fromList (zip new orig)
+  in maybe n id (Map.lookup n new2orig)
+
+-- | Rename all variables in the tail value given, using
+-- the renaming function provided.
+renameTail :: (Name -> Name) -> TailM -> TailM
+renameTail r (Return v) = Return (r v)
+renameTail r (Enter f x) = Enter (r f) (r x)
+renameTail r (Closure dest vs) = Closure dest (map r vs)
+renameTail r (Goto dest vs) = Goto dest (map r vs)
+renameTail r (ConstrM c vs) = ConstrM c (map r vs)
+renameTail r (Thunk dest vs) = Thunk dest (map r vs)
+renameTail r (Run v) = Run (r v)
+renameTail r (Prim p vs) = Prim p (map r vs)
+renameTail r (LitM i) = LitM i
 

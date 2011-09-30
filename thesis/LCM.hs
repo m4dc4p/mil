@@ -64,8 +64,6 @@ type Latest = Map Dest Exprs
 -- for each block.
 type Successors = Map Dest (Set Dest)
 
-type Env = [Name]
-
 newtype PostFact = PP (Exprs {- used -}
                       , Exprs {- postponable -})
   deriving (Eq, Show)
@@ -301,16 +299,6 @@ antTransfer uses kills = mkBTransfer anticipate
     mkAnticipated dest (AF _ ant) env = 
       AF env ((uses ! dest) `Set.union` (ant `Set.difference` (kills ! dest)))
 
-    -- | Create a function which will rename
-    -- successor expressions and facts with
-    -- the local block names. The renaming 
-    -- function will return the name in this block
-    -- or the original name, if no renaming occurred.
-    mkRenamer :: Env -> Env -> Name -> Name
-    mkRenamer env succEnv n = 
-      let succMap = Map.fromList (zip succEnv env)
-      in maybe n id (Map.lookup n succMap)
-
     -- | Rename anticipatable facts.
     renameFact :: (Name -> Name) -> Exprs -> Exprs
     renameFact r ants = renameTails r ants
@@ -318,18 +306,6 @@ antTransfer uses kills = mkBTransfer anticipate
     -- | Rename set of tail expressions.
     renameTails :: (Name -> Name) -> Exprs -> Exprs
     renameTails rename = Set.map (renameTail rename)
-
-    -- | Rename all variables used in anticipatable 
-    -- tail expressions.
-    renameTail :: (Name -> Name) -> TailM -> TailM
-    renameTail r (Enter f x) = Enter (r f) (r x)
-    renameTail r (Closure dest vs) = Closure dest (map r vs)
-    renameTail r (ConstrM c vs) = ConstrM c (map r vs)
-    renameTail r (Thunk dest vs) = Thunk dest (map r vs)
-    renameTail r (Prim p vs) = Prim p (map r vs)
-    -- Any other type of Tail expressions should not appear
-    -- in the anticipated set we are renaming anyways.
-    renameTail r t = t
 
 -- | If the tail gives a successor (i.e., a goto),
 -- pair the destination with the value given. Otherwise,
