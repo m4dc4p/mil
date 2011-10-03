@@ -15,11 +15,11 @@
 \usepackage{amsmath}
 \usepackage{booktabs}
 \usepackage[margin=\parindent, format=hang,labelfont=bf]{caption}
+\usepackage[subrefformat=parens]{subcaption}
 \usepackage{ifthen}
 \usepackage{stmaryrd}
 \usepackage{longtable}
 \usepackage{afterpage}
-\usepackage{subfig}
 \usepackage{xifthen}
 \usepackage{mathtools}
 \usepackage{xparse}
@@ -219,6 +219,10 @@
 \centering%%
 \figbegin}{\figend%%
 \end{figure}}
+
+%% Produce a sub-caption and label it.
+\newcommand{\scap}[2][1in]{\begin{minipage}{#1}%%
+\subcaption{}\label{#2}\end{minipage}}
 
 % single-argument comment. Do not put
 % a space before the command when used

@@ -62,11 +62,8 @@ which reason we say \emph{enters} and \emph{leaves}.
 
 \begin{myfig}[th]
 \begin{tabular}{cc}
-\subfloat{\input{lst_back1}%%
-  \label{fig_back1_a}} \vline & 
-\subfloat{\input{lst_back2}%%
-  \label{fig_back1_b}} \\
-\subref{fig_back1_a} & \subref{fig_back1_b} 
+\input{lst_back1} & \input{lst_back2} \\
+\scap{fig_back1_a} & \scap{fig_back1_b} 
 \end{tabular}
 \caption{\subref{fig_back1_a} A C-language program fragment. \subref{fig_back1_b} The
   \emph{control-flow graph} (CFG) for the program.}
@@ -121,16 +118,16 @@ to consist of one statement each.
 \begin{myfig}
 \begin{tabular}{m{1.5in}m{1.5in}m{1.5in}}
   \begin{center}
-    \subfloat{\input{lst_back3}\label{fig_back4_a}}
+    \input{lst_back3}
   \end{center} & %%
   \begin{center}
-    \subfloat{\input{lst_back4}\label{fig_back4_b}}
+    \input{lst_back4}
   \end{center}
   & %%
   \begin{center}
-    \subfloat{\input{lst_back5}\label{fig_back4_c}}
+    \input{lst_back5}
   \end{center} \\
-  \vtop{\centering\subref{fig_back4_a}} & \vtop{\centering\subref{fig_back4_b}} & \vtop{\centering\subref{fig_back4_c}} \\
+  \vtop{\centering\scap{fig_back4_a}} & \vtop{\centering\scap{fig_back4_b}} & \vtop{\centering\scap{fig_back4_c}} \\
 \end{tabular}
 \caption{\subref{fig_back4_a}: A C-language fragment to illustrate
   \emph{basic blocks}.  \subref{fig_back4_b}: The CFG for
@@ -174,10 +171,8 @@ repeatedly.
 
 \begin{myfig}[tbh]
   \begin{tabular}{cc}
-    \subfloat{\input{lst_back11}\label{fig_back7_initial}} & %%
-    \subfloat{\input{lst_back12}\label{fig_back7_opt}} \\
-
-    \subref{fig_back7_initial} & \subref{fig_back7_opt} 
+    \input{lst_back11} & \input{lst_back12} \\
+    \scap{fig_back7_initial} & \scap{fig_back7_opt} 
   \end{tabular}
   \caption{A C program which multiplies its argument, \texttt{val}, by
     10 \texttt{cnt} times. Part~\subref{fig_back7_initial} shows the
@@ -510,9 +505,8 @@ shows which \out sets are used to calcuate \inE sets.
   \setlength{\tabcolsep}{2pt}
   \hbox to \textwidth{\hss
   \begin{tabular}{cc}
-    \subfloat{\input{fig_back13_tbl}\label{fig_back13_tbl}} & 
-    \subfloat{\input{fig_back12_cfg}\label{fig_back13_cfg}} \\
-    \subref{fig_back13_tbl} & \subref{fig_back13_cfg}
+    \input{fig_back13_tbl} & \input{fig_back12_cfg} \\
+    \scap{fig_back13_tbl} & \scap{fig_back13_cfg}
   \end{tabular}\hss}
   \caption{This figure shows the values for $i$ calculated by all nodes in our
     example program. Part~\subref{fig_back13_tbl} shows the \inE and
@@ -838,9 +832,8 @@ Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt}.
   \setlength{\tabcolsep}{2pt}
   \hbox to \textwidth{\hss
   \begin{tabular}{cc}
-    \subfloat{\input{fig_back12_tbl}\label{fig_back12_tbl}} & 
-    \subfloat{\input{fig_back12_cfg}\label{fig_back12_cfg}} \\
-    \subref{fig_back12_tbl} & \subref{fig_back12_cfg}
+    \input{fig_back12_tbl} & \input{fig_back12_cfg} \\
+    \scap{fig_back12_tbl} & \scap{fig_back12_cfg}
   \end{tabular}\hss}
   \caption{This figure shows the facts calculated for all nodes in our
     example program. Part~\subref{fig_back12_tbl} shows the \inE and

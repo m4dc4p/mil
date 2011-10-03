@@ -1,9 +1,13 @@
 \begin{myfig}[p]
   \begin{tabular}{c}
-    \subfloat{\input{lst_back15}\label{fig_back9_initial}} \\
-    \subref{fig_back9_initial} \\
-    \subfloat{\setcounter{nodeCounter}{0}\input{lst_back18}\label{fig_back9_transfer}} \\
-    \subref{fig_back9_transfer} \\
+    \begin{minipage}{1in}
+      {\input{lst_back15}}
+    \end{minipage} \\
+    \scap{fig_back9_initial} \\
+    \begin{minipage}{1in}
+      {\setcounter{nodeCounter}{0}\input{lst_back18}}
+    \end{minipage} \\
+    \scap{fig_back9_transfer} \\
   \end{tabular}
   \caption{Part~\subref{fig_back9_initial} shows our program annotated
     with initial facts. In Part~\subref{fig_back9_transfer}, we have
