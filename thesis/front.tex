@@ -1,4 +1,4 @@
-\documentclass[12pt]{article}
+\documentclass[12pt]{report}
 %include polycode.fmt
 \input{preamble}
 \begin{document}
@@ -39,10 +39,11 @@
     both functional and imperative compilers. We then demonstrate
     \emph{uncurrying}, an optimization specific to functional language
     compilers. Next, we use the \emph{monad laws} to derive inlining and
-    copy-propagation optimizations. Finally, we implement \emph{Lazy
-      Code Motion} (LCM), one of the most complicated dataflow-based
-    optimizations. To our knowledge this is the first implementation of
-    LCM over a monadic intermediate language. Throughout, we use the
+    copy-propagation optimizations. %% Finally, we implement \emph{Lazy
+    %%   Code Motion} (LCM), one of the most complicated dataflow-based
+    %% optimizations. To our knowledge this is the first implementation of
+    %% LCM over a monadic intermediate language. 
+    Throughout, we use the
     \emph{Hoopl} library to implement our optimizations, making our work
     a case-study for the library as well.
   \end{minipage}

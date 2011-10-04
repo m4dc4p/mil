@@ -272,7 +272,12 @@
 
 %% Adds an equation number on demand.
 \newcommand\addtag{\refstepcounter{equation}\tag{\theequation}}
+
 %% For typesetting set definitions like {x | x \in f(y)}
 \newcommand\setdef[2]{\ensuremath{\{#1\ |\ #2\}}}
+
 %% For typesetting function names like dom(f) or out(b).
 \newcommand\mfun[1]{\ensuremath{\mathit{#1}}}
+
+%% Marginal notes
+\newcommand\margin[2]{#1}

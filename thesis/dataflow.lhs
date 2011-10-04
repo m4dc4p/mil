@@ -848,7 +848,7 @@ Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt}.
 We have now seen how we can use constant propagation to optimize a
 simple program. Typically many more optimizations will be run over the
 same code, each (hopefully) improving it a little more. For example,
-we could use an optimziation called \emph{dead-code elimination} to
+we could use an optimization called \emph{dead-code elimination} to
 remove the declaration of #m# altogether from our optimized program,
 as it is no longer used. 
 

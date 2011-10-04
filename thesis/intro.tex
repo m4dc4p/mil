@@ -29,11 +29,11 @@ common to imperative and functional languages, including constant
 propagation and dead-code elimination. We implement an optimization
 which eliminates intermediate closure construction, showing that this
 technique can be used for optimizations specific to functional
-languages. Finally, we implement \emph{lazy code motion}, which to our
-knowledge has not been applied to programs in a monadic language
-before.
+languages. %% Finally, we implement \emph{lazy code motion}, which to our
+%% knowledge has not been applied to programs in a monadic language
+%% before.
 
-We use the Hoopl library\rem{reference} to implement our
+We use the Hoopl library \citep{Hoopl-3.8.7.0} to implement our
 optimizations. Besides showing that it is possible (and even
 desirable) to use dataflow analysis in this context, our work also
 serves as a case-study for advanced uses of Hoopl.

@@ -58,21 +58,21 @@
 \subsection{Implementation}
 \subsection{Reflection}
 
-\chapter{Lazy Code Motion}
-\emph{Describes our implementation of LCM in terms of the four passes
-  used. This section will give an overview of LCM and briefly describe
-  each pass. We give a example program which will be used throughout
-  the section.}
+%% \chapter{Lazy Code Motion}
+%% \emph{Describes our implementation of LCM in terms of the four passes
+%%   used. This section will give an overview of LCM and briefly describe
+%%   each pass. We give a example program which will be used throughout
+%%   the section.}
 
-\section{Anticipated Expressions}
+%% \section{Anticipated Expressions}
 
-\section{Available Expressions}
+%% \section{Available Expressions}
 
-\section{Dead-code Elimination}
+%% \section{Dead-code Elimination}
 
-\section{Reflection}
+%% \section{Reflection}
 
-\emph{Conclusions regarding our implemenation.}
+%% \emph{Conclusions regarding our implemenation.}
 
 \chapter{Conclusion \& Future Work}
 
