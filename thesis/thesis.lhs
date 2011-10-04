@@ -21,16 +21,11 @@
 
 \input{dataflow}
 
+\input{hoopl}
+
 \input{languages}
 
 \input{mil}
-
-\chapter{The Hoopl Library}
-
-\emph{Introduce the Hoopl library, describing how
-it approaches dataflow analysis. Important concepts
-such as shape, transfer and rewrite functions, facts and
-lattices will be described. }
 
 \input{uncurrying}
 

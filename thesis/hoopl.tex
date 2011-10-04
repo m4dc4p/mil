@@ -4,17 +4,34 @@
 \begin{document}
 \input{document.preamble}
 \chapter{The Hoopl Library}
+\label{ref_chapter_hoopl}
 
 %% Introduction ...
 
+The Hoopl library \citep{Hoopl-3.8.7.0}, written in Haskell, provides a
+framework for implementing dataflow optimizations. It does not target a 
+particular programming language or provide specific optimizations; rather, it
+enables the programm to implemente
+
 %% Running Example: Dead Code Elimination
+\section{Hoopl's Representation of the Dataflow Algorithm}
 
-\section{Facts, Lattice}
+\subsection{Control-Flow Graphs}
 
-\section{Transfer \& Rewrite}
+\subsection{Blocks \& Shapes}
 
-\section{Interleaved Analysis \& Rewriting}
+\subsection{Facts and Lattices}
+
+\subsection{Transfer Functions}
+
+\subsection{Iteration \& Fixed Points}
+
+\subsection{Interleaved Analysis \& Rewriting}
+
+\section{MIL and Hoopl}
 
 \section{Summary}
+
+\standaloneBib
 
 \end{document}
