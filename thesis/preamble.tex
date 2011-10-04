@@ -15,7 +15,20 @@
 \usepackage{amsmath}
 \usepackage{booktabs}
 \usepackage[margin=\parindent, format=hang,labelfont=bf]{caption}
-\usepackage[subrefformat=parens]{subcaption}
+%% \usepackage[subrefformat=parens]{subcaption}
+%% The following makes sure we get parentheses around
+%% subreferences. The newest version of the subcaption
+%% package has an option for this, but that's not available
+%% widely.
+%%
+%% From http://tex.stackexchange.com/questions/25644
+\usepackage[labelformat=simple]{subcaption}
+\makeatletter
+  \def\thesubfigure{(\alph{subfigure})}
+  \providecommand\thefigsubsep{,~}
+  \def\p@subfigure{\@nameuse{thefigure}\thefigsubsep}
+\makeatother
+
 \usepackage{ifthen}
 \usepackage{stmaryrd}
 \usepackage{longtable}
@@ -223,6 +236,10 @@
 %% Produce a sub-caption and label it.
 \newcommand{\scap}[2][1in]{\begin{minipage}{#1}%%
 \subcaption{}\label{#2}\end{minipage}}
+
+%% Produce a sub-caption with text.
+\newcommand{\lscap}[3][1in]{\begin{minipage}{#1}%%
+\subcaption{#3}\label{#2}\end{minipage}}
 
 % single-argument comment. Do not put
 % a space before the command when used

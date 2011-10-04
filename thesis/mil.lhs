@@ -124,7 +124,7 @@ value given for it.
 
 \begin{myfig}
   \begin{tabular}{m{1in}m{4in}}
-    \subref{mil_fig4a} & \subfloat{\label{mil_fig4a}}\begin{minipage}{4in}\vbox to .75in {\vss\hbox to \textwidth{\hss
+    \scap{mil_fig4a} & \begin{minipage}{4in}\vbox to .75in {\vss\hbox to \textwidth{\hss
       \begin{tikzpicture}[remember picture, overlay]
         \newbox\clobox
         \tikzstyle{clo}=[draw]
@@ -139,7 +139,7 @@ value given for it.
 
       \end{tikzpicture}\hss}\vss}
     \end{minipage} \\
-      \subref{mil_fig4b} & \subfloat{\label{mil_fig4b}}\tikz[remember picture,overlay]{\node[invis] (comp_l) {}; \draw[->] (compclo_l.west) -|| (comp_l.north) ;}\text{\sc CompL}:\ %%
+      \scap{mil_fig4b} & \tikz[remember picture,overlay]{\node[invis] (comp_l) {}; \draw[->] (compclo_l.west) -|| (comp_l.north) ;}\text{\sc CompL}:\ %%
       \lamAbs{f}{\lamAbs{g}{\lamAbs{x}{%%
             \lamApp{\tikz[remember picture,overlay]{\node[invis] (comp_f) {\phantom{\fbox{f}}}; \draw[->] (comp_f.north) -- (compclo_f.south);}\fbox{f}}%%
                    {(\lamApp{\tikz[remember picture,overlay]{\node[invis] (comp_g) {\phantom{\fbox{g}}}; \draw[->] (comp_g.north) -- (compclo_g.south);}\fbox{g}}%%
@@ -374,10 +374,9 @@ the location on the left. In turn, Line~\ref{mil_fofx_fig1b} applies
 
 \begin{myfig}[t]
   \begin{tabular}{cc}
-    \subfloat{$compose = \lamCompose$%%
-      \label{mil_fig1a}} & 
-    \subfloat{\input{lst_mil1}\label{mil_fig1b}} \\
-    \subref{mil_fig1a} & \subref{mil_fig1b}
+    $compose = \lamCompose$ & 
+    \input{lst_mil1} \\
+    \scap{mil_fig1a} & \scap{mil_fig1b}
   \end{tabular} 
   \caption{\subref{mil_fig1a} gives a \lamA definition of the composition
     function; \subref{mil_fig1b} shows a fragment of the MIL program

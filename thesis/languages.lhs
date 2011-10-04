@@ -38,21 +38,19 @@ return a function or anything fancy.  Figure~\ref{lang_fig1} shows
 different functional languages.
 
 \begin{myfig}[bth]
-  \begin{tabular}{cc}
-  \subfloat{%%
+  \begin{tabular}{cc}%%
     \begin{minipage}{2in}\begin{withHsNum}%%
 > mag :: Float -> Float {-"\label{lang_fig1_haskell_sig}"-}
 > mag a = 2 * a {-"\label{lang_fig1_haskell_impl}"-}
-    \end{withHsNum}\end{minipage}%%
-    \label{lang_fig1_haskell}} & %%
-  \subfloat{\input{lang_fig1_ml}\label{lang_fig1_ml}} \\
+    \end{withHsNum}\end{minipage} & %%
+  \input{lang_fig1_ml} \\
 
-  \subref{lang_fig1_haskell} Haskell. & \subref{lang_fig1_ml} ML. \\
+  \lscap{lang_fig1_haskell}{Haskell.} & \lscap{lang_fig1_ml}{ML.} \\
 
-  \subfloat{\input{lang_fig1_scheme}\label{lang_fig1_scheme}} & %%
-  \subfloat{\input{lang_fig1_js}\label{lang_fig1_js}} \\
+  \input{lang_fig1_scheme} & %%
+  \input{lang_fig1_js} \\
 
-  \subref{lang_fig1_scheme} Scheme. & \subref{lang_fig1_js} JavaScript.
+  \lscap{lang_fig1_scheme}{Scheme.} & \lscap{lang_fig1_js}{JavaScript.}
   \end{tabular}
   \caption{Definitions of a function that doubles its argument in
     \subref{lang_fig1_haskell} Haskell, \subref{lang_fig1_ml} ML, 
@@ -167,7 +165,7 @@ multiplies it by the original multiple given to |multiplier|.
 
 \begin{myfig}
   \begin{tabular}{cc}
-    \subfloat{\begin{minipage}{3.5in}\begin{withHsNum} %%
+    \begin{minipage}{3.5in}\begin{withHsNum} %%
 > multiplier :: Float -> (Float -> Float)
 > multiplier multiple = 
 >   \a -> multiple * a {-"\label{lang_fig2_hs_fun}"-}
@@ -175,15 +173,15 @@ multiplies it by the original multiple given to |multiplier|.
 > mag :: Float -> Float
 > mag = multiplier 2 {-"\label{lang_fig2_hs_mag}"-}
         \end{withHsNum}
-      \end{minipage}\label{lang_fig2_hs}} & %%
-    \subfloat{\input{lang_fig2_ml}\label{lang_fig2_ml}} \\
+      \end{minipage} & %%
+    \input{lang_fig2_ml} \\
 
-    \subref{lang_fig2_hs} Haskell. & \subref{lang_fig2_ml} ML. \\
+    \lscap{lang_fig2_hs}{.Haskell} & \lscap{lang_fig2_ml}{ML.} \\
 
-    \subfloat{\input{lang_fig2_scheme}\label{lang_fig2_scheme}} & %%
-    \subfloat{\input{lang_fig2_js}\label{lang_fig2_js}} \\
+    \input{lang_fig2_scheme} & %%
+    \input{lang_fig2_js} \\
 
-    \subref{lang_fig2_scheme} Scheme. & \subref{lang_fig2_js} JavaScript. \\
+    \lscap{lang_fig2_scheme}{Scheme.} & \lscap{lang_fig2_js}{JavaScript.} \\
 
   \end{tabular}
   \caption{The |multiplier| function and how it can be used to define
