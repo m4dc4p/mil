@@ -9,24 +9,22 @@
 %% Introduction ...
 
 The Hoopl library \citep{Hoopl-3.8.7.0}, written in Haskell, provides
-a framework for implementing optimizations using the dataflow
-algorithm. It does not target a particular programming language or
-provide specific optimizations; rather, it enables the user to
-implement their own optimizations for their own language. A
-thorough description of the implementation of the library can be found
-in the authors' paper \citep{Ramsey2010}; here, we discuss the
-abstractions they provide and how to use Hoopl when implementing
-dataflow-based optimizations.
+a framework for implementing dataflow-based program analyses and
+transformations (which we refer to together as ``optimizations''). The
+library does not target a particular langauge or provide any built-in
+optimizations; rather, Hoopl enables the user to implement their own
+optimizations for their own language. A thorough description of the
+library's implementation can be found in the authors' paper
+\citep{Ramsey2010}; here, we discuss the abstractions they provide and
+how to use Hoopl when implementing dataflow-based optimizations.
 
 %% Broad description of how Hoopl abstracts the dataflow algorithm
 
-Hoopl applies a given optimization to a control-flow graph (CFG),
-iteratively collecting facts (either forward or backward) until
-reaching a fixed point. The library implements the generic portions of
-the dataflow algorithm: iterative analysis, traversing the CFG, and
-combining facts between blocks. The \emph{client program}, a term
-Hoopl uses to mean a program implementing some optimization, provides
-data structures and functions for that specific optimization: the
+Hoopl implements the generic portions of the dataflow algorithm:
+iterative analysis, traversing the control-flow graph (CFG), and combining
+facts. The \emph{client program}, a term Hoopl uses to mean the
+program using the library for some optimization, provides data
+structures and functions specific to that optimization: the
 representation of facts, a transfer function, a meet operator such
 that the facts can be placed in a lattice, and a rewriting function
 that transforms the CFG.
@@ -41,42 +39,21 @@ that transforms the CFG.
 
 %% Introduce example
 
-Throughout this chapter we will explain Hoopl concepts by implementing
-a client program that performs \emph{dead-code elimination} for a very
-small subset of the C language. Dead-code elimination removes
-``useless'' statements from a program. The definition of ``useless''
-varies according to programming language, hardware, and user intent,
-but in all cases it implies that the semantics of the program do not
-change.
-
-Figure \ref{hoopl_fig1} defines a function in C. The assignments to
-|a| on Lines \ref{hoopl_lst1_assign_a} and \ref{hoopl_lst1_add} do
-not affect the behavior of the function and can be safely
-eliminated. We will develop a client program that can 
-analyze this function and transform it as described.
-
+We will illustrate Hoopl concepts through a running example motivated
+by the C function, #foo#, defined in Figure \ref{hoopl_fig1_a}. The
+assignments on Lines \ref{hoopl_lst1_assign_a} and
+\ref{hoopl_lst1_add} do not affect the output, or observable behavior,
+of #foo#. Eliminating them will not change the program's meaning and
+may improve its performance. However, we could not eliminate the
+assignment to #c# on Line \ref{hoopl_lst1_assign_c} because that would
+change the value printed on Line \ref{hoopl_lst1_print}. In general, a
+\emph{live} variable might be used in an observable way; a \emph{dead}
+variable will definitely not. 
 
 \begin{myfig}
 \begin{tabular}{cc}
-  \begin{minipage}[b]{2in}
-    \begin{AVerb}[numbers=left]
-void f() {
-  int c = 4; \label{hoopl_lst1_assign_c}
-  int a = c + 1;  \label{hoopl_lst1_assign_a}
-  print(c); \label{hoopl_lst1_print}
-  a = c + 1; \label{hoopl_lst1_add};
-}
-    \end{AVerb}
-  \end{minipage} & 
-  \begin{minipage}[b]{2in}
-    \begin{AVerb}[numbers=left]
-void f() {
-  int c = 4; \label{hoopl_lst2_assign_c}
-  print(c); \label{hoopl_lst2_print}
-}
-    \end{AVerb}
-  \end{minipage} \\
-  \scap{hoopl_fig1_a} & \scap{hoopl_fig1_b} 
+  \input{hoopl_lst1} & \input{hoopl_lst2} \\
+  \scap{hoopl_fig1_a} & \scap{hoopl_fig1_b}
 \end{tabular}
 \caption{Part \subref{hoopl_fig1_a} defines function defined in
   C. Part \subref{hoopl_fig1_b} shows the program after perfomring
@@ -84,13 +61,21 @@ void f() {
 \label{hoopl_fig1}
 \end{myfig}
 
+\emph{Dead-code elimination} refers to the process described above:
+determing variable ``liveness'' and removing statements only using dead
+variables. Our running example will implement a client program that
+performs dead-code elimination for enough of the C language to apply
+it to Figure \ref{hoopl_fig1_a}. Our example will be able to
+analyze and rewrite #foo# into the form show in Figure
+\ref{hoopl_fig1_b}.
+
 %% Provides signposts for chapter.
 
 In Section \ref{hoopl_sec1}, we describe Hoopl's abstractions, showing
 the Haskell types, data structures, and function signatures provided
 by the library. Throughout, we develop our client program to implement
 dead-code elimination and show how it optimizes the program in Figure
-\ref{hoopl_fig1}. Section \ref{hoopl_sec2} shows how Hoopl influenced
+\ref{hoopl_fig1_a}. Section \ref{hoopl_sec2} shows how Hoopl influenced
 the implementation the MIL language from Chapter \ref{ref_chapter_mil}
 and discusses the design choices we made. We conclude with a summary
 and brief discussion of our experience with Hoopl in Section
@@ -128,49 +113,41 @@ optimization.
 
 \subsection*{Control-Flow Graphs}
 
-Hoopl defines CFGs in terms of basic blocks. The library parameterizes
-blocks by \emph{content} and \emph{shape}. Content means statements or
-expressions from the client's AST. Shape can be either \emph{open} or
-\emph{closed} and applies to both the entry and exit of the block. 
-Roughly, ``open'' allows control-flow to fall through the block; ``closed''
-means control-flow branches from the block. 
+%% Introduce parameterization of blocks by AST and shape.
 
-Hoopl provides types representing open and closed, |O| and
-|C|. Neither needs constructors as we only use them to parameterize
-later types. As open and closed apply to both entry and exit, we write
-them as |O O| (``open/open''), |O C| (``open/closed''), etc., where the
-first describes the block's entry shape and the latter its exit shape.
+Hoopl defines CFGs in terms of basic blocks, parameterized by
+\emph{content} and \emph{shape}. Content means statements or
+expressions from the client's AST. Shape can be either \emph{open} or
+\emph{closed} and applies to both the entry and exit of the block.
+Roughly, ``open'' allows control-flow to fall through the block;
+``closed'' means control-flow branches from the block.
+
+%% Introduce meaning and definition of O and C types.
+
+Hoopl provides types named |O| and |C|, representing open and
+closed. Neither needs constructors as we only use them to parameterize
+other types:
 
 > data O 
 > data C
 
-Hoopl defines the |Block| type to represent blocks:
-
-> data Block n e x = {-"\dots"-}
-
-The parameters |e| and |x| (``entry'' and ``exit'') describe the shape
-of the block and must be |O| or |C|. The |n| (for ``node'') parameter
-specifies the contents of the each block and will be the type of the
-AST used by the client program. |Block| defines a number of
-constructors but they do not relate to our presentation and we ignore
-them. In practice, they are rarely used.
-
-The |O| and |C| types, with the |e| and |x| parameters, constrain the
-edges between blocks. An |O C| block allows one predecessor block but
-many successors (i.e., control-flow branches on exit). An |O O| block
-permits exactly one predecessor and one successor (i.e., control-flow
-falls through on exit). |C O| blocks allow many predecessors but only
-a single successor (i.e., the block can be the target of many
-jumps). Table \ref{hoopl_tbl1} summarizes the meaning of the different
-block shapes.
+Hoopl uses the |O| and |C| types to constrain the edges between blocks
+in the CFG. As open and closed describe both the entry and exit point
+of the block, we write them as |O O| (``open/open''), |O C|
+(``open/closed''), etc., where the first describes the block's entry
+shape and the latter its exit shape. An |O C| block allows one
+predecessor block but many successors (i.e., control-flow branches on
+exit). An |O O| block permits exactly one predecessor and one
+successor (i.e., control-flow falls through on exit). Table
+\ref{hoopl_tbl1} summarizes the meaning of the different block shapes.
 
 \begin{myfig}[tb]
   \begin{tabular}{cccr}
     Shape & Predecessors & Successors & Example Statement \\\midrule
-    \texttt{O C} & One & Many & Conditionals, jumps. \\
-    \texttt{C O} & Many & One & Function entry points, branch labels. \\
-    \texttt{O O} & One & One & Assignments, statements. \\
-    \texttt{C C} & Many & Many & Function bodies. \\
+    |O C| & One & Many & Conditionals, jumps. \\
+    |C O| & Many & One & Function entry points, branch labels. \\
+    |O O| & One & One & Assignments, statements. \\
+    |C C| & Many & Many & Function bodies. \\
   \end{tabular}
   \caption{This table shows the four entry and exit shapes that Hoopl
     defines for blocks. It also shows the number of predecessors and
@@ -179,27 +156,69 @@ block shapes.
   \label{hoopl_tbl1}
 \end{myfig}
 
-Hoopl's forms blocks into graphs using the |Graph'| type. |Graph'|
-allows the block type to vary, but in practice the alias |Graph| works
-well. |Graph'| exports several constructors but we rarely use them and
-omit them here:
+Using |O| and |C|, we can define an AST for our subset of C as 
+follows:
 
-> type Graph = Graph' Block
+%let includeAst = True
+%include DeadCodeC.lhs
+%let includeAst = False
+
+%% Introduce types necessary to construct graphs; use of O and C
+%% types in graphs.
+
+Hoopl represents blocks with the |Block| type and graphs with the
+|Graph'| type. |Graph'| is parameterized by block type; however, Hoopl
+also provides an alias, |Graph|, which specifies |Block| and that
+works well in practice:\footnote{|Block| and |Graph'| define a number
+  of constructors but they do not relate to our presentation and so we
+  elide them.}
+
+> data Block n e x = {-"\dots"-}
 > data Graph' block n e x {-"\dots"-}
+> type Graph = Graph' Block
 
-Client programs construct graphs from blocks using functions from
-the class |GraphRep|. The class parameterizes
-each method by the shape of blocks it accepts and the shape of
-the graph produced:
+The parameters |e| and |x| (``entry'' and ``exit'') describe the shape
+of the block (or graph) and must be |O| or |C|. The |n| (for ``node'')
+parameter specifies the contents of each block (or graph) and will be
+the type of the AST used by the client program.
 
-> class GraphRep g where
->   mkFirst  :: n C O -> g n C O
->   mkMiddle :: n O O -> g n O O
->   mkLast   :: n O C -> g n O C
+%% 
 
-While |GraphRep| allows the client to implement their
-own graph representation, but we do not use that here. Instead, we use
-Hoopl's instances defined for |Graph|. |mkFirst| creates an 
+Client programs construct graphs using methods specified by the
+|GraphRep| class. While |GraphRep| allows the client to implement
+their own graph representation, but we do not use that here. Instead,
+we use Hoopl's instances defined for |Graph| and give those signatures
+instead of the more general method definitions:
+
+>   mkFirst  :: n C O -> Graph n C O
+>   mkMiddle :: n O O -> Graph n O O
+>   mkLast   :: n O C -> Graph n O C
+>   (<*>)    :: NonLocal n => Graph n e O -> Graph n O x -> Graph n e x
+
+|mkFirst|, |mkMiddle| and |mkLast| all turn a single block into a
+graph of one node with the same shape.  Notice that the
+resulting |Graph| has the same shape as the argument.
+
+The graph concatenation operator, |(<*>)|, connects graphs
+together. Ignoring the |NonLocal| constraint for the time being, its
+signature specifies that the predecessor graph must be open on exit
+and the successor must be open on entry. The resulting graph's shape
+will depend on the two arguments: |O C|, |C O|, |C C|, or |O O|. This
+method concatenates graphs such that control-flow falls through
+each. |e C| predecessors and |C x| successors do not fall through: the
+former branches to multiple successors, while the latter may have
+multiple predecessors. In both cases, the type of |(<*>)| prevents
+such graphs.
+
+
+
+The |n| parameter on each method in |GraphRep| represents the AST of
+the language that the client program targets. Notice that the
+statement must be parameterized with the correct |O| and |C|
+type. 
+
+
+|mkFirst| creates an 
 entry point in the graph; |mkMiddle| concatenates blocks together such
 that control-flow falls through each; |mkLast| creates a branching
 block. 
@@ -210,6 +229,8 @@ the successor of another block. A closed block cannot be the target of
 a jump, but it can jump to one of many blocks; for example, a |switch|
 statement in C can be represented as a closed block that could branch
 to any of the case labels.
+
+
 
 \subsection*{Blocks and the Client AST}
 
