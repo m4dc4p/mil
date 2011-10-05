@@ -40,10 +40,7 @@
 \setlength{\bibitemsep}{\bigskipamount}
 \addbibresource{thesis.bib}
 \usepackage{microtype}
-%%\usepackage{natbib}
-%%\bibliographystyle{plainnat}
-%% \usepackage{listings}
-%% \lstset{escapeinside=!!}
+\usepackage{marginnote}
 
 \usepackage{tikz}
 \usetikzlibrary{arrows,automata,positioning,calc}
@@ -280,4 +277,4 @@
 \newcommand\mfun[1]{\ensuremath{\mathit{#1}}}
 
 %% Marginal notes
-\newcommand\margin[2]{#1}
+\newcommand\margin[2]{#1\marginnote{#2}}

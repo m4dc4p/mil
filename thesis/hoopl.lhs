@@ -119,31 +119,81 @@ optimization.
 
 \subsection*{Control-Flow Graphs}
 
-Hoopl defines CFGs in terms of \emph{successors} and
-\emph{predecessors}. Additionally, Hoopl parameterizes blocks as
-\emph{open} or \emph{closed} on entry and exit. Roughly, ``open''
-means control-flow enters the block. ``Closed'' means control-flow
-branches from the block. As open and closed apply to both entry and
-exit, we write them as ``open/open'', ``open/closed'',
-``closed/open,'' and ``closed/closed.''
+Hoopl defines CFGs in terms of basic blocks. The library parameterizes
+blocks by \emph{content} and \emph{shape}. Content means statements or
+expressions from the client's AST. Shape can be either \emph{open} or
+\emph{closed} and applies to both the entry and exit of the block. 
+Roughly, ``open'' allows control-flow to fall through the block; ``closed''
+means control-flow branches from the block. 
+
+Hoopl provides types representing open and closed, |O| and
+|C|. Neither needs constructors as we only use them to parameterize
+later types. As open and closed apply to both entry and exit, we write
+them as |O O| (``open/open''), |O C| (``open/closed''), etc., where the
+first describes the block's entry shape and the latter its exit shape.
+
+> data O 
+> data C
+
+Hoopl defines the |Block| type to represent blocks:
+
+> data Block n e x = {-"\dots"-}
+
+The parameters |e| and |x| (``entry'' and ``exit'') describe the shape
+of the block and must be |O| or |C|. The |n| (for ``node'') parameter
+specifies the contents of the each block and will be the type of the
+AST used by the client program. |Block| defines a number of
+constructors but they do not relate to our presentation and we ignore
+them. In practice, they are rarely used.
+
+The |O| and |C| types, with the |e| and |x| parameters, constrain the
+edges between blocks. An |O C| block allows one predecessor block but
+many successors (i.e., control-flow branches on exit). An |O O| block
+permits exactly one predecessor and one successor (i.e., control-flow
+falls through on exit). |C O| blocks allow many predecessors but only
+a single successor (i.e., the block can be the target of many
+jumps). Table \ref{hoopl_tbl1} summarizes the meaning of the different
+block shapes.
+
+\begin{myfig}[tb]
+  \begin{tabular}{cccr}
+    Shape & Predecessors & Successors & Example Statement \\\midrule
+    \texttt{O C} & One & Many & Conditionals, jumps. \\
+    \texttt{C O} & Many & One & Function entry points, branch labels. \\
+    \texttt{O O} & One & One & Assignments, statements. \\
+    \texttt{C C} & Many & Many & Function bodies. \\
+  \end{tabular}
+  \caption{This table shows the four entry and exit shapes that Hoopl
+    defines for blocks. It also shows the number of predecessors and
+    successors allowed by each shape, as well as example
+    statements.}
+  \label{hoopl_tbl1}
+\end{myfig}
+
+Hoopl's forms blocks into graphs using the |Graph'| type. |Graph'|
+allows the block type to vary, but in practice the alias |Graph| works
+well. |Graph'| exports several constructors but we rarely use them and
+omit them here:
 
 > type Graph = Graph' Block
-> data Block n e x where
->   {-"\ellipsis"-}
->
-> data Graph' block n e x where
->   GNil  :: Graph' block n O O
->   GUnit :: block n O O -> Graph' block n O O
->   GMany :: MaybeO e (block n O C) 
->         -> LabelMap (block n C C)
->         -> MaybeO x (block n C O)
->         -> Graph' block n e x
+> data Graph' block n e x {-"\dots"-}
 
-An ``open/open'' block can be
-the successor of another block (i.e., it can be the target of a jump
-or normal straight-line execution).  There may not be any predecessor,
-of course. However, the same block must be the predecessor of another
-block.
+Client programs construct graphs from blocks using functions from
+the class |GraphRep|. The class parameterizes
+each method by the shape of blocks it accepts and the shape of
+the graph produced:
+
+> class GraphRep g where
+>   mkFirst  :: n C O -> g n C O
+>   mkMiddle :: n O O -> g n O O
+>   mkLast   :: n O C -> g n O C
+
+While |GraphRep| allows the client to implement their
+own graph representation, but we do not use that here. Instead, we use
+Hoopl's instances defined for |Graph|. |mkFirst| creates an 
+entry point in the graph; |mkMiddle| concatenates blocks together such
+that control-flow falls through each; |mkLast| creates a branching
+block. 
 
 A closed on entry
 block block can be the target of a jump; i.e., an open block can be
@@ -151,6 +201,8 @@ the successor of another block. A closed block cannot be the target of
 a jump, but it can jump to one of many blocks; for example, a |switch|
 statement in C can be represented as a closed block that could branch
 to any of the case labels.
+
+\subsection*{Blocks and the Client AST}
 
 \subsection*{Facts and Lattices}
 
