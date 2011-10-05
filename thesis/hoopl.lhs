@@ -49,29 +49,38 @@ varies according to programming language, hardware, and user intent,
 but in all cases it implies that the semantics of the program do not
 change.
 
-Considering Figure \ref{hoopl_fig1}, we can see several
-useless statements: the assignment to \texttt{a} on Line
-\ref{hoopl_lst1_assign}, the test on Line \ref{hoopl_lst1_test}, and
-the ``true'' branch on Line \ref{hoopl_lst1_test_true}. Any and all of
-these can be removed without changing the meaning of the program ---
-it will still print ``\texttt{3}'', but may run a little bit faster
-and use less memory. 
+Figure \ref{hoopl_fig1} defines a function in C. The assignments to
+|a| on Lines \ref{hoopl_lst1_assign_a} and \ref{hoopl_lst1_add} do
+not affect the behavior of the function and can be safely
+eliminated. We will develop a client program that can 
+analyze this function and transform it as described.
+
 
 \begin{myfig}
-\begin{minipage}[b]{2in}
-\begin{AVerb}[numbers=left]
-int a = 1, c; \label{hoopl_lst1_assign}
-
-if(1 > 2) \label{hoopl_lst1_test}
-  c = 4; \label{hoopl_lst1_test_true}
-else     
-  c = 3; \label{hoopl_lst1_test_false}
-
-print(c); \label{hoopl_lst1_print}
-\end{AVerb}
-\end{minipage}
-\caption{A C-language fragment that will be used to demonstrate
-  \emph{dead-code elimination}.}
+\begin{tabular}{cc}
+  \begin{minipage}[b]{2in}
+    \begin{AVerb}[numbers=left]
+void f() {
+  int c = 4; \label{hoopl_lst1_assign_c}
+  int a = c + 1;  \label{hoopl_lst1_assign_a}
+  print(c); \label{hoopl_lst1_print}
+  a = c + 1; \label{hoopl_lst1_add};
+}
+    \end{AVerb}
+  \end{minipage} & 
+  \begin{minipage}[b]{2in}
+    \begin{AVerb}[numbers=left]
+void f() {
+  int c = 4; \label{hoopl_lst2_assign_c}
+  print(c); \label{hoopl_lst2_print}
+}
+    \end{AVerb}
+  \end{minipage} \\
+  \scap{hoopl_fig1_a} & \scap{hoopl_fig1_b} 
+\end{tabular}
+\caption{Part \subref{hoopl_fig1_a} defines function defined in
+  C. Part \subref{hoopl_fig1_b} shows the program after perfomring
+  dead-code elimination.}
 \label{hoopl_fig1}
 \end{myfig}
 
