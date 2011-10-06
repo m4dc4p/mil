@@ -14,16 +14,16 @@
 >   Call :: Var -> [CExpr] -> CStmt O O
 >   Return :: CStmt O C
 >   Entry :: Label -> CStmt C O
-%endif
-
-%if False
+>
 > data CExpr = Const Int 
 >   | Add CExpr CExpr 
 >   | Var Var 
 >   | String String
-
+>
 > type Var = String
+%endif
 
+%if False
 > foo l = mkFirst (Entry l) <*> 
 >       mkMiddle (Assign "c" (Const 4)) <*>
 >       mkMiddle (Assign "a" (Add (Var "c") (Const 1))) <*>

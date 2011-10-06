@@ -1,0 +1,31 @@
+\begin{minipage}{2in}
+  \begin{tikzpicture}[>=stealth, node distance=.5in]
+    \node[entex] (entry) {\entryN};
+
+    \node[stmt,
+      below of=entry] (assignc) {#c = 4#\labelNode{hoopl_lst3_assignc}};
+    \node[labelfor=assignc] () {\refNode{hoopl_lst3_assignc}};
+
+    \node[stmt,
+      below of=assignc] (assigna1) {#a = c + 1#\labelNode{hoopl_lst3_assigna1}};
+    \node[labelfor=assigna1] () {\refNode{hoopl_lst3_assigna1}};
+
+    \node[stmt,
+      below of=assigna1] (print) {#printf("\%d",c)#\labelNode{hoopl_lst3_print}};
+    \node[labelfor=print] () {\refNode{hoopl_lst3_print}};
+
+    \node[stmt,
+      below of=print] (assigna2) {#a = c + 1#\labelNode{hoopl_lst3_assigna2}};
+    \node[labelfor=assigna2] () {\refNode{hoopl_lst3_assigna2}};
+
+    \node[entex,
+      below of=assigna2] (exit) {\exitN};
+
+    \draw [->>] (entry) to (assignc);
+    \draw [->] (assignc) to (assigna1);
+    \draw [->] (assigna1) to (print);
+    \draw [->] (print) to (assigna2);
+    \draw [->] (assigna2) to (exit);
+  \end{tikzpicture}
+\end{minipage}
+

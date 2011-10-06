@@ -11,7 +11,7 @@
 The Hoopl library \citep{Hoopl-3.8.7.0}, written in Haskell, provides
 a framework for implementing dataflow-based program analyses and
 transformations (which we refer to together as ``optimizations''). The
-library does not target a particular langauge or provide any built-in
+library does not target a particular language or provide any built-in
 optimizations; rather, Hoopl enables the user to implement their own
 optimizations for their own language. A thorough description of the
 library's implementation can be found in the authors' paper
@@ -61,13 +61,13 @@ variable will definitely not.
 \label{hoopl_fig1}
 \end{myfig}
 
-\emph{Dead-code elimination} refers to the process described above:
-determing variable ``liveness'' and removing statements only using dead
-variables. Our running example will implement a client program that
-performs dead-code elimination for enough of the C language to apply
-it to Figure \ref{hoopl_fig1_a}. Our example will be able to
-analyze and rewrite #foo# into the form show in Figure
-\ref{hoopl_fig1_b}.
+\emph{Dead-code elimination} refers to the optimization that
+determines variable ``liveness'' and removes dead statements
+(i.e., those only using dead variables. Our running example will
+implement a client program that performs dead-code elimination for
+enough of the C language to apply it to Figure \ref{hoopl_fig1_a}. Our
+example will be able to analyze and rewrite #foo# into the form show
+in Figure \ref{hoopl_fig1_b}.
 
 %% Provides signposts for chapter.
 
@@ -88,7 +88,7 @@ and brief discussion of our experience with Hoopl in Section
 
 In order to implement dataflow analysis generically, Hoopl defines
 several core data structures which client programs must use. These
-include: the representation of CFGs, the type of transfer and rewrite
+include the representation of CFGs, the type of transfer and rewrite
 functions, and the represention of the meet operator. Hoopl controls
 the CFG representation so it can traverse, rewrite, and propagate
 facts around the CFG. Hoopl specifies the type of the transfer and
@@ -102,7 +102,7 @@ Hoopl requires that client programs specify those items related to
 their specific optimization: the abstract syntax tree (AST) of the
 language, the representation of facts, and the implementation of the
 transfer and rewrite functions. Each node in the CFG typically
-contains an expression or statement from the client programs
+contains an expression or statement from the client program's
 AST. While Hoopl controls the edges between nodes in the CFG, it does
 not specify the contents of those nodes. Similarly, while Hoopl
 determines when the analysis reaches a fixpoint, it requires that the
@@ -156,12 +156,49 @@ successor (i.e., control-flow falls through on exit). Table
   \label{hoopl_tbl1}
 \end{myfig}
 
-Using |O| and |C|, we can define an AST for our subset of C as 
-follows:
+Figure~\ref{hoopl_fig3} gives Haskell declarations that can represent
+the AST of #foo#. We use the GHC Haskell compiler's GADT syntax
+\citep{GadtRef} to succinctly specify the actual type of the |e|
+(``entry'') and |x| (``exit'') type parameters for each
+constructor. The entry and exit type (i.e., either |O| or |C|)
+given for each constructor reflects the control-flow of the
+represented statement. The |CExpr| and |Var| types do not affect
+control flow in our subset, so we do not annotate them like |CStmt|.
 
+\begin{myfig}
 %let includeAst = True
 %include DeadCodeC.lhs
 %let includeAst = False
+\caption{Haskell datatypes for representing the AST of the 
+  subset of C our example client will handle.}
+\label{hoopl_fig3}
+\end{myfig}
+
+For example, the |Return| constructor creates a value with the type
+|CStmt O C| --- an ``open/closed'' statement. A statement with a
+``closed'' exit type does not allow control-flow to fall through,
+which reflects the behavior of the #return# statement. The |Assign|
+constructor's type, |CStmt O O|, indicates that control-flow
+\emph{can} fall through, again reflecting the behavior of the
+assignment statement.
+
+Figure \ref{hoopl_fig2} shows #foo# as a CFG. Part
+\subref{hoopl_fig2_a} shows the program with C syntax, as presented in
+Figure \ref{hoopl_fig1_a}. Part \subref{hoopl_fig2_b} uses the AST
+just given. Notice we use the |Entry| and |Return| constructors to replace the |E|
+and |X| blocks from Part \ref{hoopl_fig1_a}.
+
+\begin{myfig}
+  \begin{tabular}{cc}
+    \input{hoopl_lst3} &  \input{hoopl_lst4} \\
+    \scap{hoopl_fig2_a} & \scap{hoopl_fig2_b}
+  \end{tabular}
+  \caption{Our example function as a control-flow graph. Part
+    \ref{hoopl_fig1_a} uses C syntax for each statement. Part \ref{hoopl_fig1_b}
+  uses the AST given in Figure~\ref{hoopl_fig3}.}
+  \label{hoopl_fig2}
+\end{myfig}
+
 
 %% Introduce types necessary to construct graphs; use of O and C
 %% types in graphs.
@@ -174,7 +211,7 @@ works well in practice:\footnote{|Block| and |Graph'| define a number
   elide them.}
 
 > data Block n e x = {-"\dots"-}
-> data Graph' block n e x {-"\dots"-}
+> data Graph' block n e x = {-"\dots"-}
 > type Graph = Graph' Block
 
 The parameters |e| and |x| (``entry'' and ``exit'') describe the shape
