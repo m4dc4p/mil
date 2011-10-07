@@ -1,14 +1,15 @@
 %if False
+
 > {-# LANGUAGE GADTs #-}
 > 
 > module DeadCodeC 
-
 > where
-
 > import Compiler.Hoopl
+
 %endif
 
 %if includeAst
+
 > data CStmt e x where
 >   Assign :: Var -> CExpr -> CStmt O O
 >   Call :: Var -> [CExpr] -> CStmt O O
@@ -21,9 +22,12 @@
 >   | String String
 >
 > type Var = String
+
 %endif
 
-%if False
+%if buildFoo
+
+> foo :: Label -> Graph CStmt C C
 > foo l = mkFirst (Entry l) <*> 
 >       mkMiddle (Assign "c" (Const 4)) <*>
 >       mkMiddle (Assign "a" (Add (Var "c") (Const 1))) <*>
@@ -31,10 +35,19 @@
 >       mkMiddle (Assign "a" (Add (Var "c") (Const 1))) <*>
 >       mkLast Return
 
+%endif
+
+%if nonLocalInst
+
 > instance NonLocal CStmt where
 >   entryLabel (Entry l) = l
 >   successors _ = []
 
+%endif
+
+%if False
+
 > deadCode :: Graph CStmt C C -> Graph CStmt C C
 > deadCode = undefined
+
 %endif

@@ -41,7 +41,7 @@ that transforms the CFG.
 
 We will illustrate Hoopl concepts through a running example motivated
 by the C function, #foo#, defined in Figure \ref{hoopl_fig1_a}. The
-assignments on Lines \ref{hoopl_lst1_assign_a} and
+zassignments on Lines \ref{hoopl_lst1_assign_a} and
 \ref{hoopl_lst1_add} do not affect the output, or observable behavior,
 of #foo#. Eliminating them will not change the program's meaning and
 may improve its performance. However, we could not eliminate the
@@ -157,13 +157,14 @@ successor (i.e., control-flow falls through on exit). Table
 \end{myfig}
 
 Figure~\ref{hoopl_fig3} gives Haskell declarations that can represent
-the AST of #foo#. We use the GHC Haskell compiler's GADT syntax
+the AST for #foo#. We use the GHC Haskell compiler's GADT syntax
 \citep{GadtRef} to succinctly specify the actual type of the |e|
 (``entry'') and |x| (``exit'') type parameters for each
-constructor. The entry and exit type (i.e., either |O| or |C|)
-given for each constructor reflects the control-flow of the
-represented statement. The |CExpr| and |Var| types do not affect
-control flow in our subset, so we do not annotate them like |CStmt|.
+constructor. The entry and exit type (i.e., either |O| or |C|) given
+for each constructor reflects the control-flow of the represented
+statement. The |CExpr| and |Var| types do not affect control flow in
+our subset, so we do not annotate them like |CStmt|. Hoopl defines the
+|Label| type and uses it to connect basic blocks together.
 
 \begin{myfig}
 %let includeAst = True
@@ -182,11 +183,12 @@ constructor's type, |CStmt O O|, indicates that control-flow
 \emph{can} fall through, again reflecting the behavior of the
 assignment statement.
 
+%% Make connection between CFG and open/closed types on 
+%% AST.
 Figure \ref{hoopl_fig2} shows #foo# as a CFG. Part
 \subref{hoopl_fig2_a} shows the program with C syntax, as presented in
 Figure \ref{hoopl_fig1_a}. Part \subref{hoopl_fig2_b} uses the AST
-just given. Notice we use the |Entry| and |Return| constructors to replace the |E|
-and |X| blocks from Part \ref{hoopl_fig1_a}.
+just given. 
 
 \begin{myfig}
   \begin{tabular}{cc}
@@ -199,16 +201,28 @@ and |X| blocks from Part \ref{hoopl_fig1_a}.
   \label{hoopl_fig2}
 \end{myfig}
 
+Each block in Part \subref{hoopl_fig2_b} shows the type associated
+that statement. The type for Block \refNode{hoopl_lst4_assignc}
+(\verb_c = 4_,'') , |CStmt O O|, shows that control-flow falls
+through the statement. However, the type on
+\refNode{hoopl_lst4_start}, |CStmt C O|, shows that the function's
+entry point allows many predecessors --- that is, the function can be
+called from multiple locations. The type |CStmt O C| on
+\refNode{hoopl_lst4_return} shows the opposite --- the function can
+have many successors (i.e., since it can be called from many
+locations, it can return to those same locations) but control-flow can
+only exit the function from only location -- namely, that preceding
+the implicit return.
 
 %% Introduce types necessary to construct graphs; use of O and C
 %% types in graphs.
 
-Hoopl represents blocks with the |Block| type and graphs with the
-|Graph'| type. |Graph'| is parameterized by block type; however, Hoopl
-also provides an alias, |Graph|, which specifies |Block| and that
-works well in practice:\footnote{|Block| and |Graph'| define a number
-  of constructors but they do not relate to our presentation and so we
-  elide them.}
+Hoopl builds CFGs like that in Figure~\ref{hoopl_fig2b} using the
+|Block| and |Graph'| types. |Graph'| is parameterized by block type;
+however, Hoopl also provides an alias, |type Graph = Graph' Block|,
+which suffices for our needs:\footnote{|Block| and |Graph'| define a
+  number of constructors but they do not relate to our presentation
+  and so we elide them.}
 
 > data Block n e x = {-"\dots"-}
 > data Graph' block n e x = {-"\dots"-}
@@ -219,57 +233,89 @@ of the block (or graph) and must be |O| or |C|. The |n| (for ``node'')
 parameter specifies the contents of each block (or graph) and will be
 the type of the AST used by the client program.
 
-%% 
+%% Describe how to build CFGs with Hoopl
 
 Client programs construct graphs using methods specified by the
-|GraphRep| class. While |GraphRep| allows the client to implement
-their own graph representation, but we do not use that here. Instead,
-we use Hoopl's instances defined for |Graph| and give those signatures
-instead of the more general method definitions:
+|GraphRep| class, shown in Figure~\ref{hoopl_fig4}. |GraphRep| allows
+the client to implement their own graph representation, but we do not
+use that here. Instead, we use Hoopl's instances defined for |Graph|
+and give those signatures instead of the more general method
+definitions.\footnote{These instances show why we let Hoopl create
+  |Block| and |Graph'| values. The |Graph| alias expands to |Graph'
+  Block|; Hoopl provides a |GraphRep| instance for the |Graph| type
+  that constructs the actual |Graph'| and |Block| values.}
 
+\begin{myfig}
+> class GraphRep where
 >   mkFirst  :: n C O -> Graph n C O
 >   mkMiddle :: n O O -> Graph n O O
 >   mkLast   :: n O C -> Graph n O C
 >   (<*>)    :: NonLocal n => Graph n e O -> Graph n O x -> Graph n e x
+>   (|*><*|) :: NonLocal n => Graph n e C -> Graph n C x -> Graph n e x
+> {-"\dots"-}
+\caption{Methods defined on Hoopl's |GraphRep| class. The signatures shown
+reflect the |Graph| instance provided by Hoopl.}
+\label{hoopl_fig4}
+\end{myfig}
 
-|mkFirst|, |mkMiddle| and |mkLast| all turn a single block into a
-graph of one node with the same shape.  Notice that the
-resulting |Graph| has the same shape as the argument.
+|mkFirst|, |mkMiddle| and |mkLast| all turn a single block
+(represented by the type parameter |n|) into a graph of one block with
+the same shape. The |(<*>)| operator, said ``concat'' , concatenates
+compatible graphs. By compatible, we mean the shapes of each argument
+must fit together. Ignoring the |NonLocal| constraint for the time
+being, the |(<*>)| operator's signature specifies that the first
+argument must be open on exit and the second must be open on
+entry. The resulting graph's shape combines the exit shape of the
+predecessor with the entry shape of the successor. For example,
+arguments with type |CStmt C O| and |CStmt O O| will have a result
+with type |CStmt C O|. On the hand, the types |CStmt O O| and |CStmt O
+C| will result in |CStmt O C|. Necessarily, in the resulting graph the
+first argument will be a predecessor to the second.
 
-The graph concatenation operator, |(<*>)|, connects graphs
-together. Ignoring the |NonLocal| constraint for the time being, its
-signature specifies that the predecessor graph must be open on exit
-and the successor must be open on entry. The resulting graph's shape
-will depend on the two arguments: |O C|, |C O|, |C C|, or |O O|. This
-method concatenates graphs such that control-flow falls through
+|(<*>)| concatenates graphs such that control-flow falls through
 each. |e C| predecessors and |C x| successors do not fall through: the
 former branches to multiple successors, while the latter may have
 multiple predecessors. In both cases, the type of |(<*>)| prevents
-such graphs.
+such graphs. In other words, |(<*>)| creates basic blocks. 
 
+Returning to our example, we can construct the CFG in
+Figure~\ref{hoopl_fig2_b} using the following code:
 
+%let buildFoo = True
+%include DeadCodeC.lhs
+%let buildFoo = False
 
-The |n| parameter on each method in |GraphRep| represents the AST of
-the language that the client program targets. Notice that the
-statement must be parameterized with the correct |O| and |C|
-type. 
+The |l| parameter defines the entry point for this block and will be
+supplied externally. Each individual statement turns into a graph
+through |mkFirst|, |mkMiddle| and |mkLast|. Then, |(<*>)| concatenates
+those graphs together, forming one large graph with type |CStmt C
+C|. This construction exactly represents the CFG in
+Figure~\ref{hoopl_fig2_b}.
 
+Hoopl connects composes disparate basic blocks into larger graphs
+using the |(|*><*|)| operator.\footnote{Sorry, I don't know how to
+  pronounce this one.} This operator does not imply any 
+control-flow between its arguments, unlike |(<*>)|. Instead, the |NonLocal|
+class defines control-flow between blocks with its two members, |entryLabel| and
+|successors|:
 
-|mkFirst| creates an 
-entry point in the graph; |mkMiddle| concatenates blocks together such
-that control-flow falls through each; |mkLast| creates a branching
-block. 
+> class NonLocal n where 
+>   entryLabel :: n C x -> Label 
+>   successors :: n e C -> [Label]
 
-A closed on entry
-block block can be the target of a jump; i.e., an open block can be
-the successor of another block. A closed block cannot be the target of
-a jump, but it can jump to one of many blocks; for example, a |switch|
-statement in C can be represented as a closed block that could branch
-to any of the case labels.
+Hoopl uses these methods to determine how basic blocks connect. The |NonLocal|
+constraint on |(<*>)| and |(|*><*|)| is required so that Hoopl can traverse
+the CFG built by the client program.
 
+The |NonLocal| instance for |CStmt| is then:
 
+%let nonLocalInst = True
+%include DeadCodeC.lhs
+%let nonLocalInst = False
 
-\subsection*{Blocks and the Client AST}
+If our AST supported any sort of branching (such as #if# statements),
+then |successors| would be more intersting.
+
 
 \subsection*{Facts and Lattices}
 
