@@ -40,7 +40,6 @@
 \setlength{\bibitemsep}{\bigskipamount}
 \addbibresource{thesis.bib}
 \usepackage{microtype}
-\usepackage{marginnote}
 
 \usepackage{tikz}
 \usetikzlibrary{arrows,automata,positioning,calc}
@@ -277,4 +276,7 @@
 \newcommand\mfun[1]{\ensuremath{\mathit{#1}}}
 
 %% Marginal notes
-\newcommand\margin[2]{#1\marginnote{#2}}
+\newcommand\margin[2]{#1\begin{singlespace}\emph{\footnotesize\marginpar{Intent: #2}}\end{singlespace}}
+
+%% Describe intent of a passage
+\newcommand\intent[1]{\begin{singlespace}\emph{\footnotesize{#1}}\end{singlespace}}

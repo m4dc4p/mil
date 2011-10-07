@@ -69,7 +69,10 @@ derives, in Section~\ref{mil_sec2}.  MIL syntax and examples follow in
 Section~\ref{mil_sec3}. Section~\ref{mil_sec4} shows our compiler for
 translating \lamC to MIL. We sketch how MIL programs can be evaluated
 in Section~\ref{mil_sec5}, using the same structural operational
-semantics (SOS) style as in Chapter~\ref{ref_chapter_languages}.
+semantics (SOS) style as in
+Chapter~\ref{ref_chapter_languages}. Section \ref{mil_sec7} shows
+how Hoopl influenced the implementation the MIL language from Chapter
+\ref{ref_chapter_mil} and discusses the design choices we made.
 
 %% Examples of intermediate forms: SSA, RTL, a-normal, bytecode
 
@@ -548,6 +551,11 @@ implemented in MIL, however.
 
 %% \section{Intermediate Languages, MIL, and Three-Address Code}
 
+
+\section{MIL and Hoopl}
+\label{mil_sec7}
+
+\subsection{MIL Statements, Tails, \& Shapes}
 
 \section{Summary}
 \label{mil_sec6}

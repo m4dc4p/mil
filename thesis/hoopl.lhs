@@ -18,7 +18,7 @@ library's implementation can be found in the authors' paper
 \citep{Ramsey2010}; here, we discuss the abstractions they provide and
 how to use Hoopl when implementing dataflow-based optimizations.
 
-%% Broad description of how Hoopl abstracts the dataflow algorithm
+\intent{Broad description of how Hoopl abstracts the dataflow algorithm}
 
 Hoopl implements the generic portions of the dataflow algorithm:
 iterative analysis, traversing the control-flow graph (CFG), and combining
@@ -37,7 +37,7 @@ that transforms the CFG.
 %% interleaved analysis and rewriting technique described in
 %% \cite{Lerner2002}.
 
-%% Introduce example
+\intent{Introduce example}
 
 We will illustrate Hoopl concepts through a running example motivated
 by the C function, #foo#, defined in Figure \ref{hoopl_fig1_a}. The
@@ -69,22 +69,20 @@ enough of the C language to apply it to Figure \ref{hoopl_fig1_a}. Our
 example will be able to analyze and rewrite #foo# into the form show
 in Figure \ref{hoopl_fig1_b}.
 
-%% Provides signposts for chapter.
+\intent{Provides signposts for chapter.}
 
 In Section \ref{hoopl_sec1}, we describe Hoopl's abstractions, showing
 the Haskell types, data structures, and function signatures provided
 by the library. Throughout, we develop our client program to implement
 dead-code elimination and show how it optimizes the program in Figure
-\ref{hoopl_fig1_a}. Section \ref{hoopl_sec2} shows how Hoopl influenced
-the implementation the MIL language from Chapter \ref{ref_chapter_mil}
-and discusses the design choices we made. We conclude with a summary
+\ref{hoopl_fig1_a}. We conclude with a summary
 and brief discussion of our experience with Hoopl in Section
 \ref{hoopl_sec3}.
 
 \section{Hoopl's Representation of the Dataflow Algorithm}
 \label{hoopl_sec1}
 
-%% Hoopl parameters: Hoopl-defined structures
+\intent{Hoopl parameters: Hoopl-defined structures}
 
 In order to implement dataflow analysis generically, Hoopl defines
 several core data structures which client programs must use. These
@@ -96,7 +94,7 @@ rewrite function such that they produce useable information (and
 rewrites). Finally, Hoopl specifies the meet operator (but not its
 implementation) so that the library can find fixpoints.
 
-%% Hoopl parameters: User-defined structures
+\intent{Hoopl parameters: User-defined structures}
 
 Hoopl requires that client programs specify those items related to
 their specific optimization: the abstract syntax tree (AST) of the
@@ -113,7 +111,7 @@ optimization.
 
 \subsection*{Control-Flow Graphs}
 
-%% Introduce parameterization of blocks by AST and shape.
+\intent{Introduce parameterization of blocks by AST and shape.}
 
 Hoopl defines CFGs in terms of basic blocks, parameterized by
 \emph{content} and \emph{shape}. Content means statements or
@@ -122,7 +120,7 @@ expressions from the client's AST. Shape can be either \emph{open} or
 Roughly, ``open'' allows control-flow to fall through the block;
 ``closed'' means control-flow branches from the block.
 
-%% Introduce meaning and definition of O and C types.
+\intent{Introduce meaning and definition of O and C types.}
 
 Hoopl provides types named |O| and |C|, representing open and
 closed. Neither needs constructors as we only use them to parameterize
@@ -156,6 +154,8 @@ successor (i.e., control-flow falls through on exit). Table
   \label{hoopl_tbl1}
 \end{myfig}
 
+\intent{Show example with O and C types applied.}
+
 Figure~\ref{hoopl_fig3} gives Haskell declarations that can represent
 the AST for #foo#. We use the GHC Haskell compiler's GADT syntax
 \citep{GadtRef} to succinctly specify the actual type of the |e|
@@ -183,8 +183,8 @@ constructor's type, |CStmt O O|, indicates that control-flow
 \emph{can} fall through, again reflecting the behavior of the
 assignment statement.
 
-%% Make connection between CFG and open/closed types on 
-%% AST.
+\intent{Make connection between CFG and open/closed types on 
+AST.}
 Figure \ref{hoopl_fig2} shows #foo# as a CFG. Part
 \subref{hoopl_fig2_a} shows the program with C syntax, as presented in
 Figure \ref{hoopl_fig1_a}. Part \subref{hoopl_fig2_b} uses the AST
@@ -214,8 +214,8 @@ locations, it can return to those same locations) but control-flow can
 only exit the function from only location -- namely, that preceding
 the implicit return.
 
-%% Introduce types necessary to construct graphs; use of O and C
-%% types in graphs.
+\intent{Introduce graphs; use of O and C
+types in graphs.} 
 
 Hoopl builds CFGs like that in Figure~\ref{hoopl_fig2b} using the
 |Block| and |Graph'| types. |Graph'| is parameterized by block type;
@@ -233,7 +233,7 @@ of the block (or graph) and must be |O| or |C|. The |n| (for ``node'')
 parameter specifies the contents of each block (or graph) and will be
 the type of the AST used by the client program.
 
-%% Describe how to build CFGs with Hoopl
+\intent{Describe how to build CFGs with Hoopl}
 
 Client programs construct graphs using methods specified by the
 |GraphRep| class, shown in Figure~\ref{hoopl_fig4}. |GraphRep| allows
@@ -292,7 +292,7 @@ those graphs together, forming one large graph with type |CStmt C
 C|. This construction exactly represents the CFG in
 Figure~\ref{hoopl_fig2_b}.
 
-Hoopl connects composes disparate basic blocks into larger graphs
+Hoopl connects disparate basic blocks into larger graphs
 using the |(|*><*|)| operator.\footnote{Sorry, I don't know how to
   pronounce this one.} This operator does not imply any 
 control-flow between its arguments, unlike |(<*>)|. Instead, the |NonLocal|
@@ -303,19 +303,29 @@ class defines control-flow between blocks with its two members, |entryLabel| and
 >   entryLabel :: n C x -> Label 
 >   successors :: n e C -> [Label]
 
-Hoopl uses these methods to determine how basic blocks connect. The |NonLocal|
-constraint on |(<*>)| and |(|*><*|)| is required so that Hoopl can traverse
-the CFG built by the client program.
+The |entryLabel| method returns the entry point (as a |Label|) for a
+given node, block or graph. The |C| type on the first argument (i.e.,
+|n C x|) ensures only ``closed on entry'' graphs can be given to
+|entryLabel|. |successors| gives the |Labels| that a given node, block
+or graph may branch to. Again, the |C| type on the first argument
+(i.e., |n e C|) ensures only ``closed on exit'' graphs can be given to
+|successors|. Hoopl uses these methods to determine how basic blocks
+connect. The |NonLocal| constraint on |(<*>)| and |(|*><*|)| ensures
+Hoopl can traverse the CFG built by the client program.
 
-The |NonLocal| instance for |CStmt| is then:
+Now we can give the |NonLocal| instance for |CStmt|:
 
 %let nonLocalInst = True
 %include DeadCodeC.lhs
 %let nonLocalInst = False
 
-If our AST supported any sort of branching (such as #if# statements),
-then |successors| would be more intersting.
-
+We only define |entryLabel| for the |Entry| constructor, because only
+it has type |C x|.  We do not define any cases for |successors| even
+though |Return| has type |e X|, because our AST does not represent the
+destination of a return (implicit or explicit). \margin{If our AST
+  supported branching (such as \texttt{if} statements), then
+  |successors| would be more interesting.}{Maybe the example should be
+  more complicated, to show branching?}
 
 \subsection*{Facts and Lattices}
 
@@ -324,11 +334,6 @@ then |successors| would be more intersting.
 \subsection*{Iteration \& Fixed Points}
 
 \subsection*{Interleaved Analysis \& Rewriting}
-
-\section{MIL and Hoopl}
-\label{hoopl_sec2}
-
-\subsection{MIL Statements, Tails, \& Shapes}
 
 \section{Summary}
 \label{hoopl_sec3}
