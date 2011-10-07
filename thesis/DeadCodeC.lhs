@@ -11,10 +11,10 @@
 %if includeAst
 
 > data CStmt e x where
+>   Entry :: Label -> CStmt C O
 >   Assign :: Var -> CExpr -> CStmt O O
 >   Call :: Var -> [CExpr] -> CStmt O O
 >   Return :: CStmt O C
->   Entry :: Label -> CStmt C O
 >
 > data CExpr = Const Int 
 >   | Add CExpr CExpr 

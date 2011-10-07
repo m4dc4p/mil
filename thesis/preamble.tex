@@ -25,7 +25,7 @@
 \usepackage[labelformat=simple]{subcaption}
 \makeatletter
   \def\thesubfigure{(\alph{subfigure})}
-  \providecommand\thefigsubsep{,~}
+  \providecommand\thefigsubsep{~}
   \def\p@subfigure{\@nameuse{thefigure}\thefigsubsep}
 \makeatother
 
@@ -276,7 +276,7 @@
 \newcommand\mfun[1]{\ensuremath{\mathit{#1}}}
 
 %% Marginal notes
-\newcommand\margin[2]{#1\begin{singlespace}\emph{\footnotesize\marginpar{Intent: #2}}\end{singlespace}}
+\newcommand\margin[2]{\marginpar{\begin{singlespace}\emph{\footnotesize #2}\end{singlespace}}\relax #1}
 
 %% Describe intent of a passage
-\newcommand\intent[1]{\begin{singlespace}\emph{\footnotesize{#1}}\end{singlespace}}
+\newcommand\intent[1]{{\leftskip = -1in\begin{singlespace}\emph{\noindent\footnotesize Intent: #1}\end{singlespace}}}
