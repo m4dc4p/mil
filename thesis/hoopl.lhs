@@ -293,7 +293,7 @@ C|. This construction exactly represents the CFG in
 Figure~\ref{hoopl_fig2_b}.
 
 Hoopl connects composes disparate basic blocks into larger graphs
-using the |(|*><*|)| operator.\footnote{Sorry, I don't know how to
+using the |(||*><*||)| operator.\footnote{Sorry, I don't know how to
   pronounce this one.} This operator does not imply any 
 control-flow between its arguments, unlike |(<*>)|. Instead, the |NonLocal|
 class defines control-flow between blocks with its two members, |entryLabel| and
@@ -304,7 +304,7 @@ class defines control-flow between blocks with its two members, |entryLabel| and
 >   successors :: n e C -> [Label]
 
 Hoopl uses these methods to determine how basic blocks connect. The |NonLocal|
-constraint on |(<*>)| and |(|*><*|)| is required so that Hoopl can traverse
+constraint on |(<*>)| and |(||*><*||)| is required so that Hoopl can traverse
 the CFG built by the client program.
 
 The |NonLocal| instance for |CStmt| is then:
