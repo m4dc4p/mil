@@ -4,11 +4,16 @@
 > 
 > module DeadCodeC 
 > where
+
+%endif
+
+%if includeAll
+
 > import Compiler.Hoopl
 
 %endif
 
-%if includeAst
+%if includeAst || includeAll
 
 > data CStmt e x where
 >   Entry :: Label -> CStmt C O
@@ -25,7 +30,7 @@
 
 %endif
 
-%if buildFoo
+%if buildFoo || includeAll
 
 > foo :: Label -> Graph CStmt C C
 > foo l = mkFirst (Entry l) <*> 
@@ -37,7 +42,7 @@
 
 %endif
 
-%if nonLocalInst
+%if nonLocalInst || includeAll
 
 > instance NonLocal CStmt where
 >   entryLabel (Entry l) = l
@@ -45,7 +50,7 @@
 
 %endif
 
-%if False
+%if includeAll
 
 > deadCode :: Graph CStmt C C -> Graph CStmt C C
 > deadCode = undefined

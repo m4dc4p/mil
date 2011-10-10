@@ -1,0 +1,20 @@
+\documentclass{article}
+%% \tracingonline=1
+\def\rA{\futurelet\next\doRaa}
+\long\def\doRaa#1{\ifx\next+\expandafter\doRab\else\char`!\expandafter#1\fi}
+\def\doRab{\begingroup\catcode`!=12\long\def\doRac##1+!{{%%
+      %%\tracingmacros=0\tracingcommands=0
+      \tt ##1%%
+      %% \tracingmacros=1\tracingcommands=2
+    }\endgroup}\doRac}
+\catcode`!=\active
+\let!=\rA
+\begin{document}
+%% \tracingmacros=1\tracingcommands=2
+!+hello1.+!\par
+!+hello2.+!\par
+hello4!\par
+foo!+\emph{}+!bar
+foo!\emph{bar}!
+%% \tracingmacros=0\tracingcommands=0
+\end{document}

@@ -279,4 +279,6 @@
 \newcommand\margin[2]{\marginpar{\begin{singlespace}\emph{\footnotesize #2}\end{singlespace}}\relax #1}
 
 %% Describe intent of a passage
-\newcommand\intent[1]{{\leftskip = -1in\begin{singlespace}\emph{\noindent\footnotesize Intent: #1}\end{singlespace}}}
+\newcommand\intent[1]{{\begin{singlespace}\noindent\leftskip=-1in\emph{\footnotesize Intent: #1}\end{singlespace}}\nopagebreak[1]}
+
+

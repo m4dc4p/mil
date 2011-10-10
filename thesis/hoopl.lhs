@@ -17,10 +17,10 @@ library's implementation can be found in the authors' paper
 \citep{Ramsey2010}; here, we discuss the abstractions they provide and
 how to use them.
 
-\intent{Broad description of how Hoopl abstracts the dataflow algorithm}
+\intent{Broad description of how Hoopl abstracts dataflow optimization}
 
-Hoopl implements the generic portions of the dataflow algorithm:
-iterative analysis, traversing the control-flow graph (CFG), and
+Hoopl implements the generic portions of dataflow analysis:
+iterative computation, traversing the control-flow graph (CFG), and
 combining facts. The \emph{client program}, a term Hoopl uses to mean
 the program using the library for some optimization, provides data
 structures and functions specific to that optimization: the
@@ -108,7 +108,7 @@ Hoopl applies the transfer and rewrite functions to the CFG but
 requires that the client program implement them for their specific AST
 and optimization.
 
-\subsection*{Control-Flow Graphs}
+\section{Control-Flow Graphs}
 
 \intent{Introduce parameterization of blocks by AST and shape.}
 
@@ -121,21 +121,15 @@ Roughly, ``open'' allows control-flow to fall through the block;
 
 \intent{Introduce meaning and definition of O and C types.}
 
-Hoopl provides types named |O| and |C|, representing open and
-closed. Neither needs constructors as we only use them to parameterize
-other types:
-
-> data O 
-> data C
-
-Hoopl uses the |O| and |C| types to constrain the edges between blocks
-in the CFG. As open and closed describe both the entry and exit point
-of the block, we write them as |O O| (``open/open''), |O C|
-(``open/closed''), etc., where the first describes the block's entry
-shape and the latter its exit shape. An |O C| block allows one
-predecessor block but many successors (i.e., control-flow can branch
-to one of many locations on exit). An |O O| block permits exactly one
-predecessor and one successor (i.e., control-flow falls through on
+Hoopl provides types named |O| and |C|, representing open and closed,
+which Hoopl uses to constrain the edges between blocks in the CFG. As
+open and closed describe both the entry and exit point of the block,
+we write them as |O O| (``open/open''), |O C| (``open/closed''), etc.,
+where the first describes the block's entry shape and the latter its
+exit shape. An |O C| block allows one predecessor block but many
+successors (i.e., control-flow can branch to one of many locations on
+exit). An |O O| block permits exactly one predecessor and one
+successor (i.e., control-flow falls through on
 exit). Figure~\ref{hoopl_tbl1} summarizes the meaning of the different
 block shapes.
 
@@ -170,8 +164,7 @@ our subset, so we do not annotate them like |CStmt|. Hoopl defines the
 %let includeAst = True
 %include DeadCodeC.lhs
 %let includeAst = False
-\caption{Haskell datatypes for representing the AST of the 
-  subset of C our example client will handle.}
+\caption{Haskell datatypes capable of reprsenting the AST of \texttt{foo}.}
 \label{hoopl_fig3}
 \end{myfig}
 
@@ -195,33 +188,41 @@ assignment statement.
   \label{hoopl_fig2}
 \end{myfig}
 
-\intent{Make connection between CFG and open/closed types on AST.}
-Figure~\ref{hoopl_fig2} shows #foo# as a
-CFG. Part~\subref{hoopl_fig2_a} shows the program with C syntax, as
-presented in Figure~\ref{hoopl_fig1_a}. Part~\subref{hoopl_fig2_b}
-uses the AST just given.  Each block in Part~\subref{hoopl_fig2_b}
-shows the type associated that statement. The type for
-Block~\refNode{hoopl_lst4_assignc} (representing ``\verb_c = 4_''),
-|CStmt O O|, shows that control-flow falls through the
-statement. However, the type on \refNode{hoopl_lst4_start}, |CStmt C
-O|, shows that the function's entry point allows many predecessors ---
-that is, the function can be called from multiple locations. The type
-|CStmt O C| on \refNode{hoopl_lst4_return} (i.e., the implicit return
-or exit point for the function) shows the opposite --- the function
-can have many successors (i.e., since it can be called from many
-locations, it can return to those same locations) but control-flow
-exits the function from only one location -- namely, that preceding
-the implicit return.
+\intent{Make connection between CFG using program text and CFG using
+  AST.}  Figure~\ref{hoopl_fig2} shows #foo# as a
+CFG. Part~\subref{hoopl_fig2_a} shows the program with C
+syntax. Part~\subref{hoopl_fig2_b} uses the AST just given.  Each
+block in Part~\subref{hoopl_fig2_a} corresponds with the adjacent
+block in Part~\subref{hoopl_fig2_b}. For example,
+Block~\refNode{hoopl_lst3_assignc} (``\verb_c = 4_'') corresponds with
+Block~\refNode{hoopl_lst4_assignc} (``|Assign "c" (Const 4)|''). Also
+notice that the entry and exit points ($E$ and $X$, respectively) in
+Part~\subref{hoopl_fig2_a} do not explicitly appear in our program
+text, but they must be represented in the CFG. Our AST makes entry and
+exit points explicit using the |Entry| and |Return| constructors.
 
-\intent{Introduce graphs; use of O and C
-types in graphs.} 
+\intent{Show how types mirror control flow.}
+Each block in Figure~\subref{hoopl_fig2_b} shows the type
+associated with its value. The type for
+Block~\refNode{hoopl_lst4_assignc}, |CStmt O O|, shows that
+control-flow falls through the statement. However, the type on
+\refNode{hoopl_lst4_start}, |CStmt C O|, shows that the function's
+entry point allows many predecessors --- that is, the function can be
+called from multiple locations. The type |CStmt O C| on
+\refNode{hoopl_lst4_return} (i.e., the exit point
+for the function) shows the opposite --- the function can have many
+successors (i.e., since it can be called from many locations, it can
+return to those same locations) but control-flow exits the function
+from only one location -- namely, that preceding the implicit return.
 
-Hoopl builds CFGs like that in Figure~\ref{hoopl_fig2_b} using the
-|Block| and |Graph'| types. |Graph'| is parameterized by block type;
-however, Hoopl also provides an alias, |Graph|,
-which suffices for our needs:\footnote{|Block| and |Graph'| define a
-  number of constructors but they do not relate to our presentation
-  and so we elide them.}
+\intent{Introduce types and classes Hoopl uses to build graphs; use of
+  O and C types in graphs.}  
+Hoopl builds CFGs like that in
+Figure~\ref{hoopl_fig2_b} using the |Block| and |Graph'|
+types. |Graph'| is parameterized by block type; however, Hoopl also
+provides an alias, |Graph|, which suffices for our
+needs:\footnote{|Block| and |Graph'| define a number of constructors
+  but they do not relate to our presentation and so we elide them.}
 
 > data Block n e x = {-"\dots"-}
 > data Graph' block n e x = {-"\dots"-}
@@ -233,7 +234,6 @@ parameter specifies the contents of each block (or graph) and will be
 the type of the AST used by the client program.
 
 \intent{Describe how to build CFGs with Hoopl}
-
 Client programs construct graphs using methods specified by the
 |GraphRep| class. |GraphRep| allows the client to implement their own
 graph representation, but we do not use that here. Instead,
@@ -256,6 +256,8 @@ the more general class definitions.\footnote{These instances show why
 \label{hoopl_fig4}
 \end{myfig}
 
+\intent{Show how to build single-node graphs and how to compose them into 
+basic blocks. Continue illustrating use of |O| and |C| types.}
 |mkFirst|, |mkMiddle| and |mkLast| all turn a single block
 (represented by the type parameter |n|) into a graph of one block with
 the same shape. The |(<*>)| operator, said ``concat'' , concatenates
@@ -271,12 +273,6 @@ O| and |CStmt O O| will have a result with type |CStmt C O|. The types
 in the resulting graph the first argument will be a predecessor to the
 second. In other words, |(<*>)| creates basic blocks.
 
-A basic block has one entry point and one exit. |(<*>)| concatenates
-graphs such that control-flow falls through each. |e C| predecessors
-and |C x| successors do not fall through: the former branches to
-multiple successors, while the latter may have multiple
-predecessors. In both cases, the type of |(<*>)| prevents such graphs.
-
 \begin{myfig}
 %let buildFoo = True
 %include DeadCodeC.lhs
@@ -287,15 +283,16 @@ from Figure~\ref{hoopl_fig3}.}
 \label{hoopl_fig5}
 \end{myfig}
 
-Returning to our example, we can construct the CFG from
-Figure~\ref{hoopl_fig2_b} using code in Figure~\ref{hoopl_fig5}.
-The |l| parameter defines the entry point for this block and will be
-supplied externally. Each individual statement turns into a graph
-through |mkFirst|, |mkMiddle| and |mkLast|. |(<*>)| concatenates
-those graphs together, forming one large graph with type |CStmt C
-C|. This construction exactly represents the CFG in
-Figure~\ref{hoopl_fig2_b}.
+\intent{Illustrate use of |(<*>)|.}  Returning to our example, we can
+construct the CFG from Figure~\ref{hoopl_fig2_b} using code in
+Figure~\ref{hoopl_fig5}.  The |l| parameter (with type |Label|)
+defines the entry point for this block and will be supplied
+externally. Each individual statement turns into a graph through
+|mkFirst|, |mkMiddle| and |mkLast|. |(<*>)| concatenates those graphs
+together, forming one large graph with type |CStmt C C|. This
+construction exactly represents the CFG in Figure~\ref{hoopl_fig2_b}.
 
+\intent{Show how Hoopl manages control-flow between blocks.}
 Hoopl connects basic blocks into larger graphs
 using the |(||*><*||)| operator.\footnote{Sorry, I don't know how to
   pronounce this one. Call it ``funny.''} This operator does not imply any 
@@ -317,20 +314,20 @@ or graph may branch to. Again, the |C| type on the first argument
 connect. The |NonLocal| constraint on |(<*>)| and |(||*><*||)| ensures
 Hoopl can traverse the CFG built by the client program.
 
+\intent{Illustrate use of |NonLocal| in our example.}
 Now we can give the |NonLocal| instance for |CStmt|:
 
 %let nonLocalInst = True
 %include DeadCodeC.lhs
 %let nonLocalInst = False
 
-\margin{We only define |entryLabel| for the |Entry| constructor,
+We only define |entryLabel| for the |Entry| constructor,
   because only it is ``open on entry'' (i.e., due to its type |C O|).
   We do not define any cases for |successors| even though |Return| is
   ``closed on exit'' (i.e., due to its type |O C|), because our AST
   does not represent the destination of a return (implicit or
   explicit). If our AST supported branching (such as \texttt{if}
-  statements), then |successors| would be more interesting.}{Maybe the
-  example should be more complicated, to show branching?}
+  statements), then |successors| would be more interesting.
 
 \intent{Summarize CFGs in Hoopl} 
 
@@ -345,18 +342,75 @@ Figure~\ref{hoopl_fig2} that represents the subset of the C
 language used by #foo#, and showed how to build a representation of
 #foo# in Figure~\ref{hoopl_fig5}.
 
-\subsection*{Facts and Lattices}
+\section{Facts and Lattices}
+\intent{Reminder about what facts and lattices are; How Hoopl represents them. 
+  Emphasize facts are defined by the client; meet operator defined by the client; Hoopl 
+manages combining facts and determinin when a fixed point has been reached}
 
-\subsection*{Transfer Functions}
+\intent{Introduce |DataflowLattice| type and show connection to facts and 
+the meet operator.}
 
-\subsection*{Iteration \& Fixed Points}
+\intent{Show fact and meet operator for example as Haskell code and as 
+  dataflow equations.}
 
-\subsection*{Interleaved Analysis \& Rewriting}
+\intent{Aside: |WithTop|/|WithBottom| types.}
+
+\section{Direction \& Transfer Functions}
+
+\intent{Reminder about what transfer functions do \& that they can go forwards or
+backwards;}
+
+\intent{Introduce |FwdTransfer| and |BwdTransfer| types; show how to construct them
+with |mkFTransfer3| and |mkBTransfer3|. }
+
+\intent{Show how |mkFTransfer| and |mkBTransfer| with existential
+  types and type families are used in general.}
+
+\intent{Give definition for example's transfer function.}
+
+\section{Iteration \& Fixed Points}
+
+\intent{Describe how Hoopl iterates on facts; how Hoopl determines when
+a fixed point has been reached.}
+
+\section{Rewriting}
+
+\intent{Briefly describe rewriting as transformation.}
+\intent{Introduce |FwdRewrite| and |BwdRewrite| types; show
+  how to construct them with |mkFRewrite3| and |mkBRewrite3|.}
+
+\intent{Segue to |mkFRewrite|, |mkBRewrite|, existentials and type families.}
+
+\intent{Give definition of examples transfer functino.}
+
+\section{Interleaved Analysis \& Rewriting}
+
+\intent{Discuss how Hoopl manages to interleave both.}
+
+\section{Dead-Code Elimination}
+
+\intent{Apply the optimization developed to the example program with 
+lots of illustratin.}
+
+\section{The Rest of Hoopl}
+
+\intent{Items that don't fit in elsewhere: combinators for rewriting,
+  the |CheckPoint| monad, optimization fuel, |liftFuel|,
+  |runInfinite|, |runChecked|, etc. }
 
 \section{Summary}
 \label{hoopl_sec3}
+\intent{Discuss experience with Hoopl; summarize features, move on.}
+
+\begin{myfig}
+%let includeAll = True
+%include DeadCodeC.lhs
+%let includeAll = False
+\caption{}
+\label{hoopl_fig6}
+\end{myfig}
 
 \standaloneBib
 
 \end{document}
-[
+

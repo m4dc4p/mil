@@ -1,10 +1,8 @@
 %include polycode.fmt
 \begin{minipage}{3in}
   \begin{tikzpicture}[>=stealth, node distance=.5in]
-    \node[entex] (entry) {};
 
-    \node[stmt,
-      below of=entry] (start) {|Entry l :: CStmt C O|\labelNode{hoopl_lst4_start}};
+    \node[stmt] (start) {|Entry l :: CStmt C O|\labelNode{hoopl_lst4_start}};
     \node[labelfor=start] () {\refNode{hoopl_lst4_start}};
 
     \node[stmt,
@@ -27,16 +25,12 @@
       below of=assigna2] (return) {|Return :: CStmt O C|\labelNode{hoopl_lst4_return}};
     \node[labelfor=return] () {\refNode{hoopl_lst4_return}};
 
-    \node[entex,
-      below of=return] (exit) {};
-
-    \draw [->>] (entry) to (start);
-    \draw [->] (start) to (assignc);
+    \draw [->>] (start) to (assignc);
     \draw [->] (assignc) to (assigna1);
     \draw [->] (assigna1) to (print);
     \draw [->] (print) to (assigna2);
-    \draw [->] (assigna2) to (return);
-    \draw [->>] (return) to (exit);
+    \draw [->>] (assigna2) to (return);
+
   \end{tikzpicture}
 \end{minipage}
 
