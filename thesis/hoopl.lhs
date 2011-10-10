@@ -6,6 +6,9 @@
 \chapter{The Hoopl Library}
 \label{ref_chapter_hoopl}
 
+\section{Introduction}
+\label{hoopl_sec4}
+
 \intent{Introduction}
 The Hoopl library \citep{Hoopl-3.8.7.0}, written in Haskell, provides
 a framework for implementing program analyses and transformations,
@@ -41,9 +44,9 @@ We will illustrate Hoopl concepts through a running example motivated
 by the function defined in Figure~\ref{hoopl_fig1_a}. The assignments
 to \texttt{a} on Lines~\ref{hoopl_lst1_assign_a} and
 \ref{hoopl_lst1_add} do not affect the output (i.e., observable
-behavior)of #foo#. Eliminating them will not change the program's
+behavior)of !+foo+!. Eliminating them will not change the program's
 meaning and may improve its performance. However, we could not
-eliminate the assignment to #c# on Line~\ref{hoopl_lst1_assign_c}
+eliminate the assignment to !+c+! on Line~\ref{hoopl_lst1_assign_c}
 because that may change the value printed on
 Line~\ref{hoopl_lst1_print}. We call variables that may affect
 observable behavior \emph{live}; a \emph{dead} variable is not
@@ -57,7 +60,7 @@ Figure~\ref{hoopl_fig1_a}.
   \scap{hoopl_fig1_a} & \scap{hoopl_fig1_b}
 \end{tabular}
 \caption{Part~\subref{hoopl_fig1_a} defines function defined in
-  C. Part~\subref{hoopl_fig1_b} shows the program after perfomring
+  C. Part~\subref{hoopl_fig1_b} shows the program after performing
   dead-code elimination.}
 \label{hoopl_fig1}
 \end{myfig}
@@ -151,7 +154,7 @@ block shapes.
 \intent{Show example with O and C types applied.}
 
 Figure~\ref{hoopl_fig3} gives Haskell declarations that can represent
-the AST for #foo#. We use the GHC Haskell compiler's GADT syntax
+the AST for !+foo+!. We use the GHC Haskell compiler's GADT syntax
 \citep{GHC-7.2.1} to succinctly specify the actual type of the |e|
 (``entry'') and |x| (``exit'') type parameters for each
 constructor. The entry and exit type (i.e., either |O| or |C|) given
@@ -161,17 +164,19 @@ our subset, so we do not annotate them like |CStmt|. Hoopl defines the
 |Label| type and uses it to connect basic blocks together.
 
 \begin{myfig}
+  \begin{minipage}{\hsize}
 %let includeAst = True
 %include DeadCodeC.lhs
 %let includeAst = False
-\caption{Haskell datatypes capable of reprsenting the AST of \texttt{foo}.}
+  \end{minipage}
+  \caption{Haskell datatypes capable of representing the AST of \texttt{foo}.}
 \label{hoopl_fig3}
 \end{myfig}
 
 For example, the |Return| constructor creates a value with the type
 |CStmt O C| --- an ``open/closed'' statement. A statement with a
 ``closed'' exit type does not allow control-flow to fall through,
-which reflects the behavior of the #return# statement. The |Assign|
+which reflects the behavior of the !+return+! statement. The |Assign|
 constructor's type, |CStmt O O|, indicates that control-flow
 \emph{can} fall through, again reflecting the behavior of the
 assignment statement.
@@ -189,7 +194,7 @@ assignment statement.
 \end{myfig}
 
 \intent{Make connection between CFG using program text and CFG using
-  AST.}  Figure~\ref{hoopl_fig2} shows #foo# as a
+  AST.}  Figure~\ref{hoopl_fig2} shows !+foo+! as a
 CFG. Part~\subref{hoopl_fig2_a} shows the program with C
 syntax. Part~\subref{hoopl_fig2_b} uses the AST just given.  Each
 block in Part~\subref{hoopl_fig2_a} corresponds with the adjacent
@@ -245,13 +250,15 @@ the more general class definitions.\footnote{These instances show why
   values.}
 
 \begin{myfig}
+\begin{minipage}{\hsize}
 > instance GraphRep Graph where
 >   mkFirst  :: n C O -> Graph n C O
 >   mkMiddle :: n O O -> Graph n O O
 >   mkLast   :: n O C -> Graph n O C
 >   (<*>)    :: NonLocal n => Graph n e O -> Graph n O x -> Graph n e x
 >   (|*><*|) :: NonLocal n => Graph n e C -> Graph n C x -> Graph n e x
-> {-"\dots"-}
+>   {-"\dots"-}
+\end{minipage}
 \caption{Hoopl's definition of the |Graph| instance for the |GraphRep| class.}
 \label{hoopl_fig4}
 \end{myfig}
@@ -274,9 +281,11 @@ in the resulting graph the first argument will be a predecessor to the
 second. In other words, |(<*>)| creates basic blocks.
 
 \begin{myfig}
+\begin{minipage}{\hsize}
 %let buildFoo = True
 %include DeadCodeC.lhs
 %let buildFoo = False
+\end{minipage}
 \caption{A representation of our example function, built using the |GraphRep| methods in
 Figure~\ref{hoopl_fig4} and the AST
 from Figure~\ref{hoopl_fig3}.}
@@ -337,25 +346,100 @@ and |C| types. The library controls graph creation through the
 basic blocks, connected by |Labels|. Hoopl recovers control-flow
 information using the |NonLocal| class, through its |entryLabel| and
 |successors| methods. This section introduced our example function,
-\texttt{foo}, in Figure~\ref{hoopl_fig1}, defined an AST in
+!+foo+!, in Figure~\ref{hoopl_fig1}, defined an AST in
 Figure~\ref{hoopl_fig2} that represents the subset of the C
-language used by #foo#, and showed how to build a representation of
-#foo# in Figure~\ref{hoopl_fig5}.
+language used by !+foo+!, and showed how to build a representation of
+!+foo+! in Figure~\ref{hoopl_fig5}.
 
-\section{Facts and Lattices}
-\intent{Reminder about what facts and lattices are; How Hoopl represents them. 
-  Emphasize facts are defined by the client; meet operator defined by the client; Hoopl 
-manages combining facts and determinin when a fixed point has been reached}
+\section{Facts, Meet Operators and Lattices}
+\intent{Reminder about what facts and lattices are; How Hoopl
+  represents them.  Emphasize facts are defined by the client; meet
+  operator defined by the client; Hoopl manages combining facts and
+  determining when a fixed point has been reached.}  
+
+Recall that dataflow analysis computes \emph{facts} for each block in
+the control-flow graph, using a \emph{meet operator} to combine facts
+when a block has multiple successors or predecessors (depdening on the
+direction of the analysis). \margin{The analysis will always terminate
+  if the meet operator forms the facts into a finite-height
+  lattice.}{Awkward.}
 
 \intent{Introduce |DataflowLattice| type and show connection to facts and 
 the meet operator.}
 
+Hoopl provides the type |DataflowLattice| (shown with several
+associated definitions in Figure~\ref{hoopl_fig7}) so clients can
+define the facts and meet operator for their specific analysis. The
+field |fact_name| exists only for documentation. Hoopl uses the value
+in the |fact_empty| field to create initial facts for each block in
+the CFG when analysis starts. The |fact_join| field will hold the
+client's implementation of their meet operator.
+
+The meet operator, |fact_join|, takes two arguments (one of type
+|OldFact| and the other of type |NewFact|) and returns a pair
+consisting of a value and a |ChangeFlag|. |OldFact| and |NewFact|
+represent two, possibly different, facts. \margin{The facts may differ
+  for two reasons: |OldFact| and |NewFact| could be from different
+  iterations of the analysis, or they could be from multiple
+  predecessors or successors\footnote{Facts come from multiple
+    predecessors when doing forwards analysis, multiple successors
+    when going backwards.} of the current block.}{Is |fact_join| used
+  to combine facts from nodes, or does th transfer function implicitly
+  do that when the |Fact| argument is a |FactBase|?} The client
+determines if the facts differ and returns |SomeChange|, plus the new
+facts, if so. Otherwise, the client returns |NoChange|, indicating the
+the |OldFact| and |NewFact| values are equal. Hoopl choose this
+implementation for efficiency: the client can determine if facts
+change during each join, rather than the library comparing all facts
+on every iteration.
+
+\begin{myfig}
+  \begin{minipage}{\hsize}
+> data DataflowLattice a = DataflowLattice { fact_name :: String,
+>   fact_bot :: a,
+>   fact_join :: JoinFun a }
+>
+> type JoinFun a = Label -> OldFact a -> NewFact a -> (ChangeFlag, a)
+>
+> newtype OldFact a = {-"\dots"-}
+> newtype NewFact a = {-"\dots"-}
+>
+> data ChangeFlag = NoChange | SomeChange 
+>
+  \end{minipage}
+  \caption{|DataflowLattice| and associated types defined by Hoopl for
+    representing and combining facts.}
+  \label{hoopl_fig7}
+\end{myfig}
+
 \intent{Show fact and meet operator for example as Haskell code and as 
   dataflow equations.}
+
+As stated in Section~\ref{hoopl_sec4}, dead-code uses \emph{liveness}
+analysis to find dead code. A variable is live if it is used after
+declaration; otherwise, it is dead. Therefore, we call our facts the
+set of live variables for each block. Our transfer function, given in
+Section~\ref{hoopl_sec5}, will show that we compute this information
+by traversing the CFG backward. When a block has multiple successors,
+we must take the union of the successors' \inE facts to compute the
+\out set for the current block. 
+
+Consider Figure~\ref{hoopl_fig8}, which shows a fragment of C code
+and its associated CFG. 
+
+\begin{myfig}
+  \begin{tabular}{cc}
+    \input{hoopl_lst5} & \input{hoopl_lst6} \\
+    \scap{hoopl_fig8_a} & \scap{hoopl_fig8_b}
+  \end{tabular}
+  \caption{A fragment of C code and its associated CFG.}
+  \label{hoopl_fig8}
+\end{myfig}
 
 \intent{Aside: |WithTop|/|WithBottom| types.}
 
 \section{Direction \& Transfer Functions}
+\label{hoopl_sec5}
 
 \intent{Reminder about what transfer functions do \& that they can go forwards or
 backwards;}
@@ -403,10 +487,12 @@ lots of illustratin.}
 \intent{Discuss experience with Hoopl; summarize features, move on.}
 
 \begin{myfig}
+\begin{minipage}{\hsize}
 %let includeAll = True
 %include DeadCodeC.lhs
 %let includeAll = False
-\caption{}
+\end{minipage}
+\caption{Complete listing of our dead-code elimination optimization.}
 \label{hoopl_fig6}
 \end{myfig}
 

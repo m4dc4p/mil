@@ -1,4 +1,4 @@
-\pgfkeysifdefined{/tikz/incr}{}{\pgfkeys{/tikz/incr/.append style={}}}
+\withmd{\pgfkeysifdefined{/tikz/incr}{}{\pgfkeys{/tikz/incr/.append style={}}}
 \pgfkeysifdefined{/tikz/return}{}{\pgfkeys{/tikz/return/.append style={}}}
 \pgfkeysifdefined{/tikz/assign}{}{\pgfkeys{/tikz/assign/.append style={}}}
 \pgfkeysifdefined{/tikz/test}{}{\pgfkeys{/tikz/test/.append style={}}}
@@ -16,16 +16,16 @@ i = 0
     \labelNode{\prefix assign}};
   \node[labelfor=assign] () {\refNode{\prefix assign}};
 
-  \node[stmt, test, below=of assign] (test) {#i < cnt#\labelNode{\prefix test}};
+  \node[stmt, test, below=of assign] (test) {!+i < cnt+!\labelNode{\prefix test}};
   \node[labelfor=test] () {\refNode{\prefix test}};
 
-  \node[stmt, mult, right=of test] (mult) {#n += val * m#\labelNode{\prefix mult}};
+  \node[stmt, mult, right=of test] (mult) {!+n += val * m+!\labelNode{\prefix mult}};
   \node[labelfor=mult] () {\refNode{\prefix mult}};
 
-  \node[stmt, incr, below=of mult] (incr) {#i++#\labelNode{\prefix incr}};
+  \node[stmt, incr, below=of mult] (incr) {!+i+++!\labelNode{\prefix incr}};
   \node[labelfor=incr] () {\refNode{\prefix incr}};
 
-  \node[stmt, return, below=of test] (return) {#return n#\labelNode{\prefix return}};
+  \node[stmt, return, below=of test] (return) {!+return n+!\labelNode{\prefix return}};
   \node[labelfor=return] () {\refNode{\prefix return}};
 
   \node[invis, below=0.2in of return] (exit) {};
@@ -34,6 +34,7 @@ i = 0
   \draw [->] (assign) to (test);
   \draw [->] (test) to (mult);
   \draw [->] (mult) to (incr);
-  \draw [->] (incr) -| ($(mult.east) + (5mm,0mm)$) |- ($(test.north)!.5!(assign.south)$) to (test.north) ;
+  \pausemd{\draw [->] (incr) -| ($(mult.east) + (5mm,0mm)$) |- ($(test.north)!.5!(assign.south)$) to (test.north);}
   \draw [->] (test) to (return);
   \draw [->>] (return) to (exit);
+}

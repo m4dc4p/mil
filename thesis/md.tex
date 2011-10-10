@@ -1,20 +1,73 @@
-\documentclass{article}
-%% \tracingonline=1
-\def\rA{\futurelet\next\doRaa}
-\long\def\doRaa#1{\ifx\next+\expandafter\doRab\else\char`!\expandafter#1\fi}
-\def\doRab{\begingroup\catcode`!=12\long\def\doRac##1+!{{%%
-      %%\tracingmacros=0\tracingcommands=0
-      \tt ##1%%
-      %% \tracingmacros=1\tracingcommands=2
-    }\endgroup}\doRac}
-\catcode`!=\active
-\let!=\rA
-\begin{document}
-%% \tracingmacros=1\tracingcommands=2
-!+hello1.+!\par
-!+hello2.+!\par
-hello4!\par
-foo!+\emph{}+!bar
-foo!\emph{bar}!
-%% \tracingmacros=0\tracingcommands=0
-\end{document}
+%% This stuff makes !+<text>+! write <text> in typewriter font.  
+
+%% We make ! and + active characters early, then manipulate their
+%% meaning to produce the right effect. Initially, + produces +. When
+%% !  appears w/o a + following, it produces ``!''. When ``+''
+%% follows, we start writing in teleteype (\ttfamily). The definition
+%% of ``!'' changes to produce a bang. ``+'' changes such that it
+%% looks for trailing ``!''. When no ``!'' appears, ``+'' produces ``+''. 
+%% If a ``!'' appears, we shift out of \ttfamily (by ending the group) and
+%% reset the meaning of ``!'' and ``+'' so we can start again.
+\makeatletter
+\let\mdplus=+\let\mdbang=!      %% Preserve meaning of + and ! so we can put them into document.
+%% Turn off mark down for everyone
+\protected\def\nomd{\global\catcode`!=12\global\catcode`+=12}
+%% Turn mark down on for everyone
+\protected\def\domd{\global\catcode`!=\active\global\catcode`+=\active %%
+  \initialmd}
+%% Use only with a group IMMEDIETALY following. Turns off
+%% markdown for the group-to-come, without actually tokenizing the
+%% group. If no group follows, this has no effect.
+\protected\def\pausemd{\def\dopause{\catcode`!=12\catcode`+=12}%%
+  \def\pausemdB{\ifx\next\bgroup%%
+    %% A ``partial'' application of expandwith is used
+    %% so we don't double up the group argument (which is what
+    %% happens if we expand \next). This has the effect of 
+    %% inserting \expandafter\dowith in front of the upcoming {. 
+    %% If no brace is coming, \withmdC will have no effect.
+    \def\pausemdC{\expandafter\dopause}
+  \else
+    \let\pausedmC=\relax
+  \fi\pausemdC}
+  %% \futurelet has to end the macro so it grabs the next token
+  %% from the input file. Otherwise, it grabs it *from* this
+  %% definition.
+  \futurelet\next\pausemdB} %%
+%% Turns markdown on for the group-to-come, without actually
+%% tokenizing the group. Only has an effect when
+%% used in front of a group, otherwise its a no-op.
+\protected\def\withmd{\def\dowith{\catcode`!=\active\catcode`+=\active\initialmd}%%
+  \def\withmdB{\ifx\next\bgroup %%
+    %% A ``partial'' application of expandwith is used
+    %% so we don't double up the group argument (which is what
+    %% happens if we expand \next). This has the effect of 
+    %% inserting \expandafter\dowith in front of the upcoming {. 
+    %% If no brace is coming, \withmdC will have no effect.
+      \def\withmdC{\expandafter\dowith} %%
+    \else %%
+      \let\withmdC=\relax %%
+    \fi\withmdC}%%
+  %% \futurelet has to end the macro so it grabs the next token
+  %% from the input file. Otherwise, it grabs it *from* this
+  %% definition.
+  \futurelet\next\withmdB} %%
+%% Make ! and + active in the following group so they have the right
+%% catcode in the definitions to follow.
+\catcode`!=\active\catcode`+=\active %%
+%% Initial definitions associated with ! and +.
+\def\initialmd{\def!{\startTTA}\def+{\mdplus}} %%
+%% Step 1 of startTT. Inital meaning of !; capture next token in \next, go to next step.
+\def\startTTA{\futurelet\next\startTTB} %%
+%% Step 2 of startTT. Compare captured token to + and go to step 3 if true. Otherwise
+%% output a ! (since that started our macro), the argument captured and stop
+%% processing.
+\long\def\startTTB{\ifx\next+\expandafter\startTTC\expandafter\@gobble\else\mdbang\fi} %%
+%% Step 3 of startTT. Shift into teletype mode and change definition of 
+%% + and ! so we can stop processing.
+\def\startTTC{\begingroup\ttfamily\protected\def+{\stopTTA}\protected\def!{\mdbang}} %%
+%% Step 1, 2  and 3 of stopTT follow the same pattern as startTT.
+\def\stopTTA{\futurelet\next\stopTTB} %%
+\long\def\stopTTB{\ifx\next!\expandafter\stopTTC\expandafter\@gobble\else\mdplus\fi} %%
+\def\stopTTC{\endgroup}%%
+\catcode`!=12\catcode`+=12
+\makeatother

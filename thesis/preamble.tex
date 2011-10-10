@@ -152,6 +152,8 @@
 \newcommand{\inBv}[2]{\ensuremath{\mathit{in}(B_{\ref{#1}}, #2)}\xspace}
 %% out(B) -- fact function for an anonymous block.
 \newcommand{\outBa}{\ensuremath{\mathit{out}(B)}\xspace}
+%% out(Bn) -- fact function for an named block.
+\newcommand{\outBn}[1]{\ensuremath{\mathit{out}(B_{#1})}\xspace}
 %% out(X) -- fact function for an anonymous block, but using a different variable.
 \newcommand{\outXa}[1]{\ensuremath{\mathit{out}(#1)}\xspace}
 %% out(B,v) -- fact function for an anonymous block and some variable.
@@ -281,4 +283,5 @@
 %% Describe intent of a passage
 \newcommand\intent[1]{{\begin{singlespace}\noindent\leftskip=-1in\emph{\footnotesize Intent: #1}\end{singlespace}}\nopagebreak[1]}
 
-
+\include{md}
+\domd
