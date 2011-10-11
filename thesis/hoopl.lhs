@@ -357,12 +357,17 @@ language used by !+foo+!, and showed how to build a representation of
   operator defined by the client; Hoopl manages combining facts and
   determining when a fixed point has been reached.}  
 
-Recall that dataflow analysis computes \emph{facts} for each block in
-the control-flow graph, using a \emph{meet operator} to combine facts
-when a block has multiple successors or predecessors (depdening on the
-direction of the analysis). \margin{The analysis will always terminate
-  if the meet operator forms the facts into a finite-height
-  lattice.}{Awkward.}
+Recall that dataflow analysis computes \emph{facts} on each edge for
+each block $B$ in the CFG. We call the set of facts computed on the
+inbound edges of a block $B$ \inBa and the set facts on outbound edges
+\outBa. A \emph{meet operator} combines facts when multiple edges
+enter or leave the block (depending on the direction of the
+analysis). The analysis will always terminate if the meet operator
+defines a finite-height lattice. A \emph{forwards} dataflow-analysis
+computes the set \outBa, for a block $B$ in the CFG, using \inBa and
+the transfer function; \inBa then equals the meet of all \outBa from
+predecessor blocks. A backwards analysis does the same, except in
+reverse.
 
 \intent{Introduce |DataflowLattice| type and show connection to facts and 
 the meet operator.}
@@ -371,27 +376,26 @@ Hoopl provides the type |DataflowLattice| (shown with several
 associated definitions in Figure~\ref{hoopl_fig7}) so clients can
 define the facts and meet operator for their specific analysis. The
 field |fact_name| exists only for documentation. Hoopl uses the value
-in the |fact_empty| field to create initial facts for each block in
+in the |fact_bot| field to create initial facts for each block in
 the CFG when analysis starts. The |fact_join| field will hold the
 client's implementation of their meet operator.
 
-The meet operator, |fact_join|, takes two arguments (one of type
-|OldFact| and the other of type |NewFact|) and returns a pair
-consisting of a value and a |ChangeFlag|. |OldFact| and |NewFact|
-represent two, possibly different, facts. \margin{The facts may differ
-  for two reasons: |OldFact| and |NewFact| could be from different
-  iterations of the analysis, or they could be from multiple
-  predecessors or successors\footnote{Facts come from multiple
-    predecessors when doing forwards analysis, multiple successors
-    when going backwards.} of the current block.}{Is |fact_join| used
-  to combine facts from nodes, or does th transfer function implicitly
-  do that when the |Fact| argument is a |FactBase|?} The client
-determines if the facts differ and returns |SomeChange|, plus the new
-facts, if so. Otherwise, the client returns |NoChange|, indicating the
-the |OldFact| and |NewFact| values are equal. Hoopl choose this
-implementation for efficiency: the client can determine if facts
-change during each join, rather than the library comparing all facts
-on every iteration.
+The meet operator, |fact_join|, takes two arguments and returns a pair
+consisting of a value and a |ChangeFlag|. The arguments, of type
+|OldFact| and |NewFact|, represent two, possibly different, sets of
+facts for the same block. \margin{The facts may differ for two
+  reasons: |OldFact| and |NewFact| could be from different iterations
+  of the analysis, or they could be from multiple predecessors or
+  successors\footnote{Facts come from multiple predecessors when doing
+    forwards analysis, multiple successors when going backwards.} of
+  the current block.}{Is |fact_join| used to combine facts from nodes,
+  or does th transfer function implicitly do that with |FactBase|?}
+The client determines if the facts differ and returns |SomeChange|,
+plus the new facts, if so. Otherwise, the client returns |NoChange|,
+indicating the the |OldFact| and |NewFact| values are equal. Hoopl
+choose this implementation for efficiency: the client can determine if
+facts change during each join, rather than the library comparing all
+facts on every iteration.
 
 \begin{myfig}
   \begin{minipage}{\hsize}
@@ -412,20 +416,43 @@ on every iteration.
   \label{hoopl_fig7}
 \end{myfig}
 
-\intent{Show fact and meet operator for example as Haskell code and as 
-  dataflow equations.}
+\intent{Remind reader how liveness is computed for dead-code
+  elimination} As stated in Section~\ref{hoopl_sec4}, dead-code
+elimination uses \emph{liveness} analysis to find dead code. A
+variable is live if it is used after declaration; otherwise, it is
+dead.
 
-As stated in Section~\ref{hoopl_sec4}, dead-code uses \emph{liveness}
-analysis to find dead code. A variable is live if it is used after
-declaration; otherwise, it is dead. Therefore, we call our facts the
-set of live variables for each block. Our transfer function, given in
-Section~\ref{hoopl_sec5}, will show that we compute this information
-by traversing the CFG backward. When a block has multiple successors,
-we must take the union of the successors' \inE facts to compute the
-\out set for the current block. 
+\intent{Introduce fact definition for liveness.} 
 
-Consider Figure~\ref{hoopl_fig8}, which shows a fragment of C code
-and its associated CFG. 
+We define the set \textsc{Live} as the set of all declared variables
+in the program. Recall that dataflow analysis computes two sets for
+each block in the CFG, named \inBa and \outBa. For liveness analysis,
+\inBa and \outBa are subsets of \textsc{Live}. 
+
+\intent{Introduce meet for liveness}
+
+Our transfer function,
+given in Section~\ref{hoopl_sec5}, will show that we traverse the CFG
+backward.  That is, \outBa set for block $B$ is the union of all
+the \inE sets of $B$'s successors. That is, the meet operator for
+liveness is set union.
+
+\intent{Illustrate liveness using a better example than our sample
+  program.}  
+
+Consider Figure~\ref{hoopl_fig8}, which shows a fragment of C code and
+its associated CFG. In Block~\refNode{hoopl_lst6_assignx2} only !+x+!
+is live due to ``!+x = 0+!.'' Therefore, $\inB{hoopl_lst6_assignx2} =
+\{\facts{x}\} \subset \textsc{Live}$.  However, in
+Block~\refNode{hoopl_lst6_assignx1} both !+x+! and !+y+!  are live due
+to ``!+x = 1 + y+!'' (and thus, $\inB{hoopl_lst6_assignx1} =
+\{\facts{x,y}\} \subset \textsc{Live}$). Because both
+Block~\refNode{hoopl_lst6_assignx1} and
+Block~\refNode{hoopl_lst6_assignx2} are successors to
+Block~\refNode{hoopl_lst6_test}, \outB{hoopl_lst6_test} must be the
+union of \inB{hoopl_lst6_assignx2} and \inB{hoopl_lst6_assignx1}; that
+is, we compute that $\outB{hoopl_lst6_test} = \{\facts{x,y}\} \subset
+\textsc{Live}$.
 
 \begin{myfig}
   \begin{tabular}{cc}
@@ -436,55 +463,73 @@ and its associated CFG.
   \label{hoopl_fig8}
 \end{myfig}
 
+\intent{Show fact and meet operator for example as Haskell code and as 
+  dataflow equations.}
+\lipsum
+
 \intent{Aside: |WithTop|/|WithBottom| types.}
+\lipsum
 
 \section{Direction \& Transfer Functions}
 \label{hoopl_sec5}
 
 \intent{Reminder about what transfer functions do \& that they can go forwards or
 backwards;}
+\lipsum
 
 \intent{Introduce |FwdTransfer| and |BwdTransfer| types; show how to construct them
 with |mkFTransfer3| and |mkBTransfer3|. }
+\lipsum
 
 \intent{Show how |mkFTransfer| and |mkBTransfer| with existential
   types and type families are used in general.}
+\lipsum
 
 \intent{Give definition for example's transfer function.}
+\lipsum
 
 \section{Iteration \& Fixed Points}
 
 \intent{Describe how Hoopl iterates on facts; how Hoopl determines when
 a fixed point has been reached.}
+\lipsum
 
 \section{Rewriting}
 
 \intent{Briefly describe rewriting as transformation.}
+\lipsum
 \intent{Introduce |FwdRewrite| and |BwdRewrite| types; show
   how to construct them with |mkFRewrite3| and |mkBRewrite3|.}
+\lipsum
 
 \intent{Segue to |mkFRewrite|, |mkBRewrite|, existentials and type families.}
+\lipsum
 
 \intent{Give definition of examples transfer functino.}
+\lipsum
 
 \section{Interleaved Analysis \& Rewriting}
 
 \intent{Discuss how Hoopl manages to interleave both.}
+\lipsum
 
 \section{Dead-Code Elimination}
 
 \intent{Apply the optimization developed to the example program with 
 lots of illustratin.}
+\lipsum
 
 \section{The Rest of Hoopl}
 
 \intent{Items that don't fit in elsewhere: combinators for rewriting,
   the |CheckPoint| monad, optimization fuel, |liftFuel|,
   |runInfinite|, |runChecked|, etc. }
+\lipsum
 
 \section{Summary}
 \label{hoopl_sec3}
 \intent{Discuss experience with Hoopl; summarize features, move on.}
+\lipsum
 
 \begin{myfig}
 \begin{minipage}{\hsize}
