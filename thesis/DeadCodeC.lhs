@@ -9,7 +9,7 @@
 %if includeAll
 
 > import Compiler.Hoopl
-> import Data.Set (Set)
+> import Data.Set (Set, isSubsetOf, union)
 > import Data.Map (Map)
 > import qualified Data.Set as Set
 > import qualified Data.Map as Map
@@ -44,16 +44,19 @@
 %endif
 %if latticeDef || includeAll
 
-> lattice :: DataflowLattice (Map Label (Set Var))
-> lattice = DataflowLattice { fact_name = "Liveness"
+> type Live = Set Var
+>
+> meet :: Label -> OldFact Live 
+>         -> NewFact Live 
+>         -> (ChangeFlag, Live)
+> meet _ (OldFact old) (NewFact new) = 
+>   (changeIf (old /= new), old `union` new)
+>
+> lattice :: DataflowLattice (Map Label Live)
+> lattice = DataflowLattice { 
+>       fact_name = "Liveness"
 >     , fact_bot = Map.empty
->     , fact_join = joinMaps extend }
->   where
->     extend :: Label 
->               -> OldFact (Set Var)
->               -> NewFact (Set Var)
->               -> (ChangeFlag, Set Var)
->     extend = undefined
+>     , fact_join = joinMaps meet }
 
 %endif
 %if nonLocalInst || includeAll

@@ -212,7 +212,7 @@ analysis. A \emph{known integer constant}, $C \in \mathbb{Z}$, means our analysi
 that the variable was assigned a specific value that does not
 change. \emph{Indeterminate}, indicated by $\top$ (``top''), means our
 analysis found that the variable might have more than one value at a
-given point. Together, $\{\bot, \top\} \cup C$ forms a set which we
+given point. Together, $\{\bot, \top\} \cup \mathbb{Z}$ forms a set which we
 will denote as \setLC.
 
 \begin{myfig}
@@ -299,7 +299,7 @@ the fact \factC{x}{\bot} appeared, we could warn that a variable might
 be used before being initialized. Similarly, if our language defined
 an initial value for all variables, our assumption would have no
 effect. We could use the same definition, but no variable would have
-the value $\bot$ -- each would have a known initial value. 
+the value $\bot$ --- each would have a known initial value. 
 
 We have defined \lub on elements in \setLC, but our facts are pairs
 $(a,x)$ where $a$ is a variable and $x$ a value in \setLC; \inE and

@@ -284,6 +284,10 @@
 
 %% Describe intent of a passage
 \newcommand\intent[1]{{\begin{singlespace}\noindent\leftskip=-1in\emph{\footnotesize Intent: #1}\end{singlespace}}\nopagebreak[1]}
+%% In aligned/alignedat/gathered environments, you don't et
+%% automatice equation numbers. This command makes sure to
+%% label them properly.
+\newcommand\labeleq[1]{\refstepcounter{equation}\label{#1}}
 
 \include{md}
 \domd

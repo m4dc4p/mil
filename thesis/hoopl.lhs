@@ -330,13 +330,13 @@ Now we can give the |NonLocal| instance for |CStmt|:
 %include DeadCodeC.lhs
 %let nonLocalInst = False
 
-We only define |entryLabel| for the |Entry| constructor,
-  because only it is ``open on entry'' (i.e., due to its type |C O|).
-  We do not define any cases for |successors| even though |Return| is
-  ``closed on exit'' (i.e., due to its type |O C|), because our AST
-  does not represent the destination of a return (implicit or
-  explicit). If our AST supported branching (such as \texttt{if}
-  statements), then |successors| would be more interesting.
+We only define |entryLabel| for the |Entry| constructor, because only
+it is ``open on entry'' (i.e., due to its type |C O|).  We do not
+define any cases for |successors| even though |Return| is ``closed on
+exit'' (i.e., due to its type |O C|), because our AST does not
+represent the destination of a return (implicit or explicit). If our
+AST supported branching (such as \texttt{if} statements), then
+|successors| would be more interesting.
 
 \intent{Summarize CFGs in Hoopl} 
 
@@ -401,9 +401,8 @@ facts on every iteration.
   \begin{minipage}{\hsize}
 > data DataflowLattice a = DataflowLattice { fact_name :: String,
 >   fact_bot :: a,
->   fact_join :: JoinFun a }
->
-> type JoinFun a = Label -> OldFact a -> NewFact a -> (ChangeFlag, a)
+>   fact_join :: Label -> OldFact a -> NewFact a 
+>                -> (ChangeFlag, a) }
 >
 > newtype OldFact a = {-"\dots"-}
 > newtype NewFact a = {-"\dots"-}
@@ -424,18 +423,17 @@ dead.
 
 \intent{Introduce fact definition for liveness.} 
 
-We define the set \textsc{Live} as the set of all declared variables
+We define the set \setL{Live} as the set of all declared variables
 in the program. Recall that dataflow analysis computes two sets for
 each block in the CFG, named \inBa and \outBa. For liveness analysis,
-\inBa and \outBa are subsets of \textsc{Live}. 
+\inBa and \outBa are subsets of \setL{Live}. 
 
 \intent{Introduce meet for liveness}
 
-Our transfer function,
-given in Section~\ref{hoopl_sec5}, will show that we traverse the CFG
-backward.  That is, \outBa set for block $B$ is the union of all
-the \inE sets of $B$'s successors. That is, the meet operator for
-liveness is set union.
+Our transfer function, given in Section~\ref{hoopl_sec5}, will show
+that we traverse the CFG backward. To compute the \outBa set for block
+$B$, we take the union of all the \inE sets of $B$'s successors. That
+is, the meet operator for liveness is set union.
 
 \intent{Illustrate liveness using a better example than our sample
   program.}  
@@ -443,16 +441,16 @@ liveness is set union.
 Consider Figure~\ref{hoopl_fig8}, which shows a fragment of C code and
 its associated CFG. In Block~\refNode{hoopl_lst6_assignx2} only !+x+!
 is live due to ``!+x = 0+!.'' Therefore, $\inB{hoopl_lst6_assignx2} =
-\{\facts{x}\} \subset \textsc{Live}$.  However, in
+\{\facts{x}\} \subset \setL{Live}$.  However, in
 Block~\refNode{hoopl_lst6_assignx1} both !+x+! and !+y+!  are live due
 to ``!+x = 1 + y+!'' (and thus, $\inB{hoopl_lst6_assignx1} =
-\{\facts{x,y}\} \subset \textsc{Live}$). Because both
+\{\facts{x,y}\} \subset \setL{Live}$). Because both
 Block~\refNode{hoopl_lst6_assignx1} and
 Block~\refNode{hoopl_lst6_assignx2} are successors to
 Block~\refNode{hoopl_lst6_test}, \outB{hoopl_lst6_test} must be the
 union of \inB{hoopl_lst6_assignx2} and \inB{hoopl_lst6_assignx1}; that
 is, we compute that $\outB{hoopl_lst6_test} = \{\facts{x,y}\} \subset
-\textsc{Live}$.
+\setL{Live}$.
 
 \begin{myfig}
   \begin{tabular}{cc}
@@ -463,9 +461,53 @@ is, we compute that $\outB{hoopl_lst6_test} = \{\facts{x,y}\} \subset
   \label{hoopl_fig8}
 \end{myfig}
 
-\intent{Show fact and meet operator for example as Haskell code and as 
-  dataflow equations.}
-\lipsum
+\intent{Show fact and meet operator for example as Haskell code and as
+  dataflow equations.}  
+
+Figure~\ref{hoopl_fig9} shows definitions for our liveness facts and
+meet operator. Part~\subref{hoopl_fig9_a} shows dataflow equations
+(using the notation of Chapter~\ref{ref_chapter_background}) and
+Part~\subref{hoopl_fig9_b} shows Haskell
+code. Equation~\ref{hoopl_eqn_facts} in Part~\subref{hoopl_fig9_A}
+defines \setL{Live} as the set of variables in the CFG; in
+Part~\subref{hoopl_fig9_b}, we define an analogous synonym, |Live|, as
+a |Set Var| (using Haskell's standard  |Set|
+type). Equation~\ref{hoopl_eqn_meet} defines our meet operator as set
+union. The |meet| function implements the operator. |meet| takes two sets
+, |(OldFact old)| and |(NewFact new)|. If |old| does not equal |new| we
+return |SomeChange| and the union of the two sets. Hoopl provides the
+|changeIf| function that maps |Bools| to |ChangeFlag|
+values.\footnote{If the sets are equal, the second value of the pair
+  will be ignored and lazy evaluation saves us from computing a union
+  we never use.}
+
+
+\begin{myfig}
+  \begin{tabular}{cc}
+    \begin{minipage}{3in}
+      \input{hoopl_fact_def}
+    \end{minipage} & \begin{minipage}{3.5in}
+%let latticeDef = True
+%include DeadCodeC.lhs
+%let latticeDef = False
+    \end{minipage} \\
+    \scap{hoopl_fig9_a} & \scap{hoopl_fig9_b}
+  \end{tabular}
+  \caption{Fact and meet definitions for liveness
+    analysis. Part~\subref{hoopl_fig9_a} shows dataflow equations;
+    Part~\subref{hoopl_fig9_b} shows Haskell code.}
+  \label{hoopl_fig9}
+\end{myfig}
+
+The |lattice| function in Part~\subref{hoopl_fig9_b} creates a
+|DataflowLattice| value for our analysis. Its type, |Map Label Live|,
+does not match |meet| exactly. Hoopl associates facts with each
+|Label| (i.e., entry point) in the CFG. Hoopl provides the |joinMaps|
+function which lifts facts into a map from |Labels| to
+facts. Therefore, we define |meet| in terms of |Live|, and use
+|joinMaps| to extend it to |Map Label Live|. The bottom element for
+the lattice is also |Map.empty|, an empty map, meaning we have no
+knowledge about liveness when analysis begins.
 
 \intent{Aside: |WithTop|/|WithBottom| types.}
 \lipsum
