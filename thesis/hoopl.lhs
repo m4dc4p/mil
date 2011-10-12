@@ -520,7 +520,7 @@ when analysis begins.
 backwards.}
 
 The \emph{transfer function}, as defined by dataflow analysis,
-computes either \inBa or \outB for a some block $B$ in the CFG. A
+computes either \inBa or \outBa for a some block $B$ in the CFG. A
 \emph{forwards} analysis calculates \outBa, based on the contents of
 $B$ and \inBa. A \emph{backwards} analysis does the reverse: computing
 \inBa from the block's contents and its \outBa.
@@ -602,9 +602,31 @@ receives a map of |Labels| to |Facts| for all its successor blocks.
 \intent{Give definition for example's transfer function.}
 
 Figure~\ref{hoopl_fig11} shows the transfer function, |liveness|, for
-our example. The |vars| function takes an expression and returns the
+our example. The |uses| function takes an expression and returns the
 set of all variables used in the expression. The |transfer| function
-computes the facts for each value in |CStmt|, which we now detail:
+computes the facts for each value in |CStmt|. 
+
+\noindent\hangindent=\parindent\hangafter=1 |transfer (Entry _)
+f|\quad This statement represents the entry point of the function. If we
+represented global variables we would pass them along as our result. However,
+because we do not, no variables will be live after this statement and our result
+is the empty set.
+
+\noindent\hangindent=\parindent\hangafter=1 |transfer (Assign var expr)
+f|\quad In this case, |f| represents the set of live variables found
+so far. We first remove |var| from |f|.\footnote{This statement
+  represents the declaration of |var|; because our analysis goes
+  backwards, |var| cannot be live \emph{prior} to declaration.}  Any
+variables in |expr| are live, so we add them to |f|. 
+
+\noindent\hangindent=\parindent\hangafter=1 |transfer (Call _ exprs)
+f|\quad This case resembles |Assign|, except we do not remove any
+variables from |f|. We just add all variables found in all the
+elements of |exprs|.
+
+\noindent\hangindent=\parindent\hangafter=1 |transfer Return f|\quad
+We do not add any variables here, since our |Return| does not take an
+argument.
 
 \begin{myfig}
   \begin{minipage}{\hsize}
@@ -617,27 +639,8 @@ computes the facts for each value in |CStmt|, which we now detail:
   \caption{The transfer function for our liveness example.}
   \label{hoopl_fig11}
 \end{myfig}
+\intent{Conclude \& Summarize transfer functions and our example.}
 
-{\narrower
-
-\noindent\hangindent=\parindent\hangafter=1|transfer (Assign var expr) f|\quad In this case, |f| represents the
-set of live variables found so far. We first remove |var| from |f|,
-since (this) instance of |var| can no longer be live. Any variables in
-|expr| are live, so we add them to |f|.\footnote{The order is not
-  import for C, but may be for other languages that allow the same
-  variable to be declared more than once in the same scope.}
-
-\noindent\hangindent=\parindent\hangafter=1|transfer (Call _ exprs) f|\quad This case resembles |Assign|, except
-we do not remove any variables from |f|. We just add all variables found in all
-the elements of |exprs|.
-
-\noindent\hangindent=\parindent\hangafter=1|transfer Return f|\quad We do not add any variables here, since our |Return|
-does not take an argument. However, |f| will be a |FactBase| value here. We
-take the union of all live variables in all successors and return that as our
-result. If our AST was more complicated this would have an effect --- as it is,
-|f| will always be an empty |FactBase|.
-
-}
 \section{Iteration \& Fixed Points}
 
 \intent{Describe how Hoopl iterates on facts; how Hoopl determines when
