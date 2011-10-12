@@ -380,8 +380,9 @@ associated definitions in Figure~\ref{hoopl_fig7}) so clients can
 define the facts and meet operator for their specific analysis. The
 field |fact_name| exists only for documentation. Hoopl uses the value
 in the |fact_bot| field to create initial facts for each block in
-the CFG when analysis starts. The |fact_join| field will hold the
-client's implementation of their meet operator.
+the CFG when analysis starts. \margin{The |fact_join| field will hold the
+client's implementation of their meet operator.}{Clarify that meet
+operator \textbf{only} used to determine fixed point.}
 
 The meet operator, |fact_join|, takes two arguments and returns a pair
 consisting of a value and a |ChangeFlag|. The arguments, of type
@@ -391,8 +392,8 @@ facts for the same block. \margin{The facts may differ for two
   of the analysis, or they could be from multiple predecessors or
   successors\footnote{Facts come from multiple predecessors when doing
     forwards analysis, multiple successors when going backwards.} of
-  the current block.}{Is |fact_join| used to combine facts from nodes,
-  or does th transfer function implicitly do that with |FactBase|?}
+  the current block.}{|fact_join| is only used when determining if analysis is at 
+a fixed-point. It does NOT apply to |FactBase|.}
 The client determines if the facts differ and returns |SomeChange|,
 plus the new facts, if so. Otherwise, the client returns |NoChange|,
 indicating the the |OldFact| and |NewFact| values are equal. Hoopl
@@ -639,32 +640,116 @@ argument.
   \caption{The transfer function for our liveness example.}
   \label{hoopl_fig11}
 \end{myfig}
+
 \intent{Conclude \& Summarize transfer functions and our example.}
+\lipsum
 
 \section{Iteration \& Fixed Points}
-
 \intent{Describe how Hoopl iterates on facts; how Hoopl determines when
 a fixed point has been reached.}
-\lipsum
+Dataflow analysis iterates over the CFG until facts reach a fixed point. Hoopl
+implements this portion of the algorithm using the lattice and transfer
+function implementations given by the client program.
+
+Hoopl uses the meet operator (the |fact_join| field of the
+|DataflowLattice| type) given by the client to 
+determine when facts stop changing. In a forwards analysis, the
+transfer funcitn produces a |FactBase| at each block's exit point. In a
+backwards analysis, a |Fact| is produced at each block's entry point. In both
+cases, facts are associated with |Labels|.
+
+Conceptually, Hoopl tracks the facts associated with each |Label|. On
+each iteration, the previous facts for a label are combined with new
+facts using the meet operator. Recall that |fact_join| returns a
+|ChangeFlag| as well as new facts. Therefore, if any application of
+|fact_join| results in |SomeChange|, Hoopl continues to iterate the
+analysis. Otherwise, the analysis terminates. 
 
 \section{Rewriting}
+\intent{Briefly describe rewriting as transformation.}  
 
-\intent{Briefly describe rewriting as transformation.}
-\lipsum
-\intent{Introduce |FwdRewrite| and |BwdRewrite| types; show
-  how to construct them with |mkFRewrite3| and |mkBRewrite3|.}
-\lipsum
+Dataflow anlysis does not strictly address how to transform (or
+rewrite) the CFG --- it just defines how to analyze properties
+of the CFG. Rewriting is usually the goal of analysis, and is therefore
+generally grouped with dataflow analysis under the term ``optimization.''
 
-\intent{Segue to |mkFRewrite|, |mkBRewrite|, existentials and type families.}
-\lipsum
+\intent{Introduce |FwdRewrite| and |BwdRewrite| types; show how to
+  construct them with |mkFRewrite| and |mkBRewrite|.} 
 
-\intent{Give definition of examples transfer functino.}
-\lipsum
+Hoopl provides two types to represent rewriting, shown in
+Figure~\ref{hoopl_fig11}. A forwards optimization uses |FwdRewrite|;
+backwards optimizatin uses |BwdRewrite|. Hoopl does not export the
+constructors for either type. Instead, they are constructed with the
+|mkBRewrite| and |mkFRewrite| functions. Hoopl defines exactly
+analogous functions for forward and backward rewrites, so we will only
+discuss the backwards case from here.
 
-\section{Interleaved Analysis \& Rewriting}
+The |mkBRewrite| function takes an argument with an existential type,
+similar to |mkBTransfer| in Figure~\ref{hoopl_fig10}. This argument
+implements the rewriting that the given analysis will perform. The
+existential type |(forall e x. n e x)| allows one function to
+pattern-match on all definitions in the AST. The |Fact x f| argument
+gives facts computed by the transfer function to the rewriter. The |n|
+and |f| parameters are the same as always: facts and the AST. However,
+the |m| parameter and its |FuelMonad| constraint are new.
 
-\intent{Discuss how Hoopl manages to interleave both.}
-\lipsum
+\begin{myfig}
+  \begin{minipage}{\hsize}
+> newtype FwdRewrite m n f 
+> newtype BwdRewrite m n f 
+> mkBRewrite :: FuelMonad m => 
+>   (forall e x . n e x -> Fact x f -> m (Maybe (Graph n e x)))
+>   -> BwdRewrite m n f
+  \end{minipage}
+  \caption{The |FwdRewrite| and |BwdRewrite| types provided by Hoopl,
+    as well as functions used to construct them. |mkBRewrite|,
+    |deepBwdRw|, create BwdRewrite values with different
+    behaviors. Analogous definitions named |mkFRewrite|, |deepFwdRw|,
+    etc. exist for |FwdRewrite| as well.}
+  \label{hoopl_fig11}
+\end{myfig}
+
+\intent{Describe optimization fuel and purpose of |FuelMonad|
+  constraint.}  
+
+Hoopl implements a concept known as ``optimization
+fue'' to add in debugging optimizations. Each rewrite costs 1 ``unit''
+of fuel. If fuel runs out, Hoopl stops iterating. This allows the
+programmer to debug faulty optimizations by decreasing the fuel supply
+in a class divide-and-conquer approach. The |FuelMonad| constraint
+ensures Hoopl can properly deduce fuel during rewriting. Normally, the client
+program does not worry about fuel. 
+
+\intent{Describe result of rewrite function.}  
+
+The rewrite function returns monadic |Maybe (Graph n e x)| value. The
+monadic portion relates to |FuelMonad|. However, the |Maybe| portion
+indicates if any rewriting took place. Returning |Nothing| means no
+changes occurred. A |Just| value is returned, causes Hoopl to replace
+the current block with the \emph{graph} given. This allows rewriters
+to replace a single statement with many statements. A rewriter can
+also return |Just emptyGraph|, which deletes the current block. Notice
+that only an |O O| block can be deleted. A |C O| and |O C| block
+cannot be deleted by Hoopl (using this mechanism), as that would leave
+a dangling |O x| or |e O| blockm, respectively.
+
+\intent{Give definition of examples transfer functio.n}  
+Figure~\ref{hoopl_fig12} shows the rewrite function for our
+dead-code elmination optimization. The returns |Nothing| in all
+cases except for the |Assign| statement. If the variable assigned, |var|, 
+does not exist in the live set, |f|, we can eliminate the
+assignment. Otherwise, we leave the graph alone.
+
+\begin{myfig}
+  \begin{minipage}{\hsize}
+%let includeRewrite = True
+%include DeadCodeC.lhs
+%let includeRewrite = False    
+  \end{minipage}
+  \caption{The rewrite functin for our dead-code elimination optimization. |Assign|
+    statements are deleted when they assign to a dead variable. In all other cases
+    the CFG remains unchanged.}
+\end{myfig}
 
 \section{Dead-Code Elimination}
 
@@ -673,6 +758,8 @@ lots of illustratin.}
 \lipsum
 
 \section{The Rest of Hoopl}
+
+\intent{Interleaved Analysis \& Rewriting}
 
 \intent{Items that don't fit in elsewhere: combinators for rewriting,
   the |CheckPoint| monad, optimization fuel, |liftFuel|,

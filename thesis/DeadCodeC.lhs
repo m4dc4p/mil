@@ -15,6 +15,7 @@
 > import qualified Data.Set as Set
 > import qualified Data.Map as Map
 > import Compiler.Hoopl
+> import Text.PrettyPrint
 
 %endif
 %if includeAst || includeAll
@@ -31,6 +32,35 @@
 >   | String String
 >
 > type Var = String
+
+%endif
+%if includeAll
+
+> printGraph :: Graph CStmt C C -> Doc
+> printGraph (GMany _ blocks _) = 
+>   let (JustC entry, mids, JustC last) = blockToNodeList' (head $ mapElems blocks)
+>       p1 = printStmt entry
+>       p2 = map printStmt mids
+>       p3 = printStmt last
+>   in p1 <+> hcat p2 <+> p3
+> 
+> printBlocks :: forall e x. Block CStmt e x -> Doc
+> printBlocks (BFirst (Entry _)) = text "void example()"  <+> lbrace  
+> printBlocks (BMiddle e) = printStmt e
+> printBlocks (BLast (Return)) = rbrace
+
+> printStmt :: forall e x. CStmt e x -> Doc
+> printStmt (Entry _) = empty
+> printStmt (Assign v expr) = text v <+> equals <+> printExpr expr <> semi
+> printStmt (Call fun exprs) = text fun <> parens (hcat $ punctuate comma $ map printExpr exprs) <> semi
+> printStmt Return = empty
+
+> printExpr :: CExpr -> Doc
+> printExpr (Const i) = text (show i)
+> printExpr (Add e1 e2) = printExpr e1 <+> text "+" <+> printExpr e2
+> printExpr (Var v) = text v
+> printExpr (String s) = text s
+        
 
 %endif
 %if nonLocalInst || includeAll
@@ -100,16 +130,17 @@
 >        else return (Just emptyGraph)
 >     rewrite (Call _ _) _ = return Nothing
 >     rewrite Return _ = return Nothing
->       
 
 %endif
 %if includeAll
 
 > deadCode :: Graph CStmt C C -> Graph CStmt C C
-> deadCode program = runSimpleUniqueMonad $ runInfinite $ do
->     (prog, _, _) <- analyzeAndRewriteBwd opt (JustC entryPoints) program initialFacts
->     return prog
+> deadCode program = runSimpleUniqueMonad $ runWithFuel infiniteFuel $ pass
 >   where
+>     pass :: SimpleFuelMonad (Graph CStmt C C)
+>     pass = do
+>       (prog, _, _) <- analyzeAndRewriteBwd opt (JustC entryPoints) program initialFacts
+>       return prog
 >     opt = BwdPass { bp_lattice = lattice
 >                   , bp_transfer = liveness 
 >                   , bp_rewrite = eliminate }
@@ -121,5 +152,12 @@
 >     entry (BFirst (Entry l)) = l
 >
 >     initialFacts = mkFactBase lattice (zip entryPoints (repeat Set.empty))
+
+> main = do 
+>   let prog = runSimpleUniqueMonad $ do
+>         label <- freshLabel
+>         return (foo label)
+>   putStrLn $ render (printGraph prog)
+>   putStrLn $ render (printGraph (deadCode prog))
 
 %endif
