@@ -1,6 +1,6 @@
 %if False
 
-> {-# LANGUAGE GADTs #-}
+> {-# LANGUAGE GADTs, RankNTypes #-}
 > 
 > module DeadCodeC 
 > where
@@ -8,11 +8,13 @@
 %endif
 %if includeAll
 
-> import Compiler.Hoopl
-> import Data.Set (Set, isSubsetOf, union)
+> import Data.List (nub)
+> import Data.Set (Set, union, unions, (\\)
+>                  , singleton, delete)
 > import Data.Map (Map)
 > import qualified Data.Set as Set
 > import qualified Data.Map as Map
+> import Compiler.Hoopl
 
 %endif
 %if includeAst || includeAll
@@ -29,6 +31,13 @@
 >   | String String
 >
 > type Var = String
+
+%endif
+%if nonLocalInst || includeAll
+
+> instance NonLocal CStmt where
+>   entryLabel (Entry l) = l
+>   successors _ = []
 
 %endif
 %if buildFoo || includeAll
@@ -52,21 +61,30 @@
 > meet _ (OldFact old) (NewFact new) = 
 >   (changeIf (old /= new), old `union` new)
 >
-> lattice :: DataflowLattice (Map Label Live)
+> lattice :: DataflowLattice Live
 > lattice = DataflowLattice { 
 >       fact_name = "Liveness"
->     , fact_bot = Map.empty
->     , fact_join = joinMaps meet }
+>     , fact_bot = Set.empty
+>     , fact_join = meet }
 
 %endif
-%if nonLocalInst || includeAll
+%if includeLiveness || includeAll
 
-> instance NonLocal CStmt where
->   entryLabel (Entry l) = l
->   successors _ = []
+> liveness :: BwdTransfer CStmt Live
+> liveness = mkBTransfer transfer
+>   where 
+>     transfer :: forall e x. CStmt e x -> Fact x Live -> Live {-"\label{hoopl_eg_transfer}"-}
+>     transfer (Entry _) f = f {-"\label{hoopl_eg_transfer_entry}"-}
+>     transfer (Assign var expr) f = var `delete` (f `union` (vars expr)) {-"\label{hoopl_eg_transfer_assign}"-}
+>     transfer (Call _ exprs) f = f `union` unions (map vars exprs) {-"\label{hoopl_eg_transfer_call}"-}
+>     transfer Return f = unions (mapElems f) {-"\label{hoopl_eg_transfer_return}"-}
+>     
+>     vars :: CExpr -> Set Var {-"\label{hoopl_eg_transfer_vars}"-}
+>     vars (Add e1 e2) = vars e1 `union` vars e2
+>     vars (Var v) = singleton v
+>     vars _ = Set.empty
 
 %endif
-
 %if includeAll
 
 > deadCode :: Graph CStmt C C -> Graph CStmt C C

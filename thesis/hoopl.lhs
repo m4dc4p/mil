@@ -1,6 +1,8 @@
 \documentclass[12pt]{report}
 %include polycode.fmt
+%include lineno.fmt
 \input{preamble}
+\numbersoff
 \begin{document}
 \input{document.preamble}
 \chapter{The Hoopl Library}
@@ -112,6 +114,7 @@ requires that the client program implement them for their specific AST
 and optimization.
 
 \section{Control-Flow Graphs}
+\label{hoopl_sec_cfg}
 
 \intent{Introduce parameterization of blocks by AST and shape.}
 
@@ -468,7 +471,7 @@ Figure~\ref{hoopl_fig9} shows definitions for our liveness facts and
 meet operator. Part~\subref{hoopl_fig9_a} shows dataflow equations
 (using the notation of Chapter~\ref{ref_chapter_background}) and
 Part~\subref{hoopl_fig9_b} shows Haskell
-code. Equation~\ref{hoopl_eqn_facts} in Part~\subref{hoopl_fig9_A}
+code. Equation~\ref{hoopl_eqn_facts} in Part~\subref{hoopl_fig9_a}
 defines \setL{Live} as the set of variables in the CFG; in
 Part~\subref{hoopl_fig9_b}, we define an analogous synonym, |Live|, as
 a |Set Var| (using Haskell's standard  |Set|
@@ -500,36 +503,141 @@ values.\footnote{If the sets are equal, the second value of the pair
 \end{myfig}
 
 The |lattice| function in Part~\subref{hoopl_fig9_b} creates a
-|DataflowLattice| value for our analysis. Its type, |Map Label Live|,
-does not match |meet| exactly. Hoopl associates facts with each
-|Label| (i.e., entry point) in the CFG. Hoopl provides the |joinMaps|
-function which lifts facts into a map from |Labels| to
-facts. Therefore, we define |meet| in terms of |Live|, and use
-|joinMaps| to extend it to |Map Label Live|. The bottom element for
-the lattice is also |Map.empty|, an empty map, meaning we have no
-knowledge about liveness when analysis begins.
+|DataflowLattice| value for our analysis. Its type, |Live|, reflects
+the facts computed. The bottom element for the lattice is also
+|Set.empty|, an empty set, meaning we have no knowledge about liveness
+when analysis begins.
 
-\intent{Aside: |WithTop|/|WithBottom| types.}
+%% \intent{Aside: |WithTop|/|WithBottom| types.}
+%% \lipsum
+
+\intent{Conclude \& Summarize}
 \lipsum
 
 \section{Direction \& Transfer Functions}
 \label{hoopl_sec5}
-
 \intent{Reminder about what transfer functions do \& that they can go forwards or
-backwards;}
-\lipsum
+backwards.}
 
-\intent{Introduce |FwdTransfer| and |BwdTransfer| types; show how to construct them
-with |mkFTransfer3| and |mkBTransfer3|. }
-\lipsum
+The \emph{transfer function}, as defined by dataflow analysis,
+computes either \inBa or \outB for a some block $B$ in the CFG. A
+\emph{forwards} analysis calculates \outBa, based on the contents of
+$B$ and \inBa. A \emph{backwards} analysis does the reverse: computing
+\inBa from the block's contents and its \outBa.
 
-\intent{Show how |mkFTransfer| and |mkBTransfer| with existential
-  types and type families are used in general.}
-\lipsum
+\intent{Introduce |FwdTransfer| and |BwdTransfer| types; Show how
+  |mkFTransfer| and |mkBTransfer| construct transfer functions.} 
+
+Hoopl defines the |FwdTransfer| and |BwdTransfer| types, shown in
+Figure~\ref{hoopl_fig10}, to represent forwards and backwards transfer
+functions. The |n| parameter represents the blocks contents (i.e., the
+AST of the language analyzed). The |f| parameter represents the facts
+computed. Hoopl does not export the constructors for |FwdTransfer| or
+|BwdTransfer|; instead, clients use the |mkFTransfer| and
+|mkBTransfer| functions, whose signatures are also shown in
+Figure~\ref{hoopl_fig10}. 
+
+\begin{myfig}
+    \begin{minipage}{\hsize}
+> newtype FwdTransfer n f 
+> newtype BwdTransfer n f
+
+> mkFTransfer :: (forall e x . n e x -> f -> Fact x f) -> FwdTransfer n f
+> mkBTransfer :: (forall e x . n e x -> Fact x f -> f) -> BwdTransfer n f      
+    \end{minipage}
+  \caption{Hoopl's |FwdTransfer| and |BwdTransfer| types. They can be
+    constructed with the functions |mkFTransfer| and |mkBTransfer|.}
+  \label{hoopl_fig10}
+\end{myfig}
+
+The signatures for |mkFTransfer| and |mkBTransfer| use
+\emph{existential} types. Hoopl requires that we parameterize our AST
+(i.e., the |n| type) using the |O| and |C| types from
+Section~\ref{hoopl_sec_cfg}.  A standard Haskell function cannot
+pattern match on values with different types (e.g., |Assign| has type
+|CStmt O O|, but |Entry| has type |CStmt C O|).  Therefore, to
+pattern-match on all constructors, the transfer function must be
+defined with an \emph{existential} type. The notation |(forall e x. n
+e x -> {-"\dots"-})| indicates that the |e| and |x| types will not be
+visible outside the function definition. This allows us to write one
+transfer function that can match on all constructors in the
+AST.\footnote{Hoopl also exports |mkFTransfer3| and |mkBTransfer3|
+  which take separate arguments for each |C O|, |O O| and |O C| type,
+  in case the node type is not known and an existential transfer
+  function cannot be defined.}
+
+\intent{Types families and |Fact C| vs. |Fact O|} 
+
+The |mkFTransfer| and |mkBTransfer| functions look almost identical
+but for their |Fact x f| argument. |Fact x f| defines a type family
+(another GHC extension) such that the \emph{actual} type of |Fact x f|
+depends on the type of |x|. When |x| is |C|, then |Fact x f| is a
+|FactBase f| type. A |FactBase| maps |Labels| to |f| values. When |x|
+is |O|, |Fact x f| is only |f|.
+
+Recall that a |C| type on exit means the block may branch to one of
+many successors. In a forwards analysis, the transfer function
+distributes facts to all successors. \margin{In a backwards analysis,
+  the transfer function gathers facts from all successors.}{Doesn't
+  this imply a meet operation?}
+
+A forwards transfer function produces a |Fact| type. The
+parameterization of |FactBase| by |C| allows the transfer function to
+distribute facts to any (or all) of the block's successors, as
+required by the particular analysis. That is, it produces a map of
+|Labels| to |Facts|. A backwards transfer function receives a |Fact|
+argument. If the block has type |n e C|, then the transfer function
+receives a map of |Labels| to |Facts| for all its successor blocks. 
+
+\intent{Explain how |Fact e C| does not conflict with the meet operator --- or does it?}
+%% The |FactBase| argument given to the backwards transfer function might
+%% seem to conflict with the meet operator defined for the analysis. In
+%% fact, the |FactBase| is provided for informational purposes only ---
+%% the transfer function is free to use it in any way. \margin{Because
+%%   Hoopl interleaves rewriting and analysis (as discussed in
+%%   Section~\ref{hoopl_sec_iter}), the facts in the |FactBase|
+%%   associated with each successor label will evolve. converge until the
+%%   analysis reaches a fixed point.}{Better verify this!}
 
 \intent{Give definition for example's transfer function.}
-\lipsum
 
+Figure~\ref{hoopl_fig11} shows the transfer function, |liveness|, for
+our example. The |vars| function takes an expression and returns the
+set of all variables used in the expression. The |transfer| function
+computes the facts for each value in |CStmt|, which we now detail:
+
+\begin{myfig}
+  \begin{minipage}{\hsize}
+    \begin{withHsNum}
+%let includeLiveness = True
+%include DeadCodeC.lhs
+%let includeLiveness = False
+    \end{withHsNum}
+  \end{minipage}
+  \caption{The transfer function for our liveness example.}
+  \label{hoopl_fig11}
+\end{myfig}
+
+{\narrower
+
+\noindent\hangindent=\parindent\hangafter=1|transfer (Assign var expr) f|\quad In this case, |f| represents the
+set of live variables found so far. We first remove |var| from |f|,
+since (this) instance of |var| can no longer be live. Any variables in
+|expr| are live, so we add them to |f|.\footnote{The order is not
+  import for C, but may be for other languages that allow the same
+  variable to be declared more than once in the same scope.}
+
+\noindent\hangindent=\parindent\hangafter=1|transfer (Call _ exprs) f|\quad This case resembles |Assign|, except
+we do not remove any variables from |f|. We just add all variables found in all
+the elements of |exprs|.
+
+\noindent\hangindent=\parindent\hangafter=1|transfer Return f|\quad We do not add any variables here, since our |Return|
+does not take an argument. However, |f| will be a |FactBase| value here. We
+take the union of all live variables in all successors and return that as our
+result. If our AST was more complicated this would have an effect --- as it is,
+|f| will always be an empty |FactBase|.
+
+}
 \section{Iteration \& Fixed Points}
 
 \intent{Describe how Hoopl iterates on facts; how Hoopl determines when
