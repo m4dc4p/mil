@@ -11,7 +11,7 @@
 \usepackage{verbatim}
 \usepackage{url}
 \usepackage{fancyvrb}
-\usepackage{setspace}
+\usepackage[doublespacing]{setspace}
 \usepackage{amsmath}
 \usepackage{booktabs}
 \usepackage[margin=\parindent, format=hang,labelfont=bf]{caption}
@@ -229,8 +229,8 @@
 %% End MIL chapter
 
 \newenvironment{myfig}[1][tbh]{\begin{figure}[#1]%%
-\centering%%
-\figbegin}{\figend%%
+\begin{singlespace}\centering%%
+\figbegin}{\figend\end{singlespace}%%
 \end{figure}}
 
 %% Produce a sub-caption and label it.
@@ -284,10 +284,18 @@
 
 %% Describe intent of a passage
 \newcommand\intent[1]{{\begin{singlespace}\noindent\leftskip=-1in\emph{\footnotesize Intent: #1}\end{singlespace}}\nopagebreak[1]}
+
 %% In aligned/alignedat/gathered environments, you don't et
 %% automatice equation numbers. This command makes sure to
 %% label them properly.
 \newcommand\labeleq[1]{\refstepcounter{equation}\label{#1}}
 
+%% Creates a hanging paragraph, where the first line is not
+%% indented but all other lines are.
+\def\itempar#1{\noindent\hangindent=\parindent\hangafter=1 #1\quad}
+
 \include{md}
 \domd
+
+%% Place an input file on the next page
+\def\onnextpage#1{\afterpage{\clearpage\input{#1}\clearpage}}

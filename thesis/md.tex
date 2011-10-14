@@ -11,9 +11,9 @@
 \makeatletter
 \let\mdplus=+\let\mdbang=!      %% Preserve meaning of + and ! so we can put them into document.
 %% Turn off mark down for everyone
-\protected\def\nomd{\global\catcode`!=12\global\catcode`+=12}
+\outer\def\nomd{\catcode`!=12\catcode`+=12}
 %% Turn mark down on for everyone
-\protected\def\domd{\global\catcode`!=\active\global\catcode`+=\active %%
+\outer\def\domd{\catcode`!=\active\catcode`+=\active %%
   \initialmd}
 %% Use only with a group IMMEDIETALY following. Turns off
 %% markdown for the group-to-come, without actually tokenizing the
@@ -38,7 +38,7 @@
 %% used in front of a group, otherwise its a no-op.
 \protected\def\withmd{\def\dowith{\catcode`!=\active\catcode`+=\active\initialmd}%%
   \def\withmdB{\ifx\next\bgroup %%
-    %% A ``partial'' application of expandwith is used
+    %% A ``partial'' application of expandafter is used
     %% so we don't double up the group argument (which is what
     %% happens if we expand \next). This has the effect of 
     %% inserting \expandafter\dowith in front of the upcoming {. 
@@ -55,7 +55,7 @@
 %% catcode in the definitions to follow.
 \catcode`!=\active\catcode`+=\active %%
 %% Initial definitions associated with ! and +.
-\def\initialmd{\def!{\startTTA}\def+{\mdplus}} %%
+\def\initialmd{\protected\def!{\startTTA}\protected\def+{\mdplus}} %%
 %% Step 1 of startTT. Inital meaning of !; capture next token in \next, go to next step.
 \def\startTTA{\futurelet\next\startTTB} %%
 %% Step 2 of startTT. Compare captured token to + and go to step 3 if true. Otherwise

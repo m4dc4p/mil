@@ -12,7 +12,6 @@
 
 \VerbatimFootnotes
 \DefineShortVerb{\#}
-\doublespacing
              
 \input{front}
 

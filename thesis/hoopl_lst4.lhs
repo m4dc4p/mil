@@ -18,7 +18,7 @@
     \node[labelfor=print] () {\refNode{hoopl_lst4_print}};
 
     \node[stmt,
-      below of=print] (assigna2) {|Assign "a" (Add (Var "c") (Const 1)) :: CStmt O O|\labelNode{hoopl_lst4_assigna2}};
+      below of=print] (assigna2) {|Assign "a" (Add (Var "c") (Const 2)) :: CStmt O O|\labelNode{hoopl_lst4_assigna2}};
     \node[labelfor=assigna2] () {\refNode{hoopl_lst4_assigna2}};
 
     \node[stmt,

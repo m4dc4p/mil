@@ -43,27 +43,27 @@ rewriting function that transforms the CFG.
 \intent{Introduce example}
 
 We will illustrate Hoopl concepts through a running example motivated
-by the function defined in Figure~\ref{hoopl_fig1_a}. The assignments
-to \texttt{a} on Lines~\ref{hoopl_lst1_assign_a} and
-\ref{hoopl_lst1_add} do not affect the output (i.e., observable
-behavior)of !+foo+!. Eliminating them will not change the program's
-meaning and may improve its performance. However, we could not
-eliminate the assignment to !+c+! on Line~\ref{hoopl_lst1_assign_c}
-because that may change the value printed on
-Line~\ref{hoopl_lst1_print}. We call variables that may affect
-observable behavior \emph{live}; a \emph{dead} variable is not
+by the function defined in Figure~\ref{hoopl_fig1_a}. A cursory
+examination of that listing shows the assignments to !+a+! on
+Lines~\ref{hoopl_lst1_assign_a} and \ref{hoopl_lst1_add} do not affect
+the output (i.e., observable behavior) of !+example+!. We could eliminate
+them without changing the program's meaning; we may even improve its
+performance. However, we could not eliminate the assignment to !+c+!
+on Line~\ref{hoopl_lst1_assign_c} because that may change the value
+printed on Line~\ref{hoopl_lst1_print}. We call variables that may
+affect observable behavior \emph{live}; a \emph{dead} variable is not
 live. Figure~\ref{hoopl_fig1_b} shows one way we could optimize this
 program by eliminating the ``dead'' statements in
 Figure~\ref{hoopl_fig1_a}.
 
-\begin{myfig}
+\begin{myfig}[tb]
 \begin{tabular}{cc}
   \input{hoopl_lst1} & \input{hoopl_lst2} \\
   \scap{hoopl_fig1_a} & \scap{hoopl_fig1_b}
 \end{tabular}
-\caption{Part~\subref{hoopl_fig1_a} defines function defined in
-  C. Part~\subref{hoopl_fig1_b} shows the program after performing
-  dead-code elimination.}
+\caption{Part~\subref{hoopl_fig1_a} defines a function using the C
+  language. Part~\subref{hoopl_fig1_b} shows the program after
+  performing dead-code elimination.}
 \label{hoopl_fig1}
 \end{myfig}
 
@@ -76,12 +76,23 @@ Figure~\ref{hoopl_fig1_b}.
 
 \intent{Provides signposts for chapter.}
 
-In Section~\ref{hoopl_sec1}, we describe the the Haskell types, data
-structures, and functions Hoopl provides for implementing
-dataflow-analysis based optimizations. Throughout, we develop our
+This chapter provides enough background to understand the use of Hoopl
+in later chapters. It assumes the reader has a fair knowledge of the
+Haskell programming language, as well as recent extensions available
+in the GHC compiler, such as GADTs. This chapter's structure mirrors
+that covering dataflow analysis
+(Chapter~\ref{ref_chapter_background}), presenting parallel concepts
+in terms of Hoopl structures. Section~\ref{hoopl_sec1} gives an
+overview of the types, data structures, and functions provided by
+Hoopl. Sections~\ref{hoopl_sec_cfg} through \ref{hoopl_sec6} give
+detailed information about each item. Section~\ref{hoopl_sec8} gives a 
+brief overview of other Hoopl elements that do not directly pertain to 
+our introduction here. Throughout, we develop our
 client program to implement dead-code elimination. We conclude with a
 summary and brief discussion of our experience with Hoopl in
-Section~\ref{hoopl_sec3}.
+Section~\ref{hoopl_sec3}. Section~\ref{hoopl_sec7} shows all the code
+for our dead-code optimization in one place, as well as output demonstrating
+the optimization shown in Figure~\ref{hoopl_fig1_b}.
 
 \section{Hoopl's API}
 \label{hoopl_sec1}
@@ -101,17 +112,17 @@ implementation) so that the library can recognize fixpoints.
 \intent{Introduce client-managed structures}
 
 Hoopl requires that client programs specify those items related to
-their specific optimization: the abstract syntax tree (AST) of
-  the language, the representation of facts, and the implementation of
-  the transfer and rewrite functions. Each node in the CFG
-typically contains an expression or statement from the client
-program's AST. While Hoopl controls the edges between nodes in the
-CFG, it does not specify the contents of those nodes. Similarly, while
-Hoopl determines when the analysis reaches a fixpoint, it requires
-that the client specify when one set of facts equals another. Finally,
-Hoopl applies the transfer and rewrite functions to the CFG but
-requires that the client program implement them for their specific AST
-and optimization.
+their specific optimization: the abstract syntax tree (AST) of the
+language analyzed, the representation of facts, and the implementation
+of the transfer and rewrite functions. Each node in the CFG typically
+contains an expression or statement from the AST of the language which
+the client program analyzes. While Hoopl controls the edges between
+nodes in the CFG, it does not specify the contents of those
+nodes. Similarly, while Hoopl determines when the analysis reaches a
+fixpoint, it requires that the client specify when one set of facts
+equals another. Finally, Hoopl applies the transfer and rewrite
+functions to the CFG but requires that the client program implement
+them for their specific AST and optimization.
 
 \section{Control-Flow Graphs}
 \label{hoopl_sec_cfg}
@@ -157,7 +168,7 @@ block shapes.
 \intent{Show example with O and C types applied.}
 
 Figure~\ref{hoopl_fig3} gives Haskell declarations that can represent
-the AST for !+foo+!. We use the GHC Haskell compiler's GADT syntax
+the AST for !+example+!. We use the GHC Haskell compiler's GADT syntax
 \citep{GHC-7.2.1} to succinctly specify the actual type of the |e|
 (``entry'') and |x| (``exit'') type parameters for each
 constructor. The entry and exit type (i.e., either |O| or |C|) given
@@ -172,7 +183,7 @@ our subset, so we do not annotate them like |CStmt|. Hoopl defines the
 %include DeadCodeC.lhs
 %let includeAst = False
   \end{minipage}
-  \caption{Haskell datatypes capable of representing the AST of \texttt{foo}.}
+  \caption{Haskell datatypes capable of representing the AST of !+example+!.}
 \label{hoopl_fig3}
 \end{myfig}
 
@@ -197,7 +208,7 @@ assignment statement.
 \end{myfig}
 
 \intent{Make connection between CFG using program text and CFG using
-  AST.}  Figure~\ref{hoopl_fig2} shows !+foo+! as a
+  AST.}  Figure~\ref{hoopl_fig2} shows !+example+! as a
 CFG. Part~\subref{hoopl_fig2_a} shows the program with C
 syntax. Part~\subref{hoopl_fig2_b} uses the AST just given.  Each
 block in Part~\subref{hoopl_fig2_a} corresponds with the adjacent
@@ -232,9 +243,11 @@ provides an alias, |Graph|, which suffices for our
 needs:\footnote{|Block| and |Graph'| define a number of constructors
   but they do not relate to our presentation and so we elide them.}
 
+\begin{singlespace}
 > data Block n e x = {-"\dots"-}
 > data Graph' block n e x = {-"\dots"-}
 > type Graph = Graph' Block
+\end{singlespace}
 
 The parameters |e| and |x| (``entry'' and ``exit'') describe the shape
 of the block (or graph) and must be |O| or |C|. The |n| (``node'')
@@ -270,7 +283,7 @@ the more general class definitions.\footnote{These instances show why
 basic blocks. Continue illustrating use of |O| and |C| types.}
 |mkFirst|, |mkMiddle| and |mkLast| all turn a single block
 (represented by the type parameter |n|) into a graph of one block with
-the same shape. The |(<*>)| operator, said ``concat'' , concatenates
+the same shape. The |(<*>)| operator, said ``concat,'' concatenates
 compatible graphs. By compatible, we mean the shapes of each argument
 must fit together. Ignoring the |NonLocal| constraint for the time
 being, the |(<*>)| operator's signature specifies that the first
@@ -312,9 +325,11 @@ control-flow between its arguments, unlike |(<*>)|. Instead, the |NonLocal|
 class defines control-flow between blocks with its two members, |entryLabel| and
 |successors|:
 
+\begin{singlespace}
 > class NonLocal n where 
 >   entryLabel :: n C x -> Label 
 >   successors :: n e C -> [Label]
+\end{singlespace}
 
 The |entryLabel| method returns the entry point (as a |Label|) for a
 given node, block or graph. The |C| type on the first argument (i.e.,
@@ -328,17 +343,17 @@ Hoopl can traverse the CFG built by the client program.
 
 \intent{Illustrate use of |NonLocal| in our example.}
 Now we can give the |NonLocal| instance for |CStmt|:
-
+\begin{singlespace}
 %let nonLocalInst = True
 %include DeadCodeC.lhs
 %let nonLocalInst = False
-
+\end{singlespace}
 We only define |entryLabel| for the |Entry| constructor, because only
 it is ``open on entry'' (i.e., due to its type |C O|).  We do not
 define any cases for |successors| even though |Return| is ``closed on
 exit'' (i.e., due to its type |O C|), because our AST does not
 represent the destination of a return (implicit or explicit). If our
-AST supported branching (such as \texttt{if} statements), then
+AST supported branching (such as !+if+! statements), then
 |successors| would be more interesting.
 
 \intent{Summarize CFGs in Hoopl} 
@@ -349,10 +364,10 @@ and |C| types. The library controls graph creation through the
 basic blocks, connected by |Labels|. Hoopl recovers control-flow
 information using the |NonLocal| class, through its |entryLabel| and
 |successors| methods. This section introduced our example function,
-!+foo+!, in Figure~\ref{hoopl_fig1}, defined an AST in
+!+example+!, in Figure~\ref{hoopl_fig1}, defined an AST in
 Figure~\ref{hoopl_fig2} that represents the subset of the C
-language used by !+foo+!, and showed how to build a representation of
-!+foo+! in Figure~\ref{hoopl_fig5}.
+language used by !+example+!, and showed how to build a representation of
+!+example+! in Figure~\ref{hoopl_fig5}.
 
 \section{Facts, Meet Operators and Lattices}
 \intent{Reminder about what facts and lattices are; How Hoopl
@@ -362,15 +377,20 @@ language used by !+foo+!, and showed how to build a representation of
 
 Recall that dataflow analysis computes \emph{facts} on each edge for
 each block $B$ in the CFG. We call the set of facts computed on the
-inbound edges of a block $B$ \inBa and the set facts on outbound edges
-\outBa. A \emph{meet operator} combines facts when multiple edges
-enter or leave the block (depending on the direction of the
-analysis). The analysis will always terminate if the meet operator
-defines a finite-height lattice. A \emph{forwards} dataflow-analysis
-computes the set \outBa, for a block $B$ in the CFG, using \inBa and
-the transfer function; \inBa then equals the meet of all \outBa from
-predecessor blocks. A backwards analysis does the same, except in
-reverse.
+inbound edges of a block $B$ \inBa and the set of facts on outbound
+edges \outBa. A \emph{meet operator} combines facts when multiple
+edges enter or leave the block (depending on the direction of the
+analysis).\footnote{The Hoopl documentation refers to a \emph{join}
+  operator, which is essentially the opposite of \emph{meet}, but we
+  use \emph{meet} for consistency with the rest of this thesis. Hoopl
+  allows the operator to be defined either way, as long as it is
+  consistent.}  The analysis will always terminate if the meet
+operator defines a finite-height lattice. A \emph{forwards}
+dataflow-analysis computes the set \outBa, for a block $B$ in the CFG,
+using \inBa and the transfer function; \inBa then equals the meet of
+all \outBa from predecessor blocks. A backwards analysis does the
+opposite: \inBa is computed using the transfer function and \outBa, and \outBa 
+equals the meet of all \inBa from successor blocks.
 
 \intent{Introduce |DataflowLattice| type and show connection to facts and 
 the meet operator.}
@@ -380,26 +400,24 @@ associated definitions in Figure~\ref{hoopl_fig7}) so clients can
 define the facts and meet operator for their specific analysis. The
 field |fact_name| exists only for documentation. Hoopl uses the value
 in the |fact_bot| field to create initial facts for each block in
-the CFG when analysis starts. \margin{The |fact_join| field will hold the
-client's implementation of their meet operator.}{Clarify that meet
-operator \textbf{only} used to determine fixed point.}
+the CFG when analysis starts. The |fact_join| field will hold the
+client's implementation of their meet operator.
 
 The meet operator, |fact_join|, takes two arguments and returns a pair
 consisting of a value and a |ChangeFlag|. The arguments, of type
-|OldFact| and |NewFact|, represent two, possibly different, sets of
-facts for the same block. \margin{The facts may differ for two
-  reasons: |OldFact| and |NewFact| could be from different iterations
-  of the analysis, or they could be from multiple predecessors or
-  successors\footnote{Facts come from multiple predecessors when doing
-    forwards analysis, multiple successors when going backwards.} of
-  the current block.}{|fact_join| is only used when determining if analysis is at 
-a fixed-point. It does NOT apply to |FactBase|.}
-The client determines if the facts differ and returns |SomeChange|,
-plus the new facts, if so. Otherwise, the client returns |NoChange|,
-indicating the the |OldFact| and |NewFact| values are equal. Hoopl
-choose this implementation for efficiency: the client can determine if
-facts change during each join, rather than the library comparing all
-facts on every iteration.
+|OldFact| and |NewFact|, represent sets of facts for the same block
+from different iterations. |fact_join| determines if the facts differ
+and returns |SomeChange|, plus the new facts, if so. Otherwise, the
+|fact_join| returns |NoChange|, indicating the the |OldFact| and
+|NewFact| values are equal. Hoopl choose this implementation for
+efficiency: the client can determine if facts change during each join,
+rather than the library comparing all facts on every iteration.
+
+Unlike the meet operator defined in Chapter~\ref{ref_chapter_background},
+Section~\ref{back_subsec_facts}, |fact_join| is \emph{not} used to
+combine \inE or \out facts during analysis. The transfer function, to
+be discussed in Section~\ref{hoopl_sec5}, manages that. |fact_join| is only used
+when determining if analysis is at a fixed-point.
 
 \begin{myfig}
   \begin{minipage}{\hsize}
@@ -445,15 +463,15 @@ is, the meet operator for liveness is set union.
 Consider Figure~\ref{hoopl_fig8}, which shows a fragment of C code and
 its associated CFG. In Block~\refNode{hoopl_lst6_assignx2} only !+x+!
 is live due to ``!+x = 0+!.'' Therefore, $\inB{hoopl_lst6_assignx2} =
-\{\facts{x}\} \subset \setL{Live}$.  However, in
+\{\facts{x}\} \subseteq \setL{Live}$.  However, in
 Block~\refNode{hoopl_lst6_assignx1} both !+x+! and !+y+!  are live due
 to ``!+x = 1 + y+!'' (and thus, $\inB{hoopl_lst6_assignx1} =
-\{\facts{x,y}\} \subset \setL{Live}$). Because both
+\{\facts{x,y}\} \subseteq \setL{Live}$). Because both
 Block~\refNode{hoopl_lst6_assignx1} and
 Block~\refNode{hoopl_lst6_assignx2} are successors to
 Block~\refNode{hoopl_lst6_test}, \outB{hoopl_lst6_test} must be the
 union of \inB{hoopl_lst6_assignx2} and \inB{hoopl_lst6_assignx1}; that
-is, we compute that $\outB{hoopl_lst6_test} = \{\facts{x,y}\} \subset
+is, we compute that $\outB{hoopl_lst6_test} = \{\facts{x,y}\} \subseteq
 \setL{Live}$.
 
 \begin{myfig}
@@ -475,15 +493,15 @@ Part~\subref{hoopl_fig9_b} shows Haskell
 code. Equation~\ref{hoopl_eqn_facts} in Part~\subref{hoopl_fig9_a}
 defines \setL{Live} as the set of variables in the CFG; in
 Part~\subref{hoopl_fig9_b}, we define an analogous synonym, |Live|, as
-a |Set Var| (using Haskell's standard  |Set|
+a |Set Var| (using Haskell's standard |Set|
 type). Equation~\ref{hoopl_eqn_meet} defines our meet operator as set
-union. The |meet| function implements the operator. |meet| takes two sets
-, |(OldFact old)| and |(NewFact new)|. If |old| does not equal |new| we
-return |SomeChange| and the union of the two sets. Hoopl provides the
-|changeIf| function that maps |Bools| to |ChangeFlag|
-values.\footnote{If the sets are equal, the second value of the pair
-  will be ignored and lazy evaluation saves us from computing a union
-  we never use.}
+union. The |meet| function in Part~\subref{hoopl_fig9_b} implements
+the operator. |meet| takes two sets, |(OldFact old)| and |(NewFact
+new)|. If |old| does not equal |new| we return |SomeChange| and the
+union of the two sets. Hoopl provides the |changeIf| function that
+maps |Bools| to |ChangeFlag| values.\footnote{If the sets are equal,
+  the second value of the pair will be ignored and lazy evaluation
+  saves us from computing a union we never use.}
 
 
 \begin{myfig}
@@ -504,7 +522,7 @@ values.\footnote{If the sets are equal, the second value of the pair
 \end{myfig}
 
 The |lattice| function in Part~\subref{hoopl_fig9_b} creates a
-|DataflowLattice| value for our analysis. Its type, |Live|, reflects
+|DataflowLattice| value for our analysis. Its type, |DataflowLattice Live|, reflects
 the facts computed. The bottom element for the lattice is also
 |Set.empty|, an empty set, meaning we have no knowledge about liveness
 when analysis begins.
@@ -513,7 +531,7 @@ when analysis begins.
 %% \lipsum
 
 \intent{Conclude \& Summarize}
-\lipsum
+\dots To be written \dots
 
 \section{Direction \& Transfer Functions}
 \label{hoopl_sec5}
@@ -531,7 +549,7 @@ $B$ and \inBa. A \emph{backwards} analysis does the reverse: computing
 
 Hoopl defines the |FwdTransfer| and |BwdTransfer| types, shown in
 Figure~\ref{hoopl_fig10}, to represent forwards and backwards transfer
-functions. The |n| parameter represents the blocks contents (i.e., the
+functions. The |n| parameter represents the block's contents (i.e., the
 AST of the language analyzed). The |f| parameter represents the facts
 computed. Hoopl does not export the constructors for |FwdTransfer| or
 |BwdTransfer|; instead, clients use the |mkFTransfer| and
@@ -578,9 +596,8 @@ is |O|, |Fact x f| is only |f|.
 
 Recall that a |C| type on exit means the block may branch to one of
 many successors. In a forwards analysis, the transfer function
-distributes facts to all successors. \margin{In a backwards analysis,
-  the transfer function gathers facts from all successors.}{Doesn't
-  this imply a meet operation?}
+distributes facts to all successors. In a backwards analysis,
+  the transfer function gathers facts from all successors.
 
 A forwards transfer function produces a |Fact| type. The
 parameterization of |FactBase| by |C| allows the transfer function to
@@ -605,7 +622,7 @@ receives a map of |Labels| to |Facts| for all its successor blocks.
 Figure~\ref{hoopl_fig11} shows the transfer function, |liveness|, for
 our example. The |uses| function takes an expression and returns the
 set of all variables used in the expression. The |transfer| function
-computes the facts for each value in |CStmt|. 
+computes the facts for each constructor in |CStmt|:
 
 \noindent\hangindent=\parindent\hangafter=1 |transfer (Entry _)
 f|\quad This statement represents the entry point of the function. If we
@@ -637,12 +654,12 @@ argument.
 %let includeLiveness = False
     \end{withHsNum}
   \end{minipage}
-  \caption{The transfer function for our liveness example.}
+  \caption{The transfer function implementing liveness analysis.}
   \label{hoopl_fig11}
 \end{myfig}
 
 \intent{Conclude \& Summarize transfer functions and our example.}
-\lipsum
+\dots To be written \dots
 
 \section{Iteration \& Fixed Points}
 \intent{Describe how Hoopl iterates on facts; how Hoopl determines when
@@ -654,7 +671,7 @@ function implementations given by the client program.
 Hoopl uses the meet operator (the |fact_join| field of the
 |DataflowLattice| type) given by the client to 
 determine when facts stop changing. In a forwards analysis, the
-transfer funcitn produces a |FactBase| at each block's exit point. In a
+transfer function produces a |FactBase| at each block's exit point. In a
 backwards analysis, a |Fact| is produced at each block's entry point. In both
 cases, facts are associated with |Labels|.
 
@@ -666,20 +683,20 @@ facts using the meet operator. Recall that |fact_join| returns a
 analysis. Otherwise, the analysis terminates. 
 
 \section{Rewriting}
-\intent{Briefly describe rewriting as transformation.}  
-
-Dataflow anlysis does not strictly address how to transform (or
-rewrite) the CFG --- it just defines how to analyze properties
-of the CFG. Rewriting is usually the goal of analysis, and is therefore
-generally grouped with dataflow analysis under the term ``optimization.''
+\intent{Briefly describe rewriting as transformation.}  Dataflow
+anlysis does not strictly address how to transform (or rewrite) the
+CFG --- it just defines how to analyze properties of the
+CFG. Even so, rewriting is usually the goal of analysis, and is therefore
+generally grouped with dataflow analysis under the term
+``optimization.''
 
 \intent{Introduce |FwdRewrite| and |BwdRewrite| types; show how to
   construct them with |mkFRewrite| and |mkBRewrite|.} 
 
 Hoopl provides two types to represent rewriting, shown in
-Figure~\ref{hoopl_fig11}. A forwards optimization uses |FwdRewrite|;
-backwards optimizatin uses |BwdRewrite|. Hoopl does not export the
-constructors for either type. Instead, they are constructed with the
+Figure~\ref{hoopl_fig15}. A forwards optimization uses |FwdRewrite|;
+backwards optimization uses |BwdRewrite|. Hoopl does not export the
+constructors for either type. Instead, client programs use the
 |mkBRewrite| and |mkFRewrite| functions. Hoopl defines exactly
 analogous functions for forward and backward rewrites, so we will only
 discuss the backwards case from here.
@@ -697,48 +714,43 @@ the |m| parameter and its |FuelMonad| constraint are new.
   \begin{minipage}{\hsize}
 > newtype FwdRewrite m n f 
 > newtype BwdRewrite m n f 
+
+> mkFRewrite :: FuelMonad m => 
+>   (forall e x . n e x -> f -> m (Maybe (Graph n e x))) 
+>   -> FwdRewrite m n f
 > mkBRewrite :: FuelMonad m => 
 >   (forall e x . n e x -> Fact x f -> m (Maybe (Graph n e x)))
 >   -> BwdRewrite m n f
   \end{minipage}
   \caption{The |FwdRewrite| and |BwdRewrite| types provided by Hoopl,
-    as well as functions used to construct them. |mkBRewrite|,
-    |deepBwdRw|, create BwdRewrite values with different
-    behaviors. Analogous definitions named |mkFRewrite|, |deepFwdRw|,
-    etc. exist for |FwdRewrite| as well.}
-  \label{hoopl_fig11}
+    as well as the functions used to construct them, |mkBRewrite| and
+    |mkFRewrite|.}
+  \label{hoopl_fig15}
 \end{myfig}
 
 \intent{Describe optimization fuel and purpose of |FuelMonad|
   constraint.}  
 
 Hoopl implements a concept known as ``optimization
-fue'' to add in debugging optimizations. Each rewrite costs 1 ``unit''
+fuel'' to aid in debugging optimizations. Each rewrite costs 1 ``unit''
 of fuel. If fuel runs out, Hoopl stops iterating. This allows the
 programmer to debug faulty optimizations by decreasing the fuel supply
-in a class divide-and-conquer approach. The |FuelMonad| constraint
-ensures Hoopl can properly deduce fuel during rewriting. Normally, the client
+in a classic divide-and-conquer approach. The |FuelMonad| constraint
+ensures Hoopl can manage fuel during rewriting. Normally, the client
 program does not worry about fuel. 
 
 \intent{Describe result of rewrite function.}  
 
-The rewrite function returns monadic |Maybe (Graph n e x)| value. The
-monadic portion relates to |FuelMonad|. However, the |Maybe| portion
-indicates if any rewriting took place. Returning |Nothing| means no
-changes occurred. A |Just| value is returned, causes Hoopl to replace
+The rewrite function returns a monadic |Maybe (Graph n e x)| value. The
+monadic portion relates to |FuelMonad|. The |Maybe| portion
+indicates if any rewriting took place. |Nothing| means no
+changes occurred. A |Just| value causes Hoopl to replace
 the current block with the \emph{graph} given. This allows rewriters
 to replace a single statement with many statements. A rewriter can
 also return |Just emptyGraph|, which deletes the current block. Notice
 that only an |O O| block can be deleted. A |C O| and |O C| block
-cannot be deleted by Hoopl (using this mechanism), as that would leave
-a dangling |O x| or |e O| blockm, respectively.
-
-\intent{Give definition of examples transfer functio.n}  
-Figure~\ref{hoopl_fig12} shows the rewrite function for our
-dead-code elmination optimization. The returns |Nothing| in all
-cases except for the |Assign| statement. If the variable assigned, |var|, 
-does not exist in the live set, |f|, we can eliminate the
-assignment. Otherwise, we leave the graph alone.
+cannot be deleted during rewrite as that would leave
+a dangling |O x| or |e O| block, respectively.
 
 \begin{myfig}
   \begin{minipage}{\hsize}
@@ -746,40 +758,162 @@ assignment. Otherwise, we leave the graph alone.
 %include DeadCodeC.lhs
 %let includeRewrite = False    
   \end{minipage}
-  \caption{The rewrite functin for our dead-code elimination optimization. |Assign|
-    statements are deleted when they assign to a dead variable. In all other cases
-    the CFG remains unchanged.}
+  \caption{The rewrite function for our dead-code elimination
+    optimization. |Assign| statements are deleted when they assign to
+    a dead variable. In all other cases the CFG remains unchanged.}
+  \label{hoopl_fig12}
 \end{myfig}
 
-\section{Dead-Code Elimination}
+\intent{Give definition of examples transfer function.}
+Figure~\ref{hoopl_fig12} shows |eliminate|, the rewrite function for
+our example optimization. We define the local function |rewrite| with
+cases for each constructor in |CStmt|, but only the |Assign| case 
+affects the CFG. If the variable assigned to is
+dead (i.e., |not (var `member` live)|), |rewrite| returns |Just
+emptyGraph|, deleting the statement from the CFG. In all other cases
+|rewrite| return |Nothing|, leaving the CFG unchanged.
 
-\intent{Apply the optimization developed to the example program with 
-lots of illustratin.}
-\lipsum
+
+\section{Executing an Optimization}
+\label{hoopl_sec6}
+\intent{Introduce |BwdPass|/|FwdPass| and
+  |analyzeAndRewriteBwd|/|analyzeAndRewriteFwd|.}
+Figure~\ref{hoopl_fig14} shows Hoopl's |BwdPass| and |FwdPass|
+types. The figure also shows |analyzeAndRewriteBwd| and
+|analyzeAndRewriteFwd|, Hoopl functions which the client program uses the to
+apply a given analysis and transformation. As the names suggest, one
+pair is used for backwards dataflow-analysis and the other for
+forwards analysis. We will only discuss backwards analysis here --- a
+forwards analysis is exactly analogous.
+
+\onnextpage{hoopl_fig14}
+
+\intent{Describe pieces of |BwdPass| and |analyzeAndRewriteBwd|.}
+The |BwdPass| type packages the lattice definition, transfer function, and
+rewrite function into one structure. The |analyzeAndRewriteBwd|
+function takes a number of interesting arguments and must be run
+inside a Hoopl--specified monad. We address those arguments in turn.
+
+\itempar{(|CheckpointMonad m|, |NonLocal n|, |LabelsPtr entries|)} These constraints reflect
+several Hoopl requirements:
+\begin{itemize}
+\item |CheckpointMonad| -- Hoopl implements speculative rewriting
+  (discussed in Section~\ref{hoopl_sec8}); this class provides
+  methods for restoring the graph after an abandonded rewrite.
+\item |NonLocal| -- This class, discussed in
+  Section~\ref{hoopl_sec_cfg}, allows Hoopl to traverse the CFG.
+\item |LabelsPtr| -- Hoopl defines entry points to blocks in the
+  CFG using this class.
+\end{itemize}
+
+\itempar{|BwdPass m n f|} This argument packages the client program's
+definitions.  
+
+\itempar{|MaybeC e entries|} This gives all the entry points to the
+program, which may not always be all the |Labels| in the CFG ---
+just those where control-flow can start. |MaybeC| guarantees that
+entry points exist in a ``closed/closed'' (|C C|) program. The
+|entries| type must have an instance of the |LabelsPtr| class
+defined. Hoopl provides a |LabelsPtr| instance for a list of labels,
+|[Label]|, so this argument reduces to a list of all the ``entry
+point'' labels in the graph.
+
+\itempar{|Graph n e x|} The third argument holds the CFG to be
+optimized. In practice, |e x| is always |C C|. If |e| were |O|, the
+|MaybeC| argument will imply that no entry points exist in the graph.
+
+\itempar{|Fact x f|} The final argument gives the initial facts for
+the graph. In the backwards case, these facts appear at all ``exit
+points'' --- ``closed'' blocks with no successors. The |x| type will
+always be |C|, meaning this argument is a |FactBase|, mapping initial
+facts to labels. In the forwards case, this argument has type |Fact e
+f|. However, |e| is always |C|, so it is still a |FactBase| value.
+
+\intent{Describe how |deadCode| uses |runInfinite|, |runSimpleUniqueMonad|}  Figure~\ref{hoopl_fig13}
+shows |deadCode|, which puts all the pieces of our example
+optimization together and applies them to a given program. The type,
+|Graph CStmt C C -> Graph CStmt C C|, shows that |deadCode| modifies a
+CFG composed of |CStmt| values. We use |runWithFuel infiniteFuel| so
+the optimization will never run out of fuel and to satisfy the |FuelMonad|
+constraint on |analyzedAndRewriteBwd|. |runSimpleUniqueMonad| 
+satisfies the |CheckpointMonad| constraint on the same function, and will
+result in our transformed graph.
+
+\intent{Describe how arguments to |analyzeAndRewriteBwd| are
+  constructed.}  The first argument to |analyzedAndRewriteBwd|,
+|pass|, packages up the lattice definition, transfer function, and
+rewrite function previously discussed. The second argument, |(JustC
+entryPoints)|, gives all entry points for the program.\footnote{The
+  contortions required to retrieve these blocks is not very
+  interesting and will recur many times throughout the optimizations
+  we will show in later chapters.} We pass the program to optimize as the
+third argument. Finally, the initial facts for analysis are given in
+the fourth argument. This argument associates an empty set with each
+entry point in the program.
+
+|analyzeAndRewriteBwd| returns a transformed graph, final facts
+computed, and any facts that should propagate ``out'' of the CFG. In
+our case, we only care about the returned graph, |program'|. We return
+this graph with a type signature, |SimpleFuelMonad (Graph CStmt C C)|,
+that selects a Hoopl provided fuel and checkpoint monad
+implementation.
+
+\begin{myfig}
+  \begin{minipage}{\hsize}
+%let includeDeadCode = True
+%include DeadCodeC.lhs
+%let includeDeadCode = False
+  \end{minipage}
+  \caption{|deadCode| applies the optimization developed so far to a particular
+    program.}
+  \label{hoopl_fig13}
+\end{myfig}
 
 \section{The Rest of Hoopl}
-
+\label{hoopl_sec8}
 \intent{Interleaved Analysis \& Rewriting}
 
 \intent{Items that don't fit in elsewhere: combinators for rewriting,
   the |CheckPoint| monad, optimization fuel, |liftFuel|,
   |runInfinite|, |runChecked|, etc. }
-\lipsum
 
 \section{Summary}
 \label{hoopl_sec3}
 \intent{Discuss experience with Hoopl; summarize features, move on.}
-\lipsum
 
-\begin{myfig}
-\begin{minipage}{\hsize}
+\section{Dead-Code Elimination}
+\label{hoopl_sec7}
+This section gives our entire example program. All the code
+shown so far appears, as well as code for printing before and after
+results and |main|, which runs the optimization over our sample
+program. 
+
+\begin{singlespace}
 %let includeAll = True
 %include DeadCodeC.lhs
 %let includeAll = False
-\end{minipage}
-\caption{Complete listing of our dead-code elimination optimization.}
-\label{hoopl_fig6}
-\end{myfig}
+\end{singlespace}
+
+\begin{singlespace}
+\noindent Executing ``main'' produces output showing our optimized function:
+\begin{AVerb}
+Original Program
+----------------
+void example() \{
+  c = 4;
+  a = c + 1;
+  printf("%d",c);
+  a = c + 2;
+\}
+
+Optimized Program
+-----------------
+void example() \{
+  c = 4;
+  printf("%d",c);
+\}  
+\end{AVerb}
+\end{singlespace}
 
 \standaloneBib
 
