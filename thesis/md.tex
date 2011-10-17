@@ -64,7 +64,7 @@
 \long\def\startTTB{\ifx\next+\expandafter\startTTC\expandafter\@gobble\else\mdbang\fi} %%
 %% Step 3 of startTT. Shift into teletype mode and change definition of 
 %% + and ! so we can stop processing.
-\def\startTTC{\begingroup\ttfamily\protected\def+{\stopTTA}\protected\def!{\mdbang}} %%
+\def\startTTC{\begingroup\show\f@family\fontfamily{cmtt}\selectfont\show\f@family\protected\def+{\stopTTA}\protected\def!{\mdbang}} %%
 %% Step 1, 2  and 3 of stopTT follow the same pattern as startTT.
 \def\stopTTA{\futurelet\next\stopTTB} %%
 \long\def\stopTTB{\ifx\next!\expandafter\stopTTC\expandafter\@gobble\else\mdplus\fi} %%

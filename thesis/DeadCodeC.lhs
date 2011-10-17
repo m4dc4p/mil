@@ -49,15 +49,15 @@
 %endif
 %if latticeDef || includeAll
 
-> type Live = Set Var
+> type Vars = Set Var
 >
-> meet :: Label -> OldFact Live 
->         -> NewFact Live 
->         -> (ChangeFlag, Live)
+> meet :: Label -> OldFact Vars 
+>         -> NewFact Vars 
+>         -> (ChangeFlag, Vars)
 > meet _ (OldFact old) (NewFact new) = 
 >   (changeIf (old /= new), old `union` new)
 >
-> lattice :: DataflowLattice Live
+> lattice :: DataflowLattice Vars
 > lattice = DataflowLattice { 
 >       fact_name = "Liveness"
 >     , fact_bot = Set.empty
@@ -66,13 +66,13 @@
 %endif
 %if includeLiveness || includeAll
 
-> liveness :: BwdTransfer CStmt Live
+> liveness :: BwdTransfer CStmt Vars
 > liveness = mkBTransfer transfer
 >   where 
->     transfer :: forall e x. CStmt e x -> Fact x Live -> Live {-"\label{hoopl_eg_transfer}"-}
->     transfer (Entry _) f = Set.empty {-"\label{hoopl_eg_transfer_entry}"-}
->     transfer (Assign var expr) f = var `delete` (f `union` (uses expr)) {-"\label{hoopl_eg_transfer_assign}"-}
->     transfer (Call _ exprs) f = f `union` unions (map uses exprs) {-"\label{hoopl_eg_transfer_call}"-}
+>     transfer :: forall e x. CStmt e x -> Fact x Vars -> Vars {-"\label{hoopl_eg_transfer}"-}
+>     transfer (Entry _) _ = Set.empty {-"\label{hoopl_eg_transfer_entry}"-}
+>     transfer (Assign var expr) facts = (var `delete` facts) `union` (uses expr) {-"\label{hoopl_eg_transfer_assign}"-}
+>     transfer (Call _ exprs) facts = facts `union` unions (map uses exprs) {-"\label{hoopl_eg_transfer_call}"-}
 >     transfer Return _ = Set.empty {-"\label{hoopl_eg_transfer_return}"-}
 >     
 >     uses :: CExpr -> Set Var {-"\label{hoopl_eg_transfer_uses}"-}
@@ -84,11 +84,11 @@
 
 %if includeRewrite
 
-> eliminate :: FuelMonad m => BwdRewrite m CStmt Live
+> eliminate :: FuelMonad m => BwdRewrite m CStmt Vars
 > eliminate = mkBRewrite rewrite
 >   where
 >     rewrite :: FuelMonad m => forall e x. CStmt e x 
->                -> Fact x Live -> m (Maybe (Graph CStmt e x))
+>                -> Fact x Vars -> m (Maybe (Graph CStmt e x))
 >     rewrite (Entry _) _ = return Nothing
 >     rewrite (Assign var exprs) live = return $
 >       if not (var `member` live)
@@ -118,7 +118,7 @@
 >              -> Label
 >     entry (JustC (Entry l), _, _) = l
 >
->     facts :: FactBase Live
+>     facts :: FactBase Vars
 >     facts = mkFactBase lattice (zip entryPoints (repeat Set.empty))
 
 %endif

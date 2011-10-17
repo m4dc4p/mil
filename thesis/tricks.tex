@@ -1,0 +1,6 @@
+\newif\ifresult
+\newtoks\t
+\def\ctest#1{\resultfalse\expandafter\c\the#1\ctest\show\ifresult}
+\def\c{\afterassignment\cc\let\next=}
+\def\cc{\ifx\next\ctest \let\next\relax
+  \else\ifx\next*\resulttrue\fi\let\next\c\fi \next}
