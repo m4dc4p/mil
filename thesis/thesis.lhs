@@ -9,7 +9,6 @@
 \setboolean{standaloneFlag}{false}
 
 \begin{document}
-
 \VerbatimFootnotes
 \DefineShortVerb{\#}
              

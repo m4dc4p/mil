@@ -25,25 +25,43 @@
 \intent{Define dataflow equations for the uncurrying optimization}
 
 \begin{math}
-\newtoks\rest \rest={f (\mathtt{v\ \texttt{<-}\ \dots}, F)} %%
+%% Below used to measure & typeset the case where we don't
+%% see a binding.
+\newtoks\rest \rest={f (!+v\ \texttt{<-}\ \dots+!)} %%
   \begin{array}{rl}
     \multicolumn{2}{l}{\textit{Facts}} \\
     \setL{Labels} &= \text{Set of all program labels.} \\
     \setL{Vars} &= \text{Set of all variables.} \\
     \setL{Dest} &= \{\top\} \cup \setL{Labels}. \\
-    \setL{Fact} &= \{(v, x)\ ||\ v \in \setL{Vars}, x \in \setL{Dest}\} \\
+    \setL{Fact} &= \{(v, b)\ ||\ v \in \setL{Vars}, b \in \setL{Dest}\}. \\
 
     \multicolumn{2}{l}{\textit{Meet}} \\
-    x \wedge \top &= \top, x \in \setL{Dest}. \\
-    \top \wedge x &= \top, x \in \setL{Dest}. \\
-    x \wedge y &= \top, x, y \in \setL{Dest}, x \neq y. \\\\
+    b \wedge b &= b. \\
+    b \wedge c &= \top, b \neq c. \\
+    & \text{where\ } b, c \in \setL{Dest}. \\\\
 
-    \multicolumn{2}{l}{\textit{Transfer Function}} \\
-    
-    \phantom{\the\rest} \mathllap{f (\mathtt{v\ \texttt{<-}\ k\ b\ \{\dots\}}, F)} &= \{(\mathtt{v, b})\} \cup F \\
-    \the\rest &= \{(\mathtt{v}, \top)\} \cup F\\
-    f (\_, F) &= F \\
-    \multicolumn{2}{c}{F \dots \subseteq \setL{Fact}.}\\\\
+    \multicolumn{2}{l}{\textit{Transfer Function for Statements}} \\
+    \phantom{\the\rest} \mathllap{f (!+v\ \texttt{<-}\ k\ b\ \{\dots\}+!)} &= %%
+    \begin{cases}
+      \{!+(v, b \wedge c)+!\} \cup (F \backslash \{!+(v, c)+!\}) & \text{when\ } !+(v, c)+! \in F. \\
+      \{!+(v, b)+!\} \cup F & \text{otherwise.}\\
+    \end{cases} \\
+    \the\rest &= \{!+(v, \top)+!\} \cup F.\\
+    f (!+\_+!) &= F. \\
+    & \text{where\ } F \subseteq \setL{Fact}. \\\\
+
+    \multicolumn{2}{l}{\textit{Transfer Function for Blocks}} \\
+    \outBa &= \inBa \cup f(!+s_1+!) \dots \cup f(!+s_n+!) \\
+    & \text{where\ } B \text{is\ } \begin{minipage}[t]{1in}\singlespacing\vskip-1.56\baselineskip\begin{AVerb}[gobble=8]
+        b($\dots$) = do 
+          $\mathtt{s_1}$
+          $\dots$
+          $\mathtt{s_n}$
+      \end{AVerb}
+    \end{minipage} \\
+    \outBa &= \inBa \\
+    & \text{where\ } B = !+k \{v_1,\dots,v_n\}+!.
+
   \end{array}
 \end{math}
 

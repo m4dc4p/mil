@@ -894,7 +894,6 @@ program.
 %let includeAll = False
 \end{singlespace}
 
-\begin{singlespace}
 \noindent Executing ``main'' produces output showing our optimized function:
 \begin{AVerb}
 Original Program
@@ -913,9 +912,7 @@ void example() \{
   printf("%d",c);
 \}  
 \end{AVerb}
-\end{singlespace}
-
-\standaloneBib
-
+%%
+\standaloneBib %%
 \end{document}
 

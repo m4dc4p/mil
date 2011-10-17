@@ -55,7 +55,8 @@
 %% catcode in the definitions to follow.
 \catcode`!=\active\catcode`+=\active %%
 %% Initial definitions associated with ! and +.
-\def\initialmd{\protected\def!{\startTTA}\protected\def+{\mdplus}} %%
+\def\initialmd{\protected\def!{\startTTA} %%
+  \protected\def+{\stopTTA}} %%
 %% Step 1 of startTT. Inital meaning of !; capture next token in \next, go to next step.
 \def\startTTA{\futurelet\next\startTTB} %%
 %% Step 2 of startTT. Compare captured token to + and go to step 3 if true. Otherwise
@@ -64,7 +65,13 @@
 \long\def\startTTB{\ifx\next+\expandafter\startTTC\expandafter\@gobble\else\mdbang\fi} %%
 %% Step 3 of startTT. Shift into teletype mode and change definition of 
 %% + and ! so we can stop processing.
-\def\startTTC{\begingroup\show\f@family\fontfamily{cmtt}\selectfont\show\f@family\protected\def+{\stopTTA}\protected\def!{\mdbang}} %%
+\def\startTTC{\begingroup\ifmmode %%
+  \let \math@bgroup \relax %%
+  \def \math@egroup {\let \math@bgroup \@@math@bgroup %%
+    \let \math@egroup \@@math@egroup} %%
+  \mathtt\relax %%
+  \else  %%
+  \ttfamily\fi} %%
 %% Step 1, 2  and 3 of stopTT follow the same pattern as startTT.
 \def\stopTTA{\futurelet\next\stopTTB} %%
 \long\def\stopTTB{\ifx\next!\expandafter\stopTTC\expandafter\@gobble\else\mdplus\fi} %%

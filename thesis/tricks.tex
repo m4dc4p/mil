@@ -1,6 +1,12 @@
-\newif\ifresult
-\newtoks\t
-\def\ctest#1{\resultfalse\expandafter\c\the#1\ctest\show\ifresult}
-\def\c{\afterassignment\cc\let\next=}
-\def\cc{\ifx\next\ctest \let\next\relax
-  \else\ifx\next*\resulttrue\fi\let\next\c\fi \next}
+\documentclass{article}
+\input{md}
+\begin{document}
+\domd
+%% $(\mathtt{v_m\ \texttt{<-}\ k\ b\ \{v_1, \dots, v_n\}}, F)$
+%% \ensuremath{(\mathtt{v_m\ \texttt{<-}\ k\ b\ \{v_1, \dots, v_n\}}, F)}
+%% \texttt{$(\mathtt{v_m} $<-$ \mathtt{k\ b\ \{v_1, \dots, v_n\}}, F)$}
+
+$(!+v_m\ \texttt{<-}\ ! +k\ + ! b\ \{v_1, \dots, v_n\}+!, F)$
+%% \ensuremath{(\mathtt{v_m\ \texttt{<-}\ k\ b\ \{v_1, \dots, v_n\}}, F)}
+%% \texttt{$(\mathtt{v_m} $<-$ \mathtt{k\ b\ \{v_1, \dots, v_n\}}, F)$}
+\end{document}
