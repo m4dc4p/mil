@@ -1,5 +1,6 @@
 :set -i..\..\compiler\src 
 :set -i..\..\priosetExample
+:set -XOverloadedStrings
 :def sl (\ _ -> return ":steplocal")
 :def st (\args -> return $ ":step " ++ args)
 :def sm (\ _ -> return ":stepmodule")
