@@ -347,10 +347,10 @@ newArrayPrim :: UniqueMonad m => (Name, m (ProgM C C))
 newArrayPrim = ("newArray_", liftM snd $ mkMonadicPrim "newArray_" 2)
 
 plusPrim, minusPrim, timesPrim, divPrim, ltPrim, gtPrim, ltePrim, gtePrim, eqPrim, neqPrim :: UniqueMonad m => (Name, m (ProgM C C))
-plusPrim = ("plus", liftM snd $ binPrim "plus")
-minusPrim = ("minus", liftM snd $ binPrim "minus")
-timesPrim = ("times", liftM snd $ binPrim "times")
-divPrim = ("div", liftM snd $ binPrim "div")
+plusPrim = ("plus", liftM snd $ mkPrim "plus" 2)
+minusPrim = ("minus", liftM snd $ mkPrim "minus" 2)
+timesPrim = ("times", liftM snd $ mkPrim "times" 2)
+divPrim = ("div", liftM snd $ mkPrim "div" 2)
 
 ltPrim = ("lt", liftM snd $ binPrim "lt")
 gtPrim = ("gt", liftM snd $ binPrim "gt")
@@ -395,38 +395,60 @@ monadic rest name  = do
                   mkLast (Done name thunkLabel (Thunk dest []))
   return ((name, thunkLabel), thunkBody |*><*| prog)
 
-mkMonadicPrim :: UniqueMonad m => Name -> Int -> m (Dest, ProgM C C)
-mkMonadicPrim name numArgs 
-  | numArgs == 0 = mkPrim name []
+mkPrim :: UniqueMonad m => Name -> Int -> m (Dest, ProgM C C)
+mkPrim name numArgs 
+  | numArgs == 0 = final []
   | otherwise = do
-    (next, rest) <- prim' (numArgs - 1) ["a"]
+    (next, rest) <- mkIntermediate final name numArgs [] 
     dest@(n, l) <- newDest name
     return (dest
            , (mkFirst (BlockEntry n l []) <*>
               mkLast (Done n l $ Closure next [])) |*><*| 
             rest)
   where
-    prim' 0 args = mkPrim (name ++ "mon") args 
-    prim' n args = do
-      let arg = "a" ++ show n
-          args' = args ++ [arg]
-      (next, rest) <- prim' (n - 1) args'
-      dest@(n, l) <- newDest (name ++ "clo" ++ show n)
-      return (dest
-             , (mkFirst (CloEntry n l args arg) <*>
-                mkLast (Done n l $ Closure next args')) |*><*| 
-              rest)
-    mkPrim monName args = do
-      dest1@(n1, l1) <- newDest monName
+    final args = do
+      dest1@(n1, l1) <- newDest (name ++ "body")
+      return (dest1
+             , (mkFirst (BlockEntry n1 l1 args) <*>
+                mkLast (Done n1 l1 (Prim name args))))
+
+mkMonadicPrim :: UniqueMonad m => Name -> Int -> m (Dest, ProgM C C)
+mkMonadicPrim name numArgs 
+  | numArgs == 0 = final []
+  | otherwise = do
+    (next, rest) <- mkIntermediate final name (numArgs - 1) ["a"] 
+    dest@(n, l) <- newDest name
+    return (dest
+           , (mkFirst (BlockEntry n l []) <*>
+              mkLast (Done n l $ Closure next [])) |*><*| 
+            rest)
+  where
+    final args = do
+      dest1@(n1, l1) <- newDest (name ++ "mon")
       dest2@(n2, l2) <- newDest (name ++ "body")
       return (dest1
              , (mkFirst (BlockEntry n1 l1 args) <*>
                 mkLast (Done n1 l1 (Thunk dest2 args))) |*><*|
               (mkFirst (BlockEntry n2 l2 args) <*>
                mkLast (Done n2 l2 (Prim name args))))
-    newDest name = do
-      l <- freshLabel
-      return (name, l)
+
+mkIntermediate final _ 0 args = final args 
+mkIntermediate final name n args = do
+  let arg = "a" ++ show n
+      args' = args ++ [arg]
+  (next, rest) <- mkIntermediate final name (n - 1) args' 
+  dest@(dn, dl) <- newDest (name ++ "clo" ++ show n)
+  return (dest
+         , (mkFirst (CloEntry dn dl args arg) <*>
+            mkLast (Done dn dl $ 
+                         if n == 1 
+                         then Goto next args'
+                         else Closure next args')) |*><*| 
+          rest)
+
+newDest name = do
+  l <- freshLabel
+  return (name, l)
 
 nullaryPrim :: UniqueMonad m => Name -> m (Dest, ProgM C C)
 nullaryPrim name = do
