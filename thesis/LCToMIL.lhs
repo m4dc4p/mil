@@ -16,6 +16,7 @@
 > import Debug.Trace
 
 > import MIL
+> import Syntax.Common
 > import Syntax.LambdaCase hiding (Alt)
 > import qualified Syntax.LambdaCase as LC
 > import Util
@@ -45,7 +46,7 @@ I will describe the translation of each LC expression into MIL
 instructions, starting with ECon. The ECon term creates a data
 value. 
 
-> compileStmt (ECon cons _) ctx = do 
+> compileStmt (ECon (Ident cons _) _) ctx = do 
 
 We implement ECon using a series of pre-generated primitives, one for
 each constructor of each known data type. Therefore, we first look for
@@ -71,33 +72,31 @@ requires that we accomplish two tasks: create a new function
 definition, and generate code to create the closure representing the
 function.
 
-> compileStmt body@(ELam v _ b) ctx = withFree (const (setFree body)) $ \free -> do
-
-To create a new function definition, we essentially create a new
-"compilation context." 
-
+> compileStmt body@(ELam (Ident v _) _ b) ctx = withFree (const (setFree body)) $ \free -> do
 >   (name, label) <- do
 >     name <- newTop "absBody"
 >     withNewLabel $ \l -> do
->       rest <- compileStmt b (return . mkLast . Done name l)
+>       rest <- case b of
+>                 (ELam _ _ _) -> compileStmt b (return . mkLast . Done name l)
+>                 _ -> do 
+>                   bn <- newTop "absBlock"
+>                   (blockName, blockLabel) <- 
+>                      blockDefn bn (free ++ [v]) 
+>                        (\bn bl -> compileStmt b (return . mkLast . Done bn bl))
+>                   return (mkLast (Done name l (Goto (blockName, blockLabel) (free ++ [v]))))
 >       addProg (mkFirst (CloEntry name l free v) <*> rest)
 >       return (name, l)
 >   setDest name label
-
-Now that we know where to find the translated body of the lambda term,
-we can generate code to create a closure value representing the lambda
-term. We pass this closure to our context.
-
 >   ctx (Closure (name, label) free)
 
 EBind evaluates its right-hand side as a monadic value. Therefore, the 
 translated code for the monadic expression will evaluate to a monadic
 thunk. 
 
-> compileStmt bind@(EBind v _ _ _) ctx = withFree (return . delete v) $ \fvs -> do
+> compileStmt bind@(EBind (Ident v _) _ _ _) ctx = withFree (return . delete v) $ \fvs -> do
 >   name <- newTop "bindBody"
 >   dest <- blockDefn name fvs $ \n l -> do
->     let compM (EBind v _ b r) = withFree (return . delete v) $ \_ -> do
+>     let compM (EBind (Ident v _) _ b r) = withFree (return . delete v) $ \_ -> do
 >           rest <- compM r 
 >           compResultVar b $ \n -> return (mkMiddle (v `Bind` (Run n)) <*> rest)
 >         compM e = compResultVar e (\v -> return (mkLast (Done n l (Run v))))
@@ -109,7 +108,7 @@ would be handled by EApp, EBind, or other terms. Therefore, we apply
 the Return instruction to variable in order to "wrap" the value and 
 place it in context. 
 
-> compileStmt (EVar v _) ctx = do
+> compileStmt (EVar (Ident v _) _) ctx = do
 >   top <- isTopLevel v
 >   if isJust top
 >    then do
@@ -208,7 +207,7 @@ statement. The cases for EApp and EBind handle EPrim through the
 compResultVar function. Therefore, we should not see an EPrim by itself, so
 I report an error if the situation occurs.
 
-> compileStmt (EPrim p _ _) ctx = do
+> compileStmt (EPrim (Ident p _) _ _) ctx = do
 >   dest <- getDestOfName p
 >   when (isNothing dest) (error $ "primitive " ++ p ++ " not defined.")
 >   ctx (Goto (fromJust dest) [])
@@ -218,11 +217,11 @@ I report an error if the situation occurs.
 >     compBody (Right body) = compResultVar body 
 >     compBody (Left (prim, typs)) = 
 >       compResultVar (EPrim prim (error "evaluated type") (error "evaluated types"))
->     compVars [Defn name _ letBody] = 
+>     compVars [Defn (Ident name _) _ letBody] = 
 >       compBody letBody $ \v -> do
 >         rest <- compileStmt outerBody ctx
 >         return (mkMiddle (Bind name (Return v)) <*> rest)
->     compVars (Defn name _ letBody : ds) = do
+>     compVars (Defn (Ident name _) _ letBody : ds) = do
 >       rest <- compVars ds 
 >       compBody letBody $ \v -> do
 >         return (mkMiddle (Bind name (Return v)) <*> rest)
@@ -239,7 +238,7 @@ I report an error if the situation occurs.
 > compResultVar :: Expr 
 >   -> (Name -> CompM (ProgM O C))
 >   -> CompM (ProgM O C)
-> compResultVar (EVar v _) ctx = do
+> compResultVar (EVar (Ident v _) _) ctx = do
 >   top <- isTopLevel v
 >   if isJust top
 >    then do
@@ -392,17 +391,17 @@ I report an error if the situation occurs.
 > free :: Expr -> Free
 > free = nub . free'
 >   where
->     free' (EVar v _) = [v]
->     free' (EPrim v _ _) = [v]
+>     free' (EVar (Ident v _) _) = [v]
+>     free' (EPrim (Ident v _) _ _) = [v]
 >     free' (ENat _) = []
 >     free' (EBits _ _) = []
 >     free' (ECon _ _) = []
->     free' (ELam v _ expr) = v `delete` nub (free' expr)
->     free' (ELet (Decls decls) expr) = free' expr \\ (map (\(Defn n _ _) -> n) $ getDefns decls)
->     free' (ECase expr alts) = nub (free' expr ++ concatMap (\(LC.Alt _ _ vs e) -> nub (free' e) \\ vs) alts)
+>     free' (ELam (Ident v _) _ expr) = v `delete` nub (free' expr)
+>     free' (ELet (Decls decls) expr) = free' expr \\ (map (\(Defn (Ident n _) _ _) -> n) $ getDefns decls)
+>     free' (ECase expr alts) = nub (free' expr ++ concatMap (\(LC.Alt _ _ vs e) -> nub (free' e) \\ map (\(Ident n _) -> n) vs) alts)
 >     free' (EApp e1 e2) = nub (free' e1 ++ free' e2)
 >     free' (EFatbar e1 e2) = nub (free' e1 ++ free' e2)
->     free' (EBind v _ e1 e2) = nub (free' e1 ++ v `delete` nub (free' e2))
+>     free' (EBind (Ident v _) _ e1 e2) = nub (free' e1 ++ v `delete` nub (free' e2))
 
 > setDest :: Name -> Label -> CompM ()
 > setDest name label = 
@@ -421,7 +420,7 @@ I report an error if the situation occurs.
 > withNewLabel f = freshLabel >>= f
   
 > toAlt :: LC.Alt -> Alt Expr
-> toAlt (LC.Alt cons _ vs expr) = Alt cons vs expr
+> toAlt (LC.Alt (Ident cons _) _ vs expr) = Alt cons (map (\(Ident n _) -> n) vs) expr
 
 > getDefns :: [Decl] -> [Defn]
 > getDefns = concatMap f
@@ -448,7 +447,7 @@ I report an error if the situation occurs.
 >   | otherwise = prefix ++ name
 
 > fromProgram :: Program -> [(Name, Expr)]
-> fromProgram (Program { decls = (Decls d)}) = [(name, expr) | decl <- d, (Defn name _ (Right expr)) <- f decl] 
+> fromProgram (Program { decls = (Decls d)}) = [(name, expr) | decl <- d, (Defn (Ident name _) _ (Right expr)) <- f decl] 
 >   where
 >     f (Mutual decls) = decls
 >     f (Nonrec decl) = [decl] 
