@@ -133,23 +133,54 @@ fully-applied curried functions into direct calls to the function body.
 
 \section{Example of Desired Optimization}
 
-Recall from Section \ref{ref_foo} our definition of |foldr|:
+Suppose we define the functions |main| and |compose| as follows:
 
 \begin{code}
-foldr :: (a -> b -> b) -> b -> [a] -> b
-foldr f b (a:as) = foldr f (f a b) as
-foldr f b []     = b
+compose f g x = f (g x)
+main a b x = compose a b x
 \end{code}
 
-which compiles to the following blocks in our MIL:
+Our compiler generates the following code, before optimization:
 
+\begin{MILVerb}[gobble=2]
+  main = (((compose a) b) x)
+  main (compose, a, b, x):
+    v201 <- compose @ a
+    v202 <- v201 @ b
+    v202 @ x
+
+  compose = (\f :: #.t -> (\g :: #.t -> (\x :: #.t -> (f ((g x))))))
+  compose (): closure absBody201 {}
+  absBody201 {} f: closure absBody203 {f}
+  absBody203 {f} g: closure absBody205 {f, g}
+  absBody205 {f, g} x: absBlock207(f, g, x)
+  absBlock207 (f, g, x):
+    v209 <- g @ x
+    f @ v209
+\end{MILVerb}
+
+We wish to transform our program in order to remove the intermediate
+closures created by calling !+compose+!:
+
+\begin{MILVerb}
+main (a, b, x): absBlock208(a, b, x)
+absBlock208 (f, g, x):
+  v210 <- g @ x
+  f @ v210
+\end{MILVerb}
+ 
 \begin{code}
 
 \end{code}
 
 \section{Implementation}
+
+\intent{Describe how we recognize when a closure is created}
+
+\intent{Describe how we re-write an Enter instruction to a closure or goto}
+
+\intent{Describe how deep rewrite progressively captures closures.}
+
 \section{Reflection}
 \subsection{Prior Work}
-\emph{...}
-
 \end{document}

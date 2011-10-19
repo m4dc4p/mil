@@ -109,7 +109,7 @@
 >     collapse :: CollapseFact -> Name -> Name -> Maybe TailM
 >     collapse col f x =       
 >       case Map.lookup f col of
->         Just (PElem (CloVal dest@(_, l) vs)) -> -- Just (Closure dest (vs ++ [x]))
+>         Just (PElem (CloVal dest@(_, l) vs)) -> 
 >           case l `Map.lookup` blocks of
 >             Just (Jump dest) -> Just (Goto dest (vs ++ [x]))
 >             Just (Capture dest (Just idx)) -> Just (Closure dest (insertAt vs idx x))
