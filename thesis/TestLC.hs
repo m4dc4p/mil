@@ -9,6 +9,7 @@ import qualified Data.Map as Map
 
 import qualified Printer.Common as PP
 import Printer.LambdaCase
+import Syntax.Common
 import Syntax.LambdaCase hiding (Alt)
 -- import qualified PrioSetLC as Prio
 
@@ -173,8 +174,8 @@ main (bar, foo, x):
 -}
 origExample = [("main", 
                 var "compose" `app` 
-                    var "foo" `app` 
-                    var "bar" `app` 
+                    var "a" `app` 
+                    var "b" `app` 
                     var "x")
               , head compose]
 {-
@@ -953,7 +954,7 @@ arrExample = [("main"
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
 
-alt :: Name -> [Name] -> ([Expr] -> Expr) -> [LC.Alt] -> [LC.Alt]
+alt :: Id -> [Id] -> ([Expr] -> Expr) -> [LC.Alt] -> [LC.Alt]
 alt cons vs f = (LC.Alt cons [] vs (f (map var vs)) :)
 
 mPrint = EPrim "print" typ []
@@ -967,10 +968,10 @@ mkNil = ECon "Nil" []
 mkCons :: Expr
 mkCons = ECon "Cons" [typ, typ] 
 
-bindE :: String -> Expr -> (Expr -> Expr) -> Expr
+bindE :: Id -> Expr -> (Expr -> Expr) -> Expr
 bindE v body rest = EBind v typ body (rest (var v))
 
-lam :: String -> (Expr -> Expr) -> Expr
+lam :: Id -> (Expr -> Expr) -> Expr
 lam v body = ELam v typ (body (var v))
 
 plus, minus, times, div :: Expr -> Expr -> Expr
@@ -997,17 +998,17 @@ infixl 0 `app`
 app :: Expr -> Expr -> Expr
 app f g = EApp f g
 
-var :: String -> Expr
+var :: Id -> Expr
 var n = EVar n typ
 
 lit :: Integer -> Expr
 lit n = ENat n 
 
 -- Allows a single name to be defined in a let.
-_let :: Name -> Expr -> (Expr -> Expr) -> Expr
+_let :: Id -> Expr -> (Expr -> Expr) -> Expr
 _let n body rest = ELet (Decls [Nonrec (Defn n typ (Right body))]) (rest (var n))
 
-prim :: Name -> Int -> Expr
+prim :: Id -> Int -> Expr
 -- prim n cnt = EPrim n (take (cnt + 1) $ repeat typ) 
 prim n _ = var n
 
