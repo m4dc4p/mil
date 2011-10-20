@@ -52,7 +52,7 @@
 
     \multicolumn{2}{l}{\textit{Transfer Function for Blocks}} \\
     \outBa &= \inBa \cup f(!+s_1+!) \dots \cup f(!+s_n+!) \\
-    & \text{where\ } B \text{is\ } \begin{minipage}[t]{1in}\singlespacing\vskip-1.56\baselineskip\begin{AVerb}[gobble=8]
+    & \text{where\ } B = \begin{minipage}[t]{1in}\singlespacing\vskip-1.56\baselineskip\begin{AVerb}[gobble=8]
         b($\dots$) = do 
           $\mathtt{s_1}$
           $\dots$
@@ -141,41 +141,45 @@ main a b x = compose a b x
 \end{code}
 
 Our compiler generates the following code, before optimization:
-
-\begin{MILVerb}[gobble=2]
-  main = (((compose a) b) x)
+\begin{singlespace}\begin{MILVerb}[gobble=2]
   main (compose, a, b, x):
-    v201 <- compose @ a
-    v202 <- v201 @ b
-    v202 @ x
+    v201 <- compose @@ a
+    v202 <- v201 @@ b
+    v202 @@ x
 
-  compose = (\f :: #.t -> (\g :: #.t -> (\x :: #.t -> (f ((g x))))))
   compose (): closure absBody201 {}
   absBody201 {} f: closure absBody203 {f}
   absBody203 {f} g: closure absBody205 {f, g}
   absBody205 {f, g} x: absBlock207(f, g, x)
   absBlock207 (f, g, x):
-    v209 <- g @ x
-    f @ v209
+    v209 <- g @@ x
+    f @@ v209
 \end{MILVerb}
+\end{singlespace}
 
 We wish to transform our program in order to remove the intermediate
 closures created by calling !+compose+!:
-
-\begin{MILVerb}
+\begin{singlespace}\begin{MILVerb}
 main (a, b, x): absBlock208(a, b, x)
 absBlock208 (f, g, x):
-  v210 <- g @ x
-  f @ v210
+  v210 <- g @@ x
+  f @@ v210
 \end{MILVerb}
- 
-\begin{code}
-
-\end{code}
+\end{singlespace}
 
 \section{Implementation}
 
-\intent{Describe how we recognize when a closure is created}
+\intent{Describe how we recognize when a closure is created} Our
+transfer function analyzes each statement in each block. The function
+inspects the right-hand side of each |Bind| statement in the
+block. When the right-hand side creates a closure, the function
+associates the binding with the destination label and captured
+arguments used by the closure. Any other |TailM| value is represented
+as $\top$.
+
+At the end of each block, the transfer function passes the facts
+collected to each successor. 
+
 
 \intent{Describe how we re-write an Enter instruction to a closure or goto}
 
