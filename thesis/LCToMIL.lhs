@@ -80,10 +80,10 @@ function.
 >                 (ELam _ _ _) -> compileStmt b (return . mkLast . Done name l)
 >                 _ -> do 
 >                   bn <- newTop "absBlock"
->                   (blockName, blockLabel) <- 
+>                   dest <- 
 >                      blockDefn bn (free ++ [v]) 
 >                        (\bn bl -> compileStmt b (return . mkLast . Done bn bl))
->                   return (mkLast (Done name l (Goto (blockName, blockLabel) (free ++ [v]))))
+>                   return (mkLast (Done name l (Goto dest (free ++ [v]))))
 >       addProg (mkFirst (CloEntry name l free v) <*> rest)
 >       return (name, l)
 >   setDest name label
@@ -173,7 +173,8 @@ Now the block for evaluating the case expression is generated. The
 block takes all free variables in the entire case expression
 (including all arms).
 
->     dest <- blockDefn (mkName "caseEval" "") fvs 
+>     caseName <- newTop "caseEval"
+>     dest <- blockDefn caseName fvs 
 >             (\_ _ -> 
 
 The body of block evaluates the case expression and puts the result
@@ -189,7 +190,8 @@ present in the current arm, so |compAlt| starts with a call to |setFree body|
 so compiliation of the body sees the appropriate free variables.
 
 >   compAlt (Alt cons vs body) = withFree (const (setFree body)) $ \afvs -> do
->     altDest <- blockDefn (mkName "altBody" cons) afvs $ \n l -> do
+>     altName <- newTop (mkName "altBody" cons)                                  
+>     altDest <- blockDefn altName afvs $ \n l -> do
 
 The block for the arm evaulates the body of the arm and places it in
 a new variable. The block ends by returning the value of that variable.
@@ -240,6 +242,7 @@ I report an error if the situation occurs.
 >   -> CompM (ProgM O C)
 > compResultVar (EVar (Ident v _) _) ctx = do
 >   top <- isTopLevel v
+>   trace (v ++ " is top level " ++ show top) (return ())
 >   if isJust top
 >    then do
 >      v <- fresh "v"
