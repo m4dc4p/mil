@@ -352,12 +352,12 @@ minusPrim = ("minus", liftM snd $ mkPrim "minus" 2)
 timesPrim = ("times", liftM snd $ mkPrim "times" 2)
 divPrim = ("div", liftM snd $ mkPrim "div" 2)
 
-ltPrim = ("lt", liftM snd $ binPrim "lt")
-gtPrim = ("gt", liftM snd $ binPrim "gt")
-ltePrim = ("lte", liftM snd $ binPrim "lte")
-gtePrim = ("gte", liftM snd $ binPrim "gte")
-eqPrim = ("eq", liftM snd $ binPrim "eq")
-neqPrim = ("neq", liftM snd $ binPrim "neq")
+ltPrim = ("lt", liftM snd $ mkPrim "lt" 2)
+gtPrim = ("gt", liftM snd $ mkPrim "gt" 2)
+ltePrim = ("lte", liftM snd $ mkPrim "lte" 2)
+gtePrim = ("gte", liftM snd $ mkPrim "gte" 2)
+eqPrim = ("eq", liftM snd $ mkPrim "eq" 2)
+neqPrim = ("neq", liftM snd $ mkPrim "neq" 2)
 
 -- | Implements primitive to create data values. The argument
 -- specifies the number of values the constructor will take. The
