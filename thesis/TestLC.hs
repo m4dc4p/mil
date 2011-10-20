@@ -24,49 +24,13 @@ import LCM
 progM :: [(Name, Expr)] -> ([Name], ProgM C C) -> IO ()
 progM progs prelude@(prims, _) = do
   putStrLn "\n ========= Unoptimized ============"
-  printResult progs (map (deadBlocks tops . compile tops prelude) . map (: []) $ progs)
+  -- printResult progs (map (deadBlocks tops . compile tops prelude) . map (: []) $ progs)
+  putStrLn (render $ printProgM (deadBlocks tops . compile tops prelude $ progs))
 
   let optProgs = mostOpt tops prelude . (compile tops prelude) $ progs
-      killedIn = killed optProgs
-      usedIn = used optProgs
-      antIn = anticipated usedIn killedIn optProgs
 
   putStrLn "================================================================================"
   putStrLn (render $ printProgM optProgs)
-
-  -- putStrLn "\n ========= Killed Expressions ============="
-  -- putStrLn (render $ printExprs killedIn)
-
-  -- putStrLn "\n ========= Used Expressions ============="
-  -- putStrLn (render $ printExprs usedIn)
-
-  -- putStrLn "\n ========= Anticipated Expressions ============="
-  -- putStrLn (render $ printExprs antIn)
-
-  -- let (used, killed, ant) = anticipated optProgs
-  --     avail = available ant killed optProgs
-  --     early = earliest ant avail
-  --     postpone = postponable early used optProgs
-  --     late = latest early postpone used (allSuccessors optProgs)
-           
-  -- putStrLn "\n ========= Used Expressions ============="
-  -- putStrLn (render $ printExprs used)
-           
-           
-  -- putStrLn "\n ========= Anticipated Expressions ============="
-  -- putStrLn (render $ printExprs ant)
-           
-  -- putStrLn "\n ========= Available Expressions ============="
-  -- putStrLn (render $ printExprs avail)
-           
-  -- putStrLn "\n ========= Earliest Expressions ============="
-  -- putStrLn (render $ printExprs early)
-
-  -- putStrLn "\n ========= Postponable Expressions ============="
-  -- putStrLn (render $ printExprs postpone)
-           
-  -- putStrLn "\n ========= Latest Expressions ============="
-  -- putStrLn (render $ printExprs late)
            
     where
       tops = map fst progs
@@ -950,6 +914,17 @@ arrExample = [("main"
   where
     mUnsafeWrite a i n = EPrim "unsafeWrite" typ [] `app` a `app` i `app` lit n
     mNewArray i l = EPrim "newArray_" typ [] `app` lit i `app` lit l
+
+{- An example to demonstrat uncurrying
+across case statements.-}
+mapTwo = [("mapTwo",
+           lam "f" $ \f ->
+           lam "g" $ \g ->
+           lam "xs" $ \xs ->
+           lam "test" $ \test ->
+             _case test $
+                (alt "True" [] $ \_ -> var "map" `app` f `app` xs) .
+                (alt "False" [] $ \_ -> var "map" `app` g `app` xs))] ++ myMap
 
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
