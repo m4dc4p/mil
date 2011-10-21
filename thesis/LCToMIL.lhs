@@ -73,29 +73,24 @@ definition, and generate code to create the closure representing the
 function.
 
 > compileStmt body@(ELam (Ident v _) _ b) ctx = withFree (const (setFree body)) $ \free -> do
->   (name, label) <- do
->     name <- newTop "absBody"
->     withNewLabel $ \l -> do
->       rest <- case b of
->                 (ELam _ _ _) -> compileStmt b (return . mkLast . Done name l)
->                 _ -> do 
->                   bn <- newTop "absBlock"
->                   dest <- 
->                      blockDefn bn (free ++ [v]) 
->                        (\bn bl -> compileStmt b (return . mkLast . Done bn bl))
->                   return (mkLast (Done name l (Goto dest (free ++ [v]))))
->       addProg (mkFirst (CloEntry name l free v) <*> rest)
->       return (name, l)
->   setDest name label
->   ctx (Closure (name, label) free)
+>   dest <- withNewDest "absBody" $ \(uniqueName, l) -> do
+>     rest <- case b of
+>               (ELam _ _ _) -> compileStmt b (return . mkLast . Done uniqueName l)
+>               _ -> do 
+>                 dest <- blockDefn "absBlock" (free ++ [v]) 
+>                   (\bn bl -> compileStmt b (return . mkLast . Done bn bl))
+>                 return (mkLast (Done uniqueName l (Goto dest (free ++ [v]))))
+>     addProg (mkFirst (CloEntry uniqueName l free v) <*> rest)
+>     return (uniqueName, l)
+>   addDest dest
+>   ctx (Closure dest free)
 
 EBind evaluates its right-hand side as a monadic value. Therefore, the 
 translated code for the monadic expression will evaluate to a monadic
 thunk. 
 
 > compileStmt bind@(EBind (Ident v _) _ _ _) ctx = withFree (return . delete v) $ \fvs -> do
->   name <- newTop "bindBody"
->   dest <- blockDefn name fvs $ \n l -> do
+>   dest <- blockDefn "bindBody" fvs $ \n l -> do
 >     let compM (EBind (Ident v _) _ b r) = withFree (return . delete v) $ \_ -> do
 >           rest <- compM r 
 >           compResultVar b $ \n -> return (mkMiddle (v `Bind` (Run n)) <*> rest)
@@ -173,8 +168,7 @@ Now the block for evaluating the case expression is generated. The
 block takes all free variables in the entire case expression
 (including all arms).
 
->     caseName <- newTop "caseEval"
->     dest <- blockDefn caseName fvs 
+>     dest <- blockDefn "caseEval" fvs 
 >             (\_ _ -> 
 
 The body of block evaluates the case expression and puts the result
@@ -190,8 +184,7 @@ present in the current arm, so |compAlt| starts with a call to |setFree body|
 so compiliation of the body sees the appropriate free variables.
 
 >   compAlt (Alt cons vs body) = withFree (const (setFree body)) $ \afvs -> do
->     altName <- newTop (mkName "altBody" cons)                                  
->     altDest <- blockDefn altName afvs $ \n l -> do
+>     altDest <- blockDefn (mkName "altBody" cons) afvs $ \n l -> do
 
 The block for the arm evaulates the body of the arm and places it in
 a new variable. The block ends by returning the value of that variable.
@@ -230,8 +223,7 @@ I report an error if the situation occurs.
 >       -- as arguments, containing code representing
 >       -- the body. 
 >       -- Jump to the block and put the result in a varialbe
->       letName <- newTop (mkName "letBody" name)
->       letDest <- blockDefn letName lfvs (\ln ll ->
+>       letDest <- blockDefn (mkName "letBody" name) lfvs (\ln ll ->
 >                    compileStmt body (return . mkLast . Done ln ll))
 >       ctx (Goto letDest lfvs)
 >     compBody name (Left (prim, typs)) ctx = 
@@ -265,10 +257,11 @@ I report an error if the situation occurs.
 
 > -- | Add a new block.
 > blockDefn :: Name -> [Name] -> (Name -> Label -> CompM (ProgM O C)) -> CompM Dest
-> blockDefn name args progM = withNewLabel $ \l -> do
->   rest <- progM name l
->   addProg (mkFirst (BlockEntry name l args) <*> rest)
->   return (name, l)
+> blockDefn name args progM = withNewDest name $ \(uniqueName, l) -> do
+>   rest <- progM uniqueName l
+>   addProg (mkFirst (BlockEntry uniqueName l args) <*> rest)
+>   addDest (uniqueName, l)
+>   return (uniqueName, l)
 
 > type CompM = State CompS
 > type Free = [Name]
@@ -351,14 +344,6 @@ I report an error if the situation occurs.
 >   modify (\s@(C { compI }) -> s { compI = compI + 1})
 >   return (intToUnique i)
 
-> -- | Make a new top-level function name, based on the
-> -- prefix given.
-> newTop :: Name -> CompM Name
-> newTop name = do
->     f <- fresh name
->     modify (\s@(C { compT }) -> s { compT = Map.insert f Nothing compT })
->     return f
-
 > -- | Gets free variables in the expression.
 > getFree :: Expr -> CompM [Name]
 > getFree expr = return (free expr)
@@ -420,8 +405,10 @@ I report an error if the situation occurs.
 >     freeDefn (Defn (Ident n _) _ (Right e)) = n `delete` nub (free' e)
 >     freeDefn (Defn (Ident n _) _ _) = []
 
-> setDest :: Name -> Label -> CompM ()
-> setDest name label = 
+> -- Add a top-level destination (name, label pair) to
+> -- our map of top-level names.
+> addDest :: Dest -> CompM ()
+> addDest (name, label) = 
 >   modify (\s@(C { compT }) -> s { compT = Map.insert name (Just (name, label)) compT })
 
 > getDestOfName :: Name -> CompM (Maybe Dest)
@@ -435,7 +422,10 @@ I report an error if the situation occurs.
 > -- | Do something with a new label.
 > withNewLabel :: UniqueMonad m => (Label -> m a) -> m a
 > withNewLabel f = freshLabel >>= f
-  
+>                  
+> withNewDest :: UniqueMonad m => String -> (Dest -> m a) -> m a
+> withNewDest prefix f = freshLabel >>= \l -> f (prefix ++ show l, l)
+
 > toAlt :: LC.Alt -> Alt Expr
 > toAlt (LC.Alt (Ident cons _) _ vs expr) = Alt cons (map (\(Ident n _) -> n) vs) expr
 

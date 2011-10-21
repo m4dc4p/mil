@@ -111,9 +111,9 @@ data TailM = Return Name
 -- Pretty printing programs
 printStmtM :: StmtM e x -> Doc
 printStmtM (Bind n b) = text n <+> text "<-" <+> nest 2 (printTailM b)
-printStmtM (BlockEntry f _ args) = text f <+> 
+printStmtM (BlockEntry f l args) = text (show l) <+> text f <+> 
                                   parens (commaSep text args) <> text ":" 
-printStmtM (CloEntry f _ clos arg) = text f <+> braces (commaSep text clos) 
+printStmtM (CloEntry f l clos arg) = text (show l) <+> text f <+> braces (commaSep text clos) 
                                      <+> text arg <> text ":" 
 printStmtM (CaseM v alts) = hang (text "case" <+> text v <+> text "of") 2 (vcat' $ map printAlt alts)
   where
