@@ -216,17 +216,26 @@ I report an error if the situation occurs.
 
 > compileStmt (ELet (Decls defs) outerBody) ctx = compVars (getDefns defs)
 >   where
->     compBody (Right body) = compResultVar body 
->     compBody (Left (prim, typs)) = 
->       compResultVar (EPrim prim (error "evaluated type") (error "evaluated types"))
 >     compVars [Defn (Ident name _) _ letBody] = 
->       compBody letBody $ \v -> do
+>       compBody name letBody $ \t -> do
 >         rest <- compileStmt outerBody ctx
->         return (mkMiddle (Bind name (Return v)) <*> rest)
+>         return (mkMiddle (Bind name t) <*> rest)
 >     compVars (Defn (Ident name _) _ letBody : ds) = do
 >       rest <- compVars ds 
->       compBody letBody $ \v -> do
->         return (mkMiddle (Bind name (Return v)) <*> rest)
+>       compBody name letBody $ \t -> do
+>         return (mkMiddle (Bind name t) <*> rest)
+>     compBody name (Right body) ctx = withFree (const (return $ free body)) $ \lfvs -> do
+>       -- Determine free variables
+>       -- Create a block taking all free variables
+>       -- as arguments, containing code representing
+>       -- the body. 
+>       -- Jump to the block and put the result in a varialbe
+>       letName <- newTop (mkName "letBody" name)
+>       letDest <- blockDefn letName lfvs (\ln ll ->
+>                    compileStmt body (return . mkLast . Done ln ll))
+>       ctx (Goto letDest lfvs)
+>     compBody name (Left (prim, typs)) ctx = 
+>       compileStmt (EPrim prim (error "evaluated type") (error "evaluated types")) ctx
 
 > compileStmt (ENat n) ctx
 >   = ctx (LitM n)
@@ -242,7 +251,6 @@ I report an error if the situation occurs.
 >   -> CompM (ProgM O C)
 > compResultVar (EVar (Ident v _) _) ctx = do
 >   top <- isTopLevel v
->   trace (v ++ " is top level " ++ show top) (return ())
 >   if isJust top
 >    then do
 >      v <- fresh "v"
@@ -400,11 +408,17 @@ I report an error if the situation occurs.
 >     free' (EBits _ _) = []
 >     free' (ECon _ _) = []
 >     free' (ELam (Ident v _) _ expr) = v `delete` nub (free' expr)
->     free' (ELet (Decls decls) expr) = free' expr \\ (map (\(Defn (Ident n _) _ _) -> n) $ getDefns decls)
+>     free' (ELet (Decls decls) expr) = 
+>             (free' expr \\ 
+>                    map (\(Defn (Ident n _) _ _) -> n) (getDefns decls)) ++ 
+>             (nub $ concatMap freeDefn $ getDefns decls)
 >     free' (ECase expr alts) = nub (free' expr ++ concatMap (\(LC.Alt _ _ vs e) -> nub (free' e) \\ map (\(Ident n _) -> n) vs) alts)
 >     free' (EApp e1 e2) = nub (free' e1 ++ free' e2)
 >     free' (EFatbar e1 e2) = nub (free' e1 ++ free' e2)
 >     free' (EBind (Ident v _) _ e1 e2) = nub (free' e1 ++ v `delete` nub (free' e2))
+>     declName (Defn (Ident n _) _ _) = n
+>     freeDefn (Defn (Ident n _) _ (Right e)) = n `delete` nub (free' e)
+>     freeDefn (Defn (Ident n _) _ _) = []
 
 > setDest :: Name -> Label -> CompM ()
 > setDest name label = 
