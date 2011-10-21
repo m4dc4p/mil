@@ -33,8 +33,10 @@
 > 
 > -- | Associates a label with the destination which it either captures
 > -- (Closure) or jumps to (Goto). We store the index at which the
-> -- argument to a closure will be stored, if it is used.
-> data DestOf = Jump Dest 
+> -- argument to a closure will be stored, if it is used. For goto,
+> -- we store the variables passed as positions from teh arguments
+> -- given to the block. 
+> data DestOf = Jump Dest [Int]
 >             | Capture Dest (Maybe Int)
 >               deriving (Eq, Show)
 > 
@@ -60,44 +62,63 @@
 >       return p
 >   where
 >     labels = entryLabels body
->     destinations = Map.fromList . catMaybes . map (destOf body) 
->     initial = mapFromList (zip labels (repeat (topFacts body)))
->     -- We determine if each top-level name only allocates
->     -- a closure or not, and use that as our initial facts.
->     topFacts :: ProgM C C -> CollapseFact
->     topFacts = Map.fromList . map factForBlock . allBlocks
->     -- Conceptually, all top-level labels hold a closure pointing to
->     -- the entry point of the procedure. We don't implement it
->     -- that way but the below will fake it for purposes of this
->     -- optimization. 
->     --
->     -- TODO: Filter the initial facts to top-level names only, the below
->     -- will create an entry for all labels.
->     factForBlock :: (Dest, Block StmtM C C) -> (Name, WithTop CloVal)
->     factForBlock (dest@(name, _), block) = (name, PElem (CloVal dest [])) 
->     destOf :: ProgM C C -> Label -> Maybe (Label, DestOf)
->     destOf body l = case blockOfLabel body l of
->                    Just (_,  block) ->
->                      case blockToNodeList' block of
->                        (JustC (CloEntry {}), [], JustC (Done _ _ (Goto d _))) -> Just (l, Jump d)
->                        (JustC (CloEntry _ _ _ arg), [], JustC (Done _ _ (Closure d args))) -> Just (l, Capture d (arg `elemIndex` args))
->                        _ -> Nothing
->                    _ -> Nothing
+>     initial = mapFromList (zip labels (repeat Map.empty))
 >     fwd = FwdPass { fp_lattice = collapseLattice
->                   , fp_transfer = collapseTransfer
+>                   , fp_transfer = collapseTransfer (Map.fromList (entryPoints body))
 >                   , fp_rewrite = collapseRewrite (destinations labels) }
+>     destinations = Map.fromList . catMaybes . map (uncurry destOf) . catMaybes .  map (blockOfLabel body)
+>     destOf :: Dest -> Block StmtM C C -> Maybe (Label, DestOf)
+>     destOf (_, l)  block = 
+>       case blockToNodeList' block of
+>         (JustC (CloEntry _ _ args arg), _, JustC (Done _ _ (Goto d uses))) -> 
+>           Just (l, Jump d (mapUses uses (args ++ [arg])))
+>         (JustC (CloEntry _ _ _ arg), _, JustC (Done _ _ (Closure d args))) -> 
+>           Just (l, Capture d (arg `elemIndex` args))
+>         _ -> Nothing
+>     mapUses :: [Name] -> [Name] -> [Int]
+>     mapUses uses args = catMaybes (map (`elemIndex` args) uses)
 > 
-> collapseTransfer :: FwdTransfer StmtM CollapseFact
-> collapseTransfer = mkFTransfer fw
+> collapseTransfer :: Map Label (StmtM C O) -> FwdTransfer StmtM CollapseFact
+> collapseTransfer entryPoints = mkFTransfer fw
 >   where
 >     fw :: StmtM e x -> CollapseFact -> Fact x CollapseFact
 >     fw (Bind v (Closure dest args)) bound = Map.insert v (PElem (CloVal dest args)) bound
 >     fw (Bind v _) bound = Map.insert v Top bound
->     fw s@(CaseM _ alts) bound = mkFactBase collapseLattice (zip (stmtSuccessors s) (repeat bound))
->     fw s@(Done _ _ _) bound = mkFactBase collapseLattice  (zip (stmtSuccessors s) (repeat bound))
+>     fw s@(CaseM _ alts) bound = 
+>       let boundVars = Map.elems bound
+>           renameAlt (Alt _ vs (Goto (_, l) args)) = 
+>             -- For each variable in bound, determine
+>             -- if it is shadowed by an Alt binding. If not,
+>             -- determine the position it is used in 
+>             -- and rename it to match name of argument in
+>             -- corresponding position in destination block.
+>             Just (l, renameBound args l vs bound)
+>           renameAlt _ = Nothing 
+>       in mkFactBase collapseLattice (catMaybes $ map renameAlt alts)
+>     fw (Done _ _ (Goto (_, l) args)) bound = mapSingleton l (renameBound args l [] bound)
+>     fw (Done _ _ _) bound = mkFactBase collapseLattice []
 >     fw (BlockEntry _ _ _) f = f
 >     fw (CloEntry _ _ _ _) f = f
->     
+
+>     rename :: [Name] -> StmtM C O -> Name -> Name
+>     rename args (BlockEntry _ _ blockArgs) arg  = 
+>       case arg `elemIndex` args of
+>         Just i -> blockArgs !! i -- rename to block argument
+>         _ -> arg -- don't rename
+>     rename args _ arg = arg 
+
+>     -- A candidate for renaming is a var that is not shadowed and appears
+>     -- in the args list. The ignored argument just makes this easier to
+>     -- use with Map.filterWithKey.
+>     candidate :: [Name] -> [Name] -> Name -> a -> Bool
+>     candidate shadows args var _ = not (var `elem` shadows) && var `elem` args
+>
+>     -- Rename bound variables 
+>     renameBound :: [Name] -> Label -> [Name] -> CollapseFact -> CollapseFact
+>     renameBound origNames l shadows = 
+>       Map.mapKeys (rename origNames (entryPoints ! l)) . 
+>         Map.filterWithKey (candidate shadows origNames) 
+
 > collapseRewrite :: FuelMonad m => Map Label DestOf -> FwdRewrite m StmtM CollapseFact
 > collapseRewrite blocks = iterFwdRw (mkFRewrite rewriter)
 >   where
@@ -111,12 +132,19 @@
 >       case Map.lookup f col of
 >         Just (PElem (CloVal dest@(_, l) vs)) -> 
 >           case l `Map.lookup` blocks of
->             Just (Jump dest) -> Just (Goto dest (vs ++ [x]))
+>             Just (Jump dest uses) -> Just (Goto dest (fromUses uses (vs ++ [x])))
 >             Just (Capture dest (Just idx)) -> Just (Closure dest (insertAt vs idx x))
 >             Just (Capture dest _) -> Just (Closure dest vs)
 >             _ -> Nothing
 >         _ -> Nothing
-> 
+>                             
+>     -- Idxs is a list of positions which represent
+>     -- how a Goto used the arguments given in a CloEntry. We
+>     -- take local arguments and re-order them according to
+>     -- the positions given.
+>     fromUses :: [Int] -> [Name] -> [Name]
+>     fromUses idxs args = map (args !!) idxs
+
 > collapseLattice :: DataflowLattice CollapseFact
 > collapseLattice = DataflowLattice { fact_name = "Closure collapse"
 >                                   , fact_bot = Map.empty
