@@ -1,5 +1,5 @@
 > {-# LANGUAGE RankNTypes, GADTs #-}
-> module Uncurry
+> module Uncurry (collapse)
 >   
 > where
 >   
@@ -17,7 +17,8 @@
 > 
 > import Util
 > import MIL
-> 
+> import Live
+>
 > -- Closure/App collapse (aka "Beta-Fun" from "Compiling with
 > -- Continuations, Continued" section 2.3)
 > --
@@ -57,12 +58,13 @@
 > -- to a block, then avoid that extra step and directly allocate the
 > -- closure or jump to the block.
 > collapse :: ProgM C C -> ProgM C C
-> collapse body = runSimple $ do
+> collapse body = deadCode . runSimple $ do
 >       (p, _, _) <- analyzeAndRewriteFwd fwd (JustC labels) body initial
 >       return p
 >   where
 >     labels = entryLabels body
 >     initial = mapFromList (zip labels (repeat Map.empty))
+>     -- debug = debugFwdJoins trace (const True)
 >     fwd = FwdPass { fp_lattice = collapseLattice
 >                   , fp_transfer = collapseTransfer (Map.fromList (entryPoints body))
 >                   , fp_rewrite = collapseRewrite (destinations labels) }
@@ -126,7 +128,7 @@
 >     rewriter (Done n l (Enter f x)) col = done n l (collapse col f x)
 >     rewriter (Bind v (Enter f x)) col = bind v (collapse col f x)
 >     rewriter _ _ = return Nothing
-> 
+>                    
 >     collapse :: CollapseFact -> Name -> Name -> Maybe TailM
 >     collapse col f x =       
 >       case Map.lookup f col of
