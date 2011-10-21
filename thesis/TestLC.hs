@@ -914,8 +914,9 @@ uncurry1 = [("uncurry1",
                 (alt "True" [] $ \_ -> var "map" `app` f `app` xs) .
                 (alt "False" [] $ \_ -> var "map" `app` g `app` xs))] ++ myMap
 
-{- An example to demonstrat uncurrying
-across case statements.-}
+{- An example to demonstrate uncurrying across case statements.
+   Does not work as "xs" appears as in a goto but it is not
+   passed as an argument. -}
 uncurry2 = [("uncurry2",
            lam "f" $ \f ->
            lam "g" $ \g ->
@@ -939,6 +940,82 @@ uncurry3 = [("uncurry3",
            ,("mapCap",
             lam "xs" $ \xs ->
             lam "f" $ \ f -> f `app` xs)]
+
+{- An example to demonstrate uncurrying across case statements.
+
+Incorrectly rewrites :(
+
+ ========= LambdaCase =================
+uncurry4 = let val mapCap :: #.t
+                 = (\xs :: #.t -> (\t :: #.t -> (\f :: #.t -> ((f xs) t))))
+in let val map1 :: #.t
+         = (mapCap xs) in case 1 of
+                            1 -> ((map1 t) f)
+
+ ========= Unoptimized MIL ============
+L200 uncurry4 (t, f, xs):
+  mapCap <- letBodymapCapL201()
+  map1 <- letBodymap1L207(mapCap, xs)
+  result213 <- caseEvalL211(map1, t, f)
+  return result213
+L201 letBodymapCapL201 (): closure absBodyL202 {}
+L202 absBodyL202 {} xs: closure absBodyL203 {xs}
+L203 absBodyL203 {xs} t: closure absBodyL204 {xs, t}
+L204 absBodyL204 {xs, t} f: absBlockL205(xs, t, f)
+L205 absBlockL205 (xs, t, f):
+  v206 <- f @ xs
+  v206 @ t
+L207 letBodymap1L207 (mapCap, xs): mapCap @ xs
+L208 altBody1L208 (map1, t, f):
+  v209 <- map1 @ t
+  v210 <- v209 @ f
+  return v210
+L211 caseEvalL211 (map1, t, f):
+  v212 <- num 1
+  case v212 of 1 -> altBody1L208(map1, t, f)
+
+ ========= Optimized MIL ==============
+L200 uncurry4 (t, f, xs):
+  map1 <- closure absBodyL203 {xs}
+  caseEvalL211(map1, t, f)
+L203 absBodyL203 {xs} t: closure absBodyL204 {xs, t}
+L204 absBodyL204 {xs, t} f: absBlockL205(xs, t, f)
+L205 absBlockL205 (xs, t, f):
+  v206 <- f @ xs
+  v206 @ t
+L208 altBody1L208 (map1, t, f): absBlockL205(xs, t, f)
+L211 caseEvalL211 (map1, t, f):
+  v212 <- num 1
+  case v212 of 1 -> altBody1L208(map1, t, f)
+
+-}
+uncurry4 = [("uncurry4",
+             _let "mapCap" (lam "xs" $ \xs ->
+                            lam "t" $ \t ->
+                            lam "f" $ \f -> f `app` xs `app` t) $ \mapCap ->
+             _let "map1" (mapCap `app` var "xs") $ \map1 ->
+             _case (lit 1) $
+                (alt "1" [] $ \_ -> map1 `app` var "t" `app` var "f"))]
+
+uncurry5 = [("uncurry5",
+           lam "f" $ \f ->
+           lam "xs" $ \xs ->
+             _let "map1" (var "mapCap" `app` xs) $ \map1 ->
+             _case (lit 1) $
+                (alt "1" [] $ \_ -> 
+                   _let "map2" (map1 `app` f) $ \map2  ->
+                   _case (lit 2) $ 
+                      (alt "1" [] $ \_ -> map2 `app` f) . 
+                      (alt "2" [] $ \_ -> map2 `app` xs)) .
+                (alt "0" [] $ \_ -> 
+                   _let "map2" (map1 `app` xs) $ \map2  ->
+                   _case (lit 3) $ 
+                      (alt "1" [] $ \_ -> map2 `app` f) . 
+                      (alt "3" [] $ \_ -> map2 `app` xs)))
+           ,("mapCap",
+            lam "xs" $ \xs ->
+            lam "t" $ \t ->
+            lam "f" $ \ f -> f `app` xs `app` t)]
 
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
