@@ -905,7 +905,7 @@ arrExample = [("main"
     mUnsafeWrite a i n = EPrim "unsafeWrite" typ [] `app` a `app` i `app` lit n
     mNewArray i l = EPrim "newArray_" typ [] `app` lit i `app` lit l
 
-uncurry1 = [("mapTwo",
+uncurry1 = [("uncurry1",
            lam "f" $ \f ->
            lam "g" $ \g ->
            lam "xs" $ \xs ->
@@ -916,21 +916,21 @@ uncurry1 = [("mapTwo",
 
 {- An example to demonstrat uncurrying
 across case statements.-}
-uncurry2 = [("mapTwo",
+uncurry2 = [("uncurry2",
            lam "f" $ \f ->
            lam "g" $ \g ->
            lam "xs" $ \xs ->
            lam "test" $ \test ->
              _let "map1" (var "mapCap" `app` xs) $ \map1 ->
              _case test $
-                (alt "True" [] $ \_ -> map1 `app` f `app` f) .
-                (alt "False" [] $ \_ -> map1 `app` g `app` g))
+                (alt "True" [] $ \_ -> map1 `app` test `app` f) .
+                (alt "False" [] $ \_ -> map1 `app` test `app` g))
            ,("mapCap",
             lam "xs" $ \xs ->
-            lam "_" $ \_ ->
-            lam "f" $ \ f -> f `app` xs)]
+            lam "t" $ \t ->
+            lam "f" $ \ f -> f `app` xs `app` t)]
 
-uncurry3 = [("mapTwo",
+uncurry3 = [("uncurry3",
            lam "f" $ \f ->
            lam "xs" $ \xs ->
            lam "test" $ \test ->
