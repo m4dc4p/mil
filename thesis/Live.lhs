@@ -2,7 +2,7 @@
 
 > {-# LANGUAGE TypeSynonymInstances, GADTs, RankNTypes
 >   , NamedFieldPuns, TypeFamilies, ScopedTypeVariables #-}
-> module Live (addLive, LiveFact, deadCode, findLive)
+> module Live (addLive, LiveFact, deadCode, deadCodePass, findLive)
 >
 > where 
 > 
@@ -29,6 +29,9 @@
 > deadCode :: ProgM C C -> ProgM C C
 > deadCode = fst . usingLive deadRewriter []
 > 
+> deadCodePass :: FuelMonad m => [Name] -> BwdPass m StmtM LiveFact
+> deadCodePass = mkLivePass deadRewriter
+>
 > -- Determining liveness in StmtM
 
 %endif
@@ -42,7 +45,14 @@ are live at any point. Our ``fact'' is then a set of variables:
 %endif
 %if False
 
-> 
+> mkLivePass :: FuelMonad m => (Set Name -> BwdRewrite m StmtM LiveFact) -- ^ Rewrite to use
+>            -> [Name] 
+>            -> BwdPass m StmtM LiveFact
+> mkLivePass rewriter tops = 
+>   BwdPass { bp_lattice = liveLattice (undefined :: Name) "live statements"
+>           , bp_transfer = liveTransfer (Set.fromList tops)
+>           , bp_rewrite = rewriter (Set.fromList tops) } 
+
 > -- | Used to apply different rewriters which all require 
 > -- live variable analysis.
 > usingLive :: (forall m. FuelMonad m => Set Name -> BwdRewrite m StmtM LiveFact) -- ^ Rewrite to use
@@ -53,9 +63,7 @@ are live at any point. Our ``fact'' is then a set of variables:
 >       (p, f, _) <- analyzeAndRewriteBwd bwd (JustC (entryLabels body)) body mapEmpty
 >       return (p, f)
 >   where
->     bwd = BwdPass { bp_lattice = liveLattice (undefined :: Name) "live statements"
->                   , bp_transfer = liveTransfer (Set.fromList tops)
->                   , bp_rewrite = rewriter (Set.fromList tops) } 
+>     bwd = mkLivePass rewriter tops
 > 
 > -- | Initial setup for liveness analysis.
 > liveLattice :: Ord a => a -> String -> DataflowLattice (Set a)
