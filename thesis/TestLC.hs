@@ -21,33 +21,23 @@ import LCToMIL
 import DeadBlocks
 import LCM
 
-progM :: [(Name, Expr)] -> ([Name], ProgM C C) -> IO ()
+progM :: [Def] -> ([Name], ProgM C C) -> IO ()
 progM progs prelude@(prims, _) = do
-  putStrLn "\n ========= Unoptimized ============"
-  -- printResult progs (map (deadBlocks tops . compile tops prelude) . map (: []) $ progs)
+  putStrLn "\n ========= LambdaCase ================="
+  putStrLn (render $ vcat (map printDef progs)) 
+  putStrLn "\n ========= Unoptimized MIL ============"
   putStrLn (render $ printProgM (deadBlocks tops . compile tops prelude $ progs))
 
   let optProgs = mostOpt tops prelude . (compile tops prelude) $ progs
 
-  putStrLn "================================================================================"
+  putStrLn "\n ========= Optimized MIL =============="
   putStrLn (render $ printProgM optProgs)
            
     where
       tops = map fst progs
 
-      printExprs = vcat . map printExprMap . Map.toList 
-                          
       printDef :: Def -> Doc
       printDef def = text (show (ppr def))
-
-      printWithDef :: (Def, ProgM C C) -> Doc
-      printWithDef (def, comp) = text (show (ppr def)) $+$ 
-                                 vcat' (maybeGraphCC empty printBlockM comp)
-                                     
-      printExprMap ((n, _), exprs) = brackets $ text n <> colon <+> commaSep printTailM (Set.elems exprs)
-      showTails = commaSep printTailM 
-
-      printResult defs progs = putStrLn (render (vcat' (map ((text "" $+$) . printWithDef) (zip defs progs))))
 
 -- Optimize a hand-writen MIL program.
 milTest :: SimpleUniqueMonad (ProgM C C) -> IO ()
@@ -835,7 +825,7 @@ caseTest2 = [("caseTest2",
            lam "g" $ \g ->
            lam "x" $ \x ->
              bindE "()" ((_case x $ (alt "True" [] (\_ -> f)) .
-               (alt "False" [] (\_ -> g))) `app` x) $ \_ -> mkUnit)]
+               (alt "False" [] (\_ -> g))) `app` x) $ \_ -> ret mkUnit)]
 
 caseTest3 = [("caseTest3",
                lam "x" $ \x ->
@@ -915,9 +905,7 @@ arrExample = [("main"
     mUnsafeWrite a i n = EPrim "unsafeWrite" typ [] `app` a `app` i `app` lit n
     mNewArray i l = EPrim "newArray_" typ [] `app` lit i `app` lit l
 
-{- An example to demonstrat uncurrying
-across case statements.-}
-mapTwo = [("mapTwo",
+uncurry1 = [("mapTwo",
            lam "f" $ \f ->
            lam "g" $ \g ->
            lam "xs" $ \xs ->
@@ -925,6 +913,32 @@ mapTwo = [("mapTwo",
              _case test $
                 (alt "True" [] $ \_ -> var "map" `app` f `app` xs) .
                 (alt "False" [] $ \_ -> var "map" `app` g `app` xs))] ++ myMap
+
+{- An example to demonstrat uncurrying
+across case statements.-}
+uncurry2 = [("mapTwo",
+           lam "f" $ \f ->
+           lam "g" $ \g ->
+           lam "xs" $ \xs ->
+           lam "test" $ \test ->
+             _let "map1" (var "mapCap" `app` xs) $ \map1 ->
+             _case test $
+                (alt "True" [] $ \_ -> map1 `app` f `app` f) .
+                (alt "False" [] $ \_ -> map1 `app` g `app` g))
+           ,("mapCap",
+            lam "xs" $ \xs ->
+            lam "_" $ \_ ->
+            lam "f" $ \ f -> f `app` xs)]
+
+uncurry3 = [("mapTwo",
+           lam "f" $ \f ->
+           lam "xs" $ \xs ->
+           lam "test" $ \test ->
+             _let "map1" (var "mapCap" `app` xs) $ \map1 ->
+               map1 `app` f)
+           ,("mapCap",
+            lam "xs" $ \xs ->
+            lam "f" $ \ f -> f `app` xs)]
 
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
