@@ -6,7 +6,44 @@
 
 \chapter{Uncurrying}
 \label{ref_chapter_uncurrying}
-\intent{Introduce curried and uncurried terms; describe uncurrying}
+\intent{Overture: partial application, curried, uncurried.}  Many
+functional languages encourage programmers to write definitions that
+take advantage of \emph{partial application}. Partial application
+means to give a function only some of its arguments, resulting in a
+new function that takes the remaining arguments. A function definition
+that supports partial application is said to be in \emph{curried}
+style, after the mathematician Haskell Curry.\footnote{Historically,
+  Curry used this style but did not invent it. That is due to a early
+  $20^{th}$--century mathematician named Schrodenfinkel.} In contrast,
+an \emph{uncurried} function is defined such that it can only be
+applied to all of its arguments at once.
+
+\intent{Briefly motivate optimization.}  Partial
+application can be very convenient for programmers, but it can also be
+very inefficient. Conceptually, an uncurried function does real work
+with each application --- that is, each application executes the body
+of the function. A curried function does not do any real work until 
+given all its arguments; each in-between application essentially creates
+a new function. 
+
+\intent{Introduce uncurrying optimization.} This chapter describes our
+implementation of \emph{uncurrying}, an optimization that reduces the
+number of partial applications in a program. Through dataflow
+analysis, we find partial applications for a given function within a
+block of MIL code. We replace those partial applications with
+full applications to the function, or at least fewer partial
+applications. 
+
+\intent{signposts.}
+Section~\ref{uncurry_sec_papp} describes partial application in 
+more detail and introduces several examples that we will use
+to demonstrate our optimization. We will discuss uncurrying
+as applied to MIL in Section~\ref{uncurry_sec_mil}. We present
+our dataflow equations for uncurrying in Section~\re{uncurry_sec_df},
+and describe our implementation in Section~\ref{uncurry_sec_impl}. Alternate
+uncurrying strategies, which we leave to future work, are shown in
+Section~\ref{uncurry_sec_future}. We conclude with a discussion of our
+experience in Section~\ref{uncurry_sec_conc}.
 
 %% \emph{Describes our optimization for collapsing intermediate
 %% closures. Our choice of representation is analyzed to
@@ -16,14 +53,17 @@
 %% for this section will vary from the other two.}
 
 \section{Partial Application}
+\label{uncurry_sec_papp}
 \intent{Motivate partial application -- what does it buy us? Introduce example too.}
 
 \section{Uncurrying MIL blocks}
+\label{uncurry_sec_mil}
 \intent{Describe uncurrying in terms of MIL -- what do we do, what don't we do.}
 
 \section{Dataflow Equations}
-\intent{Define dataflow equations for the uncurrying optimization}
+\intent{Define dataflow equations for our uncurrying optimization.}
 
+\begin{myfig}
 \begin{math}
 %% Below used to measure & typeset the case where we don't
 %% see a binding.
@@ -40,7 +80,7 @@
     b \wedge c &= \top, b \neq c. \\
     & \text{where\ } b, c \in \setL{Dest}. \\\\
 
-    \multicolumn{2}{l}{\textit{Transfer Function for Statements}} \\
+    \multicolumn{2}{l}{\textit{Transfer Function}} \\
     \phantom{\the\rest} \mathllap{f (!+v\ \texttt{<-}\ k\ b\ \{\dots\}+!)} &= %%
     \begin{cases}
       \{!+(v, b \wedge c)+!\} \cup (F \backslash \{!+(v, c)+!\}) & \text{when\ } !+(v, c)+! \in F. \\
@@ -48,22 +88,12 @@
     \end{cases} \\
     \the\rest &= \{!+(v, \top)+!\} \cup F.\\
     f (!+\_+!) &= F. \\
-    & \text{where\ } F \subseteq \setL{Fact}. \\\\
-
-    \multicolumn{2}{l}{\textit{Transfer Function for Blocks}} \\
-    \outBa &= \inBa \cup f(!+s_1+!) \dots \cup f(!+s_n+!) \\
-    & \text{where\ } B = \begin{minipage}[t]{1in}\singlespacing\vskip-1.56\baselineskip\begin{AVerb}[gobble=8]
-        b($\dots$) = do 
-          $\mathtt{s_1}$
-          $\dots$
-          $\mathtt{s_n}$
-      \end{AVerb}
-    \end{minipage} \\
-    \outBa &= \inBa \\
-    & \text{where\ } B = !+k \{v_1,\dots,v_n\}+!.
-
+    & \text{where\ } F \subseteq \setL{Fact}.
   \end{array}
 \end{math}
+\caption{Dataflow facts and equations for our uncurrying transformation.}
+\label{uncurry_df_fig}
+\end{myfig}
 
 \section{Implementation}
 
@@ -71,8 +101,7 @@
 Functional languages permit definitions in two styles: \emph{curried}
 and \emph{uncurried}. A curried function can be \emph{partially
   applied} --- it does not need to be given all of its arguments at
-once. A function that takes the remaining arguments results from such
-an application. An \emph{uncurried} function, however, must be given
+once. An \emph{uncurried} function, however, must be given
 all of its arguments at once. It cannot be partially applied. 
 
 \intent{Illustrate curried vs. uncurried.}  For example, the following
@@ -185,6 +214,12 @@ collected to each successor.
 
 \intent{Describe how deep rewrite progressively captures closures.}
 
+\section{Prior Work}
+
+\section{Future Work}
+\lable{uncurry_sec_future}
+\intent{Discuss strategies for uncurrying: local only, across blocks, by duplication.}
+
 \section{Reflection}
-\subsection{Prior Work}
+\label{uncurry_sec_refl}
 \end{document}

@@ -1,13 +1,5 @@
 %% This stuff makes !+<text>+! write <text> in typewriter font.  
 
-%% We make ! and + active characters early, then manipulate their
-%% meaning to produce the right effect. Initially, + produces +. When
-%% !  appears w/o a + following, it produces ``!''. When ``+''
-%% follows, we start writing in teleteype (\ttfamily). The definition
-%% of ``!'' changes to produce a bang. ``+'' changes such that it
-%% looks for trailing ``!''. When no ``!'' appears, ``+'' produces ``+''. 
-%% If a ``!'' appears, we shift out of \ttfamily (by ending the group) and
-%% reset the meaning of ``!'' and ``+'' so we can start again.
 \makeatletter
 \let\mdplus=+\let\mdbang=!      %% Preserve meaning of + and ! so we can put them into document.
 %% Turn off mark down for everyone
@@ -24,7 +16,7 @@
     %% so we don't double up the group argument (which is what
     %% happens if we expand \next). This has the effect of 
     %% inserting \expandafter\dowith in front of the upcoming {. 
-    %% If no brace is coming, \withmdC will have no effect.
+    %% If no brace is coming, \pausemdC will have no effect.
     \def\pausemdC{\expandafter\dopause}
   \else
     \let\pausedmC=\relax

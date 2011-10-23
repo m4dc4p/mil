@@ -86,40 +86,10 @@
 >     fw :: StmtM e x -> CollapseFact -> Fact x CollapseFact
 >     fw (Bind v (Closure dest args)) bound = Map.insert v (PElem (CloVal dest args)) bound
 >     fw (Bind v _) bound = Map.insert v Top bound
->     fw s@(CaseM _ alts) bound = 
->       let boundVars = Map.elems bound
->           renameAlt (Alt _ vs (Goto (_, l) args)) = 
->             -- For each variable in bound, determine
->             -- if it is shadowed by an Alt binding. If not,
->             -- determine the position it is used in 
->             -- and rename it to match name of argument in
->             -- corresponding position in destination block.
->             Just (l, renameBound args l vs bound)
->           renameAlt _ = Nothing 
->       in mkFactBase collapseLattice (catMaybes $ map renameAlt alts)
->     fw (Done _ _ (Goto (_, l) args)) bound = mapSingleton l (renameBound args l [] bound)
+>     fw s@(CaseM _ alts) bound = mkFactBase collapseLattice []
 >     fw (Done _ _ _) bound = mkFactBase collapseLattice []
 >     fw (BlockEntry _ _ _) f = f
 >     fw (CloEntry _ _ _ _) f = f
-
->     rename :: [Name] -> StmtM C O -> Name -> Name
->     rename args (BlockEntry _ _ blockArgs) arg  = 
->       case arg `elemIndex` args of
->         Just i -> blockArgs !! i -- rename to block argument
->         _ -> arg -- don't rename
->     rename args _ arg = arg 
-
->     -- A candidate for renaming is a var that is not shadowed and appears
->     -- in the args list. The ignored argument just makes this easier to
->     -- use with Map.filterWithKey.
->     candidate :: [Name] -> [Name] -> Name -> a -> Bool
->     candidate shadows args var _ = not (var `elem` shadows) && var `elem` args
->
->     -- Rename bound variables 
->     renameBound :: [Name] -> Label -> [Name] -> CollapseFact -> CollapseFact
->     renameBound origNames l shadows = 
->       Map.mapKeys (rename origNames (entryPoints ! l)) . 
->         Map.filterWithKey (candidate shadows origNames) 
 
 > collapseRewrite :: FuelMonad m => Map Label DestOf -> FwdRewrite m StmtM CollapseFact
 > collapseRewrite blocks = iterFwdRw (mkFRewrite rewriter)
