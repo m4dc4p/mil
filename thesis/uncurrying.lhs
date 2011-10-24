@@ -34,14 +34,15 @@ block of MIL code. We replace those partial applications with
 full applications to the function, or at least fewer partial
 applications. 
 
-\intent{signposts.}
-Section~\ref{uncurry_sec_papp} describes partial application in 
-more detail and introduces several examples that we will use
-to demonstrate our optimization. We will discuss uncurrying
-as applied to MIL in Section~\ref{uncurry_sec_mil}. We present
-our dataflow equations for uncurrying in Section~\re{uncurry_sec_df},
-and describe our implementation in Section~\ref{uncurry_sec_impl}. Alternate
-uncurrying strategies, which we leave to future work, are shown in
+\intent{signposts.}  Section~\ref{uncurry_sec_papp} describes partial
+application in more detail; Section~\ref{uncurry_sec_costs} discusses
+drawbacks to supporting partial application.  We introduce several
+examples that will illustrate our optimization and discuss uncurrying
+as applied to MIL in Section~\ref{uncurry_sec_mil}. We present our
+dataflow equations for uncurrying in Section~\ref{uncurry_sec_df}, and
+describe our implementation in
+Section~\ref{uncurry_sec_impl}. Alternate uncurrying strategies, which
+we leave to future work, are shown in
 Section~\ref{uncurry_sec_future}. We conclude with a discussion of our
 experience in Section~\ref{uncurry_sec_conc}.
 
@@ -54,7 +55,178 @@ experience in Section~\ref{uncurry_sec_conc}.
 
 \section{Partial Application}
 \label{uncurry_sec_papp}
-\intent{Motivate partial application -- what does it buy us? Introduce example too.}
+\intent{Motivate partial application -- what does it buy us?}  Partial
+application in functional programming promotes re-usability and
+abstraction. It allows the programmer to define specialized versions
+of a function by providing only some fixed arguments to a general
+function. 
+
+\begin{myfig}
+> map1 :: (a -> b) -> [a] -> [b]
+> map1 = {-"\ldots"-}
+>
+> map2 :: ((a -> b), [a]) -> b
+> map2 = {-"\ldots"-}
+  \label{uncurry_fig_partapp}
+  \caption{Haskell definitions in curried and uncurried style. |map|
+    can be easily partially applied to produce specialized functions; |foldr|
+    cannot.}
+\end{myfig}
+
+For example, the Haskell code in Figure~\ref{uncurry_fig_partapp}
+defines |map1| in curried style and |map2| in uncurried
+style.\footnote{The implementation of each function is not relevant
+  here, so we elide them.} We can create specialized |maps| by
+applying |map1| to a single argument. For example, we can create a
+function to convert all its arguments to uppercase or one that squares
+all integers in a list:
+
+> upCase1 :: [Char] -> [Char]
+> upCase1 = map toUpper
+>
+> square :: [Int] -> [Int]
+> square = map (^2)
+
+We cannot do the same as easily with |map2|. At best we can define
+a function that ignores one of its arguments:
+
+> upCase2 :: ((a -> b), [Char]) -> [Char]
+> upcase2 (_, xs) = map (toUpper, xs)
+
+\intent{Demonstrate that partial-application needs to be considered
+  even when the language does not directly support it.}  Even if our
+language did not support partial application, we can simulate it with
+anonymous functions. For example, JavaScript does not explicitly
+support partial application. Given the following definition of |map|,
+we cannot define |upCase1| very easily:\footnote{Again, the
+  implementation of map is not relevant here, so we elide it.}
+
+\singlespacing
+\begin{minipage}{\hsize}
+  \begin{MILVerb}[gobble=4]
+    function map (f, xs) { 
+      \ldots
+    };
+  \end{MILVerb}
+\end{minipage}
+\doublespacing
+
+\noindent
+However, the following definition of |curry| converts a
+two-argument function to one that can be partially applied:
+
+\singlespacing
+\begin{minipage}{\hsize}
+  \begin{MILVerb}[gobble=4]
+    function curry(f) {
+      return function (a) {
+        return function(b) {
+          return f(a,b);
+        };
+      }; 
+    }
+  \end{MILVerb}
+\end{minipage}
+\doublespacing
+
+\noindent
+And now we can define |upCase1|:
+
+\singlespacing
+\begin{minipage}{\hsize}
+  \begin{MILVerb}[gobble=2]
+    var upCase1 = curry(map)(function(c) { 
+      return c.toUpper(); 
+    });
+  \end{MILVerb}
+\end{minipage}
+\doublespacing
+
+\section{Cost of Partial Application}
+\label{uncurry_sec_costs}
+\intent{Demonstrates why partial application can be inefficient.}
+Function application, regardless of whether partial application is
+supported or not, almost always generates code that jumps from one
+section of the program to another.\footnote{Inlining can remove the
+  need for jumps, but of course increases code size. There is no
+  perfect optimization --- only good enough.} At the assembly language
+level, function application is expensive because multilple operations
+must take place to implement it: saving registers, loading addresses,
+and finally jumping to the target location. Partial application
+exagerates all these costs.
+
+Partial application essentially creates a \emph{series} of functions,
+each of which gathers arguments and returns a closure pointing to the
+next function in the chain. Only when all the arguments are gathered
+does the function do ``real work'' --- that is, something besides
+gathering up arguments and creating a closure. Supporting partial
+application also tends to influence the lowest-level of code
+generation, where function appliation is implemented. Rather than
+generate specialized code for partially versus fully-applied
+functions, its simplest to generate the same code for all
+applications, partial or otherwise. That means every function
+appliation pays the price of partial applicatoin, even if the function
+is ``obviously'' fully-applied.
+
+\section{Partial Application and MIL}
+\intent{Reminder reader how about different MIL blocks and how
+  closures are created.}  Recall that MIL defines two types of blocks
+(i.e., entry points): \emph{closure-capturing} and normal. A
+closure-capturing block takes two arguments: a closure and a value. We
+write closure-capturing blocks as !+k \{$v_1$, \dots, $v_n$\} $v$+!,
+where $v_1$, \dots, $v_n$ represent values in the closure given, and
+$v$ a new value. A normal block takes some
+number of arguments, as specified by the \lamC definition that it
+represents, and is written as !+b($v_1$, \dots, $v_n$)+!.
+
+MIL also defines the \emph{enter} operator (written !+@@+!), which
+applies a function to an argument. !+@@+! always expects a closure on
+its left-hand side and some argument on the right. The closure always
+refers to a closure-capturing block. A closure will never point to a
+normal block.
+
+These definitions allow MIL to represent function application
+uniformly. For a function with $n$ arguments, $n - 1$ !+k+! blocks
+will be generated. At least one !+b+! block will also be generated,
+representing the body of the function. Each !+k+! block, except the
+last, returns a new closure pointing to the next !+k+! block'; the new
+closure contains all values found in the old closure plus the
+new argument given. The last !+k+! block, block !+$k_{n-1}$+!, does 
+not return a new closure. Instead, it calls block !+b+!, passing
+all arguments needed from the closure given and the argument given. The
+value returned from block !+$k_{n-1}$+! is the value returned from block !+b+!.
+
+\intent{Introduce |compose|, show how partial application is implemented.}
+For example, Figure~\ref{uncurry_fig_compose} shows a \lamC definition
+for the |compose| function and the associated (unoptimized) MIL code.
+
+\begin{myfig}
+  \begin{tabular}{l}
+    \begin{minipage}{\hsize}
+> compose :: (a -> b) -> (b -> c) -> a -> c
+> compose f g x = f (g x)
+    \end{minipage} \\
+    \hss\scap{uncurry_fig_compose_a}\hss \\
+    \begin{minipage}{\hsize}
+      \begin{MILVerb}
+compose (): closure absBodyL201 {}
+absBodyL201 {} f: closure absBodyL202 {f}
+absBodyL202 {f} g: closure absBodyL203 {f, g}
+absBodyL203 {f, g} x: absBlockL204(f, g, x)
+absBlockL204 (f, g, x):
+  v205 <- g @@ x
+  f @@ v205
+      \end{MILVerb}
+    \end{minipage} \\
+    \hss\scap{uncurry_fig_compose_b}\hss
+  \end{tabular}
+  \caption{The |compose| function. Part~\subref{uncurry_fig_compose_a}
+    shows our \lamC definition. Part~\subref{uncurry_fig_compose_b}
+    shows MIL code compiled from Part~\subref{uncurry_fig_compose_a}.}
+  \label{uncurry_fig_compose}
+\end{myfig}
+
+\intent{MIL representation of examples; cost of partial application}
 
 \section{Uncurrying MIL blocks}
 \label{uncurry_sec_mil}
@@ -104,33 +276,7 @@ and \emph{uncurried}. A curried function can be \emph{partially
 once. An \emph{uncurried} function, however, must be given
 all of its arguments at once. It cannot be partially applied. 
 
-\intent{Illustrate curried vs. uncurried.}  For example, the following
-Haskell code defines |adder| in curried style and |multiplier| in
-uncurried style:
-
-\begin{code}
-adder :: Int -> Int -> Int
-adder a b = a + b
-
-multiplier :: (Float, Float) -> Float
-multiplier (a,b) = a * b
-\end{code}
-
-\noindent
-When applied to a single argument, |adder| returns a function that we
-can re-use over and over. Now we can use |adder| to defined specialized 
-functions such as |add1|:
-
-\begin{code}
-add1 :: Int -> Int
-add1 = adder 1
-\end{code}
-
-We cannot do the same with |multiplier|. At best we can define
-a function that ignores one of its arguments:
-
-> mult1 :: (Float, Float) -> Float
-> mult1 (a, _) = multiplier (a, 1)
+\intent{Illustrate curried vs. uncurried.}  
 
 %% Why is this a problem? Need more motivation
 The implementation of partial application, however, does come at a
@@ -217,7 +363,7 @@ collected to each successor.
 \section{Prior Work}
 
 \section{Future Work}
-\lable{uncurry_sec_future}
+\label{uncurry_sec_future}
 \intent{Discuss strategies for uncurrying: local only, across blocks, by duplication.}
 
 \section{Reflection}
