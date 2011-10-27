@@ -440,8 +440,9 @@ holds $a$ and $b$, and points to the code which evaluates to $main$. The
 
 \begin{myfig}[t]
   \input{lst_mil2}
-  \caption{The MIL program which computes $main = \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}$. Note that $a$, $b$, and $c$ are assumed to be arguments given
-    outside the program.}
+  \caption{The MIL program which computes $main =
+    \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}$. Note that $a$, $b$,
+    and $c$ are assumed to be arguments given outside the program.}
   \label{mil_fig2}
 \end{myfig}
 

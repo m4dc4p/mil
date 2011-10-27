@@ -1,5 +1,7 @@
 \documentclass[12pt]{report}
- %include polycode.fmt
+%include polycode.fmt
+%format . = "."
+%format ^ = "\char`^"
 \input{preamble}
 \begin{document}
 \input{document.preamble}
@@ -82,16 +84,16 @@ function to convert all its arguments to uppercase or one that squares
 all integers in a list:
 
 > upCase1 :: [Char] -> [Char]
-> upCase1 = map toUpper
+> upCase1 = map1 toUpper
 >
 > square :: [Int] -> [Int]
-> square = map (^2)
+> square = map2 (^ 2)
 
 We cannot do the same as easily with |map2|. At best we can define
 a function that ignores one of its arguments:
 
 > upCase2 :: ((a -> b), [Char]) -> [Char]
-> upcase2 (_, xs) = map (toUpper, xs)
+> upcase2 (_, xs) = map2 (toUpper, xs)
 
 \intent{Demonstrate that partial-application needs to be considered
   even when the language does not directly support it.}  Even if our
@@ -169,15 +171,15 @@ appliation pays the price of partial applicatoin, even if the function
 is ``obviously'' fully-applied.
 
 \section{Partial Application and MIL}
-\intent{Reminder reader how about different MIL blocks and how
-  closures are created.}  Recall that MIL defines two types of blocks
-(i.e., entry points): \emph{closure-capturing} and normal. A
-closure-capturing block takes two arguments: a closure and a value. We
-write closure-capturing blocks as !+k \{$v_1$, \dots, $v_n$\} $v$+!,
-where $v_1$, \dots, $v_n$ represent values in the closure given, and
-$v$ a new value. A normal block takes some
-number of arguments, as specified by the \lamC definition that it
-represents, and is written as !+b($v_1$, \dots, $v_n$)+!.
+\intent{Reminder reader about different MIL blocks and how closures
+  are created.}  Recall that MIL defines two types of blocks:
+\emph{closure-capturing} and normal. A closure-capturing block takes
+two arguments: a closure and a value. We write closure-capturing
+blocks as !+k \{$v_1$, \ldots, $v_n$\} $v$+!, where $v_1$, \ldots, $v_n$
+represent values in the closure given, and $v$ a new value. A normal
+block takes some number of arguments, as specified by the \lamC
+definition that it represents, and is written as !+b($v_1$, \ldots,
+$v_n$)+!.
 
 MIL also defines the \emph{enter} operator (written !+@@+!), which
 applies a function to an argument. !+@@+! always expects a closure on
@@ -196,21 +198,37 @@ not return a new closure. Instead, it calls block !+b+!, passing
 all arguments needed from the closure given and the argument given. The
 value returned from block !+$k_{n-1}$+! is the value returned from block !+b+!.
 
-\intent{Introduce |compose|, show how partial application is implemented.}
-For example, Figure~\ref{uncurry_fig_compose} shows a \lamC definition
-for the |compose| function and the associated (unoptimized) MIL code.
+\intent{Sshow how partial application is
+  implemented.}  For example, Figure~\ref{uncurry_fig_compose_a} shows
+\lamC definitions for |compose| and |compose1|. We define |compose1|
+to capture one argument, in order to illustrate how MIL implements
+partial application. 
+
+Figure~\ref{uncurry_fig_compose_b} shows the MIL code for the
+definitions in Part~\subref{uncurry_fig_compose_a}. In particular, the
+block !+compose1+! acts as the top-level entry point for |compose1|,
+returning a closure pointing to !+absBodyL208!. When entered,
+!+absBodyL208+! will jump to the block !+absBlockL209+! with !+f+!,
+the captured argument. 
 
 \begin{myfig}
   \begin{tabular}{l}
     \begin{minipage}{\hsize}
+> compose1 f = compose f
 > compose :: (a -> b) -> (b -> c) -> a -> c
-> compose f g x = f (g x)
+> compose f g x = {-"\ldots"-}
     \end{minipage} \\
     \hss\scap{uncurry_fig_compose_a}\hss \\
     \begin{minipage}{\hsize}
       \begin{MILVerb}
-compose (): closure absBodyL201 {}
-absBodyL201 {} f: closure absBodyL202 {f}
+compose1 (): closure absBodyL208 {}
+absBodyL208 {} f: absBlockL209(f)
+absBlockL209 (f):
+  v210 <- compose()
+  v210 @@ f
+
+compose (): closure absBodyL201 {} 
+absBodyL201 {} f: {closure absBodyL202 {f}
 absBodyL202 {f} g: closure absBodyL203 {f, g}
 absBodyL203 {f, g} x: absBlockL204(f, g, x)
 absBlockL204 (f, g, x):
@@ -226,11 +244,25 @@ absBlockL204 (f, g, x):
   \label{uncurry_fig_compose}
 \end{myfig}
 
-\intent{MIL representation of examples; cost of partial application}
+Block !+absBlockL209+! actually implements partial application. It
+evaluates the !+compose+! block, getting a closure that points to the
+top-level entry point for |compose|. !+absBlockL209+! applies that
+value to !+f+! and returns the result. The value returned by
+!+absBlockL209+! is a closure that points to !+absBodyL202+!, second
+in the chain of closure-capturing blocks that eventually result in
+executing |compose| with all its arguments. In other words, the result
+of applying |compose1| is a function that will take two more arguments
+and then execute |compose| with them. 
+
+Examination of !+absBlockL209+! reveals at least one opportunity for
+optimization: the call to !+compose()+! results in a closure that is
+entered on the next line with argument !+f+!. Using the evaulation
+rules defined in Chapter~\ref{ref_chapter_languages}, Section~
 
 \section{Uncurrying MIL blocks}
 \label{uncurry_sec_mil}
 \intent{Describe uncurrying in terms of MIL -- what do we do, what don't we do.}
+
 
 \section{Dataflow Equations}
 \intent{Define dataflow equations for our uncurrying optimization.}
@@ -239,7 +271,7 @@ absBlockL204 (f, g, x):
 \begin{math}
 %% Below used to measure & typeset the case where we don't
 %% see a binding.
-\newtoks\rest \rest={f (!+v\ \texttt{<-}\ \dots+!)} %%
+\newtoks\rest \rest={f (!+v\ \texttt{<-}\ \ldots+!)} %%
   \begin{array}{rl}
     \multicolumn{2}{l}{\textit{Facts}} \\
     \setL{Labels} &= \text{Set of all program labels.} \\
@@ -253,7 +285,7 @@ absBlockL204 (f, g, x):
     & \text{where\ } b, c \in \setL{Dest}. \\\\
 
     \multicolumn{2}{l}{\textit{Transfer Function}} \\
-    \phantom{\the\rest} \mathllap{f (!+v\ \texttt{<-}\ k\ b\ \{\dots\}+!)} &= %%
+    \phantom{\the\rest} \mathllap{f (!+v\ \texttt{<-}\ k\ b\ \{\ldots\}+!)} &= %%
     \begin{cases}
       \{!+(v, b \wedge c)+!\} \cup (F \backslash \{!+(v, c)+!\}) & \text{when\ } !+(v, c)+! \in F. \\
       \{!+(v, b)+!\} \cup F & \text{otherwise.}\\

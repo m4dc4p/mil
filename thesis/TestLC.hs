@@ -1017,6 +1017,11 @@ uncurry5 = [("uncurry5",
             lam "t" $ \t ->
             lam "f" $ \ f -> f `app` xs `app` t)]
 
+uncurry_fig_compose_a = [("compose1", 
+                          lam "f" $ \f -> var "compose" `app` f)
+                        , head compose]
+
+
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
 
