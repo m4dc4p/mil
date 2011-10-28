@@ -179,7 +179,7 @@ $v_n$)+!.
 
 MIL also defines the \emph{enter} operator (written !+@@+!), which
 applies a function to an argument. !+@@+! always expects a closure on
-its left-hand side and some argument on the right. The closure always
+its left--hand side and some argument on the right. The closure always
 refers to a closure-capturing block. A closure will never point to a
 normal block.
 
@@ -315,163 +315,113 @@ attempts to determine if a given binding operation allocates a
 closure. The analysis maintains a map of bound variables to
 closures. If a given variable is re-bound, the analysis updates its
 map. Our analysis only operates over single blocks so in general the
-tracking is very straightforward. Our compiler won't generate new
+tracking is very straightforward. Our compiler will not generate new
 names that collide, so in practice the map of bound variables only
 grows.
 
 \begin{myfig}
-\begin{math}
-%% Below used to measure & typeset the case where we don't
-%% see a binding.
-\newtoks\rest \rest={f (!+v\ \texttt{<-}\ \ldots+!)} %%
-  \begin{array}{rl}
-    \multicolumn{2}{l}{\textit{Facts}} \\
-    \setL{Labels} &= \text{Set of all program labels.} \\
-    \setL{Capt} &= \text{Set of all labels of closure-capturing blocks.} \\
-    \setL{Vars} &= \text{Set of all variables.} \\
-    \setL{Dest} &= \{(l, m) || l \in \setL{Capt}, m \in \setL{Labels}.\} \\
-    \setL{Clo} &= \top \cup \{(l, v_1, \dots, v_n)\ ||\ l \in \setL{Labels}, v_i \in \setL{Vars}.\} \\
-    \setL{Fact} &= \{(v, p)\ ||\ v \in \setL{Vars}, p \in \setL{Clo}.\} \\\\
+  \begin{minipage}{\hsize}
+    \begin{math}
+      %% Below used to measure & typeset the case where we don't
+      %% see a binding.
+      \newtoks\rest \rest={t (!+v\ \texttt{<-}\ \ldots+!)} %%
+      \begin{array}{rl}
+        \multicolumn{2}{c}{\textit{Facts}} \\
+        \setL{Labels} &= \text{Set of all program labels.} \\
+        \setL{Capt} &= \text{Set of all labels of closure-capturing blocks}; \setL{Capt} \subset \setL{Labels}. \\
+        \setL{Vars} &= \text{Set of all variables.} \\
+        \setL{Dest} &= \{(l, m)\ ||\ l \in \setL{Capt}, m \in \setL{Labels}\}. \\
+        \setL{Clo} &= \top \cup \{(l, v_1, \dots, v_n)\ ||\ l \in \setL{Labels}, v_i \in \setL{Vars}\}. \\
+        \setL{Fact} &= \{(v, p)\ ||\ v \in \setL{Vars}, p \in \setL{Clo}\}. \\\\
 
-    \multicolumn{2}{l}{\textit{Meet}} \\
-    l \wedge l &= l. \\
-    l \wedge m &= \top, \text{when}\ l \neq m. \\
-    & \text{where\ } l, m \in \setL{Clo}.\\\\
+        \multicolumn{2}{c}{\textit{Meet}} \\
+        %% Below aligns the meet operator on both rows.
+        l \wedge \phantom{m}\mathllap{l} &= l. \\
+        l \wedge m &= \top, \text{when}\ l \neq m. \\
+        & \text{where\ } l, m \in \setL{Clo}.\\\\
 
-    \multicolumn{2}{l}{\textit{Transfer Function}} \\
-    f (!+v\ \texttt{<-} l(c_1, \dots, c_n)+!) &= %%
-    \begin{cases}
-%%      \{!+(v, (m, c_1, \dots, c_n) \wedge q)+!\} \cup (F \backslash \{!+(v, q)+!\}) & \text{when}\ !+(v,q)+! \in F \text{and !+(l, m)+! \in \setL{Dest}.} \\
-%%      \{!+(v, (m, c_1, \dots, c_n))+!\} \cup F & \text{where (m, c_1, \dots, c_n)}\ \not\in F \text{and !+(l, m)+! \in \setL{Dest}.} 
-    \end{cases} \\
+        \multicolumn{2}{c}{\textit{Transfer Function}} \\
+        \mathllap{t (!+v\ \texttt{<-} l(c_1, \dots, c_n)+!)} &= %%
+        \begin{cases}
+          \{!+(v, (m, c_1, \dots, c_n) \wedge q)+!\} \cup (F \backslash \{!+(v, q)+!\}) & 
+          \text{when}\ !+(v,q)+! \in F\ \text{and}\ !+(l, m)+!\ \in \setL{Dest}. \\
+          \{!+(v, (m, c_1, \dots, c_n))+!\} \cup F & 
+          \begin{minipage}{2.5in}\raggedright
+              when $!+(v, (m, c_1, \dots, c_n))+! \not\in\ F$ and 
+              $!+(l, m)+! \in \setL{Dest}$.
+          \end{minipage} \\
+          F & \text{otherwise.}
+        \end{cases} \label{uncurry_df_transfer_block} \\
 
-    \phantom{\the\rest} \mathllap{f (!+v\ \texttt{<-}\ k\ b\ \{c_1, \dots, c_n\}+!)} &= %%
-    \begin{cases}
-      \{!+(v, b \wedge l)+!\} \cup (F \backslash \{!+(v, l)+!\}) & \text{when\ } !+(v, l)+! \in F. \\
-      \{!+(v, (b, c_1, \dots, c_n))+!\} \cup F & \text{otherwise.}
-    \end{cases} \\
-    \the\rest &= \{!+(v, \top)+!\} \cup F.\\
-    f (!+\_+!) &= F. \\
-    & \text{where\ } F \subseteq \setL{Fact}.
-  \end{array}
-\end{math}
-\caption{Dataflow facts and equations for our uncurrying transformation.}
-\label{uncurry_fig_df}
+        \mathllap{t (!+v\ \text{!+<-+!}\ k\ b\ \{c_1, \dots, c_n\}+!)} &= %%
+        \begin{cases}
+          \{!+(v, (b, c_1, \dots, c_n) \wedge l)+!\} \cup (F \backslash \{!+(v, l)+!\}) & \text{when\ } !+(v, l)+! \in F. \\
+          \{!+(v, (b, c_1, \dots, c_n))+!\} \cup F & \text{otherwise.}
+        \end{cases} \label{uncurry_df_transfer_closure} \\
+        \mathllap{\the\rest} &= \{!+(v, \top)+!\} \cup F.\\
+        t (!+\_+!) &= F. \\
+        & \text{where\ } F \subseteq \setL{Fact}.
+      \end{array}
+    \end{math}
+  \end{minipage}
+  \caption{Dataflow facts and equations for our uncurrying transformation.}
+  \label{uncurry_fig_df}
 \end{myfig}
 
-\intent{Explain dataflow equations presented in the figure, giving an
-  intuition about how they relate to our analysis.}
+\intent{Explain dataflow equations presented in the figure.}
 Figure~\ref{uncurry_fig_df} shows the dataflow equations used for our
 analysis. The sets \setL{Labels} and \setL{Vars} contain all labels
-and all bound variables in the program, respectively. The \setL{Clo}
-set associates some label with a list (possibly empty) of
-variables. We use these these values to represent the locatin a
-closure points to and the set of variables it has captured. Our facts
-are pairs associating a bound variable with either $\top$ or
+and all variables in the program, respectively. \setL{Capt} represents
+the subset of labels that represent closure-capturing
+blocks. \setL{Dest} associates each label in \setL{Capt} with the
+destination label of the closure returned by that particular
+closure-capturing block. 
+
+The \setL{Clo} set associates some label with a list of variables; the
+list may be empty. We use \setL{Clo} values to represent the location
+a closure points to and the set of variables it captures. Our facts
+are pairs associating a bound variable with either $\top$ or a
 \setL{Clo} value. That is, a bound variable refers to a known location
-(and some set of captured variables) or some other value that we do
+and some set of captured variables or some other value that we do
 not care about.
 
 Our meet operator combines values in \setL{Fact}. When values are equal,
 the result is the same value. Otherwise, the result is $\top$. 
 
-Our transfer function, $f$, is defined over MIL statements. It takes a
-statement and a set of \setL{Fact} values. For any statement besides
-!+<-+!, $f$ is the identity --- the input set is our result. When the
-statement is binding 
+\intent{Explain in detail how $t$ works.}
+We define the transfer function, $t$, over MIL statements. $t$ takes a
+statement and $F$, a set of \setL{Fact} values. For any statement
+besides !+<-+!, $t$ does nothing --- it just returns $F$. 
 
+The case presented in Equation~\ref{uncurry_df_transfer_block} applies
+when the right--hand side of a !+<-+! calls a block, such as $!+v\ \text{<-}\
+l(c_1, \dots, c_n)+!$. If the block represented by !+l+!  returns a
+closure (i.e., $!+(l, m)+! \in \setL{Dest}$) then $t$ creates a new fact
+that associates !+v+! with a \setL{Clo} value. The \setL{Clo}
+value associates !+m+!, the destination stored in the closure returned
+by !+l+!'s block, with any captured variables. If $!+(v, p)+! \in F$
+(for any $p$), we use $\wedge$ to combine the
+\setL{Clo} values associated with !+v+!. Otherwise, we just add the
+new fact to $F$.
 
+Equation~\ref{uncurry_df_transfer_closure} applies when the
+right--hand side of a !+<-+! statement creates a closure, as in 
+$!+v\ \text{<-}\ k\ b\ \{c_1, \dots, c_n\}+!$. $t$ creates a \setL{Clo}
+value with !+b+! (the label pointed to by the closure) and 
+$!+c_1, ..., c_n+!$, the variables captured by the closure. Again, 
+$t$ uses the meet operator to combine the new \setL{Clo} value with
+any in $F$ already associated with !+v+!; otherwise, the new fact
+is just added to $F$.
 
+\intent{Explain how we rewrite based on facts.}
+We apply the facts gathered by $t$ to rewrite two kinds of tail
+statements: block calls, 
 
-
-\section{Implementation}
-
-\intent{Define curried and uncurried.}
-Functional languages permit definitions in two styles: \emph{curried}
-and \emph{uncurried}. A curried function can be \emph{partially
-  applied} --- it does not need to be given all of its arguments at
-once. An \emph{uncurried} function, however, must be given
-all of its arguments at once. It cannot be partially applied. 
-
-\intent{Illustrate curried vs. uncurried.}  
-
-%% Why is this a problem? Need more motivation
-The implementation of partial application, however, does come at a
-cost. Each partial application requires that we construct a closure
-over the arguments captured so far. That closure represents a function
-specialized to the arguments given so far. In general, we don't know
-the address of the function it contains when compiling -- only at
-run-time. Therefore, when the closure is applied to the rest of the
-arguments, we cannot generate code that jumps to a known
-address. Instead, we must look at the address in the closure at
-run-time and then jump.
-
-Because each function application |f x| may result in another
-function, the most general implementation strategy makes \emph{every}
-application result in a closure. The compiler need only generate code
-that inspects the closure constructed and jumps to the address
-indicated. When a curried function is applied to all of its arguments
-at once (e.g., |adder 1 2|), we get a chain of function calls where
-most construct a closure and immediately return. It would be more
-efficient to collect all arguments at once and immediately jump to the
-function body. \emph{Uncurrying} is the transformation we use to turn 
-fully-applied curried functions into direct calls to the function body.
-
-%% TODO: Talk about how we can look for fully-applied forms
-%% as a special case, but that is sub-optimal
-
-%% TODO: What is an example of a fully-applied function that we cannot
-%% recognize syntatically (very easily)?
-
-\section{Example of Desired Optimization}
-
-Suppose we define the functions |main| and |compose| as follows:
-
-\begin{code}
-compose f g x = f (g x)
-main a b x = compose a b x
-\end{code}
-
-Our compiler generates the following code, before optimization:
-\begin{singlespace}\begin{MILVerb}[gobble=2]
-  main (compose, a, b, x):
-    v201 <- compose @@ a
-    v202 <- v201 @@ b
-    v202 @@ x
-
-  compose (): closure absBody201 {}
-  absBody201 {} f: closure absBody203 {f}
-  absBody203 {f} g: closure absBody205 {f, g}
-  absBody205 {f, g} x: absBlock207(f, g, x)
-  absBlock207 (f, g, x):
-    v209 <- g @@ x
-    f @@ v209
-\end{MILVerb}
-\end{singlespace}
-
-We wish to transform our program in order to remove the intermediate
-closures created by calling !+compose+!:
-\begin{singlespace}\begin{MILVerb}
-main (a, b, x): absBlock208(a, b, x)
-absBlock208 (f, g, x):
-  v210 <- g @@ x
-  f @@ v210
-\end{MILVerb}
-\end{singlespace}
+\section{Rewriting}
 
 \section{Implementation}
 
-\intent{Describe how we recognize when a closure is created} Our
-transfer function analyzes each statement in each block. The function
-inspects the right-hand side of each |Bind| statement in the
-block. When the right-hand side creates a closure, the function
-associates the binding with the destination label and captured
-arguments used by the closure. Any other |TailM| value is represented
-as $\top$.
-
-At the end of each block, the transfer function passes the facts
-collected to each successor. 
-
+\intent{Describe how we recognize when a closure is created} 
 
 \intent{Describe how we re-write an Enter instruction to a closure or goto}
 
