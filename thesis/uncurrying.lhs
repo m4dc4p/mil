@@ -14,11 +14,11 @@ take advantage of \emph{partial application}. Partial application
 means to give a function only some of its arguments, resulting in a
 new function that takes the remaining arguments. A function definition
 that supports partial application is said to be in \emph{curried}
-style, after the mathematician Haskell Curry.\footnote{Historically,
-  Curry used this style but did not invent it. That is due to a early
-  $20^{th}$ century mathematician named Schrodenfinkel.} In contrast,
-an \emph{uncurried} function is defined such that it can only be
-applied to all of its arguments at once.
+style, after the mathematician Haskell Curry.\footnote{Curry used
+  this style but did not invent it. That is due to a early $20^{th}$
+  century mathematician named Moses Sch\"onfinkel.} In contrast, an
+\emph{uncurried} function is defined such that it can only be applied
+to all of its arguments at once.
 
 \intent{Briefly motivate optimization.}  Partial
 application can be very convenient for programmers, but it can also be
@@ -36,17 +36,19 @@ block of MIL code. We replace those partial applications with
 full applications to the function, or at least fewer partial
 applications. 
 
-\intent{signposts.}  Section~\ref{uncurry_sec_papp} describes partial
+\intent{Signposts.}  Section~\ref{uncurry_sec_papp} describes partial
 application in more detail; Section~\ref{uncurry_sec_costs} discusses
 drawbacks to supporting partial application.  We introduce several
-examples that will illustrate our optimization and discuss uncurrying
-as applied to MIL in Section~\ref{uncurry_sec_mil}. We present our
-dataflow equations for uncurrying in Section~\ref{uncurry_sec_df}, and
-describe our implementation in
-Section~\ref{uncurry_sec_impl}. Alternate uncurrying strategies, which
-we leave to future work, are shown in
-Section~\ref{uncurry_sec_future}. We conclude with a discussion of our
-experience in Section~\ref{uncurry_sec_conc}.
+examples that will be used to illustrate our optimization in
+Section~\ref{uncurry_sec_examples} and discuss uncurrying as applied
+to MIL in Section~\ref{uncurry_sec_mil}. We present our dataflow
+equations for uncurrying in Section~\ref{uncurry_sec_df} and our
+rewriting strategy in Section~\ref{uncurry_sec_rewriting}. We show our
+implementation in Section~\ref{uncurry_sec_impl}. Previous approaches
+to uncurrying are discussin in Section~\ref{uncurry_sec_prior}; we
+describe alternate (but unimplemented) strategies for our own approach
+in Section~\ref{uncurry_sec_future}. We conclude with a discussion of
+our experience in Section~\ref{uncurry_sec_conc}.
 
 %% \emph{Describes our optimization for collapsing intermediate
 %% closures. Our choice of representation is analyzed to
@@ -59,9 +61,8 @@ experience in Section~\ref{uncurry_sec_conc}.
 \label{uncurry_sec_papp}
 \intent{Motivate partial application -- what does it buy us?}  Partial
 application in functional programming promotes re-usability and
-abstraction. It allows the programmer to define specialized versions
-of a function by providing only some fixed arguments to a general
-function. 
+abstraction. It allows the programmer to define specialized functions
+by fixing some of the arguments to a general function.
 
 \begin{myfig}
 > map1 :: (a -> b) -> [a] -> [b]
@@ -86,14 +87,17 @@ all integers in a list:
 > upCase1 :: [Char] -> [Char]
 > upCase1 = map1 toUpper
 >
-> square :: [Int] -> [Int]
-> square = map2 (^ 2)
+> square1 :: [Int] -> [Int]
+> square1 = map2 (^ 2)
 
 We cannot do the same as easily with |map2|. At best we can define
 a function that ignores one of its arguments:
 
 > upCase2 :: ((a -> b), [Char]) -> [Char]
 > upcase2 (_, xs) = map2 (toUpper, xs)
+>
+> square2 :: ((a -> b), [Int]) -> [Int]
+> square2 (_, xs) = map2 ((^ 2), xs)
 
 \intent{Demonstrate that partial-application needs to be considered
   even when the language does not directly support it.}  Even if our
@@ -163,36 +167,40 @@ generation, where function appliation is implemented. Rather than
 generate specialized code for partially versus fully-applied
 functions, its simplest to generate the same code for all
 applications, partial or otherwise. That means every function
-appliation pays the price of partial applicatoin, even if the function
+application pays the price of partial applicatoin, even if the function
 is ``obviously'' fully-applied.
 
-\section{Partial Application and MIL}
-\intent{Remind reader about different MIL blocks and how closures
-  are created.}  Recall that MIL defines two types of blocks:
-\emph{closure-capturing} and normal. A closure-capturing block takes
-two arguments: a closure and a value. We write closure-capturing
-blocks as !+k \{$v_1$, \ldots, $v_n$\} $v$+!, where $v_1$, \ldots, $v_n$
-represent values in the closure given, and $v$ a new value. A normal
-block takes some number of arguments, as specified by the \lamC
-definition that it represents, and is written as !+b($v_1$, \ldots,
-$v_n$)+!.
+\section{Partial Application in MIL}
+\label{uncurry_sec_examples}
+\intent{Remind reader about different MIL blocks and how closures are
+  created.}  Recall that MIL defines two types of blocks, one of which
+we call \emph{closure-capturing}. MIL also defines the \emph{enter}
+operator (written !+@@+!) that applies a function to an
+argument. !+@@+! always expects a closure on its left--hand side and
+some argument on the right. That is, in the expression !+f @@ x+!,
+!+f+!  will be a closure value that points to a closure-capturing
+block and !+x+! is the argument passed to that block.
 
-MIL also defines the \emph{enter} operator (written !+@@+!), which
-applies a function to an argument. !+@@+! always expects a closure on
-its left--hand side and some argument on the right. The closure always
-refers to a closure-capturing block. A closure will never point to a
-normal block.
+We write closure-capturing blocks as $!+k \{v_1, \dots, v_n\} x+!$,
+where !+k+! is a label for the block, $!+v_1, \dots, v_n+!$
+represent values in the closure that was applied, and $x$ the
+argument that was given to the !+@@+!  operation. 
+
+MIL also defines blocks that are not closure-capturing. A normal
+blocks takes a list of arguments, as specified by the \lamC definition
+that it represents, and is written as $!+b(v_1, \dots, v_n)+!$.
 
 These definitions allow MIL to represent function application
 uniformly. For a function with $n$ arguments, $n - 1$ !+k+! blocks
 will be generated. At least one !+b+! block will also be generated,
-representing the body of the function. Each !+k+! block, except the
-last, returns a new closure pointing to the next !+k+! block'; the new
-closure contains all values found in the old closure plus the
-new argument given. The last !+k+! block, block !+$k_{n-1}$+!, does 
-not return a new closure. Instead, it calls block !+b+!, passing
-all arguments needed from the closure given and the argument given. The
-value returned from block !+$k_{n-1}$+! is the value returned from block !+b+!.
+representing the body of the function. Each $!+k_i+!$ block, except
+the $!+k_{n-1}+!$, returns a new closure pointing to the next
+$!+k_{i+1}+!$ block. The closure created by block $!+k_i+!$ contains
+all values found in the closure it was given, plus the new argument
+given. The last block, $!+k_{n-1}+!$, does not return a new
+closure. Instead, it calls block !+b+!, unpacking all necessary
+arguments. The value returned from block !+$k_{n-1}$+! is the value
+returned from block !+b+!.
 
 \intent{Show how partial application is
   implemented.}  For example, Figure~\ref{uncurry_fig_compose_a} shows
@@ -240,23 +248,23 @@ absBlockL204 (f, g, x):
   \label{uncurry_fig_compose}
 \end{myfig}
 
-Block !+absBlockL209+! actually implements partial application. It
+Block~!+absBlockL209+! actually implements partial application. It
 evaluates the !+compose+! block, getting a closure that points to the
 top-level entry point for |compose|. !+absBlockL209+! applies that
 value to !+f+! and returns the result. The value returned by
-block~!+compose+! is a closure that points to !+absBodyL202+!, second
-in the chain of closure-capturing blocks that eventually result in
-executing |compose| with all its arguments. In other words, the result
-of applying |compose1| is a function that will take two more arguments
-and then execute |compose| with them. 
+block~!+absBlockL209+! is a closure that points to !+absBodyL202+!,
+second in the chain of closure-capturing blocks that eventually result
+in executing |compose| with all its arguments. In other words, the
+result of applying |compose1| is a function that will take two more
+arguments and then execute |compose| with them.
 
 \section{Uncurrying MIL blocks}
 \label{uncurry_sec_mil}
 \intent{Show uncurrying by example, continuing discussion in previous
   section.}  Examination of !+absBlockL209+! in
-Figure~\ref{uncurry_fig_compose_b} reveals one opportunity
-for optimization: the call to !+compose()+! results in a closure that
-is entered on the next line with argument !+f+!. We could rewrite the
+Figure~\ref{uncurry_fig_compose_b} reveals one opportunity for
+optimization: the call to !+compose()+! results in a closure that is
+entered on the next line with argument !+f+!. We could rewrite the
 program to use the closure directly:
 \begin{singlespace}
   \begin{MILVerb}[gobble=4]
@@ -265,10 +273,9 @@ program to use the closure directly:
       v210 @@ f
   \end{MILVerb}
 \end{singlespace}
-
-\noindent Now we can see that !+v210+! holds a closure pointing to
-!+absBodyL201+! and holding no arguments. Block~!+absBodyL201+! also
-returns a closure, this time holding one argument and pointing to 
+\noindent Now we can see that !+v210+! refers to a closure pointing to
+!+absBodyL201+! that captures no variables. Block~!+absBodyL201+! also
+returns a closure, this time capturing its argument and pointing to 
 block~!+absBodyL202+!. We can rewrite our program again to use
 the value returned by !+absBodyL201+! directly:
 \begin{singlespace}
@@ -278,7 +285,6 @@ the value returned by !+absBodyL201+! directly:
       closure absBodyL202 {f}
   \end{MILVerb}
 \end{singlespace}
-
 \noindent The first value, !+v210+!, becomes irrelevant after our
 second rewrite, allowing us to rewrite !+absBlockL209+! one more time,
 producing:
@@ -287,7 +293,6 @@ producing:
     absBlockL209 (f): closure absBodyL202 {f}
   \end{MILVerb}
 \end{singlespace}
-
 \noindent Thus, by uncurrying we have eliminated the creation of one
 closure and the execution of at least one |Enter| instruction.
 
@@ -295,7 +300,7 @@ closure and the execution of at least one |Enter| instruction.
   what don't we do.}  Our uncurrying optimization transforms MIL
 programs to eliminate redundant closure allocations and |Enter|
 instructions as we did by hand for the program in
-Figure~\ref{uncurry_fig_compose}. We determine if a particular tail
+Figure~\ref{uncurry_fig_compose_a}. We determine if a particular tail
 evaluates to a closure and, if so, we replace the tail with the
 closure directly. We can also detemine if an |Enter| instruction
 results in a closure, allowing us to replace that |Enter| with the
@@ -309,15 +314,15 @@ Section~\ref{uncurry_sec_future}; for now, we focus on our optimization
 as currently implemented.
 
 \section{Dataflow Equations}
+\label{uncurry_sec_df}
 \intent{Define dataflow equations for our uncurrying optimization.}
 We implement uncurrying with a forwards dataflow-analysis that
-attempts to determine if a given binding operation allocates a
-closure. The analysis maintains a map of bound variables to
-closures. If a given variable is re-bound, the analysis updates its
-map. Our analysis only operates over single blocks so in general the
-tracking is very straightforward. Our compiler will not generate new
-names that collide, so in practice the map of bound variables only
-grows.
+attempts to determine if a given statement allocates a closure. The
+analysis maintains a map of bound variables to closures. If a variable
+is re-bound in the block, the analysis updates its map. Our analysis
+only operates over single blocks so in general the tracking is very
+straightforward. Our compiler will not generate new names that
+collide, so in practice the map of bound variables only grows.
 
 \begin{myfig}
   \begin{minipage}{\hsize}
@@ -325,8 +330,8 @@ grows.
       %% Below used to measure & typeset the case where we don't
       %% see a binding.
       \newtoks\rest \rest={t (!+v\ \texttt{<-}\ \ldots+!)} %%
-      \begin{array}{rl}
-        \multicolumn{2}{c}{\textit{Facts}} \\
+      \begin{array}{rlr}
+        \multicolumn{3}{c}{\textit{Facts}} \\
         \setL{Labels} &= \text{Set of all program labels.} \\
         \setL{Capt} &= \text{Set of all labels of closure-capturing blocks}; \setL{Capt} \subset \setL{Labels}. \\
         \setL{Vars} &= \text{Set of all variables.} \\
@@ -334,20 +339,21 @@ grows.
         \setL{Clo} &= \top \cup \{(l, v_1, \dots, v_n)\ ||\ l \in \setL{Labels}, v_i \in \setL{Vars}\}. \\
         \setL{Fact} &= \{(v, p)\ ||\ v \in \setL{Vars}, p \in \setL{Clo}\}. \\\\
 
-        \multicolumn{2}{c}{\textit{Meet}} \\
-        %% Below aligns the meet operator on both rows.
-        l \wedge \mathllap{l}\phantom{m} &= l. \\
-        l \wedge m &= \top, \text{when}\ l \neq m. \\
-        & \text{where\ } l, m \in \setL{Clo}.\\\\
+        \multicolumn{3}{c}{\textit{Meet}} \\
+        
+        l \wedge %% aligns the meet operator on both rows.
+          \mathllap{l}\phantom{m} &= l. \labeleq{uncurry_df_meet_eq} & \eqref{uncurry_df_meet_eq} \\
+        l \wedge m &= \top, \text{when}\ l \neq m. \labeleq{uncurry_df_meet_neq} & \eqref{uncurry_df_meet_neq} \\
+        & \multicolumn{2}{l}{\phantom{=} \text{where\ } l, m \in \setL{Clo}.}\\\\
 
-        \multicolumn{2}{c}{\textit{Transfer Function}} \\
+        \multicolumn{3}{c}{\textit{Transfer Function}} \\
         \mathllap{t (!+v\ \text{!+<-+!}\ k\ b\ \{c_1, \dots, c_n\}+!)} &= %%
         \begin{cases}
           \{!+(v, (b, c_1, \dots, c_n) \wedge l)+!\} \cup (F \backslash \{!+(v, l)+!\}) & \text{when\ } !+(v, l)+! \in F. \\
           \{!+(v, (b, c_1, \dots, c_n))+!\} \cup F & \text{otherwise.}
-        \end{cases} \label{uncurry_df_transfer_closure} \\
+        \end{cases} \labeleq{uncurry_df_transfer_closure} & \eqref{uncurry_df_transfer_closure} \\
         \mathllap{\the\rest} &= \{!+(v, \top)+!\} \cup F.\\
-        t (!+\_+!) &= F. \\
+        t (!+\_+!) &= F. \labeleq{uncurry_df_transfer_rest} & \eqref{uncurry_df_transfer_rest} \\
         & \text{where\ } F \subseteq \setL{Fact}.
       \end{array}
     \end{math}
@@ -376,35 +382,35 @@ not care about.
 Our meet operator combines values in \setL{Fact}. When values are equal,
 the result is the same value. Otherwise, the result is $\top$. 
 
-\intent{Explain in detail how $t$ works.}
-We define the transfer function, $t$, over MIL statements. $t$ takes a
-statement and $F$, a set of \setL{Fact} values. For any statement
-besides !+<-+!, $t$ does nothing --- it just returns $F$. 
+\intent{Explain in detail how $t$ works.}  We define the transfer
+function, $t$, by cases for each MIL statement. $t$ takes a statement
+and $F$, a set of \setL{Fact} values. For any statement besides
+!+<-+!, $t$ does nothing --- it just returns $F$.
 
 Equation~\ref{uncurry_df_transfer_closure} applies when the
-right--hand side of a !+<-+! statement creates a closure, as in 
-$!+v\ \text{<-}\ k\ b\ \{c_1, \dots, c_n\}+!$. $t$ creates a \setL{Clo}
-value with !+b+! (the label pointed to by the closure) and 
-$!+c_1, ..., c_n+!$, the variables captured by the closure. Again, 
-$t$ uses the meet operator to combine the new \setL{Clo} value with
-any in $F$ already associated with !+v+!; otherwise, the new fact
-is just added to $F$.
+right--hand side of a !+<-+! statement creates a closure, as in
+$!+v\ \text{<-}\ k\ b\ \{c_1, \dots, c_n\}+!$. $t$ creates a
+\setL{Clo} value with !+b+! (the label pointed to by the closure) and
+$!+c_1, ..., c_n+!$, the variables captured by the closure.  $t$ uses
+the meet operator to combine the new \setL{Clo} value with any in $F$
+already associated with !+v+!; otherwise, the new fact is just added
+to $F$.
 
 \section{Rewriting}
-
+\label{uncurry_sec_rewriting}
 \intent{Explain how we rewrite based on facts.}  The facts gathered by
-$t$ allow us to replace |Enter| operations when we know the left--hand
-side refers to a closure. That is, we rewrite tails of the form !+f @@
-x+! when $!+(f, p) \in \setL{Fact}+!$ and $!+p+! \neq \top$. We
-know $!+p+! = (!+l, c_1, \dots, c_n+!)$, therefore we replace the
-!+@@+!  operation with $!+k\ l\ \{c_1, \dots, c_n, x\}+!$, the closure
-!+f @@ x+! would construct. Notice we add the !+x+! argument to the 
-closure as well.
+$t$ allow us to rewrite |Enter| operations if we know the left--hand
+side refers to a closure. That is, we can rewrite tails like !+f @@
+x+! when $!+(f, p) \in \setL{Fact}+!$ and $!+p+! \neq \top$. Because
+$!+p+! \neq \top$, we know $!+p+! = (!+l, c_1, \dots, c_n+!)$;
+therefore we replace the !+@@+! operation with the closure !+f @@ x+!
+would construct: $!+k\ l\ \{c_1, \dots, c_n, x\}+!$. Notice we add the
+!+x+! argument to the closure as well.
 
 The example we discussed in Section~\ref{uncurry_sec_mil} does not
 match with the optimization just discussed on one crucial point:
-replacing blocks on the left-hand side of a !+<-+! with their closure
-result. Our implementation relies on another, more general, that
+replacing blocks on the right--hand side of a !+<-+! with their closure
+result. Our implementation relies on another, more general, optimization that
 inlines simple blocks into their predecessor. We describe the
 optimization in detail in Chapter~\ref{ref_chapter_monadic}, but in short
 that optimization will inline calls to blocks such as !+compose+!, so
@@ -412,9 +418,29 @@ a statement like !+v <- compose()+! becomes !+v <- k l \{\}+!, where !+l+!
 refers to the label in the closure returned by !+compose()+!.
 
 \section{Implementation}
+\label{uncurry_sec_impl}
 
-\intent{Provide a bridge to the four subsections below.}
-We present our implementation in four sections. 
+\intent{Provide a bridge to the four subsections below.}  Originally, we called this
+transformation ``closure-collapse,'' because it ``collapsed'' the
+construction of multiple closures into the construction of a single
+closure. Later, we learned this optimization is known as
+``uncurrying,'' but at the point the code had already been
+written. The ``collapse'' prefix in the code shown is merely an
+artifact of our previous name for the analysis.
+
+In our presentation of dataflow equations in
+Section~\ref{uncurry_sec_df}, we described this analysis by
+statements. However, our implementation works on blocks of MIL
+code. Fortunately, the net result is the same due to Hoopl's
+interleaved analysis and rewriting. Our transfer function and rewrite
+function work in tandem to rewrite !+@@+! operations and closure
+allocations within a block. 
+
+We present our implementation in five sections, reflecting the
+structure of our dataflow equations above. We first give the types
+used, followed by the definition of our lattice, then our transfer
+function, then our rewriting function, and finally we show the driver
+that applies the optimization to a given program.
 
 \subsection{Types}
 \label{uncurry_impl_types}
@@ -441,38 +467,23 @@ represents \setL{Fact}.
 |DestOf| actually carries more informatino than we specified for
 \setL{Dest}. Recall that closure-capturing blocks either return a
 closure or jump directly to a block. The |Capture| constructor
-represents the first case and |Jump| the second. The |Dest| value is a
-destination: either the label stored in the closure returned, or the
-block that the closure jumps to immedietely.  In any case, |Dest| is
-just an alias for a |(Name, Label)| tuple, where |Name| is a string
-and |Label| a Hoopl value.
+represents the first case and |Jump| the second. The |Dest| value in
+both is a destination: either the label stored in the closure
+returned, or the block that the closure jumps to immediately.  In any
+case, |Dest| is just an alias for a |(Name, Label)| tuple, where
+|Name| is a string and |Label| a Hoopl value, representing a block of
+MIL code.
 
-When a closure-capturing block returns a closure, it always copies all
-values from the old closure to the new. The argument can be copied or
-ignored. The flag in the |Capture| constructor, |Maybe Int|, indicates
-if the argument is used. When rewriting an expression like !+f @@ x+!
-to $!+k\ b\ \{\dots\}+!$, we use this value to
-determine if !+x+! should added to the variables captured in
-the braces, $!+\{\dots\}+!$. For example, the following block
-ignores its argument when returning a closure:
-\begin{singlespace}
-  \begin{MILVerb}[gobble=4]
-    c {a, b} x: closure l {a, b}
-    l {a, b} y: \ldots
-  \end{MILVerb}
-\end{singlespace}
+When a closure-capturing block returns a closure, it copies all
+caputred variables from the old closure to the new. The argument can
+be copied or ignored. The flag in the |Capture| constructor indicates
+if the argument is used. 
 
-We use the |Jump| constructor to capture when a closure-capturing
-block jumps directly to another block.\footnote{This indicates that
-  the function represented is now fully applied.} The |Dest| value
-indicates which block we will jump to. However, the block receives
-arguments in some order that does not necessarily represent the order
-of variables in the captured closure. Each integer in the list given to
-|Jump| represents the position of a variable from the closure
-received. The arguments to the block are built by traversing the list
-from beginning to end, putting the variable indicated by the index into
-the corresponding argument for the block. For example, the block !+c+!
-in the following:
+Each integer in the list given to |Jump| represents the position of a
+variable from the closure received. The arguments to the block are
+built by traversing the list from beginning to end, putting the
+variable indicated by the index into the corresponding argument for
+the block. For example, the block !+c+!  in the following:
 \begin{singlespace}
   \begin{MILVerb}[gobble=4]
     c {a, b, c}: l(c, a, b)
@@ -483,7 +494,61 @@ would be represented by the value |Jump l [2, 0, 1]|, because the
 variables from the closure $!+\{a, b, c\}+!$ must be given to !+l+! in
 the order $!+(c, a, b)+!$.
 
+We use |CloVal| to represent \setL{Clo} values, except the $\top$
+value. Recall that \setL{Clo} represents a closure, holding a label
+and captured variables. |CloVal| stores a |Dest| value, representing
+the label the closure refers to, and a list of captured variables,
+|[Name]|. 
+
+We use the |CollapseFact| type to represent our \setL{Fact} set. We
+represent the full \setL{Clo} set in this map, by associating each
+variable with either a |Top| value or a |CloVal| value. Hoopl provides
+the |WithTop| type, which adds a |Top| value to any type. 
+
+\subsection{Lattice}
+Figure~\ref{uncurry_fig_lattice} shows the lattice we defined for our
+analysis. |fact_bot| shows that every entry point is initialized with
+an empty map, meaning we do not start with any information. The
+|extend| function is defined over |CloVal| values and replaces any
+conflicting values with |Top| (just like the meet operator in
+Figure~\ref{uncurry_fig_df}). The |fact_join| definition uses two
+Hoopl--provided functions, |joinMaps| and |extendJoinDomain|, to lift
+|extend| to function defined over |Maps| of |WithTop CloVal| values.
+
+\begin{myfig}
+  \begin{minipage}{\hsize}
+%let includeLattice = True
+%include Uncurry.lhs
+%let includeLattice = False
+  \end{minipage}
+  \caption{The Hoopl |DataflowLattice| declaration representing the 
+  lattice used by our analysis.}
+  \label{uncurry_fig_lattice}
+\end{myfig}
+
 \subsection{Transfer}
+We give the implementation of $t$ (from Figure~\ref{uncurry_fig_df})
+in Figure~\ref{uncurry_fig_transfer}. Due to Hoopl's use of GADTs, we
+must specify a case for every |Stmt| constructor. As in all
+Hoopl-based forwards analysis, the second argument to |t| is our facts
+so far. |BlockEntry| and |CloEntry| just pass the facts given
+along.\footnote{Note these will always be empty maps, because our
+  analysis does not extend across blocks and |fact_bot| in our lattice
+  is |Map.empty|.} Because we do not propagate facts between blocks,
+|CaseM| and |Done| pass an empty map to each successor, using the
+Hoopl--provided |mkFactBase| function to create a |FactBase| from 
+empty facts.
+
+\begin{myfig}
+  \begin{minipage}{\hsize}
+%let includeTransfer = True
+%include Uncurry.lhs
+%let includeTransfer = False
+  \end{minipage}
+  \caption{The Haskell implementation of our transfer function $t$
+    from Figure~\ref{uncurry_fig_df}.}
+  \label{uncurry_fig_transfer}
+\end{myfig}
 
 \subsection{Rewrite}
 
@@ -496,6 +561,8 @@ the order $!+(c, a, b)+!$.
 \intent{Describe how deep rewrite progressively captures closures.}
 
 \section{Prior Work}
+\label{uncurry_sec_prior}
+\intent{Discuss other approaches to uncurrying.}
 
 \section{Future Work}
 \label{uncurry_sec_future}

@@ -41,6 +41,7 @@ we store the variables passed as positions from teh arguments
 given to the block. 
 
 %endif
+
 %if includeAll || includeTypes
 
 > data DestOf = Jump Dest [Int] | Capture Dest Bool
@@ -108,17 +109,23 @@ closure or jump to the block.
 >         _ -> Nothing
 >     mapUses :: [Name] -> [Name] -> [Int]
 >     mapUses uses args = catMaybes (map (`elemIndex` args) uses)
-> 
+
+%endif
+%if includeAll || includeTransfer
+
 > collapseTransfer :: FwdTransfer StmtM CollapseFact
-> collapseTransfer = mkFTransfer fw
+> collapseTransfer = mkFTransfer t
 >   where
->     fw :: StmtM e x -> CollapseFact -> Fact x CollapseFact
->     fw (Bind v (Closure dest args)) bound = Map.insert v (PElem (CloVal dest args)) bound
->     fw (Bind v _) bound = Map.insert v Top bound
->     fw (CaseM _ alts) bound = mkFactBase collapseLattice []
->     fw (Done _ _ _) bound = mkFactBase collapseLattice []
->     fw (BlockEntry _ _ _) f = f
->     fw (CloEntry _ _ _ _) f = f
+>     t :: StmtM e x -> CollapseFact -> Fact x CollapseFact
+>     t (Bind v (Closure dest args)) bound = Map.insert v (PElem (CloVal dest args)) bound
+>     t (Bind v _) bound = Map.insert v Top bound
+>     t (CaseM _ alts) bound = mkFactBase collapseLattice []
+>     t (Done _ _ _) bound = mkFactBase collapseLattice []
+>     t (BlockEntry _ _ _) f = f
+>     t (CloEntry _ _ _ _) f = f
+
+%endif
+%if includeAll 
 
 > collapseRewrite :: FuelMonad m => Map Label DestOf -> FwdRewrite m StmtM CollapseFact
 > collapseRewrite blocks = iterFwdRw (mkFRewrite rewriter)
@@ -145,6 +152,9 @@ closure or jump to the block.
 >     -- the positions given.
 >     fromUses :: [Int] -> [Name] -> [Name]
 >     fromUses idxs args = map (args !!) idxs
+
+%endif
+%if includeAll || includeLattice
 
 > collapseLattice :: DataflowLattice CollapseFact
 > collapseLattice = DataflowLattice { fact_name = "Closure collapse"
