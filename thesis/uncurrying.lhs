@@ -336,23 +336,11 @@ grows.
 
         \multicolumn{2}{c}{\textit{Meet}} \\
         %% Below aligns the meet operator on both rows.
-        l \wedge \phantom{m}\mathllap{l} &= l. \\
+        l \wedge \mathllap{l}\phantom{m} &= l. \\
         l \wedge m &= \top, \text{when}\ l \neq m. \\
         & \text{where\ } l, m \in \setL{Clo}.\\\\
 
         \multicolumn{2}{c}{\textit{Transfer Function}} \\
-        \mathllap{t (!+v\ \texttt{<-} l(c_1, \dots, c_n)+!)} &= %%
-        \begin{cases}
-          \{!+(v, (m, c_1, \dots, c_n) \wedge q)+!\} \cup (F \backslash \{!+(v, q)+!\}) & 
-          \text{when}\ !+(v,q)+! \in F\ \text{and}\ !+(l, m)+!\ \in \setL{Dest}. \\
-          \{!+(v, (m, c_1, \dots, c_n))+!\} \cup F & 
-          \begin{minipage}{2.5in}\raggedright
-              when $!+(v, (m, c_1, \dots, c_n))+! \not\in\ F$ and 
-              $!+(l, m)+! \in \setL{Dest}$.
-          \end{minipage} \\
-          F & \text{otherwise.}
-        \end{cases} \label{uncurry_df_transfer_block} \\
-
         \mathllap{t (!+v\ \text{!+<-+!}\ k\ b\ \{c_1, \dots, c_n\}+!)} &= %%
         \begin{cases}
           \{!+(v, (b, c_1, \dots, c_n) \wedge l)+!\} \cup (F \backslash \{!+(v, l)+!\}) & \text{when\ } !+(v, l)+! \in F. \\
@@ -393,17 +381,6 @@ We define the transfer function, $t$, over MIL statements. $t$ takes a
 statement and $F$, a set of \setL{Fact} values. For any statement
 besides !+<-+!, $t$ does nothing --- it just returns $F$. 
 
-The case presented in Equation~\ref{uncurry_df_transfer_block} applies
-when the right--hand side of a !+<-+! calls a block, such as $!+v\ \text{<-}\
-l(c_1, \dots, c_n)+!$. If the block represented by !+l+!  returns a
-closure (i.e., $!+(l, m)+! \in \setL{Dest}$) then $t$ creates a new fact
-that associates !+v+! with a \setL{Clo} value. The \setL{Clo}
-value associates !+m+!, the destination stored in the closure returned
-by !+l+!'s block, with any captured variables. If $!+(v, p)+! \in F$
-(for any $p$), we use $\wedge$ to combine the
-\setL{Clo} values associated with !+v+!. Otherwise, we just add the
-new fact to $F$.
-
 Equation~\ref{uncurry_df_transfer_closure} applies when the
 right--hand side of a !+<-+! statement creates a closure, as in 
 $!+v\ \text{<-}\ k\ b\ \{c_1, \dots, c_n\}+!$. $t$ creates a \setL{Clo}
@@ -413,13 +390,104 @@ $t$ uses the meet operator to combine the new \setL{Clo} value with
 any in $F$ already associated with !+v+!; otherwise, the new fact
 is just added to $F$.
 
-\intent{Explain how we rewrite based on facts.}
-We apply the facts gathered by $t$ to rewrite two kinds of tail
-statements: block calls, 
-
 \section{Rewriting}
 
+\intent{Explain how we rewrite based on facts.}  The facts gathered by
+$t$ allow us to replace |Enter| operations when we know the left--hand
+side refers to a closure. That is, we rewrite tails of the form !+f @@
+x+! when $!+(f, p) \in \setL{Fact}+!$ and $!+p+! \neq \top$. We
+know $!+p+! = (!+l, c_1, \dots, c_n+!)$, therefore we replace the
+!+@@+!  operation with $!+k\ l\ \{c_1, \dots, c_n, x\}+!$, the closure
+!+f @@ x+! would construct. Notice we add the !+x+! argument to the 
+closure as well.
+
+The example we discussed in Section~\ref{uncurry_sec_mil} does not
+match with the optimization just discussed on one crucial point:
+replacing blocks on the left-hand side of a !+<-+! with their closure
+result. Our implementation relies on another, more general, that
+inlines simple blocks into their predecessor. We describe the
+optimization in detail in Chapter~\ref{ref_chapter_monadic}, but in short
+that optimization will inline calls to blocks such as !+compose+!, so
+a statement like !+v <- compose()+! becomes !+v <- k l \{\}+!, where !+l+!
+refers to the label in the closure returned by !+compose()+!.
+
 \section{Implementation}
+
+\intent{Provide a bridge to the four subsections below.}
+We present our implementation in four sections. 
+
+\subsection{Types}
+\label{uncurry_impl_types}
+\intent{Describe |DestOf|; give details on managing names; point out
+  it other differences.}  Figure~\ref{uncurry_fig_types} shows the
+types used by our implementation to represent the sets given in
+Figure~\ref{uncurry_fig_df}. The |DestOf| type represents the
+\setL{Dest} set, |CloVal| represents \setL{Clo}, and |CollapseFact|
+represents \setL{Fact}. 
+
+\begin{myfig}
+  \begin{minipage}{\hsize}
+%let includeTypes = True
+%include Uncurry.lhs
+%let includeTypes = False
+  \end{minipage}
+  \caption{The types for our analysis. Referring to the sets
+    defined in Figure~\ref{uncurry_fig_df}, we use |DestOf| for the
+    \setL{Dest} set, |CloVal| for \setL{Clo} and |CollapseFact| for
+    \setL{Fact}.}
+  \label{uncurry_fig_types}
+\end{myfig}
+
+|DestOf| actually carries more informatino than we specified for
+\setL{Dest}. Recall that closure-capturing blocks either return a
+closure or jump directly to a block. The |Capture| constructor
+represents the first case and |Jump| the second. The |Dest| value is a
+destination: either the label stored in the closure returned, or the
+block that the closure jumps to immedietely.  In any case, |Dest| is
+just an alias for a |(Name, Label)| tuple, where |Name| is a string
+and |Label| a Hoopl value.
+
+When a closure-capturing block returns a closure, it always copies all
+values from the old closure to the new. The argument can be copied or
+ignored. The flag in the |Capture| constructor, |Maybe Int|, indicates
+if the argument is used. When rewriting an expression like !+f @@ x+!
+to $!+k\ b\ \{\dots\}+!$, we use this value to
+determine if !+x+! should added to the variables captured in
+the braces, $!+\{\dots\}+!$. For example, the following block
+ignores its argument when returning a closure:
+\begin{singlespace}
+  \begin{MILVerb}[gobble=4]
+    c {a, b} x: closure l {a, b}
+    l {a, b} y: \ldots
+  \end{MILVerb}
+\end{singlespace}
+
+We use the |Jump| constructor to capture when a closure-capturing
+block jumps directly to another block.\footnote{This indicates that
+  the function represented is now fully applied.} The |Dest| value
+indicates which block we will jump to. However, the block receives
+arguments in some order that does not necessarily represent the order
+of variables in the captured closure. Each integer in the list given to
+|Jump| represents the position of a variable from the closure
+received. The arguments to the block are built by traversing the list
+from beginning to end, putting the variable indicated by the index into
+the corresponding argument for the block. For example, the block !+c+!
+in the following:
+\begin{singlespace}
+  \begin{MILVerb}[gobble=4]
+    c {a, b, c}: l(c, a, b)
+    l(c, a, b): \dots
+  \end{MILVerb}
+\end{singlespace}
+would be represented by the value |Jump l [2, 0, 1]|, because the
+variables from the closure $!+\{a, b, c\}+!$ must be given to !+l+! in
+the order $!+(c, a, b)+!$.
+
+\subsection{Transfer}
+
+\subsection{Rewrite}
+
+\subsection{Optimization Pass}
 
 \intent{Describe how we recognize when a closure is created} 
 

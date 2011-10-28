@@ -21,8 +21,8 @@ import LCToMIL
 import DeadBlocks
 import LCM
 
-progM :: [Def] -> ([Name], ProgM C C) -> IO ()
-progM progs prelude@(prims, _) = do
+progM :: ([Name], ProgM C C) -> [Def] -> IO ()
+progM prelude@(prims, _) progs = do
   putStrLn "\n ========= LambdaCase ================="
   putStrLn (render $ vcat (map printDef progs)) 
   putStrLn "\n ========= Unoptimized MIL ============"
@@ -940,6 +940,11 @@ uncurry3 = [("uncurry3",
            ,("mapCap",
             lam "xs" $ \xs ->
             lam "f" $ \ f -> f `app` xs)]
+
+myConst = [("const",
+            lam "a" $ \a ->
+            lam "b" $ \_ ->
+              a)]
 
 {- An example to demonstrate uncurrying across case statements.
 

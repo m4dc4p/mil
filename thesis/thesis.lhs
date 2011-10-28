@@ -30,6 +30,8 @@
 \input{deadcode}
 
 \chapter{Monadic Optimizations}
+\label{ref_chapter_monadic}
+
 \emph{Describes optimizations based on the monad laws: bind/return collapse and
   monadic fuzzbang (inlining)}
 
