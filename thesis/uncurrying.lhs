@@ -341,20 +341,26 @@ collide, so in practice the map of bound variables only grows.
 
         \multicolumn{3}{c}{\textit{Meet}} \\
         
-        l \wedge %% aligns the meet operator on both rows.
-          \mathllap{l}\phantom{m} &= l. \labeleq{uncurry_df_meet_eq} & \eqref{uncurry_df_meet_eq} \\
-        l \wedge m &= \top, \text{when}\ l \neq m. \labeleq{uncurry_df_meet_neq} & \eqref{uncurry_df_meet_neq} \\
+        l \lub m &= \begin{cases}
+          l & \text{when}\ l = m. \\
+          \top & \text{when}\ l \neq m.
+        \end{cases} \labeleq{uncurry_df_lub} & \eqref{uncurry_df_lub} \\
         & \multicolumn{2}{l}{\phantom{=} \text{where\ } l, m \in \setL{Clo}.}\\\\
+        
+        F_1 \wedge F_2 &= \begin{array}{l}
+          \{(v, p \lub l)\ ||\ (v, p) \in F_1, (v, l) \in F_2\}\ \cup \\
+          \{(v, p)\ ||\ (v, p) \in F_1, v \not\in \mfun{dom}(F_2)\}\ \cup \\
+          \{(u, l)\ ||\ (u, l) \in F_2, u \not\in \mfun{dom}(F_1)\}.
+        \end{array} \labeleq{uncurry_df_meet} & \eqref{uncurry_df_meet} \\ 
+        & \multicolumn{2}{l}{\phantom{=} \text{where\ } F_1, F_2 \in \setL{Fact}.}\\\\
 
         \multicolumn{3}{c}{\textit{Transfer Function}} \\
-        \mathllap{t (!+v\ \text{!+<-+!}\ k\ b\ \{c_1, \dots, c_n\}+!)} &= %%
-        \begin{cases}
-          \{!+(v, (b, c_1, \dots, c_n) \wedge l)+!\} \cup (F \backslash \{!+(v, l)+!\}) & \text{when\ } !+(v, l)+! \in F. \\
-          \{!+(v, (b, c_1, \dots, c_n))+!\} \cup F & \text{otherwise.}
-        \end{cases} \labeleq{uncurry_df_transfer_closure} & \eqref{uncurry_df_transfer_closure} \\
-        \mathllap{\the\rest} &= \{!+(v, \top)+!\} \cup F.\\
+        \mathllap{t (!+v\ \text{!+<-+!}\ k\ b\ \{c_1, \dots, c_n\}+!)} &= 
+          \{!+(v, (b, c_1, \dots, c_n))+!\} \wedge F. 
+          \labeleq{uncurry_df_transfer_closure} & \eqref{uncurry_df_transfer_closure} \\
+        \mathllap{\the\rest} &= \{!+(v, \top)+!\} \wedge F.\\
         t (!+\_+!) &= F. \labeleq{uncurry_df_transfer_rest} & \eqref{uncurry_df_transfer_rest} \\
-        & \text{where\ } F \subseteq \setL{Fact}.
+        & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \subseteq \setL{Fact}.}
       \end{array}
     \end{math}
   \end{minipage}
@@ -362,7 +368,7 @@ collide, so in practice the map of bound variables only grows.
   \label{uncurry_fig_df}
 \end{myfig}
 
-\intent{Explain dataflow equations presented in the figure.}
+\intent{Describe fundamental sets used by our dataflow equations.}
 Figure~\ref{uncurry_fig_df} shows the dataflow equations used for our
 analysis. The sets \setL{Labels} and \setL{Vars} contain all labels
 and all variables in the program, respectively. \setL{Capt} represents
@@ -371,16 +377,37 @@ blocks. \setL{Dest} associates each label in \setL{Capt} with the
 destination label of the closure returned by that particular
 closure-capturing block. 
 
-The \setL{Clo} set associates some label with a list of variables; the
-list may be empty. We use \setL{Clo} values to represent the location
-a closure points to and the set of variables it captures. Our facts
-are pairs associating a bound variable with either $\top$ or a
-\setL{Clo} value. That is, a bound variable refers to a known location
-and some set of captured variables or some other value that we do
-not care about.
+\intent{Describe |Clo| set.}  The \setL{Clo} set associates some label
+with a list of variables; the list may be empty. We use \setL{Clo}
+values to represent the location a closure points to and the set of
+variables it captures. Our facts are pairs associating a bound
+variable with either a \setL{Clo} value or $\top$. That is, a bound
+variable refers to a known location and some set of captured variables
+or some other value that we do not care about.
 
-Our meet operator combines values in \setL{Fact}. When values are equal,
-the result is the same value. Otherwise, the result is $\top$. 
+\intent{Describe |Fact| set} We use the \setL{Var} and \setL{Clo} sets
+to describe \setL{Fact}, the set of facts that we will compute. Each
+\setL{Fact} value associates a variable with the \setL{Clo} value computed
+for that variable. 
+
+\intent{Describe $\wedge$.}  We combine sets of \setL{Fact} values
+using our meet operator, $\wedge$, as defined in
+Equation~\eqref{uncurry_df_meet}. We define $\wedge$ over two sets of
+facts, $F_1$ and $F_2$. When a given variable only appears in $F_1$ or
+$F_2$, we add the pair directly to the result set. When a variable
+appears in both $F_1$ and $F_2$, we create a new pair where we combine
+the two associated \setL{Clo} values using the \lub operator defined
+in Equation~\eqref{uncurry_df_lub}. The resulting pair has the same
+variable but a (possibly) new \setL{Clo} value. Together, \setL{Fact}
+and $\wedge$ form a lattice as described in
+Chapter~\ref{ref_chapter_background}, Section~\ref{back_subsec_facts}.
+
+\intent{Illustrate $\wedge$ with an example.}  For example, if $F_1 =
+\{(v, \{l\})\}$ and $F_2 = \{(c, \{l\}), (v, \{m\})\}$ then $F_1
+\wedge F_2$ would be $\{(v, \top), (c, \{l\})\}$. Because $c$ only
+appears in one set, we add it directly to the result. But $v$ appears
+in both so we add $(v, \{m\} \lub \{l\})$, or $\{(v, \top)\}$, to the
+result set.
 
 \intent{Explain in detail how $t$ works.}  We define the transfer
 function, $t$, by cases for each MIL statement. $t$ takes a statement
@@ -444,7 +471,7 @@ that applies the optimization to a given program.
 
 \subsection{Types}
 \label{uncurry_impl_types}
-\intent{Describe |DestOf|; give details on managing names; point out
+\intent{Describe types used; give details on managing names; point out
   it other differences.}  Figure~\ref{uncurry_fig_types} shows the
 types used by our implementation to represent the sets given in
 Figure~\ref{uncurry_fig_df}. The |DestOf| type represents the
@@ -464,7 +491,8 @@ represents \setL{Fact}.
   \label{uncurry_fig_types}
 \end{myfig}
 
-|DestOf| actually carries more informatino than we specified for
+\intent{Explain different |DestOf| values.}
+|DestOf| actually carries more information than we specified for
 \setL{Dest}. Recall that closure-capturing blocks either return a
 closure or jump directly to a block. The |Capture| constructor
 represents the first case and |Jump| the second. The |Dest| value in
@@ -474,11 +502,13 @@ case, |Dest| is just an alias for a |(Name, Label)| tuple, where
 |Name| is a string and |Label| a Hoopl value, representing a block of
 MIL code.
 
+\intent{Details on |Capture| value.}
 When a closure-capturing block returns a closure, it copies all
 caputred variables from the old closure to the new. The argument can
 be copied or ignored. The flag in the |Capture| constructor indicates
 if the argument is used. 
 
+\intent{Details on |Jump| value.}
 Each integer in the list given to |Jump| represents the position of a
 variable from the closure received. The arguments to the block are
 built by traversing the list from beginning to end, putting the
@@ -494,18 +524,21 @@ would be represented by the value |Jump l [2, 0, 1]|, because the
 variables from the closure $!+\{a, b, c\}+!$ must be given to !+l+! in
 the order $!+(c, a, b)+!$.
 
+\intent{Details on |CloVal| values.}
 We use |CloVal| to represent \setL{Clo} values, except the $\top$
 value. Recall that \setL{Clo} represents a closure, holding a label
 and captured variables. |CloVal| stores a |Dest| value, representing
 the label the closure refers to, and a list of captured variables,
 |[Name]|. 
 
-We use the |CollapseFact| type to represent our \setL{Fact} set. We
-represent the full \setL{Clo} set in this map, by associating each
-variable with either a |Top| value or a |CloVal| value. Hoopl provides
-the |WithTop| type, which adds a |Top| value to any type. 
+\intent{Explain how we complete representation of \setL{Clo} using
+  |CollapseFact|.}  We use the |CollapseFact| type to represent our
+\setL{Fact} set. We represent the full \setL{Clo} set in this map, by
+associating each variable with either a |Top| value or a |CloVal|
+value. Hoopl provides the |WithTop| type, which adds a |Top| value to
+any type.
 
-\subsection{Lattice}
+\subsection{Lattice \& Meet}
 Figure~\ref{uncurry_fig_lattice} shows the lattice we defined for our
 analysis. |fact_bot| shows that every entry point is initialized with
 an empty map, meaning we do not start with any information. The

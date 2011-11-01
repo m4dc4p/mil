@@ -208,12 +208,12 @@ categories at each point in the control-flow graph: \emph{unknown}, a
 \emph{known integer constant}, or
 \emph{indeterminate}. \emph{Unknown}, represented by $\bot$
 (``bottom''), is the initial value for all variables in our
-analysis. A \emph{known integer constant}, $C \in \mathbb{Z}$, means our analysis identified
-that the variable was assigned a specific value that does not
-change. \emph{Indeterminate}, indicated by $\top$ (``top''), means our
-analysis found that the variable might have more than one value at a
-given point. Together, $\{\bot, \top\} \cup \mathbb{Z}$ forms a set which we
-will denote as \setLC.
+analysis. A \emph{known integer constant}, $C \in \mathbb{Z}$, means
+our analysis identified that the variable was assigned a specific
+value that does not change. \emph{Indeterminate}, indicated by $\top$
+(``top''), means our analysis found that the variable might have more
+than one value at a given point. Together, $\{\bot, \top\} \cup
+\mathbb{Z}$ forms a set which we will denote as \setLC.
 
 \begin{myfig}
   \input{lst_back17}

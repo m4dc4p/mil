@@ -215,7 +215,7 @@
 \DeclareDocumentCommand \outFacts {m m O{1in}} {\doFacts{#1}{#2}{\outB}{#3}}
 \ExplSyntaxOff
 
-\newcommand{\lub}{\ifthenelse{\boolean{mmode}}{\sqcap}{\raisebox{.1em}{\ensuremath{\sqcap}}}\xspace}
+\newcommand{\lub}{\ifmmode\sqcap\else\raisebox{.1em}{\ensuremath{\sqcap}}\fi\xspace}
 \newcommand{\sqlt}{\ensuremath{\sqsubset}\xspace}
 \newcommand{\sqlte}{\ensuremath{\sqsubseteq}\xspace}
 
