@@ -58,7 +58,7 @@ GADT type variables.
 %endif
 %if includeAll || includeTypes
 
-> data CloVal = CloVal Dest [Name]
+> data CloDest = CloDest Dest [Name]
 
 %endif
 %if False
@@ -71,7 +71,8 @@ closure or an unknown value.
 %endif
 %if includeAll || includeTypes
 
-> type CollapseFact = Map Name (WithTop CloVal) 
+> type CloVal = WithTop CloDest
+> type CollapseFact = Map Name CloVal
 
 %endif
 %if False
@@ -117,28 +118,32 @@ closure or jump to the block.
 > collapseTransfer = mkFTransfer t
 >   where
 >     t :: StmtM e x -> CollapseFact -> Fact x CollapseFact
->     t (Bind v (Closure dest args)) bound = Map.insert v (PElem (CloVal dest args)) bound
->     t (Bind v _) bound = Map.insert v Top bound
->     t (CaseM _ alts) bound = mkFactBase collapseLattice []
->     t (Done _ _ _) bound = mkFactBase collapseLattice []
->     t (BlockEntry _ _ _) f = f
->     t (CloEntry _ _ _ _) f = f
+>     t (Bind v (Closure dest args)) facts = 
+>       let lubInsert o n = snd (lub o n)
+>       in Map.insertWith lubInsert v (PElem (CloDest dest args)) facts
+>     t (Bind v _) facts = Map.insert v Top facts
+>     t (CaseM _ _) facts = mkFactBase collapseLattice []
+>     t (Done _ _ _) facts = mkFactBase collapseLattice []
+>     t (BlockEntry _ _ _) facts = facts
+>     t (CloEntry _ _ _ _) facts = facts
 
 %endif
-%if includeAll 
+%if includeRewrite || includeAll 
 
-> collapseRewrite :: FuelMonad m => Map Label DestOf -> FwdRewrite m StmtM CollapseFact
+> collapseRewrite :: FuelMonad m => Map Label DestOf 
+>                    -> FwdRewrite m StmtM CollapseFact
 > collapseRewrite blocks = iterFwdRw (mkFRewrite rewriter)
 >   where
->     rewriter :: FuelMonad m => forall e x. StmtM e x -> CollapseFact -> m (Maybe (ProgM e x))
+>     rewriter :: FuelMonad m => forall e x. StmtM e x -> CollapseFact 
+>                 -> m (Maybe (ProgM e x))
 >     rewriter (Done n l (Enter f x)) col = done n l (collapse col f x)
 >     rewriter (Bind v (Enter f x)) col = bind v (collapse col f x)
 >     rewriter _ _ = return Nothing
 >                    
 >     collapse :: CollapseFact -> Name -> Name -> Maybe TailM
->     collapse col f x =       
->       case Map.lookup f col of
->         Just (PElem (CloVal dest@(_, l) vs)) -> 
+>     collapse facts f x =       
+>       case Map.lookup f facts of
+>         Just (PElem (CloDest dest@(_, l) vs)) -> 
 >           case l `Map.lookup` blocks of
 >             Just (Jump dest uses) -> Just (Goto dest (fromUses uses (vs ++ [x])))
 >             Just (Capture dest True) -> Just (Closure dest (vs ++ [x]))
@@ -146,10 +151,18 @@ closure or jump to the block.
 >             _ -> Nothing
 >         _ -> Nothing
 >                             
->     -- Idxs is a list of positions which represent
->     -- how a Goto used the arguments given in a CloEntry. We
->     -- take local arguments and re-order them according to
->     -- the positions given.
+
+%endif
+%if False
+
+Idxs is a list of positions which represent
+how a Goto used the arguments given in a CloEntry. We
+take local arguments and re-order them according to
+the positions given.
+
+%endif
+%if includeRewrite || includeAll
+
 >     fromUses :: [Int] -> [Name] -> [Name]
 >     fromUses idxs args = map (args !!) idxs
 
@@ -159,14 +172,18 @@ closure or jump to the block.
 > collapseLattice :: DataflowLattice CollapseFact
 > collapseLattice = DataflowLattice { fact_name = "Closure collapse"
 >                                   , fact_bot = Map.empty
->                                   , fact_join = joinMaps (extendJoinDomain extend) }
->   where
->     extend :: Label 
->            -> OldFact CloVal
->            -> NewFact CloVal
->            -> (ChangeFlag, WithTop CloVal)
->     extend _ (OldFact old) (NewFact new) 
->       | old == new = (NoChange, PElem new)
->       | otherwise = (SomeChange, Top)
+>                                   , fact_join = joinMaps (toJoin lub) }
+>
+> toJoin :: (a -> a -> (ChangeFlag, a)) 
+>        -> (Label -> OldFact a -> NewFact a -> (ChangeFlag, a))
+> toJoin f = 
+>   let f' _ (OldFact o) (NewFact n) = f o n
+>   in f' 
+
+> lub :: CloVal -> CloVal -> (ChangeFlag, CloVal)
+> lub old new = 
+>   if old == new 
+>    then (NoChange, new)
+>    else (SomeChange, Top)
 
 %endif

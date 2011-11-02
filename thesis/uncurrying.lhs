@@ -48,7 +48,7 @@ implementation in Section~\ref{uncurry_sec_impl}. Previous approaches
 to uncurrying are discussin in Section~\ref{uncurry_sec_prior}; we
 describe alternate (but unimplemented) strategies for our own approach
 in Section~\ref{uncurry_sec_future}. We conclude with a discussion of
-our experience in Section~\ref{uncurry_sec_conc}.
+our experience in Section~\ref{uncurry_sec_refl}.
 
 %% \emph{Describes our optimization for collapsing intermediate
 %% closures. Our choice of representation is analyzed to
@@ -70,10 +70,10 @@ by fixing some of the arguments to a general function.
 >
 > map2 :: ((a -> b), [a]) -> b
 > map2 = {-"\ldots"-}
-  \label{uncurry_fig_partapp}
   \caption{Haskell definitions in curried and uncurried style. |map|
     can be easily partially applied to produce specialized functions; |foldr|
     cannot.}
+  \label{uncurry_fig_partapp}
 \end{myfig}
 
 For example, the Haskell code in Figure~\ref{uncurry_fig_partapp}
@@ -94,7 +94,7 @@ We cannot do the same as easily with |map2|. At best we can define
 a function that ignores one of its arguments:
 
 > upCase2 :: ((a -> b), [Char]) -> [Char]
-> upcase2 (_, xs) = map2 (toUpper, xs)
+> upCase2 (_, xs) = map2 (toUpper, xs)
 >
 > square2 :: ((a -> b), [Int]) -> [Int]
 > square2 (_, xs) = map2 ((^ 2), xs)
@@ -152,7 +152,7 @@ supported or not, almost always generates code that jumps from one
 section of the program to another.\footnote{Inlining can remove the
   need for jumps, but of course increases code size. There is no
   perfect optimization --- only good enough.} At the assembly language
-level, function application is expensive because multilple operations
+level, function application is expensive because multiple operations
 must take place to implement it: saving registers, loading addresses,
 and finally jumping to the target location. Partial application
 exagerates all these costs.
@@ -161,34 +161,42 @@ Partial application essentially creates a \emph{series} of functions,
 each of which gathers arguments and returns a closure pointing to the
 next function in the chain. Only when all the arguments are gathered
 does the function do ``real work'' --- that is, something besides
-gathering up arguments and creating a closure. Supporting partial
-application also tends to influence the lowest-level of code
-generation, where function appliation is implemented. Rather than
-generate specialized code for partially versus fully-applied
-functions, its simplest to generate the same code for all
-applications, partial or otherwise. That means every function
-application pays the price of partial applicatoin, even if the function
-is ``obviously'' fully-applied.
+gathering up arguments and creating a closure. Each partial
+application causes an allocation by creating and returning a
+closure. Partial application also influences the code generated to
+implement function application. Rather than generate specialized code
+for partially versus fully-applied functions, it is simplest to
+generate the same code for all applications, partial or
+otherwise. That means every function application pays the price of
+partial application, even if the function is ``obviously''
+fully-applied.
 
 \section{Partial Application in MIL}
 \label{uncurry_sec_examples}
 \intent{Remind reader about different MIL blocks and how closures are
   created.}  Recall that MIL defines two types of blocks, one of which
-we call \emph{closure-capturing}. MIL also defines the \emph{enter}
-operator (written !+@@+!) that applies a function to an
+we call \emph{closure-capturing}. MIL also defines the |Enter|
+expression (written !+@@+!) that applies a function to an
 argument. !+@@+! always expects a closure on its left--hand side and
 some argument on the right. That is, in the expression !+f @@ x+!,
 !+f+!  will be a closure value that points to a closure-capturing
 block and !+x+! is the argument passed to that block.
 
-We write closure-capturing blocks as $!+k \{v_1, \dots, v_n\} x+!$,
-where !+k+! is a label for the block, $!+v_1, \dots, v_n+!$
-represent values in the closure that was applied, and $x$ the
-argument that was given to the !+@@+!  operation. 
+\intent{Remind reader how MIL closure--capturing blocks are written
+  and used.}  A closure--capturing block is always executed as the
+result of an !+@@+! expression. That is, in the expression !+f @@ x+!,
+!+f+!  represents a closure that points to some block labeled !+k+!
+and that captures variables $!+\{v_1, \dots, v_n\}+!$. The !+@@+!
+expression causes the block !+k+! to be executed using the closure
+value represented by !+f+! and with the arguemnt !+x+!. We write
+closure--capturing blocks as $!+k\ \{v_1, \dots, v_n\}\ x: \dots
++!$. !+k+! names the block, $!+\{v_1, \dots, v_n\}+!$ give the
+variables expected in the closure, !+x+! represents the argument
+passed, and the \ldots after the !+:+! represent the body of the block.
 
 MIL also defines blocks that are not closure-capturing. A normal
 blocks takes a list of arguments, as specified by the \lamC definition
-that it represents, and is written as $!+b(v_1, \dots, v_n)+!$.
+that it represents, and is written as $!+b(v_1, \dots, v_n): \dots+!$.
 
 These definitions allow MIL to represent function application
 uniformly. For a function with $n$ arguments, $n - 1$ !+k+! blocks
@@ -329,7 +337,7 @@ collide, so in practice the map of bound variables only grows.
     \begin{math}
       %% Below used to measure & typeset the case where we don't
       %% see a binding.
-      \newtoks\rest \rest={t (!+v\ \texttt{<-}\ \ldots+!)} %%
+      \newtoks\rest \rest={t (F, !+v\ \texttt{<-}\ \ldots+!)} %%
       \begin{array}{rlr}
         \multicolumn{3}{c}{\textit{Facts}} \\
         \setL{Labels} &= \text{Set of all program labels.} \\
@@ -355,11 +363,11 @@ collide, so in practice the map of bound variables only grows.
         & \multicolumn{2}{l}{\phantom{=} \text{where\ } F_1, F_2 \in \setL{Fact}.}\\\\
 
         \multicolumn{3}{c}{\textit{Transfer Function}} \\
-        \mathllap{t (!+v\ \text{!+<-+!}\ k\ b\ \{c_1, \dots, c_n\}+!)} &= 
+        \mathllap{t (F, !+v\ \text{!+<-+!}\ k\ b\ \{c_1, \dots, c_n\}+!)} &= 
           \{!+(v, (b, c_1, \dots, c_n))+!\} \wedge F. 
           \labeleq{uncurry_df_transfer_closure} & \eqref{uncurry_df_transfer_closure} \\
-        \mathllap{\the\rest} &= \{!+(v, \top)+!\} \wedge F.\\
-        t (!+\_+!) &= F. \labeleq{uncurry_df_transfer_rest} & \eqref{uncurry_df_transfer_rest} \\
+        \mathllap{\the\rest} &= \{!+(v, \top)+!\} \wedge F. \labeleq{uncurry_df_transfer_other} & \eqref{uncurry_df_transfer_other} \\
+        t (F, !+\_+!) &= F. \labeleq{uncurry_df_transfer_rest} & \eqref{uncurry_df_transfer_rest} \\
         & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \subseteq \setL{Fact}.}
       \end{array}
     \end{math}
@@ -411,47 +419,51 @@ result set.
 
 \intent{Explain in detail how $t$ works.}  We define the transfer
 function, $t$, by cases for each MIL statement. $t$ takes a statement
-and $F$, a set of \setL{Fact} values. For any statement besides
-!+<-+!, $t$ does nothing --- it just returns $F$.
+and $F$, a set of \setL{Fact} values. $t$ returns a \setL{Fact}
+set. For any statement besides !+<-+!, $t$ is the identity --- it just
+returns $F$.
 
 Equation~\ref{uncurry_df_transfer_closure} applies when the
 right--hand side of a !+<-+! statement creates a closure, as in
 $!+v\ \text{<-}\ k\ b\ \{c_1, \dots, c_n\}+!$. $t$ creates a
 \setL{Clo} value with !+b+! (the label pointed to by the closure) and
-$!+c_1, ..., c_n+!$, the variables captured by the closure.  $t$ uses
-the meet operator to combine the new \setL{Clo} value with any in $F$
-already associated with !+v+!; otherwise, the new fact is just added
-to $F$.
+$!+c_1, ..., c_n+!$, the variables captured by the closure. A new fact
+associating !+v+!, the variable on the left--hand side of the !+<-+!
+statement, is created. $t$ returns the result of combining $F$ and the
+new fact using $\wedge$.
 
 \section{Rewriting}
 \label{uncurry_sec_rewriting}
-\intent{Explain how we rewrite based on facts.}  The facts gathered by
-$t$ allow us to rewrite |Enter| operations if we know the left--hand
-side refers to a closure. That is, we can rewrite tails like !+f @@
-x+! when $!+(f, p) \in \setL{Fact}+!$ and $!+p+! \neq \top$. Because
-$!+p+! \neq \top$, we know $!+p+! = (!+l, c_1, \dots, c_n+!)$;
-therefore we replace the !+@@+! operation with the closure !+f @@ x+!
-would construct: $!+k\ l\ \{c_1, \dots, c_n, x\}+!$. Notice we add the
-!+x+! argument to the closure as well.
+\intent{Explain how we rewrite |Enter| expressions.}  The facts
+gathered by $t$ allow us to replace |Enter| expressions with closure
+allocations if we know the closure that the expression results
+in. That is, we can rewrite tails like !+f @@ x+!  when $!+(f, p) \in
+\setL{Fact}+!$ and $!+p+! \neq \top$. Because $!+p+! \neq \top$, we
+know $!+p+! = (!+l, c_1, \dots, c_n+!)$; therefore we replace the
+!+@@+! expression with the closure !+f @@ x+!  would construct:
+$!+k\ l\ \{c_1, \dots, c_n, x\}+!$. Notice we add the !+x+!  argument
+to the closure as well.
 
+\intent{Point out we don't inline closures from |Goto| expressions.}
 The example we discussed in Section~\ref{uncurry_sec_mil} does not
 match with the optimization just discussed on one crucial point:
-replacing blocks on the right--hand side of a !+<-+! with their closure
-result. Our implementation relies on another, more general, optimization that
-inlines simple blocks into their predecessor. We describe the
-optimization in detail in Chapter~\ref{ref_chapter_monadic}, but in short
-that optimization will inline calls to blocks such as !+compose+!, so
-a statement like !+v <- compose()+! becomes !+v <- k l \{\}+!, where !+l+!
-refers to the label in the closure returned by !+compose()+!.
+replacing calls to normal blocks on the right--hand side of a !+<-+! with
+their closure result. Our implementation relies on another, more
+general, optimization that inlines simple blocks into their
+predecessor. We describe the optimization in detail in
+Chapter~\ref{ref_chapter_monadic}, but in short that optimization will
+inline calls to blocks such as !+compose+!, so a statement like !+v <-
+compose()+! becomes !+v <- k l \{\}+!, where !+l+!  refers to the
+label in the closure returned by !+compose()+!.
 
 \section{Implementation}
 \label{uncurry_sec_impl}
 
-\intent{Provide a bridge to the four subsections below.}  Originally, we called this
-transformation ``closure-collapse,'' because it ``collapsed'' the
-construction of multiple closures into the construction of a single
-closure. Later, we learned this optimization is known as
-``uncurrying,'' but at the point the code had already been
+\intent{Provide a bridge to the four subsections below.}  Originally,
+we called this transformation ``closure-collapse,'' because it
+``collapsed'' the construction of multiple closures into the
+construction of a single closure. Later, we learned this optimization
+is known as ``uncurrying,'' but at the point the code had already been
 written. The ``collapse'' prefix in the code shown is merely an
 artifact of our previous name for the analysis.
 
@@ -459,9 +471,8 @@ In our presentation of dataflow equations in
 Section~\ref{uncurry_sec_df}, we described this analysis by
 statements. However, our implementation works on blocks of MIL
 code. Fortunately, the net result is the same due to Hoopl's
-interleaved analysis and rewriting. Our transfer function and rewrite
-function work in tandem to rewrite !+@@+! operations and closure
-allocations within a block. 
+interleaved analysis and rewriting. Our transfer and rewrite functions
+work in tandem to rewrite !+@@+! expressions within a block.
 
 We present our implementation in five sections, reflecting the
 structure of our dataflow equations above. We first give the types
@@ -525,28 +536,31 @@ variables from the closure $!+\{a, b, c\}+!$ must be given to !+l+! in
 the order $!+(c, a, b)+!$.
 
 \intent{Details on |CloVal| values.}
-We use |CloVal| to represent \setL{Clo} values, except the $\top$
+We use |CloDest| to represent \setL{Clo} values, except the $\top$
 value. Recall that \setL{Clo} represents a closure, holding a label
-and captured variables. |CloVal| stores a |Dest| value, representing
+and captured variables. |CloDest| stores a |Dest| value, representing
 the label the closure refers to, and a list of captured variables,
 |[Name]|. 
 
-\intent{Explain how we complete representation of \setL{Clo} using
-  |CollapseFact|.}  We use the |CollapseFact| type to represent our
-\setL{Fact} set. We represent the full \setL{Clo} set in this map, by
-associating each variable with either a |Top| value or a |CloVal|
-value. Hoopl provides the |WithTop| type, which adds a |Top| value to
-any type.
+\intent{Explain how we use |WithTop| to complete representation of
+  \setL{Clo}.}  Hoopl provides |WithTop|, a type that adds a $\top$
+element to any other type. We use |WithTop CloDest| to define the
+alias |CloVal|, which completes our representation of \setL{Clo}.
+
+\intent{Explain how |CollapseFact| represents \setL{Fact}.}  We use
+the |CollapseFact| alias to represent our \setL{Fact}
+set. |CollapseFact| aliases a finite map from variables (i.e., |Names|)
+to |CloVals|.
 
 \subsection{Lattice \& Meet}
-Figure~\ref{uncurry_fig_lattice} shows the lattice we defined for our
-analysis. |fact_bot| shows that every entry point is initialized with
-an empty map, meaning we do not start with any information. The
-|extend| function is defined over |CloVal| values and replaces any
-conflicting values with |Top| (just like the meet operator in
-Figure~\ref{uncurry_fig_df}). The |fact_join| definition uses two
-Hoopl--provided functions, |joinMaps| and |extendJoinDomain|, to lift
-|extend| to function defined over |Maps| of |WithTop CloVal| values.
+Figure~\ref{uncurry_fig_lattice} shows the |DataflowLattice| structure
+defined for our analysis. We set |fact_bot| to an empty map, meaning
+we start without any information. We define |lub| over |CloVals|, just
+like \lub in Figure~\ref{uncurry_fig_df}). Hoopl requires that
+|fact_join| take particular arguments, so we use |toJoin| to transform
+|lub| into the right type of function. The Hoopl--provided function
+|joinMaps| transforms |toJoin lub| into a function that operates over
+finite maps, giving |fact_join| the right signature.
 
 \begin{myfig}
   \begin{minipage}{\hsize}
@@ -570,7 +584,18 @@ along.\footnote{Note these will always be empty maps, because our
   is |Map.empty|.} Because we do not propagate facts between blocks,
 |CaseM| and |Done| pass an empty map to each successor, using the
 Hoopl--provided |mkFactBase| function to create a |FactBase| from 
-empty facts.
+empty facts. 
+
+|Bind| statments are handled based on the right--hand side of the
+statement. If the statement does not directly create a closure, we
+create a fact associating the variable on the left--hand side of the
+bind with |Top|, just as in
+Equation~\eqref{uncurry_df_transfer_other}. If the expression creates
+a closure, we create a new fact using the closure's destination and
+captured variables, corresponding to
+Equation~\eqref{uncurrying_df_transfer_closure}. We insert the new
+fact into our |facts| finite map, using an appropriately transformed
+|lub| function to combine the new fact with any existing facts. 
 
 \begin{myfig}
   \begin{minipage}{\hsize}
@@ -584,6 +609,50 @@ empty facts.
 \end{myfig}
 
 \subsection{Rewrite}
+\intent{Describe how |collapse| looks up closure information for an
+  |Enter| expression.}  Figure~\ref{uncurry_fig_rewrite} shows the
+implementation of our rewrite function for the uncurrying
+optimization. We will take the function apart in pieces.
+
+\begin{myfig}
+  \begin{minipage}{\hsize}
+%let includeRewrite = True
+%include Uncurry.lhs
+%let includeRewrite = False
+  \end{minipage}
+  \caption{Our rewrite function that replaces !+f @@ x+! expressions
+    with closure allocations.}
+  \label{uncurry_fig_rewrite}
+\end{myfig}
+
+The |collapse| function takes a set of facts and two names,
+representing the left and right--hand side of a !+@@+! expression,
+respectively. If !+f+! is associated with a |CloDest| value (as
+opposed to |Top|) in the |facts| map, then rewriting can possibly
+occur. The |blocks| argument associates each label in the program with
+one of three values: a closure value if the block immediately returns
+one, a destination block if the block immediately jumps to another
+block, or nothing if none of these cases hold. |collapse| uses
+|blocks| to find the result of the block referred to by the |CloDest|
+value associated with !+f+!. When the result is a closure or immediate
+jump, |collapse| returns a |Just| value indicating such. In all other
+cases, it returns |Nothing|, meaning no rewrite can occur.
+
+The |rewriter| function checks if it can rewrite |Enter| expressions
+when they occur in a |Done| statement or on the right--hand side of a
+|Bind|. In the first case, |done n l (collapse col f x)| will produce
+a new |Done| statement with the |TailM| expression returned by
+|collapse|, if |collapse| returns a |Just| value. Otherwise, |done|
+does not rewrite. Therefore, |done| rewrites an |Enter| only when
+|collapse| indicates that rewriting can occur. In the second case,
+|bind| behaves similarly, only rewriting if |collapse| returns a
+|Just| value. In all cases, |rewriter| does no rewriting.
+
+Finally, |collapseRewrite| defines its rewriting function so that all
+possible rewrites occur. Hoopl provides the combinator |iterFwdRw|,
+which applies iteratively applies the rewriter to the program until no
+more graph rewrites occur. This iteration ensures that ``chains'' of 
+closures get collapsed into a single allocation, if possible.
 
 \subsection{Optimization Pass}
 
