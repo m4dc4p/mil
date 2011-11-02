@@ -79,7 +79,8 @@
 \emph{Where we started and where we wished we could have go to.}
 
 \begin{singlespace}
-  \printbibliography
+  \bibliography{thesis}
+  %%                \printbibliography
 \end{singlespace}
 
 \end{document}

@@ -36,9 +36,11 @@
 \usepackage{xifthen}
 \usepackage{mathtools}
 \usepackage{xparse}
-\usepackage[natbib=true,style=authoryear,backend=bibtex8]{biblatex}
-\setlength{\bibitemsep}{\bigskipamount}
-\addbibresource{thesis.bib}
+%% \usepackage[natbib=true,style=authoryear,backend=bibtex8]{biblatex}
+\usepackage{natbib}
+\bibliographystyle{plain}
+%%\setlength{\bibitemsep}{\bigskipamount}
+%%\addbibresource{thesis.bib}
 \usepackage{microtype}
 
 \usepackage{tikz}
@@ -270,7 +272,8 @@
 \newcommand{\standaloneBib}{%%
   \ifthenelse{\boolean{standaloneFlag}}%%
              {\begin{singlespace}
-                \printbibliography
+             \bibliography{thesis}
+             %%                \printbibliography
              \end{singlespace}}{}}
 
 %% Adds an equation number on demand.
