@@ -303,7 +303,7 @@ would be expressed in three-address code as:
   t = s + d;
   a = t / 2;
 \end{AVerb}
-where #s# and #t# are new temporaries created by the compiler. This 
+where !+s+! and !+t+! are new temporaries created by the compiler. This 
 representation makes it easier for the compiler to re-order expressions,
 unravel complex control-flow, and manipulate intermediate values. 
 
@@ -363,16 +363,16 @@ To give a sense of MIL, consider the definition of $compose$ given in
 Figure~\ref{mil_fig1a}. Figure~\ref{mil_fig1b} shows a fragment of this 
 expression in MIL. The \emph{block declaration}
 on Line~\ref{mil_block_decl_fig1b} gives the name of
-the block (#compose#) and arguments that will be passed in (#f#, #g#,
-and #x#). Line~\ref{mil_gofx_fig1b} applies #g# to #x# and assigns
-the result to #t1#. The ``enter'' operator (#@@#), represents function application.
-\footnote{So called because in the expression #g @@ x#, we ``enter''
-  function #g# with the argument #x#.}  We assume #g# refers to a
+the block (!+compose+!) and arguments that will be passed in (!+f+!, !+g+!,
+and !+x+!). Line~\ref{mil_gofx_fig1b} applies !+g+! to !+x+! and assigns
+the result to !+t1+!. The ``enter'' operator (!+@@+!), represents function application.
+\footnote{So called because in the expression !+g @@ x+!, we ``enter''
+  function !+g+! with the argument !+x+!.}  We assume !+g+! refers to a
 function (or, more precisely, a \emph{closure}). The ``bind'' operator
-(#<-#) assigns the result of the operation on its right-hand side to
+(!+<-+!) assigns the result of the operation on its right-hand side to
 the location on the left. In turn, Line~\ref{mil_fofx_fig1b} applies
-#f# to #t1# and assigns the result to #t2#. The last line returns
-#t2#. Thus, the #compose# block returns the value of
+!+f+! to !+t1+! and assigns the result to !+t2+!. The last line returns
+!+t2+!. Thus, the !+compose+! block returns the value of
 \lamApPp{f}{\lamApp{g}{x}}, just as in our original \lamA expression.
 
 \begin{myfig}[t]
@@ -447,37 +447,37 @@ holds $a$ and $b$, and points to the code which evaluates to $main$. The
 \end{myfig}
 
 Figure \ref{mil_fig2} shows the complete MIL program for $main =
-\lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}$. #k1#, #k2# and #k3#
+\lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}$. !+k1+!, !+k2+! and !+k3+!
 (lines \ref{mil_k1_fig2} -- \ref{mil_fig2_k3}) represent
-\emph{closure-capturing} blocks. As opposed to #main#, these blocks
-create new closures. In the definition #k1 {} f = k2 {f}#, the braces
+\emph{closure-capturing} blocks. As opposed to !+main+!, these blocks
+create new closures. In the definition !+k1 \{\} f = k2 \{f\}+!, the braces
 on the left-hand side represent variables expected in the closure
-given to this function. In this case, #k1# does not expect to find any
-variables. #f# names the argument given to #k1#. The right-hand side,
-#k2 {f}#, shows the creation of a new closure. The closure points to
-#k2# and captures the value of #f#. In other words, evaluating #k1#
-returns a closure which can be used to execute #k2#. #k2# behaves
-similarly. It expects to find one value in its closure (#{f}#) and
-returns a closure pointing to #k3# that copies the value #f# from the
-existing closure and adds the argument, #g# (#k3 {f,g}#). #k3#,
+given to this function. In this case, !+k1+! does not expect to find any
+variables. !+f+! names the argument given to !+k1+!. The right-hand side,
+!+k2 \{f\}+!, shows the creation of a new closure. The closure points to
+!+k2+! and captures the value of !+f+!. In other words, evaluating !+k1+!
+returns a closure which can be used to execute !+k2+!. !+k2+! behaves
+similarly. It expects to find one value in its closure (!+\{f\}+!) and
+returns a closure pointing to !+k3+! that copies the value !+f+! from the
+existing closure and adds the argument, !+g+! (!+k3 \{f, g\}+!). !+k3+!,
 however, does something new. Instead of returning a closure, it
-executes the #compose# block (defined in Figure \ref{mil_fig1b}) with
-three arguments: #f#, #g#, and #x#. This does \emph{not} return a
+executes the !+compose+! block (defined in Figure \ref{mil_fig1b}) with
+three arguments: !+f+!, !+g+!, and !+x+!. This does \emph{not} return a
 closure or ``enter'' a function. Instead, we jump directly to the
-block. The value returned by #k3# will be the value computed by
-#compose# with the arguments given.
+block. The value returned by !+k3+! will be the value computed by
+!+compose+! with the arguments given.
 
-Returning to #main# on line \ref{mil_main_fig2} in Figure
+Returning to !+main+! on line \ref{mil_main_fig2} in Figure
 \ref{mil_fig2}, we can now see how MIL makes explicit the intermediate
 closures created while evaluating
 \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}. On line
-\ref{mil_t1_fig2}, we enter #k1# with the first argument, #a#. #t1#
-holds the closure returned. On the next line, we enter #t1# (which
-will point to #k2#) with the second argument, #b#. #t2# then holds the
-closure returned. Finally, on line \ref{mil_t3_fig2}, we enter #t2#
-(which will point to #k3#) with the final argument, #c#. #k3# will directly
-execute #compose# with our specific arguments. #t3# holds the result returned
-by #compose#. On the last line of #main# we return the value computed, #t3#.
+\ref{mil_t1_fig2}, we enter !+k1+! with the first argument, !+a+!. !+t1+!
+holds the closure returned. On the next line, we enter !+t1+! (which
+will point to !+k2+!) with the second argument, !+b+!. !+t2+! then holds the
+closure returned. Finally, on line \ref{mil_t3_fig2}, we enter !+t2+!
+(which will point to !+k3+!) with the final argument, !+c+!. !+k3+! will directly
+execute !+compose+! with our specific arguments. !+t3+! holds the result returned
+by !+compose+!. On the last line of !+main+! we return the value computed, !+t3+!.
 
 %% Syntax of MIL
 \subsection*{MIL Syntax}
@@ -498,18 +498,18 @@ function.
 Basic blocks (line \ref{mil_body_fig3}) consist of a sequence of statements that
 execute in order without any intra-block jumps or conditional
 branches. Each basic block ends with a branch: either they return a
-value (#done#) or take conditional branch (#case#). Conditional
+value (!+done+!) or take conditional branch (!+case+!). Conditional
 branches can specify multiple destinations, though at any given time
 only one will be taken.
 
-The #case# statement (line \ref{mil_case_fig3}) specifies a list of
+The !+case+! statement (line \ref{mil_case_fig3}) specifies a list of
 \emph{alternatives}, each of which matches a \emph{constructor} and
-binds new variables to the values held by the constructor. #case#
+binds new variables to the values held by the constructor. !+case+!
 examines the variable given (note, this cannot be an expression) and
 selects the alternative that matches the constructor
 found. Alternatives always branch immediately to some block -- they do
 not allow any other statement. The result of block called becomes the
-result of the #case#, which in turn becomes the result of the calling
+result of the !+case+!, which in turn becomes the result of the calling
 block.
 
 Only the binding statement (line \ref{mil_bind_fig3}) can appear multiple
@@ -518,26 +518,26 @@ on the right-hand side to a variable on the left. If a variable is
 bound more than once, later bindings will ``shadow'' previous
 bindings.
 
-The #done# statement (line \ref{mil_done_fig3}) ends a block and returns
+The !+done+! statement (line \ref{mil_done_fig3}) ends a block and returns
 the value of tail expression specified.
 
 \emph{Tail} expressions represent effects -- they create monadic
-values. #return# (line \ref{mil_return_fig3}) takes a variable and
+values. !+return+! (line \ref{mil_return_fig3}) takes a variable and
 makes its value monadic. Notice it can only take a variable, not an
-expression.  The ``enter'' operator, #@@#, expects a closure on its
+expression.  The ``enter'' operator, !+@@+!, expects a closure on its
 left and some value on the right. It will enter the function pointed
 to by the closure, with the argument given, and will evaluate to the
-result of that function. #k#, the ``capture'' operator, creates a
+result of that function. !+k+!, the ``capture'' operator, creates a
 closure from a block name and a list of variables. The name given is
 not an arbitrary code pointer -- it is a location determined during
 compilation. The ``goto'' expression, \texttt{b(\dots)}, jumps to the
 particular block with the arguments given. Again, this is not a
-computed value -- #b# represents a known location for the block. The
-variables mentioned in the #goto# do not have to have the same names
+computed value -- !+b+! represents a known location for the block. The
+variables mentioned in the !+goto+! do not have to have the same names
 as those given in the block's declaration. The constructor expression,
 ``C'', will create a data value with the given tag (``C'') and
 variables. Primitives, which are not implemented in MIL, have the form
-#p*# and are treated the same as ``goto'' expressions. They are not 
+!+p*+! and are treated the same as ``goto'' expressions. They are not 
 implemented in MIL, however. 
 
 \section{Compiling \lamA to MIL}

@@ -76,11 +76,10 @@
 
 \chapter{Conclusion \& Future Work}
 
-\emph{Where we started and where we wished we could have go to.}
+\emph{Where we started and where we ended.}
 
 \begin{singlespace}
-  \bibliography{thesis}
-  %%                \printbibliography
+  \printbibliography
 \end{singlespace}
 
 \end{document}

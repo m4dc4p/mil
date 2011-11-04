@@ -176,7 +176,7 @@ multiplies it by the original multiple given to |multiplier|.
       \end{minipage} & %%
     \input{lang_fig2_ml} \\
 
-    \lscap{lang_fig2_hs}{.Haskell} & \lscap{lang_fig2_ml}{ML.} \\
+    \lscap{lang_fig2_hs}{Haskell.} & \lscap{lang_fig2_ml}{ML.} \\
 
     \input{lang_fig2_scheme} & %%
     \input{lang_fig2_js} \\

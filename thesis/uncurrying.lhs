@@ -1,7 +1,6 @@
 \documentclass[12pt]{report}
 %include polycode.fmt
-%format . = "."
-%format ^ = "\char`^"
+%include subst.fmt
 \input{preamble}
 \begin{document}
 \input{document.preamble}
@@ -173,42 +172,32 @@ fully-applied.
 
 \section{Partial Application in MIL}
 \label{uncurry_sec_examples}
-\intent{Remind reader about different MIL blocks and how closures are
-  created.}  Recall that MIL defines two types of blocks, one of which
-we call \emph{closure-capturing}. MIL also defines the |Enter|
-expression (written !+@@+!) that applies a function to an
-argument. !+@@+! always expects a closure on its left--hand side and
-some argument on the right. That is, in the expression !+f @@ x+!,
-!+f+!  will be a closure value that points to a closure-capturing
-block and !+x+! is the argument passed to that block.
-
 \intent{Remind reader how MIL closure--capturing blocks are written
-  and used.}  A closure--capturing block is always executed as the
-result of an !+@@+! expression. That is, in the expression !+f @@ x+!,
-!+f+!  represents a closure that points to some block labeled !+k+!
-and that captures variables $!+\{v_1, \dots, v_n\}+!$. The !+@@+!
-expression causes the block !+k+! to be executed using the closure
-value represented by !+f+! and with the arguemnt !+x+!. We write
+  and used.}  Recall that MIL defines two types of blocks:
+``closure--capturing'' and ``normal.'' Normal blocks act much like
+labeled locations in a program and are written $!+b(v_1, \dots, v_n):
+\dots+!$.  A closure--capturing block is always executed as the result
+of an !+@@+!  expression. That is, in the expression !+f @@ x+!, !+f+!
+represents a closure that points to some block labeled !+k+!  and that
+captures variables $!+\{v_1, \dots, v_n\}+!$. The !+@@+!  expression
+causes the block !+k+! to be executed using the closure value
+represented by !+f+! and with the argument !+x+!. We write
 closure--capturing blocks as $!+k\ \{v_1, \dots, v_n\}\ x: \dots
-+!$. !+k+! names the block, $!+\{v_1, \dots, v_n\}+!$ give the
-variables expected in the closure, !+x+! represents the argument
-passed, and the \ldots after the !+:+! represent the body of the block.
++!$. !+k+! names the block, $!+\{v_1, \dots, v_n\}+!$ gives the
+variables expected in the closure, and !+x+! represents the argument
+passed.
 
-MIL also defines blocks that are not closure-capturing. A normal
-blocks takes a list of arguments, as specified by the \lamC definition
-that it represents, and is written as $!+b(v_1, \dots, v_n): \dots+!$.
-
-These definitions allow MIL to represent function application
+These two definitions allow MIL to represent function application
 uniformly. For a function with $n$ arguments, $n - 1$ !+k+! blocks
 will be generated. At least one !+b+! block will also be generated,
 representing the body of the function. Each $!+k_i+!$ block, except
 the $!+k_{n-1}+!$, returns a new closure pointing to the next
 $!+k_{i+1}+!$ block. The closure created by block $!+k_i+!$ contains
-all values found in the closure it was given, plus the new argument
-given. The last block, $!+k_{n-1}+!$, does not return a new
-closure. Instead, it calls block !+b+!, unpacking all necessary
-arguments. The value returned from block !+$k_{n-1}$+! is the value
-returned from block !+b+!.
+all values found in the closure it was given, plus the argument
+passed. The last block, $!+k_{n-1}+!$, does not return a new closure
+immediately. Instead, it calls block !+b+!, unpacking all necessary
+arguments. The value returned from block !+b+! is then returned by
+block $!+k_{n-1}+!$.
 
 \intent{Show how partial application is
   implemented.}  For example, Figure~\ref{uncurry_fig_compose_a} shows
@@ -261,7 +250,7 @@ evaluates the !+compose+! block, getting a closure that points to the
 top-level entry point for |compose|. !+absBlockL209+! applies that
 value to !+f+! and returns the result. The value returned by
 block~!+absBlockL209+! is a closure that points to !+absBodyL202+!,
-second in the chain of closure-capturing blocks that eventually result
+second in the chain of closure--capturing blocks that eventually result
 in executing |compose| with all its arguments. In other words, the
 result of applying |compose1| is a function that will take two more
 arguments and then execute |compose| with them.
@@ -324,7 +313,7 @@ as currently implemented.
 \section{Dataflow Equations}
 \label{uncurry_sec_df}
 \intent{Define dataflow equations for our uncurrying optimization.}
-We implement uncurrying with a forwards dataflow-analysis that
+We implement uncurrying with a forwards dataflow analysis that
 attempts to determine if a given statement allocates a closure. The
 analysis maintains a map of bound variables to closures. If a variable
 is re-bound in the block, the analysis updates its map. Our analysis
@@ -341,7 +330,7 @@ collide, so in practice the map of bound variables only grows.
       \begin{array}{rlr}
         \multicolumn{3}{c}{\textit{Facts}} \\
         \setL{Labels} &= \text{Set of all program labels.} \\
-        \setL{Capt} &= \text{Set of all labels of closure-capturing blocks}; \setL{Capt} \subset \setL{Labels}. \\
+        \setL{Capt} &= \text{Set of all labels of closure--capturing blocks}; \setL{Capt} \subseteq \setL{Labels}. \\
         \setL{Vars} &= \text{Set of all variables.} \\
         \setL{Dest} &= \{(l, m)\ ||\ l \in \setL{Capt}, m \in \setL{Labels}\}. \\
         \setL{Clo} &= \top \cup \{(l, v_1, \dots, v_n)\ ||\ l \in \setL{Labels}, v_i \in \setL{Vars}\}. \\
@@ -350,24 +339,24 @@ collide, so in practice the map of bound variables only grows.
         \multicolumn{3}{c}{\textit{Meet}} \\
         
         l \lub m &= \begin{cases}
-          l & \text{when}\ l = m. \\
-          \top & \text{when}\ l \neq m.
+          l & \text{when}\ l = m \\
+          \top & \text{when}\ l \neq m,
         \end{cases} \labeleq{uncurry_df_lub} & \eqref{uncurry_df_lub} \\
         & \multicolumn{2}{l}{\phantom{=} \text{where\ } l, m \in \setL{Clo}.}\\\\
         
         F_1 \wedge F_2 &= \begin{array}{l}
           \{(v, p \lub l)\ ||\ (v, p) \in F_1, (v, l) \in F_2\}\ \cup \\
           \{(v, p)\ ||\ (v, p) \in F_1, v \not\in \mfun{dom}(F_2)\}\ \cup \\
-          \{(u, l)\ ||\ (u, l) \in F_2, u \not\in \mfun{dom}(F_1)\}.
+          \{(u, l)\ ||\ (u, l) \in F_2, u \not\in \mfun{dom}(F_1)\},
         \end{array} \labeleq{uncurry_df_meet} & \eqref{uncurry_df_meet} \\ 
         & \multicolumn{2}{l}{\phantom{=} \text{where\ } F_1, F_2 \in \setL{Fact}.}\\\\
 
         \multicolumn{3}{c}{\textit{Transfer Function}} \\
         \mathllap{t (F, !+v\ \text{!+<-+!}\ k\ b\ \{c_1, \dots, c_n\}+!)} &= 
-          \{!+(v, (b, c_1, \dots, c_n))+!\} \wedge F. 
+          \{!+(v, (b, c_1, \dots, c_n))+!\} \wedge F 
           \labeleq{uncurry_df_transfer_closure} & \eqref{uncurry_df_transfer_closure} \\
-        \mathllap{\the\rest} &= \{!+(v, \top)+!\} \wedge F. \labeleq{uncurry_df_transfer_other} & \eqref{uncurry_df_transfer_other} \\
-        t (F, !+\_+!) &= F. \labeleq{uncurry_df_transfer_rest} & \eqref{uncurry_df_transfer_rest} \\
+        \mathllap{\the\rest} &= \{!+(v, \top)+!\} \wedge F \labeleq{uncurry_df_transfer_other} & \eqref{uncurry_df_transfer_other} \\
+        t (F, !+\_+!) &= F, \labeleq{uncurry_df_transfer_rest} & \eqref{uncurry_df_transfer_rest} \\
         & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \subseteq \setL{Fact}.}
       \end{array}
     \end{math}
@@ -380,23 +369,23 @@ collide, so in practice the map of bound variables only grows.
 Figure~\ref{uncurry_fig_df} shows the dataflow equations used for our
 analysis. The sets \setL{Labels} and \setL{Vars} contain all labels
 and all variables in the program, respectively. \setL{Capt} represents
-the subset of labels that represent closure-capturing
+the subset of labels that represent closure--capturing
 blocks. \setL{Dest} associates each label in \setL{Capt} with the
 destination label of the closure returned by that particular
-closure-capturing block. 
+closure--capturing block. 
 
 \intent{Describe |Clo| set.}  The \setL{Clo} set associates some label
 with a list of variables; the list may be empty. We use \setL{Clo}
 values to represent the location a closure points to and the set of
-variables it captures. Our facts are pairs associating a bound
-variable with either a \setL{Clo} value or $\top$. That is, a bound
-variable refers to a known location and some set of captured variables
-or some other value that we do not care about.
+variables it captures. We add the $\top$ value to this set to represent
+values that are not closures. 
 
 \intent{Describe |Fact| set} We use the \setL{Var} and \setL{Clo} sets
 to describe \setL{Fact}, the set of facts that we will compute. Each
-\setL{Fact} value associates a variable with the \setL{Clo} value computed
-for that variable. 
+\setL{Fact} value is a pair associating a bound variable with a
+\setL{Clo} value. That is, a bound variable refers to a known location
+and some set of captured variables or some other value that we do not
+care about.
 
 \intent{Describe $\wedge$.}  We combine sets of \setL{Fact} values
 using our meet operator, $\wedge$, as defined in
@@ -437,10 +426,9 @@ new fact using $\wedge$.
 \intent{Explain how we rewrite |Enter| expressions.}  The facts
 gathered by $t$ allow us to replace |Enter| expressions with closure
 allocations if we know the closure that the expression results
-in. That is, we can rewrite tails like !+f @@ x+!  when $!+(f, p) \in
-\setL{Fact}+!$ and $!+p+! \neq \top$. Because $!+p+! \neq \top$, we
-know $!+p+! = (!+l, c_1, \dots, c_n+!)$; therefore we replace the
-!+@@+! expression with the closure !+f @@ x+!  would construct:
+in. That is, we can rewrite tails like !+f @@ x+! when $!+(f, p) \in
+\setL{Fact}+!$ and $!+p+! = (!+l, c_1, \dots, c_n+!)$ (i.e., $!+p+!
+\neq \top$). We replace !+f @@ x+! with the closure constructed:
 $!+k\ l\ \{c_1, \dots, c_n, x\}+!$. Notice we add the !+x+!  argument
 to the closure as well.
 
@@ -453,20 +441,21 @@ general, optimization that inlines simple blocks into their
 predecessor. We describe the optimization in detail in
 Chapter~\ref{ref_chapter_monadic}, but in short that optimization will
 inline calls to blocks such as !+compose+!, so a statement like !+v <-
-compose()+! becomes !+v <- k l \{\}+!, where !+l+!  refers to the
+compose()+! becomes !+v <- k absBodyL201 \{\}+!, where !+absBodyL201+! is the
 label in the closure returned by !+compose()+!.
 
 \section{Implementation}
 \label{uncurry_sec_impl}
 
 \intent{Provide a bridge to the four subsections below.}  Originally,
-we called this transformation ``closure-collapse,'' because it
+we called this transformation ``closure--collapse,'' because it
 ``collapsed'' the construction of multiple closures into the
 construction of a single closure. Later, we learned this optimization
 is known as ``uncurrying,'' but at the point the code had already been
 written. The ``collapse'' prefix in the code shown is merely an
 artifact of our previous name for the analysis.
 
+\intent{Explain why the code doesn't match the equations.}
 In our presentation of dataflow equations in
 Section~\ref{uncurry_sec_df}, we described this analysis by
 statements. However, our implementation works on blocks of MIL
@@ -474,12 +463,7 @@ code. Fortunately, the net result is the same due to Hoopl's
 interleaved analysis and rewriting. Our transfer and rewrite functions
 work in tandem to rewrite !+@@+! expressions within a block.
 
-We present our implementation in five sections, reflecting the
-structure of our dataflow equations above. We first give the types
-used, followed by the definition of our lattice, then our transfer
-function, then our rewriting function, and finally we show the driver
-that applies the optimization to a given program.
-
+\intent{Introduce example used throughout this section.}
 Figure~\ref{uncurry_fig_eg} gives an example program we will use
 throughout this section to illustrate our implementation. The program
 takes a string as input, converts it to an integer, doubles that
@@ -489,6 +473,13 @@ closure--capturing. Two others, !+add+! and !+toInt+!, are normal
 blocks whose implementation we ignore. The final block, !+main+!, is
 also a normal block but is intended to be treated as the entry point
 for the program.
+
+\intent{Signposts.}
+We present our implementation in five sections, reflecting the
+structure of our dataflow equations above. We first give the types
+used, followed by the definition of our lattice, then our transfer
+function, then our rewriting function, and finally we show the driver
+that applies the optimization to a given program.
 
 \begin{myfig}
   \begin{minipage}{\hsize}\singlespacing
@@ -534,17 +525,14 @@ represents \setL{Fact}.
 
 \intent{Explain different |DestOf| values.}
 |DestOf| actually carries more information than we specified for
-\setL{Dest}. Recall that closure-capturing blocks either return a
+\setL{Dest}. Recall that closure--capturing blocks either return a
 closure or jump directly to a block. The |Capture| constructor
 represents the first case and |Jump| the second. The |Dest| value in
 both is a destination: either the label stored in the closure
-returned, or the block that the closure jumps to immediately.  In any
-case, |Dest| is just an alias for a |(Name, Label)| tuple, where
-|Name| is a string and |Label| a Hoopl value, representing a block of
-MIL code.
+returned, or the block that the closure jumps to immediately.  
 
 \intent{Details on |Capture| value.}
-When a closure-capturing block returns a closure, it copies all
+When a closure--capturing block returns a closure, it copies all
 captured variables from the old closure to the new. The argument can
 be copied or ignored. The flag in the |Capture| constructor indicates
 if the argument is used. 
@@ -561,19 +549,15 @@ the block. For example, the block !+c+!  in the following:
     l(c, a, b): \dots
   \end{MILVerb}
 \end{singlespace}
-would be represented by the value |Jump l [2, 0, 1]|, because the
+would be represented by the value |Jump {-"!+l+!"-} [2, 0, 1]|, because the
 variables from the closure $!+\{a, b, c\}+!$ must be given to !+l+! in
 the order $!+(c, a, b)+!$.
 
-\intent{Details on |CloVal| values.}
-We use |CloDest| to represent \setL{Clo} values, except the $\top$
-value. Recall that \setL{Clo} represents a closure, holding a label
-and captured variables. |CloDest| stores a |Dest| value, representing
-the label the closure refers to, and a list of captured variables,
-|[Name]|. 
-
-\intent{Explain how we use |WithTop| to complete representation of
-  \setL{Clo}.}  Hoopl provides |WithTop|, a type that adds a $\top$
+\intent{Details on |CloVal| values.}  We use |CloDest| to represent
+all \setL{Clo} values except $\top$. Recall that \setL{Clo} represents
+a closure, holding a label and captured variables. |CloDest| stores a
+|Dest| value, representing the label the closure refers to, and a list
+of captured variables, |[Name]|. Hoopl provides |WithTop|, a type that adds a $\top$
 element to any other type. We use |WithTop CloDest| to define the
 alias |CloVal|, which completes our representation of \setL{Clo}.
 
@@ -660,7 +644,7 @@ fact into our |facts| finite map, using an appropriately transformed
 Figure~\ref{uncurry_fig_impl_transfer} shows the facts gathered for
 each variable in the !+main+! block of our sample program from
 Figure~\ref{uncurry_fig_eg}. The variables !+n+!, !+v1+!, and
-!+v2+! are assigned $\top$ becuase the right--hand side of the !+<-+!
+!+v2+! are assigned |Top| becuase the right--hand side of the !+<-+!
 statement for each does not directly create a closure. Only !+v0+!  is
 assigned a |CloDest| value because the right--hand side of its !+<-+!
 statement is in the right form. We will see in the next section how
@@ -712,19 +696,18 @@ program.}
 functions to our locally defined |rewriter| function, creating a
 |FwdRewrite| value. The |iterFwdRw| combinator applies our function to
 the program over and over, until |rewriter| stops changing the
-program. This ensures that all possible rewrites occur, such as
-``chains'' of closure allocations get collapsed into a single
-allocation, if possible.
+program. This ensures that a ``chain'' of closure allocations get
+collapsed into a single allocation, if possible.
 
 Figure~\ref{uncurry_fig_rewrite_iterations} shows how the !+main+!
 block in our example program changes as Hoopl iteratively applies
-|rewriter|. During the first iteration, |rewriter| transforms the bold
-line from !+v1 <- v0 @@ n+! to !+v1 <- k1 {n}+!  (because !+v0+! holds
-a closure to !+k0+!, and |blocks| tells us !+k0+! returns a closure
-pointing to !+k1+!). During the second iteration, |rewriter|
-transforms the next bold line, !+v2 <- v1 @@ n+!, to !+v2 <- add(n,
-n)+!. No more iterations occur after the second, as |rewriter| will
-not find any more !+<-+! that can be transformed.
+|rewriter|. During the first iteration, |rewriter| transforms the !+v1
+{}<- v0 @@ n+! to !+v1 <- k1 {n}+!  (because !+v0+! holds a closure to
+!+k0+!, and |blocks| tells us !+k0+! returns a closure pointing to
+!+k1+!). During the second iteration, |rewriter| transforms the line,
+!+v2 <- v1 @@ n+!, to !+v2 <- add(n, n)+!. No more iterations occur
+after the second, as |rewriter| will not find any more !+<-+! that can
+be transformed.
 
 \begin{myfig}
   \begin{tabular}{lcccc}
