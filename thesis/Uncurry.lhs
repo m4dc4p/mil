@@ -95,7 +95,6 @@ closure or jump to the block.
 >   where
 >     labels = entryLabels body
 >     initial = mapFromList (zip labels (repeat Map.empty))
->     -- debug = debugFwdJoins trace (const True)
 >     fwd = FwdPass { fp_lattice = collapseLattice
 >                   , fp_transfer = collapseTransfer 
 >                   , fp_rewrite = collapseRewrite (destinations labels) }
@@ -144,13 +143,14 @@ closure or jump to the block.
 >     collapse facts f x =       
 >       case Map.lookup f facts of
 >         Just (PElem (CloDest dest@(_, l) vs)) -> 
->           case l `Map.lookup` blocks of
->             Just (Jump dest uses) -> Just (Goto dest (fromUses uses (vs ++ [x])))
->             Just (Capture dest True) -> Just (Closure dest (vs ++ [x]))
->             Just (Capture dest _) -> Just (Closure dest vs)
+>           case Map.lookup l blocks of
+>             Just (Jump dest uses) -> 
+>               Just (Goto dest (fromUses uses (vs ++ [x])))
+>             Just (Capture dest usesArg) ->
+>               Just (Closure dest 
+>                     (if usesArg then vs ++[x] else vs))
 >             _ -> Nothing
 >         _ -> Nothing
->                             
 
 %endif
 %if False

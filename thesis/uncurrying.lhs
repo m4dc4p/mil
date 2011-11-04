@@ -480,6 +480,36 @@ used, followed by the definition of our lattice, then our transfer
 function, then our rewriting function, and finally we show the driver
 that applies the optimization to a given program.
 
+Figure~\ref{uncurry_fig_eg} gives an example program we will use
+throughout this section to illustrate our implementation. The program
+takes a string as input, converts it to an integer, doubles that
+value, and returns the result. The program consists of five
+blocks. Two of the blocks, !+k0+! and !+k1+!, are
+closure--capturing. Two others, !+add+! and !+toInt+!, are normal
+blocks whose implementation we ignore. The final block, !+main+!, is
+also a normal block but is intended to be treated as the entry point
+for the program.
+
+\begin{myfig}
+  \begin{minipage}{\hsize}\singlespacing
+    \begin{MILVerb}[gobble=6]
+      main(s):
+        n <- toInt(s)
+        v0 <- k0 {}
+        v1 <- v0 @@ n
+        v2 <- v1 @@ n
+        return v2
+
+      k0 {} a: k1 {a} 
+      k1 {a} b: add(a, b)
+      add(x, y): \ldots
+      toInt(s): \ldots
+    \end{MILVerb}
+  \end{minipage} \\
+  \caption{Example program.}
+  \label{uncurry_fig_eg}
+\end{myfig}
+
 \subsection{Types}
 \label{uncurry_impl_types}
 \intent{Describe types used; give details on managing names; point out
@@ -515,7 +545,7 @@ MIL code.
 
 \intent{Details on |Capture| value.}
 When a closure-capturing block returns a closure, it copies all
-caputred variables from the old closure to the new. The argument can
+captured variables from the old closure to the new. The argument can
 be copied or ignored. The flag in the |Capture| constructor indicates
 if the argument is used. 
 
@@ -556,7 +586,7 @@ to |CloVals|.
 Figure~\ref{uncurry_fig_lattice} shows the |DataflowLattice| structure
 defined for our analysis. We set |fact_bot| to an empty map, meaning
 we start without any information. We define |lub| over |CloVals|, just
-like \lub in Figure~\ref{uncurry_fig_df}). Hoopl requires that
+like \lub in Figure~\ref{uncurry_fig_df}. Hoopl requires that
 |fact_join| take particular arguments, so we use |toJoin| to transform
 |lub| into the right type of function. The Hoopl--provided function
 |joinMaps| transforms |toJoin lub| into a function that operates over
@@ -586,17 +616,6 @@ along.\footnote{Note these will always be empty maps, because our
 Hoopl--provided |mkFactBase| function to create a |FactBase| from 
 empty facts. 
 
-|Bind| statments are handled based on the right--hand side of the
-statement. If the statement does not directly create a closure, we
-create a fact associating the variable on the left--hand side of the
-bind with |Top|, just as in
-Equation~\eqref{uncurry_df_transfer_other}. If the expression creates
-a closure, we create a new fact using the closure's destination and
-captured variables, corresponding to
-Equation~\eqref{uncurrying_df_transfer_closure}. We insert the new
-fact into our |facts| finite map, using an appropriately transformed
-|lub| function to combine the new fact with any existing facts. 
-
 \begin{myfig}
   \begin{minipage}{\hsize}
 %let includeTransfer = True
@@ -608,35 +627,131 @@ fact into our |facts| finite map, using an appropriately transformed
   \label{uncurry_fig_transfer}
 \end{myfig}
 
+|Bind| statments are handled based on the right--hand side of the
+statement. If the statement does not directly create a closure, we
+create a fact associating the variable on the left--hand side of the
+bind with |Top|, just as in
+Equation~\eqref{uncurry_df_transfer_other}. If the expression creates
+a closure, we create a new fact using the closure's destination and
+captured variables, corresponding to
+Equation~\eqref{uncurry_df_transfer_closure}. We insert the new
+fact into our |facts| finite map, using an appropriately transformed
+|lub| function to combine the new fact with any existing facts. 
+
+\begin{myfig}
+  \begin{tabular}{lcccc}
+    & !+n+! & !+v0+! & !+v1+! & !+v2+! \\\cmidrule{2-5}
+    \begin{minipage}[c]{2in}\singlespacing
+      \begin{MILVerb}[gobble=8]
+        n <- toInt(s)
+        v0 <- k0 {}
+        v1 <- v0 @@ n
+        v2 <- v1 @@ n
+        return v2
+      \end{MILVerb}
+    \end{minipage}
+    & |Top| & |CloDest {-"!+k0\ +!"-} []| & |Top| & |Top| \\
+  \end{tabular}
+  \caption{How facts evolve for the !+main+! block as our example program
+    is iteratively rewritten.}
+  \label{uncurry_fig_impl_transfer}
+\end{myfig}
+
+Figure~\ref{uncurry_fig_impl_transfer} shows the facts gathered for
+each variable in the !+main+! block of our sample program from
+Figure~\ref{uncurry_fig_eg}. The variables !+n+!, !+v1+!, and
+!+v2+! are assigned $\top$ becuase the right--hand side of the !+<-+!
+statement for each does not directly create a closure. Only !+v0+!  is
+assigned a |CloDest| value because the right--hand side of its !+<-+!
+statement is in the right form. We will see in the next section how
+these facts evolve as the program is rewritten.
+
 \subsection{Rewrite}
 \intent{Describe how |collapse| looks up closure information for an
   |Enter| expression.}  Figure~\ref{uncurry_fig_rewrite} shows the
 implementation of our rewrite function for the uncurrying
-optimization. We will take the function apart in pieces.
+optimization. We will describe it in pieces.
 
 \begin{myfig}
   \begin{minipage}{\hsize}
 %let includeRewrite = True
 %include Uncurry.lhs
 %let includeRewrite = False
-  \end{minipage}
+  \end{minipage} \\
   \caption{Our rewrite function that replaces !+f @@ x+! expressions
-    with closure allocations.}
+    with closure allocations, if possible.}
   \label{uncurry_fig_rewrite}
 \end{myfig}
 
-The |collapse| function takes a set of facts and two names,
-representing the left and right--hand side of a !+@@+! expression,
-respectively. If !+f+! is associated with a |CloDest| value (as
-opposed to |Top|) in the |facts| map, then rewriting can possibly
-occur. The |blocks| argument associates each label in the program with
-one of three values: a closure value if the block immediately returns
-one, a destination block if the block immediately jumps to another
-block, or nothing if none of these cases hold. |collapse| uses
-|blocks| to find the result of the block referred to by the |CloDest|
-value associated with !+f+!. When the result is a closure or immediate
-jump, |collapse| returns a |Just| value indicating such. In all other
-cases, it returns |Nothing|, meaning no rewrite can occur.
+|collapseRewrite| takes one argument and creates a rewriter that can
+be applied to our MIL program. The |blocks| argument associates every
+block in our program with a |DestOf| value. |DestOf|, as explained in
+Section~\ref{uncurry_impl_types}, indicates if the block returns a
+closure or  jumps immediately to another block. 
+
+For example, Figure~\ref{fig_uncurry_destof} shows the |DestOf| values
+in |blocks| for each block in the example program from
+Figure~\ref{uncurry_fig_eg}. The $\bot$ value associated with blocks
+!+toInt+!, !+add+! and !+main+! means they do not appear in |blocks|.
+
+\begin{myfig}
+    \begin{tabular}{ll}
+      Block & |DestOf| \\\cmidrule{1-1} \cmidrule{2-2} 
+      !+main+! & $\bot$ \\
+      !+k0+! &  |Capture {-"!+k1+!"-} True| \\
+      !+k1+! &  |Jump {-"!+add+!"-} [0, 1]| \\
+      !+add+! & $\bot$ \\
+      !+toInt+! & $\bot$ \\
+    \end{tabular}
+  \caption{|DestOf| values associated with each block in our example
+program.}
+  \label{fig_uncurry_destof}
+\end{myfig}
+
+|collapseRewrite| applies Hoopl's |iterFwdRw| and |mkFRewrite|
+functions to our locally defined |rewriter| function, creating a
+|FwdRewrite| value. The |iterFwdRw| combinator applies our function to
+the program over and over, until |rewriter| stops changing the
+program. This ensures that all possible rewrites occur, such as
+``chains'' of closure allocations get collapsed into a single
+allocation, if possible.
+
+Figure~\ref{uncurry_fig_rewrite_iterations} shows how the !+main+!
+block in our example program changes as Hoopl iteratively applies
+|rewriter|. During the first iteration, |rewriter| transforms the bold
+line from !+v1 <- v0 @@ n+! to !+v1 <- k1 {n}+!  (because !+v0+! holds
+a closure to !+k0+!, and |blocks| tells us !+k0+! returns a closure
+pointing to !+k1+!). During the second iteration, |rewriter|
+transforms the next bold line, !+v2 <- v1 @@ n+!, to !+v2 <- add(n,
+n)+!. No more iterations occur after the second, as |rewriter| will
+not find any more !+<-+! that can be transformed.
+
+\begin{myfig}
+  \begin{tabular}{lcccc}
+    Post-Iteration & !+main+! \\\midrule
+    1 & \begin{minipage}[c]{2in}\singlespacing
+      \begin{MILVerb}[gobble=8]
+        n <- toInt(s)
+        v0 <- k0 {}
+        \textbf[v1 <- k1 {n}]
+        v2 <- v1 @@ n
+        return v2
+      \end{MILVerb}
+    \end{minipage}  \\
+    2 & \begin{minipage}[c]{2in}\singlespacing
+      \begin{MILVerb}[gobble=8]
+        n <- toInt(s)
+        v0 <- k0 {}
+        v1 <- k1 {n}
+        \textbf[v2 <- add(n, n)]
+        return v2
+      \end{MILVerb}
+    \end{minipage} 
+  \end{tabular}
+  \caption{How facts evolve for the !+main+! block as our example program
+    is iteratively rewritten.}
+  \label{uncurry_fig_rewrite_iterations}
+\end{myfig}
 
 The |rewriter| function checks if it can rewrite |Enter| expressions
 when they occur in a |Done| statement or on the right--hand side of a
@@ -646,13 +761,42 @@ a new |Done| statement with the |TailM| expression returned by
 does not rewrite. Therefore, |done| rewrites an |Enter| only when
 |collapse| indicates that rewriting can occur. In the second case,
 |bind| behaves similarly, only rewriting if |collapse| returns a
-|Just| value. In all cases, |rewriter| does no rewriting.
+|Just| value. In all other cases, |rewriter| does no rewriting.
 
-Finally, |collapseRewrite| defines its rewriting function so that all
-possible rewrites occur. Hoopl provides the combinator |iterFwdRw|,
-which applies iteratively applies the rewriter to the program until no
-more graph rewrites occur. This iteration ensures that ``chains'' of 
-closures get collapsed into a single allocation, if possible.
+The |collapse| function takes a set of facts and two names,
+representing the left and right--hand side of a !+@@+! expression,
+respectively. If !+f+! is associated with a |CloDest| value (as
+opposed to |Top|) in the |facts| map, then rewriting can possibly
+occur, but only if the block indicated in the |CloDest| value returns
+a closure or jumps immediately to another block. |collapse| uses the
+|blocks| argument to look up the behavior of the destination in the
+|CloDest| value.
+
+If the destination immediately jumps to another block (as indicated by
+a |Jump| value) then we will rewrite the !+f @@ x+! expression to call
+the block directly. The list of integers associated with |Jump|
+specifies the order in which arguments were taken from the closure and
+passed to the block. |collapse| uses the |fromUses| function to
+re-order arguments appropriately.
+
+In Figure~\ref{fig_uncurry_destof}, we showed that the |DestOf| value
+associated with !+k1+! is |Jump {-"!+add+!"-} [0, 1]|. The list |[0,
+  1]| indicates that !+add+! takes arguments in the same order as the
+appear in the closure. However, if !+add+! took arguments in
+opposite order, !+k1+! and !+add+! would look like:
+\begin{MILVerb}
+  k1 {a} b: add(b, a)
+  add(x, y): \ldots
+\end{MILVerb}
+And the |DestOf| value associated with !+k1+! would be |Jump
+{-"!+add\ +!"-} [1, 0]|.
+
+If the destination returns a closure, we will rewrite !+f @@ x+! to
+directly allocate the closure. The boolean argument to |Capture|
+indicates if the closure ignores the argument passed, which |collapse|
+uses to determine if it should place the !+x+! argument in the closure
+that is allocated or not.
+
 
 \subsection{Optimization Pass}
 
