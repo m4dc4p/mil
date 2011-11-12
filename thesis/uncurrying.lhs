@@ -326,38 +326,39 @@ collide, so in practice the map of bound variables only grows.
     \begin{math}
       %% Below used to measure & typeset the case where we don't
       %% see a binding.
-      \newtoks\rest \rest={t (F, !+v\ \texttt{<-}\ \ldots+!)} %%
+      \newtoks\widest \widest={t (F, !+v\ \texttt{<-}\ \ldots+!)} %%
       \begin{array}{rlr}
         \multicolumn{3}{c}{\textit{Facts}} \\
         \setL{Labels} &= \text{Set of all program labels.} \\
-        \setL{Capt} &= \text{Set of all labels of closure--capturing blocks}; \setL{Capt} \subseteq \setL{Labels}. \\
         \setL{Vars} &= \text{Set of all variables.} \\
-        \setL{Dest} &= \{(l, m)\ ||\ l \in \setL{Capt}, m \in \setL{Labels}\}. \\
-        \setL{Clo} &= \top \cup \{(l, v_1, \dots, v_n)\ ||\ l \in \setL{Labels}, v_i \in \setL{Vars}\}. \\
-        \setL{Fact} &= \{(v, p)\ ||\ v \in \setL{Vars}, p \in \setL{Clo}\}. \\\\
+        \setL{Clo} &= \{(l, v_1, \dots, v_n)\ ||\ l \in \setL{Labels}, v_i \in \setL{Var}, n \geq 0\}.\\
+        \setL{Fact} &= \setL{Vars} \times (\{\top\} \cup \setL{Clo}). \\\\
 
         \multicolumn{3}{c}{\textit{Meet}} \\
         
-        l \lub m &= \begin{cases}
-          l & \text{when}\ l = m \\
-          \top & \text{when}\ l \neq m,
+        p \lub q &= \begin{cases}
+          p & \text{when}\ p = q \\
+          \top & \text{when}\ p \neq q,
         \end{cases} \labeleq{uncurry_df_lub} & \eqref{uncurry_df_lub} \\
-        & \multicolumn{2}{l}{\phantom{=} \text{where\ } l, m \in \setL{Clo}.}\\\\
+        & \multicolumn{2}{l}{\phantom{=} \text{where\ } p, q \in \setL{Clo}.}\\\\
         
         F_1 \wedge F_2 &= \begin{array}{l}
-          \{(v, p \lub l)\ ||\ (v, p) \in F_1, (v, l) \in F_2\}\ \cup \\
-          \{(v, p)\ ||\ (v, p) \in F_1, v \not\in \mfun{dom}(F_2)\}\ \cup \\
-          \{(u, l)\ ||\ (u, l) \in F_2, u \not\in \mfun{dom}(F_1)\},
+          \{(v, p \lub q)\ ||\ (v, p) \in F_1, (v, q) \in F_2\}\ \cup \\
+          \{(v, \top)\ ||\ v \in \mfun{dom}(F_1), v \not\in \mfun{dom}(F_2)\ \text{or} \\
+          \phantom{\{(v, \top)\ ||\ } v \not\in \mfun{dom}(F_1), v \in \mfun{dom}(F_2)\},
         \end{array} \labeleq{uncurry_df_meet} & \eqref{uncurry_df_meet} \\ 
         & \multicolumn{2}{l}{\phantom{=} \text{where\ } F_1, F_2 \in \setL{Fact}.}\\\\
 
         \multicolumn{3}{c}{\textit{Transfer Function}} \\
-        \mathllap{t (F, !+v\ \text{!+<-+!}\ k\ b\ \{c_1, \dots, c_n\}+!)} &= 
-          \{!+(v, (b, c_1, \dots, c_n))+!\} \wedge F 
+        t (F, !+v\ \text{!+<-+!}\ l\ \{v_1, \dots, v_n\}+!) &= 
+          \{!+(v, (l, v_1, \dots, v_n))+!\} \cup (F\ \backslash\ \mfun{uses}(F, !+v+!)) 
           \labeleq{uncurry_df_transfer_closure} & \eqref{uncurry_df_transfer_closure} \\
-        \mathllap{\the\rest} &= \{!+(v, \top)+!\} \wedge F \labeleq{uncurry_df_transfer_other} & \eqref{uncurry_df_transfer_other} \\
+        \the\widest &= \{!+(v, \top)+!\} \cup (F\ \backslash\ \mfun{uses}(F, !+v+!)) \labeleq{uncurry_df_transfer_other} & \eqref{uncurry_df_transfer_other} \\
         t (F, !+\_+!) &= F, \labeleq{uncurry_df_transfer_rest} & \eqref{uncurry_df_transfer_rest} \\
-        & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \subseteq \setL{Fact}.}
+        & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \in \setL{Fact}.} \\\\
+
+        \mfun{uses}(F, v) &= \{(u, p)\ ||\ (u, p) \in F, p = (l, \dots v \dots) \},\\
+        & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \in \setL{Fact}, v \in \setL{Var}.}
       \end{array}
     \end{math}
   \end{minipage}
@@ -365,33 +366,26 @@ collide, so in practice the map of bound variables only grows.
   \label{uncurry_fig_df}
 \end{myfig}
 
-\intent{Describe fundamental sets used by our dataflow equations.}
-Figure~\ref{uncurry_fig_df} shows the dataflow equations used for our
-analysis. The sets \setL{Labels} and \setL{Vars} contain all labels
-and all variables in the program, respectively. \setL{Capt} represents
-the subset of labels that represent closure--capturing
-blocks. \setL{Dest} associates each label in \setL{Capt} with the
-destination label of the closure returned by that particular
-closure--capturing block. 
-
-\intent{Describe |Clo| set.}  The \setL{Clo} set associates some label
+\intent{Describe fundamental sets used by our dataflow equations:
+  |Labels|, |Vars|, |Clo| and |Facts|.}  Figure~\ref{uncurry_fig_df}
+shows the dataflow equations used for our analysis. The sets
+\setL{Labels} and \setL{Vars} contain all labels and all variables in
+the program, respectively.  The \setL{Clo} set associates some label
 with a list of variables; the list may be empty. We use \setL{Clo}
 values to represent the location a closure points to and the set of
-variables it captures. We add the $\top$ value to this set to represent
-values that are not closures. 
-
-\intent{Describe |Fact| set} We use the \setL{Var} and \setL{Clo} sets
-to describe \setL{Fact}, the set of facts that we will compute. Each
-\setL{Fact} value is a pair associating a bound variable with a
-\setL{Clo} value. That is, a bound variable refers to a known location
-and some set of captured variables or some other value that we do not
-care about.
+variables it captures. We use the \setL{Var} and \setL{Clo} sets to
+describe \setL{Fact}, the set of facts that we will compute. Each
+\setL{Fact} value is a pair, $(v, p)$, associating a bound variable
+$v$ with a value $p$. If $p \in \setL{Clo}$, $v$ refers to a known
+location and some set of of captured variables. Otherwise, when $p =
+\top$, $v$ refers to some other value that we do not care about.
 
 \intent{Describe $\wedge$.}  We combine sets of \setL{Fact} values
 using our meet operator, $\wedge$, as defined in
 Equation~\eqref{uncurry_df_meet}. We define $\wedge$ over two sets of
-facts, $F_1$ and $F_2$. When a given variable only appears in $F_1$ or
-$F_2$, we add the pair directly to the result set. When a variable
+facts, $F_1$ and $F_2$. When a variable $v$ only appears in $F_1$ or
+$F_2$, we assume we do not not know what value $v$ may represent, so
+we add $(v, \top)$ to the result. When a variable
 appears in both $F_1$ and $F_2$, we create a new pair where we combine
 the two associated \setL{Clo} values using the \lub operator defined
 in Equation~\eqref{uncurry_df_lub}. The resulting pair has the same
