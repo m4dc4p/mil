@@ -58,9 +58,8 @@
 \long\def\startTTB{\ifx\next+\expandafter\startTTC\expandafter\@gobble\else\mdbang\fi} %%
 %% Step 3 of startTT. Start a new group and set up
 %% tt conditional. 
-\def\startTTC{\begingroup\aftergroup\mdttfalse\doTT} %%
-%% Inside a group already, do work to shift into TT mode.
-\def\doTT{\mdtttrue\ifmmode %%
+\def\startTTC{\begingroup\aftergroup\mdttfalse\mdtttrue %%
+  \ifmmode %%
   \let \math@bgroup \relax %%
   \def \math@egroup {\let \math@bgroup \@@math@bgroup %%
     \let \math@egroup \@@math@egroup} %%
@@ -79,7 +78,7 @@
      \ifmdtt %% test for tt mode
       \let\next=\relax %% Already in tt mode, do nothing.
      \else %%
-     \startTTC %% enter tt mode
+      \startTTC %% enter tt mode
       \let\next=\ensurettC %%
      \fi %%
     \else\let\next=\relax %% not followed by a group, do nothing

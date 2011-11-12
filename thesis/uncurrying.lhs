@@ -3,14 +3,7 @@
 %include subst.fmt
 \input{preamble}
 \begin{document}
-\def\rhs{right--hand side\xspace}
-\def\lhs{left--hand side\xspace}
-\def\bind{\texttt{<-}\xspace}
-\def\var#1/{\texttt{#1}\xspace}
-\def\clo[#1:#2]{\ensuremath{\ensurett{(#1, #2)}}\xspace}
-\def\cc{closure--capturing\xspace}
 
-\def\binds#1<-#2/{\ensuremath{\ensurett{#1\ \text{<-}\ #2}}\xspace}
 \input{document.preamble}
 
 \chapter{Uncurrying}
@@ -414,21 +407,19 @@ takes a statement and a set of \setL{Fact} values, $F$, as arguments.
 It returns an updated \setL{Fact} set. We define $t$ by cases for each
 type of MIL statement.
 
-Equation~\eqref{uncurry_df_transfer_closure} applies when the
-\rhs of a \bind statement creates a closure, as in
-\binds v <- \clo[b: v_1, \dots, v_n]/. $t$ creates a \setL{Clo}
-value with !+b+! (the label pointed to by the closure) and $!+v_1,
-..., v_n+!$, the variables captured by the closure. A new fact
-associating \var v/, the variable on the \lhs of the \bind
-statement, is created. Because \var v/ has been redefined, any closure
-that captured \var v/ does not refer to the new value for \var v/. The
-\mfun{uses} function in Equation~\eqref{uncurry_df_uses} finds the
-facts in $F$ that represent a closure capturing the variable \var v/. We
-remove any facts in $F$ that refer to \var v/ by subtracting the results
-of \mfun{uses} function from $F$.  We add our new fact to this set and
-return. Our result set shows that \var v/ now refers to the closure
-\clo[l: v_1, \dots, v_n], and does not include any previous facts
-that referred to !+v+!.
+Equation~\eqref{uncurry_df_transfer_closure} applies when the \rhs of
+a \bind statement creates a closure, as in \binds v <- \mkclo[l: v_1,
+  \dots, v_n]/. Because \var v/ has been redefined, we must invalidate
+any facts that refer to \var v/, as they do not refer to the new value
+of \var v/. The \mfun{uses} function in
+Equation~\eqref{uncurry_df_uses} finds the facts in $F$ that represent
+a closure capturing the variable \var v/. We remove any facts in $F$
+that refer to \var v/ by subtracting the results of \mfun{uses}
+function from $F$.  We combine this set with a a new fact associating
+\var v/ with the \setL{Clo} value \clo[l: v_1, \dots, v_n]. Our result
+set shows that \var v/ now refers to the closure \clo[l: v_1, \dots,
+  v_n], and does not include any previous facts that referred to
+\var v/.
 
 Equation~\eqref{uncurry_df_transfer_other} applies when the \rhs of a
 \bind statement does not allocate a closure. We create a new fact
@@ -442,13 +433,17 @@ applies, and $t$ acts like identity --- $F$ is returned unchanged.
 \section{Rewriting}
 \label{uncurry_sec_rewriting}
 \intent{Explain how we rewrite |Enter| expressions.}  The facts
-gathered by $t$ allow us to replace |Enter| expressions with closure
-allocations if we know the closure that the expression results
-in. That is, we can rewrite tails like !+f @@ x+! when $!+(f, p) \in
-\setL{Fact}+!$ and $!+p+! = (!+l, c_1, \dots, c_n+!)$ (i.e., $!+p+!
-\neq \top$). We replace !+f @@ x+! with the closure constructed:
-$!+k\ l\ \{c_1, \dots, c_n, x\}+!$. Notice we add the !+x+!  argument
-to the closure as well.
+gathered by $t$ allow us to replace !+@@+! expressions with closure
+allocations if we know the value that the expression results in. For
+example, let $F$ be the facts computed so far and \app f * x/ the
+expression we may rewrite. If $(\var f/, p) \in F$ and $p = \clo[l:
+  v_1, \dots, v_n]$, then we know the closure that \var f/
+represents. We can rewrite \app f * x/ to \app \mkclo[l: v_1, \dots,
+    v_n] * x/. If !+l+! is also a closure-capturing block that returns
+\clo[m: c_1, \dots, c_m], we can then rewrite \app \mkclo[l: v_1,
+    \dots, v_n] * x/ to \mkclo[m: v_1, \dots, v_n, x].  Notice we
+needed to add the \var x/ argument to the resulting closure as the 
+block !+l+! would do the same if we had entered it.
 
 \intent{Point out we don't inline closures from |Goto| expressions.}
 The example we discussed in Section~\ref{uncurry_sec_mil} does not
@@ -458,8 +453,8 @@ their closure result. Our implementation relies on another, more
 general, optimization that inlines simple blocks into their
 predecessor. We describe the optimization in detail in
 Chapter~\ref{ref_chapter_monadic}, but in short that optimization will
-inline calls to blocks such as !+compose+!, so a statement like !+v <-
-compose()+! becomes !+v <- k absBodyL201 \{\}+!, where !+absBodyL201+! is the
+inline calls to blocks such as !+compose+!, so a statement like \binds v <-
+compose()/ becomes \binds v <- \mkclo[absBodyL201:]/, where !+absBodyL201+! is the
 label in the closure returned by !+compose()+!.
 
 \section{Implementation}

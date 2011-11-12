@@ -228,6 +228,23 @@
 \newcommand{\milCtx}[1]{\ensuremath{\llfloor}#1\ensuremath{\rrfloor}}
 %% End MIL chapter
 
+%% Uncurrrying Chapter 
+
+\def\rhs{right--hand side\xspace}
+\def\lhs{left--hand side\xspace}
+\def\bind{\texttt{<-}\xspace}
+\def\var#1/{\texttt{#1}\xspace}
+%% Constructs a closure: l { v1, ..., vN }
+\long\def\mkclo[#1:#2]{\ensuremath{\tracingmacros=2\tracingcommands=1\ensurett{#1\ \{#2\}}}\xspace}
+%% Tuple version of closurs: (l, v1, ..., vN).
+\long\def\clo[#1:#2]{\ensuremath{\ensurett{(#1, #2)}}\xspace}
+%% Binding statement: v <- {...}
+\long\def\binds#1<-#2/{\ensuremath{\ensurett{#1\ \texttt{<-}\ #2}}\xspace}
+\long\def\app#1*#2/{\texttt{#1@#2}}
+\def\cc{closure--capturing\xspace}
+
+%%
+
 \newenvironment{myfig}[1][tbh]{\begin{figure}[#1]%%
 \begin{singlespace}\centering%%
 \figbegin}{\figend\end{singlespace}%%
