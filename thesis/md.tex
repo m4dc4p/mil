@@ -1,6 +1,7 @@
 %% This stuff makes !+<text>+! write <text> in typewriter font.  
 
 \makeatletter
+\newif\ifmdtt %% markdown typewriter flag
 \let\mdplus=+\let\mdbang=!      %% Preserve meaning of + and ! so we can put them into document.
 %% Turn off mark down for everyone
 \outer\def\nomd{\catcode`!=12\catcode`+=12}
@@ -55,9 +56,11 @@
 %% output a ! (since that started our macro), the argument captured and stop
 %% processing.
 \long\def\startTTB{\ifx\next+\expandafter\startTTC\expandafter\@gobble\else\mdbang\fi} %%
-%% Step 3 of startTT. Shift into teletype mode and change definition of 
-%% + and ! so we can stop processing.
-\def\startTTC{\begingroup\ifmmode %%
+%% Step 3 of startTT. Start a new group and set up
+%% tt conditional. 
+\def\startTTC{\begingroup\aftergroup\mdttfalse\doTT} %%
+%% Inside a group already, do work to shift into TT mode.
+\def\doTT{\mdtttrue\ifmmode %%
   \let \math@bgroup \relax %%
   \def \math@egroup {\let \math@bgroup \@@math@bgroup %%
     \let \math@egroup \@@math@egroup} %%
@@ -65,8 +68,28 @@
   \else  %%
   \ttfamily\fi} %%
 %% Step 1, 2  and 3 of stopTT follow the same pattern as startTT.
+%% Step 1, 2  and 3 of stopTT follow the same pattern as startTT.
 \def\stopTTA{\futurelet\next\stopTTB} %%
 \long\def\stopTTB{\ifx\next!\expandafter\stopTTC\expandafter\@gobble\else\mdplus\fi} %%
 \def\stopTTC{\endgroup}%%
+%% Shift into typewriter mode if not already in it.
+%% Only applies when a group immediately follows \ensurett.
+\def\ensurett{%%
+  \def\ensurettB{\ifx\next\bgroup %% test for group
+     \ifmdtt %% test for tt mode
+      \let\next=\relax %% Already in tt mode, do nothing.
+     \else %%
+     \startTTC %% enter tt mode
+      \let\next=\ensurettC %%
+     \fi %%
+    \else\let\next=\relax %% not followed by a group, do nothing
+    \fi %%
+    \next} %%
+  \def\ensurettC{\afterassignment\ensurettD\let\next=} %% capture { character, run \ensurettD
+  \def\ensurettD{\next%% re-insert captured { character.
+    %% inside group now, now we can ensure \stopTTC runs 
+    %% when we leave it.
+    \aftergroup\stopTTC} %%
+  \futurelet\next\ensurettB} %%
 \catcode`!=12\catcode`+=12
 \makeatother

@@ -3,6 +3,14 @@
 %include subst.fmt
 \input{preamble}
 \begin{document}
+\def\rhs{right--hand side\xspace}
+\def\lhs{left--hand side\xspace}
+\def\bind{\texttt{<-}\xspace}
+\def\var#1/{\texttt{#1}\xspace}
+\def\clo[#1:#2]{\ensuremath{\ensurett{(#1, #2)}}\xspace}
+\def\cc{closure--capturing\xspace}
+
+\def\binds#1<-#2/{\ensuremath{\ensurett{#1\ \text{<-}\ #2}}\xspace}
 \input{document.preamble}
 
 \chapter{Uncurrying}
@@ -58,7 +66,7 @@ our experience in Section~\ref{uncurry_sec_refl}.
 
 \section{Partial Application}
 \label{uncurry_sec_papp}
-\intent{Motivate partial application -- what does it buy us?}  Partial
+\intent{Motivate partial application --- what does it buy us?}  Partial
 application in functional programming promotes re-usability and
 abstraction. It allows the programmer to define specialized functions
 by fixing some of the arguments to a general function.
@@ -172,17 +180,17 @@ fully-applied.
 
 \section{Partial Application in MIL}
 \label{uncurry_sec_examples}
-\intent{Remind reader how MIL closure--capturing blocks are written
+\intent{Remind reader how MIL \cc blocks are written
   and used.}  Recall that MIL defines two types of blocks:
-``closure--capturing'' and ``normal.'' Normal blocks act much like
+``\cc'' and ``normal.'' Normal blocks act much like
 labeled locations in a program and are written $!+b(v_1, \dots, v_n):
-\dots+!$.  A closure--capturing block is always executed as the result
+\dots+!$.  A \cc block is always executed as the result
 of an !+@@+!  expression. That is, in the expression !+f @@ x+!, !+f+!
 represents a closure that points to some block labeled !+k+!  and that
 captures variables $!+\{v_1, \dots, v_n\}+!$. The !+@@+!  expression
 causes the block !+k+! to be executed using the closure value
 represented by !+f+! and with the argument !+x+!. We write
-closure--capturing blocks as $!+k\ \{v_1, \dots, v_n\}\ x: \dots
+\cc blocks as $!+k\ \{v_1, \dots, v_n\}\ x: \dots
 +!$. !+k+! names the block, $!+\{v_1, \dots, v_n\}+!$ gives the
 variables expected in the closure, and !+x+! represents the argument
 passed.
@@ -250,7 +258,7 @@ evaluates the !+compose+! block, getting a closure that points to the
 top-level entry point for |compose|. !+absBlockL209+! applies that
 value to !+f+! and returns the result. The value returned by
 block~!+absBlockL209+! is a closure that points to !+absBodyL202+!,
-second in the chain of closure--capturing blocks that eventually result
+second in the chain of \cc blocks that eventually result
 in executing |compose| with all its arguments. In other words, the
 result of applying |compose1| is a function that will take two more
 arguments and then execute |compose| with them.
@@ -314,12 +322,11 @@ as currently implemented.
 \label{uncurry_sec_df}
 \intent{Define dataflow equations for our uncurrying optimization.}
 We implement uncurrying with a forwards dataflow analysis that
-attempts to determine if a given statement allocates a closure. The
-analysis maintains a map of bound variables to closures. If a variable
-is re-bound in the block, the analysis updates its map. Our analysis
-only operates over single blocks so in general the tracking is very
-straightforward. Our compiler will not generate new names that
-collide, so in practice the map of bound variables only grows.
+determines if a given statement allocates a closure. The
+analysis creates a map of bound variables to closures. If a variable
+is re--bound in the block, the analysis updates its map by removing any 
+facts that referred to that variable and adding a new fact associating the 
+variable with the new value. 
 
 \begin{myfig}
   \begin{minipage}{\hsize}
@@ -350,14 +357,15 @@ collide, so in practice the map of bound variables only grows.
         & \multicolumn{2}{l}{\phantom{=} \text{where\ } F_1, F_2 \in \setL{Fact}.}\\\\
 
         \multicolumn{3}{c}{\textit{Transfer Function}} \\
-        t (F, !+v\ \text{!+<-+!}\ l\ \{v_1, \dots, v_n\}+!) &= 
+        t (F, !+v\ \text{\bind}\ l\ \{v_1, \dots, v_n\}+!) &= 
           \{!+(v, (l, v_1, \dots, v_n))+!\} \cup (F\ \backslash\ \mfun{uses}(F, !+v+!)) 
           \labeleq{uncurry_df_transfer_closure} & \eqref{uncurry_df_transfer_closure} \\
         \the\widest &= \{!+(v, \top)+!\} \cup (F\ \backslash\ \mfun{uses}(F, !+v+!)) \labeleq{uncurry_df_transfer_other} & \eqref{uncurry_df_transfer_other} \\
         t (F, !+\_+!) &= F, \labeleq{uncurry_df_transfer_rest} & \eqref{uncurry_df_transfer_rest} \\
         & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \in \setL{Fact}.} \\\\
 
-        \mfun{uses}(F, v) &= \{(u, p)\ ||\ (u, p) \in F, p = (l, \dots v \dots) \},\\
+        \mfun{uses}(F, v) &= \{(u, p)\ ||\ (u, p) \in F, p = (l, \dots v \dots) \},
+        \labeleq{uncurry_df_uses} & \eqref{uncurry_df_uses} \\
         & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \in \setL{Fact}, v \in \setL{Var}.}
       \end{array}
     \end{math}
@@ -373,12 +381,12 @@ shows the dataflow equations used for our analysis. The sets
 the program, respectively.  The \setL{Clo} set associates some label
 with a list of variables; the list may be empty. We use \setL{Clo}
 values to represent the location a closure points to and the set of
-variables it captures. We use the \setL{Var} and \setL{Clo} sets to
-describe \setL{Fact}, the set of facts that we will compute. Each
-\setL{Fact} value is a pair, $(v, p)$, associating a bound variable
-$v$ with a value $p$. If $p \in \setL{Clo}$, $v$ refers to a known
-location and some set of of captured variables. Otherwise, when $p =
-\top$, $v$ refers to some other value that we do not care about.
+variables it captures. The \setL{Fact} set defines the facts we can
+compute. Each \setL{Fact} value is a pair, $(v, p)$, associating a
+bound variable $v$ with a value $p$. If $p \in \setL{Clo}$, $v$ refers
+to a known location and some set of of captured variables. Otherwise,
+when $p = \top$, $v$ refers to some other value that we do not care
+about.
 
 \intent{Describe $\wedge$.}  We combine sets of \setL{Fact} values
 using our meet operator, $\wedge$, as defined in
@@ -386,7 +394,7 @@ Equation~\eqref{uncurry_df_meet}. We define $\wedge$ over two sets of
 facts, $F_1$ and $F_2$. When a variable $v$ only appears in $F_1$ or
 $F_2$, we assume we do not not know what value $v$ may represent, so
 we add $(v, \top)$ to the result. When a variable
-appears in both $F_1$ and $F_2$, we create a new pair where we combine
+appears in both $F_1$ and $F_2$, we create a new pair by combining
 the two associated \setL{Clo} values using the \lub operator defined
 in Equation~\eqref{uncurry_df_lub}. The resulting pair has the same
 variable but a (possibly) new \setL{Clo} value. Together, \setL{Fact}
@@ -394,26 +402,42 @@ and $\wedge$ form a lattice as described in
 Chapter~\ref{ref_chapter_background}, Section~\ref{back_subsec_facts}.
 
 \intent{Illustrate $\wedge$ with an example.}  For example, if $F_1 =
-\{(v, \{l\})\}$ and $F_2 = \{(c, \{l\}), (v, \{m\})\}$ then $F_1
-\wedge F_2$ would be $\{(v, \top), (c, \{l\})\}$. Because $c$ only
-appears in one set, we add it directly to the result. But $v$ appears
-in both so we add $(v, \{m\} \lub \{l\})$, or $\{(v, \top)\}$, to the
-result set.
+\{(v, \{l\})\}$ and $F_2 = \{(u, \{l\}), (v, \{l\})\}$ then $F_1
+\wedge F_2$ would be $\{(v, \{l\}), (u, \top)\}$. Because $u$ only
+appears in one set, we cannot assume it will always refer to $\{l\}$,
+so we add the pair $(u, \top)$ to the result. But $v$ appears in both
+so we add $(v, \{l\} \lub \{l\})$, or $\{(v, \{l\})\}$, to the result
+set.
 
-\intent{Explain in detail how $t$ works.}  We define the transfer
-function, $t$, by cases for each MIL statement. $t$ takes a statement
-and $F$, a set of \setL{Fact} values. $t$ returns a \setL{Fact}
-set. For any statement besides !+<-+!, $t$ is the identity --- it just
-returns $F$.
+\intent{Explain in detail how $t$ works.}  Our transfer function, $t$,
+takes a statement and a set of \setL{Fact} values, $F$, as arguments.
+It returns an updated \setL{Fact} set. We define $t$ by cases for each
+type of MIL statement.
 
-Equation~\ref{uncurry_df_transfer_closure} applies when the
-right--hand side of a !+<-+! statement creates a closure, as in
-$!+v\ \text{<-}\ k\ b\ \{c_1, \dots, c_n\}+!$. $t$ creates a
-\setL{Clo} value with !+b+! (the label pointed to by the closure) and
-$!+c_1, ..., c_n+!$, the variables captured by the closure. A new fact
-associating !+v+!, the variable on the left--hand side of the !+<-+!
-statement, is created. $t$ returns the result of combining $F$ and the
-new fact using $\wedge$.
+Equation~\eqref{uncurry_df_transfer_closure} applies when the
+\rhs of a \bind statement creates a closure, as in
+\binds v <- \clo[b: v_1, \dots, v_n]/. $t$ creates a \setL{Clo}
+value with !+b+! (the label pointed to by the closure) and $!+v_1,
+..., v_n+!$, the variables captured by the closure. A new fact
+associating \var v/, the variable on the \lhs of the \bind
+statement, is created. Because \var v/ has been redefined, any closure
+that captured \var v/ does not refer to the new value for \var v/. The
+\mfun{uses} function in Equation~\eqref{uncurry_df_uses} finds the
+facts in $F$ that represent a closure capturing the variable \var v/. We
+remove any facts in $F$ that refer to \var v/ by subtracting the results
+of \mfun{uses} function from $F$.  We add our new fact to this set and
+return. Our result set shows that \var v/ now refers to the closure
+\clo[l: v_1, \dots, v_n], and does not include any previous facts
+that referred to !+v+!.
+
+Equation~\eqref{uncurry_df_transfer_other} applies when the \rhs of a
+\bind statement does not allocate a closure. We create a new fact
+associating \var v/ with $\top$, indicating we know \var v/ does not
+refer to a closure. We also remove any existing uses of \var v/ from
+$F$. Our new fact and new set are combined to form our result.
+
+In all other cases, Equation~\eqref{uncurry_df_transfer_rest}
+applies, and $t$ acts like identity --- $F$ is returned unchanged.
 
 \section{Rewriting}
 \label{uncurry_sec_rewriting}
@@ -429,7 +453,7 @@ to the closure as well.
 \intent{Point out we don't inline closures from |Goto| expressions.}
 The example we discussed in Section~\ref{uncurry_sec_mil} does not
 match with the optimization just discussed on one crucial point:
-replacing calls to normal blocks on the right--hand side of a !+<-+! with
+replacing calls to normal blocks on the \rhs of a \bind with
 their closure result. Our implementation relies on another, more
 general, optimization that inlines simple blocks into their
 predecessor. We describe the optimization in detail in
@@ -463,7 +487,7 @@ throughout this section to illustrate our implementation. The program
 takes a string as input, converts it to an integer, doubles that
 value, and returns the result. The program consists of five
 blocks. Two of the blocks, !+k0+! and !+k1+!, are
-closure--capturing. Two others, !+add+! and !+toInt+!, are normal
+\cc. Two others, !+add+! and !+toInt+!, are normal
 blocks whose implementation we ignore. The final block, !+main+!, is
 also a normal block but is intended to be treated as the entry point
 for the program.
@@ -519,14 +543,14 @@ represents \setL{Fact}.
 
 \intent{Explain different |DestOf| values.}
 |DestOf| actually carries more information than we specified for
-\setL{Dest}. Recall that closure--capturing blocks either return a
+\setL{Dest}. Recall that \cc blocks either return a
 closure or jump directly to a block. The |Capture| constructor
 represents the first case and |Jump| the second. The |Dest| value in
 both is a destination: either the label stored in the closure
 returned, or the block that the closure jumps to immediately.  
 
 \intent{Details on |Capture| value.}
-When a closure--capturing block returns a closure, it copies all
+When a \cc block returns a closure, it copies all
 captured variables from the old closure to the new. The argument can
 be copied or ignored. The flag in the |Capture| constructor indicates
 if the argument is used. 
@@ -605,9 +629,9 @@ empty facts.
   \label{uncurry_fig_transfer}
 \end{myfig}
 
-|Bind| statments are handled based on the right--hand side of the
+|Bind| statments are handled based on the \rhs of the
 statement. If the statement does not directly create a closure, we
-create a fact associating the variable on the left--hand side of the
+create a fact associating the variable on the \lhs of the
 bind with |Top|, just as in
 Equation~\eqref{uncurry_df_transfer_other}. If the expression creates
 a closure, we create a new fact using the closure's destination and
@@ -638,9 +662,9 @@ fact into our |facts| finite map, using an appropriately transformed
 Figure~\ref{uncurry_fig_impl_transfer} shows the facts gathered for
 each variable in the !+main+! block of our sample program from
 Figure~\ref{uncurry_fig_eg}. The variables !+n+!, !+v1+!, and
-!+v2+! are assigned |Top| becuase the right--hand side of the !+<-+!
+!+v2+! are assigned |Top| becuase the \rhs of the \bind
 statement for each does not directly create a closure. Only !+v0+!  is
-assigned a |CloDest| value because the right--hand side of its !+<-+!
+assigned a |CloDest| value because the \rhs of its \bind
 statement is in the right form. We will see in the next section how
 these facts evolve as the program is rewritten.
 
@@ -700,7 +724,7 @@ block in our example program changes as Hoopl iteratively applies
 !+k0+!, and |blocks| tells us !+k0+! returns a closure pointing to
 !+k1+!). During the second iteration, |rewriter| transforms the line,
 !+v2 <- v1 @@ n+!, to !+v2 <- add(n, n)+!. No more iterations occur
-after the second, as |rewriter| will not find any more !+<-+! that can
+after the second, as |rewriter| will not find any more \bind that can
 be transformed.
 
 \begin{myfig}
@@ -731,7 +755,7 @@ be transformed.
 \end{myfig}
 
 The |rewriter| function checks if it can rewrite |Enter| expressions
-when they occur in a |Done| statement or on the right--hand side of a
+when they occur in a |Done| statement or on the \rhs of a
 |Bind|. In the first case, |done n l (collapse col f x)| will produce
 a new |Done| statement with the |TailM| expression returned by
 |collapse|, if |collapse| returns a |Just| value. Otherwise, |done|
@@ -741,7 +765,7 @@ does not rewrite. Therefore, |done| rewrites an |Enter| only when
 |Just| value. In all other cases, |rewriter| does no rewriting.
 
 The |collapse| function takes a set of facts and two names,
-representing the left and right--hand side of a !+@@+! expression,
+representing the left and \rhs of a !+@@+! expression,
 respectively. If !+f+! is associated with a |CloDest| value (as
 opposed to |Top|) in the |facts| map, then rewriting can possibly
 occur, but only if the block indicated in the |CloDest| value returns
