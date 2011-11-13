@@ -202,7 +202,7 @@ statement. The cases for EApp and EBind handle EPrim through the
 compResultVar function. Therefore, we should not see an EPrim by itself, so
 I report an error if the situation occurs.
 
-> compileStmt (EPrim (Ident p _) _ _) ctx = do
+> compileStmt (EPrim p _ _) ctx = do
 >   dest <- getDestOfName p
 >   when (isNothing dest) (error $ "primitive " ++ p ++ " not defined.")
 >   ctx (Goto (fromJust dest) [])
@@ -388,7 +388,7 @@ I report an error if the situation occurs.
 > free = nub . free'
 >   where
 >     free' (EVar (Ident v _) _) = [v]
->     free' (EPrim (Ident v _) _ _) = [v]
+>     free' (EPrim v _ _) = [v]
 >     free' (ENat _) = []
 >     free' (EBits _ _) = []
 >     free' (ECon _ _) = []

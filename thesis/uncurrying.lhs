@@ -433,17 +433,17 @@ applies, and $t$ acts like identity --- $F$ is returned unchanged.
 \section{Rewriting}
 \label{uncurry_sec_rewriting}
 \intent{Explain how we rewrite |Enter| expressions.}  The facts
-gathered by $t$ allow us to replace !+@@+! expressions with closure
+gathered by $t$ allow us to replace \enter expressions with closure
 allocations if we know the value that the expression results in. For
-example, let $F$ be the facts computed so far and \app f * x/ the
+example, let $F$ be the facts computed so far and \app f * x/ an
 expression we may rewrite. If $(\var f/, p) \in F$ and $p = \clo[l:
-  v_1, \dots, v_n]$, then we know the closure that \var f/
-represents. We can rewrite \app f * x/ to \app \mkclo[l: v_1, \dots,
-    v_n] * x/. If !+l+! is also a closure-capturing block that returns
-\clo[m: c_1, \dots, c_m], we can then rewrite \app \mkclo[l: v_1,
-    \dots, v_n] * x/ to \mkclo[m: v_1, \dots, v_n, x].  Notice we
-needed to add the \var x/ argument to the resulting closure as the 
-block !+l+! would do the same if we had entered it.
+  v_1, \dots, v_n]$, then we know \var f/ represents the closure
+\clo[l: v_1, \dots, v_n]. We can rewrite \app f * x/ to \app \mkclo[l:
+  v_1, \dots, v_n] * x/. If !+l+! is also a closure-capturing block
+that returns \clo[m: c_1, \dots, c_m], we can then rewrite \app
+\mkclo[l: v_1, \dots, v_n] * x/ to \mkclo[m: v_1, \dots, v_n, x].
+Notice we needed to add the \var x/ argument to the resulting closure
+as the block !+l+! would do the same if we had entered it.
 
 \intent{Point out we don't inline closures from |Goto| expressions.}
 The example we discussed in Section~\ref{uncurry_sec_mil} does not
@@ -474,18 +474,17 @@ Section~\ref{uncurry_sec_df}, we described this analysis by
 statements. However, our implementation works on blocks of MIL
 code. Fortunately, the net result is the same due to Hoopl's
 interleaved analysis and rewriting. Our transfer and rewrite functions
-work in tandem to rewrite !+@@+! expressions within a block.
+work in tandem to rewrite \enter expressions within a block.
 
 \intent{Introduce example used throughout this section.}
 Figure~\ref{uncurry_fig_eg} gives an example program we will use
 throughout this section to illustrate our implementation. The program
 takes a string as input, converts it to an integer, doubles that
 value, and returns the result. The program consists of five
-blocks. Two of the blocks, !+k0+! and !+k1+!, are
-\cc. Two others, !+add+! and !+toInt+!, are normal
-blocks whose implementation we ignore. The final block, !+main+!, is
-also a normal block but is intended to be treated as the entry point
-for the program.
+blocks. Two of the blocks, !+k0+! and !+k1+!, are \cc. Two others,
+!+add+! and !+toInt+!, are normal blocks whose implementation we
+ignore. The final block, !+main+!, is also a normal block but is
+intended to be treated as the entry point for the program.
 
 \intent{Signposts.}
 We present our implementation in five sections, reflecting the
@@ -519,9 +518,9 @@ that applies the optimization to a given program.
 \intent{Describe types used; give details on managing names; point out
   it other differences.}  Figure~\ref{uncurry_fig_types} shows the
 types used by our implementation to represent the sets given in
-Figure~\ref{uncurry_fig_df}. The |DestOf| type represents the
-\setL{Dest} set, |CloVal| represents \setL{Clo}, and |CollapseFact|
-represents \setL{Fact}. 
+Figure~\ref{uncurry_fig_df}. |CloVal| represents \setL{Clo},
+|CollapseFact| represents \setL{Fact}, |Dest| corresponds to
+\setL{Label} and |Name| to \setL{Var}.
 
 \begin{myfig}
   \begin{minipage}{\hsize}
@@ -529,20 +528,22 @@ represents \setL{Fact}.
 %include Uncurry.lhs
 %let includeTypes = False
   \end{minipage}
-  \caption{The types for our analysis. Referring to the sets
-    defined in Figure~\ref{uncurry_fig_df}, we use |DestOf| for the
-    \setL{Dest} set, |CloVal| for \setL{Clo} and |CollapseFact| for
-    \setL{Fact}.}
+  \caption{The types for our analysis. Referring to the sets defined
+    in Figure~\ref{uncurry_fig_df}, |CloVal| for \setL{Clo} and
+    |CollapseFact| for \setL{Fact}. Our |Dest| type corresponds to
+  \setL{Label}, and we use |Name| to represent \setL{Var}.}
   \label{uncurry_fig_types}
 \end{myfig}
 
-\intent{Explain different |DestOf| values.}
-|DestOf| actually carries more information than we specified for
-\setL{Dest}. Recall that \cc blocks either return a
-closure or jump directly to a block. The |Capture| constructor
-represents the first case and |Jump| the second. The |Dest| value in
-both is a destination: either the label stored in the closure
-returned, or the block that the closure jumps to immediately.  
+\intent{Explain |DestOf| values.}  Our |DestOf| type does not appear
+in Figure~\ref{uncurry_fig_df}. When rewriting, we need to know the
+result of every block in the program. Specifically, we need to know if
+a given block is \cc, if it jumps directly to another block, or if it
+does something else. The |Capture| constructor represents the first
+case and |Jump| the second. The |Dest| value in both cases is a
+destination: either the label stored in the closure returned, or the
+block that the closure jumps to immediately.The third case is not
+represented directly --- we just omit those blocks.
 
 \intent{Details on |Capture| value.}
 When a \cc block returns a closure, it copies all
@@ -556,28 +557,29 @@ variable from the closure received. The arguments to the block are
 built by traversing the list from beginning to end, putting the
 variable indicated by the index into the corresponding argument for
 the block. For example, the block !+c+!  in the following:
-\begin{singlespace}
+\begin{singlespace}\vskip-\baselineskip
   \begin{MILVerb}[gobble=4]
     c {a, b, c}: l(c, a, b)
     l(c, a, b): \dots
   \end{MILVerb}
 \end{singlespace}
-would be represented by the value |Jump {-"!+l+!"-} [2, 0, 1]|, because the
-variables from the closure $!+\{a, b, c\}+!$ must be given to !+l+! in
-the order $!+(c, a, b)+!$.
+would be represented by the value |Jump {-"!+l+!\ "-} [2, 0, 1]|,
+because the variables from the closure $!+\{a, b, c\}+!$ must be given
+to !+l+! in the order $!+(c, a, b)+!$.
 
-\intent{Details on |CloVal| values.}  We use |CloDest| to represent
+\intent{Details on |CloDest| values.}  We use |CloDest| to represent
 all \setL{Clo} values except $\top$. Recall that \setL{Clo} represents
 a closure, holding a label and captured variables. |CloDest| stores a
 |Dest| value, representing the label the closure refers to, and a list
-of captured variables, |[Name]|. Hoopl provides |WithTop|, a type that adds a $\top$
-element to any other type. We use |WithTop CloDest| to define the
-alias |CloVal|, which completes our representation of \setL{Clo}.
+of captured variables, |[Name]|. 
 
-\intent{Explain how |CollapseFact| represents \setL{Fact}.}  We use
-the |CollapseFact| alias to represent our \setL{Fact}
-set. |CollapseFact| aliases a finite map from variables (i.e., |Names|)
-to |CloVals|.
+\intent{Explain how |WithTop CloDest| and |CollapseFact| represent
+  \setL{Fact}.}  We use a finite map, aliased as |CollapseFact|, to
+represent our \setL{Fact} set. Hoopl provides |WithTop|, a type that
+adds a $\top$ value to any other type. We use |WithTop CloDest| to
+represent the set $\{\top \times \setL{Clo}\}$. |CollapseFact| then
+represents a finite map from variables to $\{\top
+\times \setL{Clo}\}$.
 
 \subsection{Lattice \& Meet}
 Figure~\ref{uncurry_fig_lattice} shows the |DataflowLattice| structure
@@ -585,9 +587,9 @@ defined for our analysis. We set |fact_bot| to an empty map, meaning
 we start without any information. We define |lub| over |CloVals|, just
 like \lub in Figure~\ref{uncurry_fig_df}. Hoopl requires that
 |fact_join| take particular arguments, so we use |toJoin| to transform
-|lub| into the right type of function. The Hoopl--provided function
-|joinMaps| transforms |toJoin lub| into a function that operates over
-finite maps, giving |fact_join| the right signature.
+|lub| into a function with the required type. The Hoopl--provided
+function |joinMaps| transforms |toJoin lub| into a function that
+operates over finite maps, giving |fact_join| the right signature.
 
 \begin{myfig}
   \begin{minipage}{\hsize}

@@ -71,8 +71,7 @@ closure or an unknown value.
 %endif
 %if includeAll || includeTypes
 
-> type CloVal = WithTop CloDest
-> type CollapseFact = Map Name CloVal
+> type CollapseFact = Map Name (WithTop CloDest)
 
 %endif
 %if False
@@ -118,13 +117,18 @@ closure or jump to the block.
 >   where
 >     t :: StmtM e x -> CollapseFact -> Fact x CollapseFact
 >     t (Bind v (Closure dest args)) facts = 
->       let lubInsert o n = snd (lub o n)
->       in Map.insertWith lubInsert v (PElem (CloDest dest args)) facts
+>       Map.insert v (PElem (CloDest dest args)) 
+>                    (Map.filter (not . using v) facts)
 >     t (Bind v _) facts = Map.insert v Top facts
 >     t (CaseM _ _) facts = mkFactBase collapseLattice []
 >     t (Done _ _ _) facts = mkFactBase collapseLattice []
 >     t (BlockEntry _ _ _) facts = facts
 >     t (CloEntry _ _ _ _) facts = facts
+>   
+>     using :: Name -> WithTop CloDest -> Bool
+>     using _ Top = False
+>     using var (PElem (CloDest _ vars)) = var `elem` vars
+>   
 
 %endif
 %if includeRewrite || includeAll 
@@ -180,7 +184,7 @@ the positions given.
 >   let f' _ (OldFact o) (NewFact n) = f o n
 >   in f' 
 
-> lub :: CloVal -> CloVal -> (ChangeFlag, CloVal)
+> lub :: WithTop CloDest -> WithTop CloDest -> (ChangeFlag, WithTop CloDest)
 > lub old new = 
 >   if old == new 
 >    then (NoChange, new)
