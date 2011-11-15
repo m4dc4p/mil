@@ -1027,6 +1027,29 @@ uncurry_fig_compose_a = [("compose1",
                         , head compose]
 
 
+uncurry_fig_eg :: UniqueMonad m => m (ProgM C C)
+uncurry_fig_eg = do
+  main <- freshLabel
+  k0 <- freshLabel
+  k1 <- freshLabel
+  add <- freshLabel
+  toInt <- freshLabel
+  let mainP = mkFirst (BlockEntry "main" main ["s"]) <*>
+              mkMiddle (Bind "n" (Goto ("toInt", toInt) ["s"])) <*>
+              mkMiddle (Bind "v0" (Closure ("k0",k0) [])) <*>
+              mkMiddle (Bind "v1" (Enter "v0" "n")) <*>
+              mkMiddle (Bind "v2" (Enter "v1" "n")) <*>
+              mkLast (Done "main" main (Return "v2"))
+      k0P = mkFirst (CloEntry "k0" k0 [] "a") <*> 
+            mkLast (Done "k0" k0 (Closure ("k1", k1) ["a"]))
+      k1P = mkFirst (CloEntry "k1" k1 ["a"] "b") <*>
+            mkLast (Done "k1" k1 (Goto ("add", add) ["a", "b"]))
+      addP = mkFirst (BlockEntry "add" add ["a", "b"]) <*>
+             mkLast (Done "add" add (Prim "plus" ["a", "b"]))
+      toIntP = mkFirst (BlockEntry "toInt" toInt ["s"]) <*>
+               mkLast (Done "toInt" toInt (Prim "toInt" ["s"]))
+  return $ mainP |*><*| k0P |*><*| k1P |*><*| addP |*><*| toIntP
+    
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
 

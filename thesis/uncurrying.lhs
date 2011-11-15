@@ -84,20 +84,24 @@ applying |map1| to a single argument. For example, we can create a
 function to convert all its arguments to uppercase or one that squares
 all integers in a list:
 
+\begin{singlespace}\correctspaceskip
 > upCase1 :: [Char] -> [Char]
 > upCase1 = map1 toUpper
 >
 > square1 :: [Int] -> [Int]
 > square1 = map2 (^ 2)
+\end{singlespace}
 
-We cannot do the same as easily with |map2|. At best we can define
+\noindent We cannot do the same as easily with |map2|. At best we can define
 a function that ignores one of its arguments:
 
+\begin{singlespace}\correctspaceskip
 > upCase2 :: ((a -> b), [Char]) -> [Char]
 > upCase2 (_, xs) = map2 (toUpper, xs)
 >
 > square2 :: ((a -> b), [Int]) -> [Int]
 > square2 (_, xs) = map2 ((^ 2), xs)
+\end{singlespace}
 
 \intent{Demonstrate that partial-application needs to be considered
   even when the language does not directly support it.}  Even if our
@@ -107,21 +111,19 @@ support partial application. Given the following definition of |map|,
 we cannot define |upCase1| very easily:\footnote{Again, the
   implementation of map is not relevant here, so we elide it.}
 
-\singlespacing
-\begin{minipage}{\hsize}
+\begin{singlespace}\correctspaceskip
   \begin{MILVerb}[gobble=4]
     function map (f, xs) { 
       \ldots
     };
   \end{MILVerb}
-\end{minipage}
-\doublespacing
+\end{singlespace}
 
 \noindent
 However, the following definition of |curry| converts a
 two-argument function to one that can be partially applied:
 
-\begin{singlespace}
+\begin{singlespace}\correctspaceskip
   \begin{MILVerb}[gobble=4]
     function curry(f) {
       return function (a) {
@@ -136,7 +138,7 @@ two-argument function to one that can be partially applied:
 \noindent
 And now we can define |upCase1|:
 
-\begin{singlespace}
+\begin{singlespace}\correctspaceskip
   \begin{MILVerb}[gobble=4]
     var upCase1 = curry(map)(function(c) { 
       return c.toUpper(); 
@@ -150,55 +152,56 @@ And now we can define |upCase1|:
 Function application, regardless of whether partial application is
 supported or not, almost always generates code that jumps from one
 section of the program to another.\footnote{Inlining can remove the
-  need for jumps, but of course increases code size. There is no
-  perfect optimization --- only good enough.} At the assembly language
-level, function application is expensive because multiple operations
-must take place to implement it: saving registers, loading addresses,
-and finally jumping to the target location. Partial application
-exagerates all these costs.
+  need for jumps, but of course increases code size.} At the assembly
+language level, function application is expensive because multiple
+operations must take place to implement it: saving registers, loading
+addresses, and finally jumping to the target location. 
 
-Partial application essentially creates a \emph{series} of functions,
-each of which gathers arguments and returns a closure pointing to the
-next function in the chain. Only when all the arguments are gathered
-does the function do ``real work'' --- that is, something besides
-gathering up arguments and creating a closure. Each partial
-application causes an allocation by creating and returning a
-closure. Partial application also influences the code generated to
-implement function application. Rather than generate specialized code
-for partially versus fully-applied functions, it is simplest to
-generate the same code for all applications, partial or
+Partial application exagerates all these costs by essentially creating
+a \emph{series} of functions, each of which gathers arguments and
+returns a closure pointing to the next function in the chain. Only
+when all the arguments are gathered does the function do ``real work''
+--- that is, something besides allocating closures and gathering up
+arguments.
+
+Partial application also influences the code
+generated to implement function application. Rather than generate
+specialized code for partially versus fully-applied functions, it is
+simplest to generate the same code for all applications, partial or
 otherwise. That means every function application pays the price of
 partial application, even if the function is ``obviously''
 fully-applied.
 
 \section{Partial Application in MIL}
 \label{uncurry_sec_examples}
-\intent{Remind reader how MIL \cc blocks are written
-  and used.}  Recall that MIL defines two types of blocks:
-``\cc'' and ``normal.'' Normal blocks act much like
-labeled locations in a program and are written $!+b(v_1, \dots, v_n):
-\dots+!$.  A \cc block is always executed as the result
-of an !+@@+!  expression. That is, in the expression !+f @@ x+!, !+f+!
-represents a closure that points to some block labeled !+k+!  and that
-captures variables $!+\{v_1, \dots, v_n\}+!$. The !+@@+!  expression
-causes the block !+k+! to be executed using the closure value
-represented by !+f+! and with the argument !+x+!. We write
-\cc blocks as $!+k\ \{v_1, \dots, v_n\}\ x: \dots
-+!$. !+k+! names the block, $!+\{v_1, \dots, v_n\}+!$ gives the
-variables expected in the closure, and !+x+! represents the argument
-passed.
+\intent{Remind reader how MIL \cc blocks are written and used.}
+Recall that MIL defines two types of blocks: ``\cc'' and ``normal.''
+Normal blocks act much like labeled locations in a program and are
+written \block b(v_1, \dots, v_n): \dots/end.  A normal block is
+called using MIL's !+goto+! expression, and receives any arguments
+given. 
+
+\Cc blocks are written \ccblock k(v_1, \dots, v_n) x: \dots/end. A \cc
+block is always executed as the result of an \enter expression, and it
+expects to receive a closure containing captured variables $!+\{v1_,
+\dots, v_n\}+!$ as well as the argument \var x/.  That is, in the
+expression \app f * x/, \var f/ represents a closure that points to
+some \cc block \lab k/ which expects a set of captured variables and
+an argument. The \enter expression causes the block \lab k/ to be
+executed using the captured variables in the closure represented by
+\var f/ and with the argument \var x/.
 
 These two definitions allow MIL to represent function application
-uniformly. For a function with $n$ arguments, $n - 1$ !+k+! blocks
-will be generated. At least one !+b+! block will also be generated,
-representing the body of the function. Each $!+k_i+!$ block, except
-the $!+k_{n-1}+!$, returns a new closure pointing to the next
-$!+k_{i+1}+!$ block. The closure created by block $!+k_i+!$ contains
+uniformly. For a function with $n$ arguments, $n - 1$ \cc blocks will
+be generated. At least one normal block, \lab b/, will also be generated,
+representing the body of the function. Each \lab k_i/ \cc block,
+except the last, returns a new closure pointing to the next \lab
+k_{i+1}/ \cc block. The closure created by block \lab b_i/ contains
 all values found in the closure it was given, plus the argument
-passed. The last block, $!+k_{n-1}+!$, does not return a new closure
-immediately. Instead, it calls block !+b+!, unpacking all necessary
-arguments. The value returned from block !+b+! is then returned by
-block $!+k_{n-1}+!$.
+passed. The last block, \lab k_{n-1}/, does not return a new closure
+immediately. Instead, it calls block \lab b/, unpacking all necessary
+arguments. The value returned from block \lab b/ is then returned by
+block \lab k_{n-1}/.
 
 \intent{Show how partial application is
   implemented.}  For example, Figure~\ref{uncurry_fig_compose_a} shows
@@ -223,15 +226,15 @@ the captured argument.
     \hss\scap{uncurry_fig_compose_a}\hss \\
     \begin{minipage}{\hsize}
       \begin{MILVerb}
-compose1 (): closure absBodyL208 {}
+compose1 (): absBodyL208 {}
 absBodyL208 {} f: absBlockL209(f)
 absBlockL209 (f):
   v210 <- compose()
   v210 @@ f
 
-compose (): closure absBodyL201 {} 
-absBodyL201 {} f: closure absBodyL202 {f}
-absBodyL202 {f} g: closure absBodyL203 {f, g}
+compose (): absBodyL201 {} 
+absBodyL201 {} f: absBodyL202 {f}
+absBodyL202 {f} g: absBodyL203 {f, g}
 absBodyL203 {f, g} x: absBlockL204(f, g, x)
 absBlockL204 (f, g, x):
   v205 <- g @@ x
@@ -264,7 +267,7 @@ Figure~\ref{uncurry_fig_compose_b} reveals one opportunity for
 optimization: the call to !+compose()+! results in a closure that is
 entered on the next line with argument !+f+!. We could rewrite the
 program to use the closure directly:
-\begin{singlespace}
+\begin{singlespace}\correctspaceskip
   \begin{MILVerb}[gobble=4]
     absBlockL209 (f):
       v210 <- closure absBodyL201 {} 
@@ -276,7 +279,7 @@ program to use the closure directly:
 returns a closure, this time capturing its argument and pointing to 
 block~!+absBodyL202+!. We can rewrite our program again to use
 the value returned by !+absBodyL201+! directly:
-\begin{singlespace}
+\begin{singlespace}\correctspaceskip
   \begin{MILVerb}[gobble=4]
     absBlockL209 (f):
       v210 <- closure absBodyL201 {} 
@@ -286,7 +289,7 @@ the value returned by !+absBodyL201+! directly:
 \noindent The first value, !+v210+!, becomes irrelevant after our
 second rewrite, allowing us to rewrite !+absBlockL209+! one more time,
 producing:
-\begin{singlespace}
+\begin{singlespace}\correctspaceskip
   \begin{MILVerb}[gobble=4]
     absBlockL209 (f): closure absBodyL202 {f}
   \end{MILVerb}
@@ -408,18 +411,18 @@ It returns an updated \setL{Fact} set. We define $t$ by cases for each
 type of MIL statement.
 
 Equation~\eqref{uncurry_df_transfer_closure} applies when the \rhs of
-a \bind statement creates a closure, as in \binds v <- \mkclo[l: v_1,
-  \dots, v_n]/. Because \var v/ has been redefined, we must invalidate
-any facts that refer to \var v/, as they do not refer to the new value
-of \var v/. The \mfun{uses} function in
+a \bind statement creates a closure, as in \binds v <- \mkclo[l: v_1, \dots,
+  v_n];. Because \var v/ has been redefined, we
+must invalidate any facts that refer to \var v/, as they do not refer
+to the new value of \var v/. The \mfun{uses} function in
 Equation~\eqref{uncurry_df_uses} finds the facts in $F$ that represent
 a closure capturing the variable \var v/. We remove any facts in $F$
 that refer to \var v/ by subtracting the results of \mfun{uses}
 function from $F$.  We combine this set with a a new fact associating
 \var v/ with the \setL{Clo} value \clo[l: v_1, \dots, v_n]. Our result
 set shows that \var v/ now refers to the closure \clo[l: v_1, \dots,
-  v_n], and does not include any previous facts that referred to
-\var v/.
+  v_n], and does not include any previous facts that referred to \var
+v/.
 
 Equation~\eqref{uncurry_df_transfer_other} applies when the \rhs of a
 \bind statement does not allocate a closure. We create a new fact
@@ -454,7 +457,7 @@ general, optimization that inlines simple blocks into their
 predecessor. We describe the optimization in detail in
 Chapter~\ref{ref_chapter_monadic}, but in short that optimization will
 inline calls to blocks such as !+compose+!, so a statement like \binds v <-
-compose()/ becomes \binds v <- \mkclo[absBodyL201:]/, where !+absBodyL201+! is the
+compose(); becomes \binds v <- \mkclo[absBodyL201:];, where !+absBodyL201+! is the
 label in the closure returned by !+compose()+!.
 
 \section{Implementation}
@@ -481,10 +484,10 @@ Figure~\ref{uncurry_fig_eg} gives an example program we will use
 throughout this section to illustrate our implementation. The program
 takes a string as input, converts it to an integer, doubles that
 value, and returns the result. The program consists of five
-blocks. Two of the blocks, !+k0+! and !+k1+!, are \cc. Two others,
-!+add+! and !+toInt+!, are normal blocks whose implementation we
-ignore. The final block, !+main+!, is also a normal block but is
-intended to be treated as the entry point for the program.
+blocks. Two of the blocks, \lab k0/ and \lab k1/, are \cc. Two others,
+\lab add/ and \lab toInt/, are normal blocks who just call runtime
+primitives. The final block, \lab main/, is also a normal block but
+is intended to be treated as the entry point for the program.
 
 \intent{Signposts.}
 We present our implementation in five sections, reflecting the
@@ -505,8 +508,8 @@ that applies the optimization to a given program.
 
       k0 {} a: k1 {a} 
       k1 {a} b: add(a, b)
-      add(x, y): \ldots
-      toInt(s): \ldots
+      add(x, y): plus*(x, y)
+      toInt(s): atoi*(s)
     \end{MILVerb}
   \end{minipage} \\
   \caption{Example program.}
@@ -535,37 +538,43 @@ Figure~\ref{uncurry_fig_df}. |CloVal| represents \setL{Clo},
   \label{uncurry_fig_types}
 \end{myfig}
 
-\intent{Explain |DestOf| values.}  Our |DestOf| type does not appear
-in Figure~\ref{uncurry_fig_df}. When rewriting, we need to know the
+\intent{Explain |DestOf| values.}  When rewriting, we need to know the
 result of every block in the program. Specifically, we need to know if
 a given block is \cc, if it jumps directly to another block, or if it
-does something else. The |Capture| constructor represents the first
-case and |Jump| the second. The |Dest| value in both cases is a
-destination: either the label stored in the closure returned, or the
-block that the closure jumps to immediately.The third case is not
-represented directly --- we just omit those blocks.
+does something else. The |DestOf| type, which does not appear in
+Figure~\ref{uncurry_fig_df} but is defined in
+Figure~\ref{uncurry_fig_types}, uses the |Capture| and |Jump|
+constructors to represent the first and second case, respecitvely. The
+|Dest| value in both is a destination: either the label stored
+in the closure returned, or the block that the closure jumps to
+immediately. The third case is not represented directly --- we just
+omit those blocks.
 
-\intent{Details on |Capture| value.}
-When a \cc block returns a closure, it copies all
-captured variables from the old closure to the new. The argument can
-be copied or ignored. The flag in the |Capture| constructor indicates
-if the argument is used. 
+\intent{Details on |Capture| value.}  A \cc block receives a closure
+and an argument. The flag in the |Capture| constructor indicates how
+the \cc block treats its argument. If |True|, the argument will be
+included in the closure returned. Otherwise, the argument will be
+ignored.
 
-\intent{Details on |Jump| value.}
-Each integer in the list given to |Jump| represents the position of a
-variable from the closure received. The arguments to the block are
-built by traversing the list from beginning to end, putting the
-variable indicated by the index into the corresponding argument for
-the block. For example, the block !+c+!  in the following:
-\begin{singlespace}\vskip-\baselineskip
+\intent{Details on |Jump| value.} A |Jump| block always has the form
+\ccblock k (v_1,\dots,v_n)  x: \goto b (\dots)/end where the
+arguments to \lab b/ are not necessarily in the same order as in the
+closure \clo[:v_1,\dots,v_n] recieved by \lab k/. Each integer in the
+list given to |Jump| gives the position of a variable in the closure
+received \lab k/. The arguments to the block \lab b/ are built by
+traversing the list from beginning to end, putting the variable
+indicated by the index into the corresponding argument for the
+block. For example, the block !+c+!  in the following:
+\begin{singlespace}\correctspaceskip
   \begin{MILVerb}[gobble=4]
-    c {a, b, c}: l(c, a, b)
-    l(c, a, b): \dots
+    c {a, b} x: l (x, a, b)
+    l (x, a, b): \dots
   \end{MILVerb}
 \end{singlespace}
-would be represented by the value |Jump {-"!+l+!\ "-} [2, 0, 1]|,
-because the variables from the closure $!+\{a, b, c\}+!$ must be given
-to !+l+! in the order $!+(c, a, b)+!$.
+\noindent would be represented by the value |Jump {-"\lab l/\ "-} [2, 0,
+  1]|, because the variables from the closure \clo[:a, b] and the
+argument \var x/ must be given to \lab l/ in the order $!+(x, a,
+b)+!$.
 
 \intent{Details on |CloDest| values.}  We use |CloDest| to represent
 all \setL{Clo} values except $\top$. Recall that \setL{Clo} represents
@@ -585,11 +594,9 @@ represents a finite map from variables to $\{\top
 Figure~\ref{uncurry_fig_lattice} shows the |DataflowLattice| structure
 defined for our analysis. We set |fact_bot| to an empty map, meaning
 we start without any information. We define |lub| over |CloVals|, just
-like \lub in Figure~\ref{uncurry_fig_df}. Hoopl requires that
-|fact_join| take particular arguments, so we use |toJoin| to transform
-|lub| into a function with the required type. The Hoopl--provided
-function |joinMaps| transforms |toJoin lub| into a function that
-operates over finite maps, giving |fact_join| the right signature.
+like \lub in Figure~\ref{uncurry_fig_df}. We use |joinMaps (toJoin
+lub)| (Hoopl provides |joinMaps|) to transform |lub| into a function
+that operates over finite maps.
 
 \begin{myfig}
   \begin{minipage}{\hsize}
@@ -603,17 +610,20 @@ operates over finite maps, giving |fact_join| the right signature.
 \end{myfig}
 
 \subsection{Transfer}
-We give the implementation of $t$ (from Figure~\ref{uncurry_fig_df})
-in Figure~\ref{uncurry_fig_transfer}. Due to Hoopl's use of GADTs, we
-must specify a case for every |Stmt| constructor. As in all
-Hoopl-based forwards analysis, the second argument to |t| is our facts
-so far. |BlockEntry| and |CloEntry| just pass the facts given
+The definition |t| in Figure~\ref{uncurry_fig_transfer} gives the
+implementation of $t$ from Figure~\ref{uncurry_fig_df}. The top-level
+definition in the figure, |collapseTransfer|, just serves to turn |t| into a
+|FwdTransfer| value.  As in all Hoopl-based forwards analysis, the
+second argument to |t| is our facts so far. We define |t| for each statement type 
+in MIL. 
+
+|BlockEntry| and |CloEntry| just pass the facts given
 along.\footnote{Note these will always be empty maps, because our
   analysis does not extend across blocks and |fact_bot| in our lattice
   is |Map.empty|.} Because we do not propagate facts between blocks,
 |CaseM| and |Done| pass an empty map to each successor, using the
-Hoopl--provided |mkFactBase| function to create a |FactBase| from 
-empty facts. 
+Hoopl--provided |mkFactBase| function to create a |FactBase| from
+empty facts.
 
 \begin{myfig}
   \begin{minipage}{\hsize}
@@ -626,44 +636,39 @@ empty facts.
   \label{uncurry_fig_transfer}
 \end{myfig}
 
-|Bind| statments are handled based on the \rhs of the
-statement. If the statement does not directly create a closure, we
-create a fact associating the variable on the \lhs of the
-bind with |Top|, just as in
-Equation~\eqref{uncurry_df_transfer_other}. If the expression creates
-a closure, we create a new fact using the closure's destination and
-captured variables, corresponding to
-Equation~\eqref{uncurry_df_transfer_closure}. We insert the new
-fact into our |facts| finite map, using an appropriately transformed
-|lub| function to combine the new fact with any existing facts. 
+|Bind| statments are handled based on the \rhs of the statement. In
+both cases, we use the |kill| function to create a new set of facts
+that does not contain any closures from the existing fact set which
+refered to |v|, the variable bound. If the statement does not directly
+create a closure, we create a fact associating |v| with |Top|, just as
+in Equation~\eqref{uncurry_df_transfer_other}. If the expression
+creates a closure, we create a new fact using the closure's
+destination and captured variables, corresponding to
+Equation~\eqref{uncurry_df_transfer_closure}. We add the new fact
+to the set returned by |kill| and return the result.
 
 \begin{myfig}
   \begin{tabular}{lcccc}
-    & !+n+! & !+v0+! & !+v1+! & !+v2+! \\\cmidrule{2-5}
-    \begin{minipage}[c]{2in}\singlespacing
-      \begin{MILVerb}[gobble=8]
-        n <- toInt(s)
-        v0 <- k0 {}
-        v1 <- v0 @@ n
-        v2 <- v1 @@ n
-        return v2
-      \end{MILVerb}
-    \end{minipage}
-    & |Top| & |CloDest {-"!+k0\ +!"-} []| & |Top| & |Top| \\
+    Statement & \var n/ & \var v0/ & \var v1/ & \var v2/ \\\cmidrule{2-2}\cmidrule{3-3}\cmidrule{4-4}\cmidrule{5-5}
+    \binds n <- \goto toInt(s); & . & . & . & . \\
+    \binds v0 <- \mkclo[k0:]; & $\top$ & . & . & . \\
+    \binds v1 <- \app v0 * n/; & . & \clo[k0:] & . & . \\
+    \binds v2 <- \app v1 * n/; & . & . & $\top$ & . \\
+    \return v2; & . & . & . & $\top$ \\
   \end{tabular}
-  \caption{How facts evolve for the !+main+! block as our example program
-    is iteratively rewritten.}
+  \caption{Facts about each variable in the \lab main/ block of
+    our example program from Figure~\ref{uncurry_fig_eg}.}
   \label{uncurry_fig_impl_transfer}
 \end{myfig}
 
 Figure~\ref{uncurry_fig_impl_transfer} shows the facts gathered for
-each variable in the !+main+! block of our sample program from
-Figure~\ref{uncurry_fig_eg}. The variables !+n+!, !+v1+!, and
-!+v2+! are assigned |Top| becuase the \rhs of the \bind
-statement for each does not directly create a closure. Only !+v0+!  is
-assigned a |CloDest| value because the \rhs of its \bind
-statement is in the right form. We will see in the next section how
-these facts evolve as the program is rewritten.
+each variable in the \lab main/ block of our sample program from
+Figure~\ref{uncurry_fig_eg}. The variables \var n/, \var v1/, and \var
+v2/ are assigned $\top$ because the \rhs of the \bind statement for
+each does not directly create a closure. Only \var v0/ is assigned a
+|CloDest| value (\clo[k0:]) because the \rhs of its \bind statement is
+in the right form. We will see in the next section how these facts
+evolve as the program is rewritten.
 
 \subsection{Rewrite}
 \intent{Describe how |collapse| looks up closure information for an
@@ -677,7 +682,7 @@ optimization. We will describe it in pieces.
 %include Uncurry.lhs
 %let includeRewrite = False
   \end{minipage} \\
-  \caption{Our rewrite function that replaces !+f @@ x+! expressions
+  \caption{Our rewrite function that replaces \app f * x/ expressions
     with closure allocations, if possible.}
   \label{uncurry_fig_rewrite}
 \end{myfig}
@@ -691,16 +696,16 @@ closure or  jumps immediately to another block.
 For example, Figure~\ref{fig_uncurry_destof} shows the |DestOf| values
 in |blocks| for each block in the example program from
 Figure~\ref{uncurry_fig_eg}. The $\bot$ value associated with blocks
-!+toInt+!, !+add+! and !+main+! means they do not appear in |blocks|.
+\lab toInt/, \lab add/ and \lab main/ means they do not appear in |blocks|.
 
 \begin{myfig}
     \begin{tabular}{ll}
       Block & |DestOf| \\\cmidrule{1-1} \cmidrule{2-2} 
-      !+main+! & $\bot$ \\
-      !+k0+! &  |Capture {-"!+k1+!"-} True| \\
-      !+k1+! &  |Jump {-"!+add+!"-} [0, 1]| \\
-      !+add+! & $\bot$ \\
-      !+toInt+! & $\bot$ \\
+      \lab main/ & $\bot$ \\
+      \lab k0/ &  |Capture {-"\lab k1/\ "-} True| \\
+      \lab k1/ &  |Jump {-"\lab add/\ "-} [0, 1]| \\
+      \lab add/ & $\bot$ \\
+      \lab toInt/ & $\bot$ \\
     \end{tabular}
   \caption{|DestOf| values associated with each block in our example
 program.}
@@ -709,45 +714,50 @@ program.}
 
 |collapseRewrite| applies Hoopl's |iterFwdRw| and |mkFRewrite|
 functions to our locally defined |rewriter| function, creating a
-|FwdRewrite| value. The |iterFwdRw| combinator applies our function to
-the program over and over, until |rewriter| stops changing the
-program. This ensures that a ``chain'' of closure allocations get
-collapsed into a single allocation, if possible.
+|FwdRewrite| value. The |iterFwdRw| combinator applies |rewriter| to
+the program over and over, until the program stops changing. This
+ensures that a ``chain'' of closure allocations get collapsed into a
+single allocation, if possible.
 
-Figure~\ref{uncurry_fig_rewrite_iterations} shows how the !+main+!
+Figure~\ref{uncurry_fig_rewrite_iterations} shows how the \lab main/
 block in our example program changes as Hoopl iteratively applies
-|rewriter|. During the first iteration, |rewriter| transforms the !+v1
-{}<- v0 @@ n+! to !+v1 <- k1 {n}+!  (because !+v0+! holds a closure to
-!+k0+!, and |blocks| tells us !+k0+! returns a closure pointing to
-!+k1+!). During the second iteration, |rewriter| transforms the line,
-!+v2 <- v1 @@ n+!, to !+v2 <- add(n, n)+!. No more iterations occur
-after the second, as |rewriter| will not find any more \bind that can
-be transformed.
+|rewriter|. During the first iteration, |rewriter| transforms \binds
+v1 <- \app v0 * n/; to \binds v1 <- \mkclo[k1: n]; (because \var v0/
+holds the closure \clo[k0:], and |blocks| tells us \lab k0/ returns a
+closure pointing to \lab k1/). During the second iteration, |rewriter|
+transforms the line \binds v2 <- \app v1 * n/; to \binds v2 <- \goto
+add(n, n);. No more iterations occur after this, as |rewriter|
+will not find any more \bind statements to transform.
 
 \begin{myfig}
-  \begin{tabular}{lcccc}
-    Post-Iteration & !+main+! \\\midrule
-    1 & \begin{minipage}[c]{2in}\singlespacing
-      \begin{MILVerb}[gobble=8]
-        n <- toInt(s)
-        v0 <- k0 {}
-        \textbf[v1 <- k1 {n}]
-        v2 <- v1 @@ n
-        return v2
-      \end{MILVerb}
+  \begin{tabular}{cl}
+    Iteration & \lab main/ \\\midrule
+    0 & \begin{minipage}[t]{2in}\obeylines\obeyspaces
+        \binds n <- \goto toInt(s);
+        \binds v0 <- \mkclo[k0:];
+        \binds v1 <- \app v0 * n/;
+        \binds v2 <- \app v1 * n/;
+        \return v2; 
     \end{minipage}  \\
-    2 & \begin{minipage}[c]{2in}\singlespacing
-      \begin{MILVerb}[gobble=8]
-        n <- toInt(s)
-        v0 <- k0 {}
-        v1 <- k1 {n}
-        \textbf[v2 <- add(n, n)]
-        return v2
-      \end{MILVerb}
+    1 & \begin{minipage}[t]{2in}\obeylines\obeyspaces
+        \binds n <- \goto toInt(s);
+        \binds v0 <- \mkclo[k0:];
+        \binds v1 <- \mkclo[k1: n];
+        \binds v2 <- \app v1 * n/;
+        \return v2;
+    \end{minipage}  \\
+    2 & \begin{minipage}[t]{2in}\obeylines\obeyspaces
+        \binds n <- \goto toInt(s);
+        \binds v0 <- \mkclo[k0:];
+        \binds v1 <- \mkclo[k1: n];
+        \binds v2 <- \goto add(n, n);
+        \return v2;
     \end{minipage} 
   \end{tabular}
-  \caption{How facts evolve for the !+main+! block as our example program
-    is iteratively rewritten.}
+  \caption{How \lab main/ is rewritten iteratively by |rewriter|. Each
+    line represents the \lab main/ after the particular iteration. The
+    first line shows the original program. After the second iteration,
+    the program stops changing. }
   \label{uncurry_fig_rewrite_iterations}
 \end{myfig}
 
@@ -762,8 +772,8 @@ does not rewrite. Therefore, |done| rewrites an |Enter| only when
 |Just| value. In all other cases, |rewriter| does no rewriting.
 
 The |collapse| function takes a set of facts and two names,
-representing the left and \rhs of a !+@@+! expression,
-respectively. If !+f+! is associated with a |CloDest| value (as
+representing the left and \rhs of a \enter expression,
+respectively. If \var f/ is associated with a |CloDest| value (as
 opposed to |Top|) in the |facts| map, then rewriting can possibly
 occur, but only if the block indicated in the |CloDest| value returns
 a closure or jumps immediately to another block. |collapse| uses the
@@ -771,28 +781,28 @@ a closure or jumps immediately to another block. |collapse| uses the
 |CloDest| value.
 
 If the destination immediately jumps to another block (as indicated by
-a |Jump| value) then we will rewrite the !+f @@ x+! expression to call
+a |Jump| value) then we will rewrite the \app f * x/ expression to call
 the block directly. The list of integers associated with |Jump|
 specifies the order in which arguments were taken from the closure and
 passed to the block. |collapse| uses the |fromUses| function to
 re-order arguments appropriately.
 
 In Figure~\ref{fig_uncurry_destof}, we showed that the |DestOf| value
-associated with !+k1+! is |Jump {-"!+add+!"-} [0, 1]|. The list |[0,
-  1]| indicates that !+add+! takes arguments in the same order as the
-appear in the closure. However, if !+add+! took arguments in
-opposite order, !+k1+! and !+add+! would look like:
-\begin{MILVerb}
-  k1 {a} b: add(b, a)
-  add(x, y): \ldots
-\end{MILVerb}
+associated with \lab k1/ is |Jump {-"\lab add/\ "-} [0, 1]|. The list |[0,
+  1]| indicates that \lab add/ takes arguments in the same order as the
+appear in the closure. However, if \lab add/ took arguments in
+opposite order, \lab k1/ and \lab add/ would look like:
+\begin{singlespace}\correctspaceskip\obeylines\obeyspaces
+    \ccblock k1 (a) b: \goto add(b, a)/end
+    \block add (x, y): \ldots/end
+\end{singlespace}
 And the |DestOf| value associated with !+k1+! would be |Jump
-{-"!+add\ +!"-} [1, 0]|.
+{-"\lab add/\ "-} [1, 0]|.
 
-If the destination returns a closure, we will rewrite !+f @@ x+! to
+If the destination returns a closure, we will rewrite \app f * x/ to
 directly allocate the closure. The boolean argument to |Capture|
 indicates if the closure ignores the argument passed, which |collapse|
-uses to determine if it should place the !+x+! argument in the closure
+uses to determine if it should place the \var x/ argument in the closure
 that is allocated or not.
 
 

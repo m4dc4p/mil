@@ -12,6 +12,10 @@
 \usepackage{url}
 \usepackage{fancyvrb}
 \usepackage[doublespacing]{setspace}
+%% below only necessary when using doublespacing -- corrects
+%% the vertical space inserted when switching to singlespace
+%% environment.
+\def\correctspaceskip{\vskip-\baselineskip} 
 \usepackage{amsmath}
 \usepackage{booktabs}
 \usepackage[margin=\parindent, format=hang,labelfont=bf]{caption}
@@ -234,15 +238,34 @@
 \def\lhs{left--hand side\xspace}
 \def\bind{\texttt{<-}\xspace}
 \def\var#1/{\texttt{#1}\xspace}
+\protected\def\lab#1/{\ensuremath{\mathbf{\mathtt{#1}}}\xspace}
 %% Constructs a closure: l { v1, ..., vN }
-\long\def\mkclo[#1:#2]{\ensuremath{\tracingmacros=2\tracingcommands=1\ensurett{#1\ \{#2\}}}\xspace}
-%% Tuple version of closurs: (l, v1, ..., vN).
-\long\def\clo[#1:#2]{\ensuremath{\ensurett{(#1, #2)}}\xspace}
+\long\def\mkclo[#1:#2]{\text{\texttt{\textbf{#1}}}\ \ensuremath{\ensurett{\{#2\}}}\xspace}
+%% Tuple version of closurs: {l: v1, ..., vN}.
+\long\def\clo[#1:#2]{\ensuremath{\ensurett{\{%%
+      \ifx#1\relax%%
+      \else\texttt{\textbf{#1}}%%
+        \ifx#2\relax%%
+        \else:\ %%
+        \fi%%
+      \fi#2\}}\xspace}}
 %% Binding statement: v <- {...}
-\long\def\binds#1<-#2/{\ensuremath{\ensurett{#1\ \texttt{<-}\ #2}}\xspace}
+\long\def\binds#1<-#2;{\ensurett{#1<-#2}\xspace}
+\long\def\bindsX#1<-#2sdnib{\ensurett{#1<-#2}\xspace}
+%% Return statement: return ... ;
+\long\def\return#1;{\ensuremath{\ensurett{return\ #1}}\xspace}
+%% A closure capturing block. k {v1, ..., vN} x: ...
+\long\def\ccblock#1(#2)#3:#4/end{\lab #1/\ \ensuremath{\ensurett{\{\ensurett{#2}\}\ #3:\ #4}}}
+%% A normal block
+\long\def\block#1(#2):#3/end{\lab #1/\ \ensuremath{\ensurett(#2):\ #3}}
+%% A goto expression
+\long\def\goto#1(#2){\texttt{\textbf{#1}}\ \ensuremath{\ensurett{(#2)}}}
+%% An enter expression
 \long\def\app#1*#2/{\texttt{#1@#2}}
-\def\cc{closure--capturing\xspace}
+
 \def\enter{\texttt{@}\xspace}
+\def\cc{closure--capturing\xspace}
+\def\Cc{Closure--capturing\xspace}
 %%
 
 \newenvironment{myfig}[1][tbh]{\begin{figure}[#1]%%
@@ -266,7 +289,7 @@
 %% A verbatim environment with active charactesr
 %% so we can use math shortcuts and macros
 \DefineVerbatimEnvironment{AVerb}{Verbatim}{commandchars=\\\{\},%% 
-  codes={\catcode`\_8\catcode`\$3\catcode`\^7},%%
+  codes={\catcode`\_8\catcode`\$3\catcode`\^7\catcode`\;12},%%
   numberblanklines=false}
 
 \DefineVerbatimEnvironment{MILVerb}{Verbatim}{commandchars=\\\[\],%% 

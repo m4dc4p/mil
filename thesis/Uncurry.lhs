@@ -118,13 +118,16 @@ closure or jump to the block.
 >     t :: StmtM e x -> CollapseFact -> Fact x CollapseFact
 >     t (Bind v (Closure dest args)) facts = 
 >       Map.insert v (PElem (CloDest dest args)) 
->                    (Map.filter (not . using v) facts)
->     t (Bind v _) facts = Map.insert v Top facts
+>                    (kill v facts)
+>     t (Bind v _) facts = Map.insert v Top (kill v facts)
 >     t (CaseM _ _) facts = mkFactBase collapseLattice []
 >     t (Done _ _ _) facts = mkFactBase collapseLattice []
 >     t (BlockEntry _ _ _) facts = facts
 >     t (CloEntry _ _ _ _) facts = facts
 >   
+>     kill :: Name -> Map Name (WithTop CloDest) -> Map Name (WithTop CloDest)
+>     kill v = Map.filter (not . using v) 
+>
 >     using :: Name -> WithTop CloDest -> Bool
 >     using _ Top = False
 >     using var (PElem (CloDest _ vars)) = var `elem` vars
