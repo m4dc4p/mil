@@ -138,22 +138,22 @@ closure or jump to the block.
 
 > collapseRewrite :: FuelMonad m => Map Label DestOf 
 >                    -> FwdRewrite m StmtM CollapseFact
-> collapseRewrite blocks = iterFwdRw (mkFRewrite rewriter)
+> collapseRewrite blocks = iterFwdRw (mkFRewrite rewriter) {-"\hslabel{top}"-}
 >   where
 >     rewriter :: FuelMonad m => forall e x. StmtM e x -> CollapseFact 
 >                 -> m (Maybe (ProgM e x))
->     rewriter (Done n l (Enter f x)) col = done n l (collapse col f x)
->     rewriter (Bind v (Enter f x)) col = bind v (collapse col f x)
->     rewriter _ _ = return Nothing
+>     rewriter (Done n l (Enter f x)) col = done n l (collapse col f x) {-"\hslabel{done}"-}
+>     rewriter (Bind v (Enter f x)) col = bind v (collapse col f x) {-"\hslabel{bind}"-}
+>     rewriter _ _ = return Nothing {-"\hslabel{rest}"-}
 >                    
 >     collapse :: CollapseFact -> Name -> Name -> Maybe TailM
 >     collapse facts f x =       
 >       case Map.lookup f facts of
->         Just (PElem (CloDest dest@(_, l) vs)) -> 
+>         Just (PElem (CloDest dest@(_, l) vs)) -> {-"\hslabel{collapse_clo}"-}
 >           case Map.lookup l blocks of
->             Just (Jump dest uses) -> 
+>             Just (Jump dest uses) -> {-"\hslabel{collapse_jump}"-}
 >               Just (Goto dest (fromUses uses (vs ++ [x])))
->             Just (Capture dest usesArg) ->
+>             Just (Capture dest usesArg) -> {-"\hslabel{collapse_capt}"-}
 >               Just (Closure dest 
 >                     (if usesArg then vs ++[x] else vs))
 >             _ -> Nothing

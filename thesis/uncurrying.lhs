@@ -1,5 +1,6 @@
 \documentclass[12pt]{report}
 %include polycode.fmt
+%include lineno.fmt
 %include subst.fmt
 \input{preamble}
 \begin{document}
@@ -177,11 +178,11 @@ fully-applied.
 \intent{Remind reader how MIL \cc blocks are written and used.}
 Recall that MIL defines two types of blocks: ``\cc'' and ``normal.''
 Normal blocks act much like labeled locations in a program and are
-written \block b(v_1, \dots, v_n): \dots/end.  A normal block is
+written \block: b(v_1, \dots, v_n): \dots/end.  A normal block is
 called using MIL's !+goto+! expression, and receives any arguments
 given. 
 
-\Cc blocks are written \ccblock k(v_1, \dots, v_n) x: \dots/end. A \cc
+\Cc blocks are written \ccblock: k(v_1, \dots, v_n) x: \dots/end. A \cc
 block is always executed as the result of an \enter expression, and it
 expects to receive a closure containing captured variables $!+\{v1_,
 \dots, v_n\}+!$ as well as the argument \var x/.  That is, in the
@@ -443,7 +444,7 @@ expression we may rewrite. If $(\var f/, p) \in F$ and $p = \clo[l:
   v_1, \dots, v_n]$, then we know \var f/ represents the closure
 \clo[l: v_1, \dots, v_n]. We can rewrite \app f * x/ to \app \mkclo[l:
   v_1, \dots, v_n] * x/. If !+l+! is also a closure-capturing block
-that returns \clo[m: c_1, \dots, c_m], we can then rewrite \app
+that returns \clo[m: c_1, \dots, c_m], we can then rewrite \app 
 \mkclo[l: v_1, \dots, v_n] * x/ to \mkclo[m: v_1, \dots, v_n, x].
 Notice we needed to add the \var x/ argument to the resulting closure
 as the block !+l+! would do the same if we had entered it.
@@ -557,7 +558,7 @@ included in the closure returned. Otherwise, the argument will be
 ignored.
 
 \intent{Details on |Jump| value.} A |Jump| block always has the form
-\ccblock k (v_1,\dots,v_n)  x: \goto b (\dots)/end where the
+\ccblock: k (v_1,\dots,v_n)  x: \goto b (\dots)/end where the
 arguments to \lab b/ are not necessarily in the same order as in the
 closure \clo[:v_1,\dots,v_n] recieved by \lab k/. Each integer in the
 list given to |Jump| gives the position of a variable in the closure
@@ -654,7 +655,7 @@ to the set returned by |kill| and return the result.
     \binds v0 <- \mkclo[k0:]; & $\top$ & . & . & . \\
     \binds v1 <- \app v0 * n/; & . & \clo[k0:] & . & . \\
     \binds v2 <- \app v1 * n/; & . & . & $\top$ & . \\
-    \return v2; & . & . & . & $\top$ \\
+    \return: v2; & . & . & . & $\top$ \\
   \end{tabular}
   \caption{Facts about each variable in the \lab main/ block of
     our example program from Figure~\ref{uncurry_fig_eg}.}
@@ -677,11 +678,11 @@ implementation of our rewrite function for the uncurrying
 optimization. We will describe it in pieces.
 
 \begin{myfig}
-  \begin{minipage}{\hsize}
+  \begin{minipage}{\hsize}\begin{withHsNum}{uncurry_fig_rewrite}
 %let includeRewrite = True
 %include Uncurry.lhs
 %let includeRewrite = False
-  \end{minipage} \\
+  \end{withHsNum}\end{minipage} \\
   \caption{Our rewrite function that replaces \app f * x/ expressions
     with closure allocations, if possible.}
   \label{uncurry_fig_rewrite}
@@ -712,99 +713,111 @@ program.}
   \label{fig_uncurry_destof}
 \end{myfig}
 
-|collapseRewrite| applies Hoopl's |iterFwdRw| and |mkFRewrite|
-functions to our locally defined |rewriter| function, creating a
-|FwdRewrite| value. The |iterFwdRw| combinator applies |rewriter| to
-the program over and over, until the program stops changing. This
-ensures that a ``chain'' of closure allocations get collapsed into a
-single allocation, if possible.
+On Line~\ref{uncurry_fig_rewrite_top}, |collapseRewrite| applies
+Hoopl's |iterFwdRw| and |mkFRewrite| functions to our locally defined
+|rewriter| function, creating a |FwdRewrite| value. The |iterFwdRw|
+combinator applies |rewriter| to the program over and over, until the
+program stops changing. This ensures that a ``chain'' of closure
+allocations get collapsed into a single allocation, if possible.
 
 Figure~\ref{uncurry_fig_rewrite_iterations} shows how the \lab main/
 block in our example program changes as Hoopl iteratively applies
-|rewriter|. During the first iteration, |rewriter| transforms \binds
-v1 <- \app v0 * n/; to \binds v1 <- \mkclo[k1: n]; (because \var v0/
+|rewriter|. The first row (iteration 0) shows the original
+program. During the first iteration, |rewriter| transforms \binds v1 <- \app v0 * n/; 
+to \binds v1 <- \mkclo[k1: n]; (because \var v0/
 holds the closure \clo[k0:], and |blocks| tells us \lab k0/ returns a
 closure pointing to \lab k1/). During the second iteration, |rewriter|
 transforms the line \binds v2 <- \app v1 * n/; to \binds v2 <- \goto
-add(n, n);. No more iterations occur after this, as |rewriter|
-will not find any more \bind statements to transform.
+add(n, n);. No more iterations occur after this, as |rewriter| will
+not find any more \bind statements to transform.
 
 \begin{myfig}
   \begin{tabular}{cl}
     Iteration & \lab main/ \\\midrule
-    0 & \begin{minipage}[t]{2in}\obeylines\obeyspaces
-        \binds n <- \goto toInt(s);
-        \binds v0 <- \mkclo[k0:];
-        \binds v1 <- \app v0 * n/;
-        \binds v2 <- \app v1 * n/;
-        \return v2; 
-    \end{minipage}  \\
-    1 & \begin{minipage}[t]{2in}\obeylines\obeyspaces
-        \binds n <- \goto toInt(s);
-        \binds v0 <- \mkclo[k0:];
-        \binds v1 <- \mkclo[k1: n];
-        \binds v2 <- \app v1 * n/;
-        \return v2;
-    \end{minipage}  \\
-    2 & \begin{minipage}[t]{2in}\obeylines\obeyspaces
-        \binds n <- \goto toInt(s);
-        \binds v0 <- \mkclo[k0:];
-        \binds v1 <- \mkclo[k1: n];
-        \binds v2 <- \goto add(n, n);
-        \return v2;
+    0 & \begin{minipage}[t]{2in}    
+      \begin{AVerb}[gobble=8]
+        \vbinds n <- \goto toInt(s);
+        \vbinds v0 <- \mkclo[k0:];
+        \vbinds v1 <- \app v0 * n/;
+        \vbinds v2 <- \app v1 * n/;
+        \return: v2; 
+      \end{AVerb}
+    \end{minipage}  \\\\
+    1 & \begin{minipage}[t]{2in}
+      \begin{AVerb}[gobble=8]
+        \vbinds n <- \goto toInt(s);
+        \vbinds v0 <- \mkclo[k0:];
+        \llap{\ensuremath{\rightarrow} }\vbinds v1 <- \mkclo[k1:n]; \ensuremath{\leftarrow}
+        \vbinds v2 <- \app v1 * n/;
+        \return: v2;
+      \end{AVerb}
+    \end{minipage}  \\\\
+    2 & \begin{minipage}[t]{2in}
+      \begin{AVerb}[gobble=8]
+        \vbinds n <- \goto toInt(s);
+        \vbinds v0 <- \mkclo[k0:];
+        \vbinds v1 <- \mkclo[k1:n];
+        \llap{\ensuremath{\rightarrow} }\vbinds v2 <- \goto add(n, n); \ensuremath{\leftarrow}
+        \return: v2;
+      \end{AVerb}
     \end{minipage} 
   \end{tabular}
-  \caption{How \lab main/ is rewritten iteratively by |rewriter|. Each
-    line represents the \lab main/ after the particular iteration. The
-    first line shows the original program. After the second iteration,
+  \caption{How |rewriter| transforms the \lab main/ block. Each
+    row represents \lab main/ after the particular iteration. The
+    first line shows the original program. The arrows 
+    shows the line that changed during each iteration. After the second iteration,
     the program stops changing. }
   \label{uncurry_fig_rewrite_iterations}
 \end{myfig}
 
 The |rewriter| function checks if it can rewrite |Enter| expressions
-when they occur in a |Done| statement or on the \rhs of a
-|Bind|. In the first case, |done n l (collapse col f x)| will produce
-a new |Done| statement with the |TailM| expression returned by
-|collapse|, if |collapse| returns a |Just| value. Otherwise, |done|
-does not rewrite. Therefore, |done| rewrites an |Enter| only when
-|collapse| indicates that rewriting can occur. In the second case,
-|bind| behaves similarly, only rewriting if |collapse| returns a
-|Just| value. In all other cases, |rewriter| does no rewriting.
+when they occur in a |Done| statement or on the \rhs of a |Bind|. In
+the first case (Line~\ref{uncurry_fig_rewrite_done}), |done n l
+(collapse col f x)| will produce a new |Done| statement with the
+|TailM| expression returned by |collapse|, if |collapse| returns a
+|Just| value. Otherwise, |done| does not rewrite. Therefore, |done|
+rewrites an |Enter| only when |collapse| indicates that rewriting can
+occur. In the second case (Line~\ref{uncurry_fig_rewrite_bind}) |bind|
+behaves similarly, only rewriting if |collapse| returns a |Just|
+value. In all other cases, |rewriter| does no rewriting.
 
 The |collapse| function takes a set of facts and two names,
 representing the left and \rhs of a \enter expression,
-respectively. If \var f/ is associated with a |CloDest| value (as
-opposed to |Top|) in the |facts| map, then rewriting can possibly
-occur, but only if the block indicated in the |CloDest| value returns
-a closure or jumps immediately to another block. |collapse| uses the
+respectively. When \var f/ is associated with a |CloDest| value (as
+opposed to |Top|) in the |facts| map
+(Line~\ref{uncurry_fig_rewrite_collapse_clo}), |collapse| uses the
 |blocks| argument to look up the behavior of the destination in the
-|CloDest| value.
+|CloDest| value. Lines~\ref{uncurry_fig_rewrite_collapse_jump} and
+\ref{uncurry_fig_rewrite_collapse_capt} test if the block associated
+\var f/ returns a closure or jumps immediately to another block. 
 
-If the destination immediately jumps to another block (as indicated by
-a |Jump| value) then we will rewrite the \app f * x/ expression to call
-the block directly. The list of integers associated with |Jump|
-specifies the order in which arguments were taken from the closure and
-passed to the block. |collapse| uses the |fromUses| function to
-re-order arguments appropriately.
+If the destination immediately jumps to another block
+(Line~\ref{uncurry_fig_rewrite_collapse_jump}) then we will rewrite
+the \app f * x/ expression to call the block directly. The list of
+integers associated with |Jump| specifies the order in which arguments
+were taken from the closure and passed to the block. |collapse| uses
+the |fromUses| function to re-order arguments appropriately.
 
 In Figure~\ref{fig_uncurry_destof}, we showed that the |DestOf| value
 associated with \lab k1/ is |Jump {-"\lab add/\ "-} [0, 1]|. The list |[0,
   1]| indicates that \lab add/ takes arguments in the same order as the
 appear in the closure. However, if \lab add/ took arguments in
 opposite order, \lab k1/ and \lab add/ would look like:
-\begin{singlespace}\correctspaceskip\obeylines\obeyspaces
-    \ccblock k1 (a) b: \goto add(b, a)/end
-    \block add (x, y): \ldots/end
+\begin{singlespace}
+  \begin{AVerb}
+    \ccblock:k1(a)b:\goto add(b, a)/end
+    \block:add(x, y):\ldots/end
+  \end{AVerb}
 \end{singlespace}
-And the |DestOf| value associated with !+k1+! would be |Jump
+\noindent And the |DestOf| value associated with \lab k1/ would be |Jump
 {-"\lab add/\ "-} [1, 0]|.
 
-If the destination returns a closure, we will rewrite \app f * x/ to
-directly allocate the closure. The boolean argument to |Capture|
-indicates if the closure ignores the argument passed, which |collapse|
-uses to determine if it should place the \var x/ argument in the closure
-that is allocated or not.
-
+If the destination returns a closure
+(Line~\ref{uncurry_fig_rewrite_collapse_capt}), we will rewrite \app f
+* x/ to directly allocate the closure. The boolean argument to
+|Capture| indicates if the closure ignores the argument passed, which
+|collapse| uses to determine if it should place the \var x/ argument
+in the closure that is allocated or not.
 
 \subsection{Optimization Pass}
 

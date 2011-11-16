@@ -6,7 +6,7 @@
 \usepackage{helvet}
 %% \usepackage{inconsolata}
 \usepackage{comment}
-\usepackage{calc}
+\usepackage{etoolbox}
 \usepackage{xspace}
 \usepackage{verbatim}
 \usepackage{url}
@@ -237,8 +237,12 @@
 \def\rhs{right--hand side\xspace}
 \def\lhs{left--hand side\xspace}
 \def\bind{\texttt{<-}\xspace}
-\def\var#1/{\texttt{#1}\xspace}
-\protected\def\lab#1/{\ensuremath{\mathbf{\mathtt{#1}}}\xspace}
+\def\var#1/{\texttt{\removespaces#1}\xspace}
+\let\sp=\ 
+\def\removespaces{\afterassignment\removesp\let\next=}
+\def\removesp{\ifx\next\sp\let\next=\removespaces%%
+\fi\next}  
+\protected\def\lab#1/{\ensuremath{\mathbf{\mathtt{\removespaces#1}}}\xspace}
 %% Constructs a closure: l { v1, ..., vN }
 \long\def\mkclo[#1:#2]{\text{\texttt{\textbf{#1}}}\ \ensuremath{\ensurett{\{#2\}}}\xspace}
 %% Tuple version of closurs: {l: v1, ..., vN}.
@@ -250,18 +254,24 @@
         \fi%%
       \fi#2\}}\xspace}}
 %% Binding statement: v <- {...}
-\long\def\binds#1<-#2;{\ensurett{#1<-#2}\xspace}
-\long\def\bindsX#1<-#2sdnib{\ensurett{#1<-#2}\xspace}
+\long\def\binds#1<-#2;{\ensurett{\removespaces#1<-#2}\xspace}
+%% In order to use \binds in verbatim environment, have to define
+%% delimiters while they are active. The below defines \vbinds which
+%% must be used in AVerb environments.  Notice the active space as
+%% well - that is necessary so the space after \vbinds (and before the
+%% first argument) in the verbatim environment gets eaten.
+\begingroup\catcode`\!=\active \lccode`\!=`\< \lccode`\~=`\- 
+  \catcode`\ =\active\lowercase{\endgroup\def\vbinds#1!~#2;}{\binds#1<-#2;}
 %% Return statement: return ... ;
-\long\def\return#1;{\ensuremath{\ensurett{return\ #1}}\xspace}
+\long\def\return#1;{\ensuremath{\ensurett{return\ \removespaces#1}}\xspace}
 %% A closure capturing block. k {v1, ..., vN} x: ...
-\long\def\ccblock#1(#2)#3:#4/end{\lab #1/\ \ensuremath{\ensurett{\{\ensurett{#2}\}\ #3:\ #4}}}
+\long\def\ccblock#1(#2)#3:#4/end{\lab#1/\ \ensuremath{\ensurett{\{\ensurett{#2}\}\ #3:\ #4}}}
 %% A normal block
-\long\def\block#1(#2):#3/end{\lab #1/\ \ensuremath{\ensurett(#2):\ #3}}
+\long\def\block#1(#2):#3/end{\lab#1/\ \ensuremath{\ensurett(#2):\ #3}}
 %% A goto expression
 \long\def\goto#1(#2){\texttt{\textbf{#1}}\ \ensuremath{\ensurett{(#2)}}}
 %% An enter expression
-\long\def\app#1*#2/{\texttt{#1@#2}}
+\long\def\app#1*#2/{\texttt{\removespaces #1@#2}}
 
 \def\enter{\texttt{@}\xspace}
 \def\cc{closure--capturing\xspace}
@@ -289,7 +299,7 @@
 %% A verbatim environment with active charactesr
 %% so we can use math shortcuts and macros
 \DefineVerbatimEnvironment{AVerb}{Verbatim}{commandchars=\\\{\},%% 
-  codes={\catcode`\_8\catcode`\$3\catcode`\^7\catcode`\;12},%%
+  codes={\catcode`\_8\catcode`\$3\catcode`\^7},%%
   numberblanklines=false}
 
 \DefineVerbatimEnvironment{MILVerb}{Verbatim}{commandchars=\\\[\],%% 
@@ -300,8 +310,18 @@
 \newcommand{\hsNumOn}{\numberson\numbersreset}
 \newcommand{\hsNumOff}{\numbersoff}
 %% Turn on line numbering in Haskell code within
-%% the environment, then turn it off.
-\newenvironment{withHsNum}{\numberson\numbersreset}{\numbersoff}
+%% the environment, then turn it off. The optional
+%% argument specifies a prefix that \hslabel can
+%% use to generate line number references. If no prefix
+%% is givne, \hslabel will have no effect.
+\newtoks\prefixtoks
+\def\mkhslabel#1{\prefixtoks={#1}\let\prefix=a}
+\def\hslabel#1{\ifx\prefix\relax%%
+  \else\label{\the\prefixtoks_#1}%%
+  \fi}
+\def\unhslabel{\let\prefix=\relax}
+\newenvironment{withHsNum}[1]{\numberson\numbersreset\mkhslabel{#1}}{\unhslabel\numbersoff}
+\numbersoff
 
 %% Paragraph run-in
 \newcommand{\runin}[1]{\begingroup\noindent\sffamily\textbf{#1}\qquad\endgroup}
