@@ -1,0 +1,117 @@
+%% TikZ and LaTeX3-specific macros.
+\usepackage{xparse}
+\ExplSyntaxOn
+\DeclareDocumentCommand \inFactsM {m m m} {\doFacts{#1}{#2}{\inB}{#3}}
+\DeclareDocumentCommand \inFacts {m m O{1in}} {\doFacts{#1}{#2}{\inB}{#3}}
+\DeclareDocumentCommand \outFactsM {m m m} {\doFacts{#1}{#2}{\outB}{#3}}
+\DeclareDocumentCommand \outFacts {m m O{1in}} {\doFacts{#1}{#2}{\outB}{#3}}
+\ExplSyntaxOff
+
+\usepackage{tikz}
+\usetikzlibrary{arrows,automata,positioning,calc}
+%% Used for CFGs.
+\tikzset{
+  >=stealth, 
+  node distance=.5in,
+  stmt/.style={rectangle,
+    draw=black, thick,        
+    minimum height=2em,
+    %% inner sep=2pt,
+    %% text centered,
+    %% node distance=.5in,
+  },
+  entex/.style={
+    minimum height=2em,
+    %% inner sep=2pt,
+    %% text centered,
+  },
+  labelfor/.style={circle, 
+    draw=black, thin,
+    font={\footnotesize},
+    inner sep=0,
+    fill=white,
+    above right=-1.5mm and -1.5mm of #1,
+  },
+  fact/.style={overlay},
+  %% Invisible node
+  invis/.style={inner sep=0pt, 
+    minimum height=0em}, 
+  table/.style={circle, fill=white,height=2mm}
+}
+
+%% Dataflow chapter commands
+\newcounter{nodeCounter}[figure]
+\newcommand{\inE}{\ensuremath{\mathit{in}}\xspace}
+\newcommand{\out}{\ensuremath{\mathit{out}}\xspace}
+\newcommand{\In}{\ensuremath{\mathit{In}}\xspace}
+\newcommand{\InBa}{\ensuremath{\mathit{In}(B)}\xspace}
+\newcommand{\Out}{\ensuremath{\mathit{Out}}\xspace}
+%% Out(B_x) -- fact function for an named block.
+\newcommand{\OutB}[1]{\ensuremath{\mathit{Out}(B_{\ref{#1}})}\xspace}
+\newcommand{\OutBa}{\ensuremath{\mathit{Out}(B)}\xspace}
+%% in(B) -- fact function for an anonymous block.
+\newcommand{\inBa}{\ensuremath{\mathit{in}(B)}\xspace}
+%% in(X) -- fact function for an anonymous block, but using a different variable.
+\newcommand{\inXa}[1]{\ensuremath{\mathit{in}(#1)}\xspace}
+%% in(B,v) -- fact function for an anonymous block and some variable.
+\newcommand{\inBav}[1]{\ensuremath{\mathit{in}(B, #1)}\xspace}
+%% in(B_x) -- fact function for an named block.
+\newcommand{\inB}[1]{\ensuremath{\mathit{in}(B_{\ref{#1}})}\xspace}
+%% in(B_x,v) -- fact function for an named block and some variable.
+\newcommand{\inBv}[2]{\ensuremath{\mathit{in}(B_{\ref{#1}}, #2)}\xspace}
+%% out(B) -- fact function for an anonymous block.
+\newcommand{\outBa}{\ensuremath{\mathit{out}(B)}\xspace}
+%% out(Bn) -- fact function for an named block.
+\newcommand{\outBn}[1]{\ensuremath{\mathit{out}(B_{#1})}\xspace}
+%% out(X) -- fact function for an anonymous block, but using a different variable.
+\newcommand{\outXa}[1]{\ensuremath{\mathit{out}(#1)}\xspace}
+%% out(B,v) -- fact function for an anonymous block and some variable.
+\newcommand{\outBav}[1]{\ensuremath{\mathit{out}(B, #1)}\xspace}
+%% out(B_x) -- fact function for an named block.
+\newcommand{\outB}[1]{\ensuremath{\mathit{out}(B_{\ref{#1}})}\xspace}
+%% out(B_x,v) -- fact function for an named block and some variable.
+\newcommand{\outBv}[2]{\ensuremath{\mathit{out}(B_{\ref{#1}}, #2)}\xspace}
+\newcommand{\entryN}{\emph{E}\xspace}
+\newcommand{\exitN}{\emph{X}\xspace}
+\newcommand{\refNode}[1]{\ensuremath{B_{\ref{#1}}}\xspace}
+\newcommand{\labelNode}[1]{\refstepcounter{nodeCounter}\label{#1}}
+
+%% Formats a list of facts
+%% Argument should be like \facts{a/1, b/2, foobar/\bot, baz/\top}.
+%% 
+\newcounter{factctr}
+\newtoks\varVal
+\newtoks\varName
+\newcommand{\facts}[1]{\begingroup%%
+  %% Test if the argument given contains a forward slash (/). Expands
+  %% slashTest with argument such that if a slash is NOT present the 
+  %% token \noSlash will be given as argument 2 to slashTest. Otherwise
+  %% there must be slash.
+  \def\hasSlash##1{\expandafter\slashTest##1/\noslash\endslash}%%
+  \def\slashTest##1/##2##3\endslash{\ifx\noslash##2 N\else Y\fi}%%
+  \def\getArgs##1/##2{\varName={##1}%%
+    \varVal={##2}}
+  \ensuremath{%%
+    \setcounter{factctr}{0}%%
+    \foreach \var in {#1}{%%
+      %% Separate list with a comma
+      \ifthenelse{\value{factctr}>0}{,\allowbreak}{}%%
+      %% \tracingmacros=1%%
+      %% If key/val arguments, use first form. Otherwise
+      %% use second.
+      \ifthenelse{\equal{\hasSlash{\var}}{Y}}%%
+                  {\expandafter\getArgs\var \factC{\the\varName}{\the\varVal}}%%
+                  {\var}%%
+      %% \tracingmacros=0%%
+      \stepcounter{factctr}%%
+    }}%%
+\endgroup}
+\newcommand{\factC}[2]{{\ensuremath{(\mathit{#1},#2)}}}
+\newcommand{\doFacts}[4]{\ensuremath{#3{#1}: %%
+    \left\{ %%
+    \begin{minipage}[c]{#4}%%
+      \facts{#2} %%
+  \end{minipage}\kern -0.23em\right\}}}
+
+%% End dataflow
+

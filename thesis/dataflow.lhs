@@ -1,5 +1,6 @@
 \documentclass[12pt]{report}
 %include polycode.fmt
+\input{tikz.preamble}
 \input{preamble}
 \begin{document}
 

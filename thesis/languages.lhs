@@ -3,6 +3,7 @@
 %include lineno.fmt
 \input{preamble}
 \begin{document}
+\numbersoff
 \input{document.preamble}
 
 \chapter{The \LamA \& Functional Languages}

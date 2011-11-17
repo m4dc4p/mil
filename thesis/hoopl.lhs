@@ -1,9 +1,10 @@
 \documentclass[12pt]{report}
 %include polycode.fmt
 %include lineno.fmt
+\input{tikz.preamble}
 \input{preamble}
-\numbersoff
 \begin{document}
+\numbersoff
 \input{document.preamble}
 \chapter{The Hoopl Library}
 \label{ref_chapter_hoopl}
@@ -912,7 +913,7 @@ void example() \{
   printf("%d",c);
 \}  
 \end{AVerb}
-%%
+%% DO NOT REMOVE THIS COMMENT OR THESIS BREAKS! "cannot \unskip in vertical mode"
 \standaloneBib %%
 \end{document}
 
