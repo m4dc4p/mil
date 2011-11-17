@@ -4,7 +4,7 @@
 %include subst.fmt
 \input{preamble}
 \begin{document}
-
+\numbersoff
 \input{document.preamble}
 
 \chapter{Uncurrying}
@@ -678,11 +678,11 @@ implementation of our rewrite function for the uncurrying
 optimization. We will describe it in pieces.
 
 \begin{myfig}
-  \begin{minipage}{\hsize}\begin{withHsNum}{uncurry_fig_rewrite}
+  \begin{minipage}{\hsize}\begin{withHsLabeled}{uncurry_fig_rewrite}
 %let includeRewrite = True
 %include Uncurry.lhs
 %let includeRewrite = False
-  \end{withHsNum}\end{minipage} \\
+  \end{withHsLabeled}\end{minipage} \\
   \caption{Our rewrite function that replaces \app f * x/ expressions
     with closure allocations, if possible.}
   \label{uncurry_fig_rewrite}

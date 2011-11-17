@@ -39,43 +39,10 @@
 \usepackage{afterpage}
 \usepackage{xifthen}
 \usepackage{mathtools}
-\usepackage{xparse}
 \usepackage[natbib=true,style=authoryear,backend=bibtex8]{biblatex}
 \setlength{\bibitemsep}{\bigskipamount}
 \addbibresource{thesis.bib}
 \usepackage{microtype}
-
-\usepackage{tikz}
-\usetikzlibrary{arrows,automata,positioning,calc}
-%% Used for CFGs.
-\tikzset{
-  >=stealth, 
-  node distance=.5in,
-  stmt/.style={rectangle,
-    draw=black, thick,        
-    minimum height=2em,
-    %% inner sep=2pt,
-    %% text centered,
-    %% node distance=.5in,
-  },
-  entex/.style={
-    minimum height=2em,
-    %% inner sep=2pt,
-    %% text centered,
-  },
-  labelfor/.style={circle, 
-    draw=black, thin,
-    font={\footnotesize},
-    inner sep=0,
-    fill=white,
-    above right=-1.5mm and -1.5mm of #1,
-  },
-  fact/.style={overlay},
-  %% Invisible node
-  invis/.style={inner sep=0pt, 
-    minimum height=0em}, 
-  table/.style={circle, fill=white,height=2mm}
-}
 
 %% GSO margins.
 \usepackage[left=1.5in, right=1in, top=1in, bottom=1in]{geometry}
@@ -108,6 +75,16 @@
 \newcommand\figbegin{\rule{\linewidth}{0.4pt}\\\vspace{12pt}}
 \newcommand\figend{\rule{\linewidth}{0.4pt}}
 
+%% Sets
+\newcommand{\setL}[1]{\textsc{#1}\xspace}
+\newcommand{\setLC}{\setL{Const}}
+
+%% Lub, subset operators.
+\newcommand{\lub}{\ifmmode\sqcap\else\raisebox{.1em}{\ensuremath{\sqcap}}\fi\xspace}
+\newcommand{\sqlt}{\ensuremath{\sqsubset}\xspace}
+\newcommand{\sqlte}{\ensuremath{\sqsubseteq}\xspace}
+
+
 %\providecommand{\citep}[1]{(\emph{#1})\xspace}
 %\renewcommand{\cite}[1]{\emph{#1}\xspace}
 
@@ -136,94 +113,6 @@
 \newcommand{\lamSubst}[2]{\ensuremath{[#1 \mapsto #2]}}
 %% End functional languages chapter
 
-%% Dataflow chapter commands
-\newcounter{nodeCounter}[figure]
-\newcommand{\inE}{\ensuremath{\mathit{in}}\xspace}
-\newcommand{\out}{\ensuremath{\mathit{out}}\xspace}
-\newcommand{\In}{\ensuremath{\mathit{In}}\xspace}
-\newcommand{\InBa}{\ensuremath{\mathit{In}(B)}\xspace}
-\newcommand{\Out}{\ensuremath{\mathit{Out}}\xspace}
-%% Out(B_x) -- fact function for an named block.
-\newcommand{\OutB}[1]{\ensuremath{\mathit{Out}(B_{\ref{#1}})}\xspace}
-\newcommand{\OutBa}{\ensuremath{\mathit{Out}(B)}\xspace}
-%% in(B) -- fact function for an anonymous block.
-\newcommand{\inBa}{\ensuremath{\mathit{in}(B)}\xspace}
-%% in(X) -- fact function for an anonymous block, but using a different variable.
-\newcommand{\inXa}[1]{\ensuremath{\mathit{in}(#1)}\xspace}
-%% in(B,v) -- fact function for an anonymous block and some variable.
-\newcommand{\inBav}[1]{\ensuremath{\mathit{in}(B, #1)}\xspace}
-%% in(B_x) -- fact function for an named block.
-\newcommand{\inB}[1]{\ensuremath{\mathit{in}(B_{\ref{#1}})}\xspace}
-%% in(B_x,v) -- fact function for an named block and some variable.
-\newcommand{\inBv}[2]{\ensuremath{\mathit{in}(B_{\ref{#1}}, #2)}\xspace}
-%% out(B) -- fact function for an anonymous block.
-\newcommand{\outBa}{\ensuremath{\mathit{out}(B)}\xspace}
-%% out(Bn) -- fact function for an named block.
-\newcommand{\outBn}[1]{\ensuremath{\mathit{out}(B_{#1})}\xspace}
-%% out(X) -- fact function for an anonymous block, but using a different variable.
-\newcommand{\outXa}[1]{\ensuremath{\mathit{out}(#1)}\xspace}
-%% out(B,v) -- fact function for an anonymous block and some variable.
-\newcommand{\outBav}[1]{\ensuremath{\mathit{out}(B, #1)}\xspace}
-%% out(B_x) -- fact function for an named block.
-\newcommand{\outB}[1]{\ensuremath{\mathit{out}(B_{\ref{#1}})}\xspace}
-%% out(B_x,v) -- fact function for an named block and some variable.
-\newcommand{\outBv}[2]{\ensuremath{\mathit{out}(B_{\ref{#1}}, #2)}\xspace}
-\newcommand{\entryN}{\emph{E}\xspace}
-\newcommand{\exitN}{\emph{X}\xspace}
-\newcommand{\refNode}[1]{\ensuremath{B_{\ref{#1}}}\xspace}
-\newcommand{\labelNode}[1]{\refstepcounter{nodeCounter}\label{#1}}
-\newcommand{\setL}[1]{\textsc{#1}\xspace}
-\newcommand{\setLC}{\setL{Const}}
-
-%% Formats a list of facts
-%% Argument should be like \facts{a/1, b/2, foobar/\bot, baz/\top}.
-%% 
-\newcounter{factctr}
-\newtoks\varVal
-\newtoks\varName
-\newcommand{\facts}[1]{\begingroup%%
-  %% Test if the argument given contains a forward slash (/). Expands
-  %% slashTest with argument such that if a slash is NOT present the 
-  %% token \noSlash will be given as argument 2 to slashTest. Otherwise
-  %% there must be slash.
-  \def\hasSlash##1{\expandafter\slashTest##1/\noslash\endslash}%%
-  \def\slashTest##1/##2##3\endslash{\ifx\noslash##2 N\else Y\fi}%%
-  \def\getArgs##1/##2{\varName={##1}%%
-    \varVal={##2}}
-  \ensuremath{%%
-    \setcounter{factctr}{0}%%
-    \foreach \var in {#1}{%%
-      %% Separate list with a comma
-      \ifthenelse{\value{factctr}>0}{,\allowbreak}{}%%
-      %% \tracingmacros=1%%
-      %% If key/val arguments, use first form. Otherwise
-      %% use second.
-      \ifthenelse{\equal{\hasSlash{\var}}{Y}}%%
-                  {\expandafter\getArgs\var \factC{\the\varName}{\the\varVal}}%%
-                  {\var}%%
-      %% \tracingmacros=0%%
-      \stepcounter{factctr}%%
-    }}%%
-\endgroup}
-\newcommand{\factC}[2]{{\ensuremath{(\mathit{#1},#2)}}}
-\newcommand{\doFacts}[4]{\ensuremath{#3{#1}: %%
-    \left\{ %%
-    \begin{minipage}[c]{#4}%%
-      \facts{#2} %%
-  \end{minipage}\kern -0.23em\right\}}}
-
-\ExplSyntaxOn
-\DeclareDocumentCommand \inFactsM {m m m} {\doFacts{#1}{#2}{\inB}{#3}}
-\DeclareDocumentCommand \inFacts {m m O{1in}} {\doFacts{#1}{#2}{\inB}{#3}}
-\DeclareDocumentCommand \outFactsM {m m m} {\doFacts{#1}{#2}{\outB}{#3}}
-\DeclareDocumentCommand \outFacts {m m O{1in}} {\doFacts{#1}{#2}{\outB}{#3}}
-\ExplSyntaxOff
-
-\newcommand{\lub}{\ifmmode\sqcap\else\raisebox{.1em}{\ensuremath{\sqcap}}\fi\xspace}
-\newcommand{\sqlt}{\ensuremath{\sqsubset}\xspace}
-\newcommand{\sqlte}{\ensuremath{\sqsubseteq}\xspace}
-
-%% End dataflow
 
 %% MIL Chapter
 \newcommand{\compMILE}[1]{\ensuremath{\left\llbracket #1 \right\rrbracket}}
@@ -234,22 +123,23 @@
 
 %% Uncurrrying Chapter 
 
-{\def\.{\global\let\sp= } \. } 
-%% Disable fancyvrb's space macro. Use \begingroup to keep change
-%% local.
-\makeatletter
-\def\removespaces{\begingroup\removespaceswork}
-\def\removespaceswork{\futurelet\next\removesp}
-\newtoks\rmspace 
-\def\removesp{\ifcat\noexpand\next\sp%%
-    \rmspace={\afterassignment\removespaceswork\let\next= }%%
-    \else\rmspace={\endgroup}%%
-    \fi\the\rmspace} \makeatother 
-\def\lab#1/{\ensurett{\textbf{\removespaces #1}}}
+%% Capture a space token. Use a ``control-symbol'' (\. instead of \mksp)
+%% to keep the trailing space from getting gobbled.
+{\def\.{\global\let\sp= } \. }
+%% Define \asp, which will capture the macro definition attached to space,
+%% if one exists. Otherwise, \spa is relax after this.
+{\catcode`\ =\active\gdef\asp{\ifx \relax\let\spa\relax\else\let\spa= \fi}}
+\newtoks\foo
+%% Removes spaces, implicit, active and explicit.
+\protected\def\removespaces{\asp\afterassignment\removesp\let\next= }
+\def\removesp{\foo={\next}\ifcat\noexpand\next\sp\foo={\removespace}%%
+ \else\ifx\next\spa\foo={\removespaces}\fi%%
+ \fi\the\foo}
+\protected\def\lab#1/{\ensurett{\textbf{\removespaces #1}}}
 %% Constructs a closure: l { v1, ..., vN }
-\long\def\mkclo[#1:#2]{\text{\texttt{\textbf{#1}}}\ \ensuremath{\ensurett{\{#2\}}}\xspace}
+\protected\long\def\mkclo[#1:#2]{\text{\texttt{\textbf{#1}}}\ \ensuremath{\ensurett{\{#2\}}}\xspace}
 %% Tuple version of closurs: {l: v1, ..., vN}.
-\long\def\clo[#1:#2]{\ensuremath{\{}\ensurett{%%
+\protected\long\def\clo[#1:#2]{\ensuremath{\{}\ensurett{%%
       \ifx#1\relax%%
       \else\lab #1/%%
         \ifx#2\relax%%
@@ -257,26 +147,26 @@
         \fi%%
       \fi#2\ensuremath{\}}}\xspace}
 %% Binding statement: v <- {...}
-\long\def\binds#1<-#2;{\ensurett{\removespaces #1<-#2}\xspace}
+\protected\long\def\binds#1<-#2;{\ensurett{\removespaces #1<-#2}\xspace}
 %% In order to use \binds in verbatim environment, have to define
 %% delimiters while they are active. The below defines \vbinds which
 %% must be used in AVerb environments.  Notice the active space as
 %% well - that is necessary so the space after \vbinds (and before the
 %% first argument) in the verbatim environment gets eaten.
 \begingroup\catcode`\!=\active \lccode`\!=`\< \lccode`\~=`\- 
-  \catcode`\ =\active\lowercase{\endgroup\def\vbinds#1!~#2;}{\binds#1<-#2;}
+  \catcode`\ =\active\lowercase{\endgroup\protected\def\vbinds#1!~#2;}{\binds#1<-#2;}
 %% Return statement: return ... ;
-\long\def\return#1;{\ensurett{return\ \removespaces #1}\xspace}
+\protected\long\def\return#1;{\ensurett{return\ \removespaces #1}\xspace}
 %% A closure capturing block. k {v1, ..., vN} x: ...
-\long\def\ccblock#1(#2)#3:#4/end{\lab#1/\ \ensuremath{\{}\ensurett{#2}\ensuremath{\}}\ \ensurett{#3:\ #4}}
+\protected\long\def\ccblock#1(#2)#3:#4/end{\lab#1/\ \ensuremath{\{}\ensurett{#2}\ensuremath{\}}\ \ensurett{#3:\ #4}}
 %% A normal block
-\long\def\block#1(#2):#3/end{\lab #1/\ \ensuremath{(}\ensurett{#2}\ensuremath{)}:\ #3}
+\protected\long\def\block#1(#2):#3/end{\lab #1/\ \ensuremath{(}\ensurett{#2}\ensuremath{)}:\ #3}
 %% A goto expression
-\long\def\goto#1(#2){\texttt{\textbf{\removespaces #1}}\ \ensuremath{(}\ensurett{#2}\ensuremath{)}}
+\protected\long\def\goto#1(#2){\texttt{\textbf{\removespaces #1}}\ \ensuremath{(}\ensurett{#2}\ensuremath{)}}
 %% An enter expression
-\long\def\app#1*#2/{\texttt{\removespaces #1@#2}}
-\def\bind{\texttt{<-}\xspace}
-\def\var#1/{\texttt{\removespaces #1}\xspace}
+\protected\long\def\app#1*#2/{\texttt{\removespaces #1@#2}}
+\protected\def\bind{\texttt{<-}\xspace}
+\protected\def\var#1/{\texttt{\removespaces #1}\xspace}
 
 \def\rhs{right--hand side\xspace}
 \def\lhs{left--hand side\xspace}
@@ -327,7 +217,8 @@
   \else\label{\the\prefixtoks_#1}%%
   \fi}
 \def\unhslabel{\let\prefix=\relax}
-\newenvironment{withHsNum}[1]{\numberson\numbersreset\mkhslabel{#1}}{\unhslabel\numbersoff}
+\newenvironment{withHsNum}{\numberson\numbersreset}{\numbersoff}
+\newenvironment{withHsLabeled}[1]{\numberson\numbersreset\mkhslabel{#1}}{\unhslabel\numbersoff}
 
 %% Paragraph run-in
 \newcommand{\runin}[1]{\begingroup\noindent\sffamily\textbf{#1}\qquad\endgroup}
