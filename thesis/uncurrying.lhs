@@ -178,11 +178,11 @@ fully-applied.
 \intent{Remind reader how MIL \cc blocks are written and used.}
 Recall that MIL defines two types of blocks: ``\cc'' and ``normal.''
 Normal blocks act much like labeled locations in a program and are
-written \block: b(v_1, \dots, v_n): \dots/end.  A normal block is
+written \block b(v$!+_1+!$, \dots, v$!+_n+!$): \dots/end.  A normal block is
 called using MIL's !+goto+! expression, and receives any arguments
 given. 
 
-\Cc blocks are written \ccblock: k(v_1, \dots, v_n) x: \dots/end. A \cc
+\Cc blocks are written \ccblock k(v$!+_1+!$, $!+\dots+!$, v$!+_n+!$) x: \dots/end. A \cc
 block is always executed as the result of an \enter expression, and it
 expects to receive a closure containing captured variables $!+\{v1_,
 \dots, v_n\}+!$ as well as the argument \var x/.  That is, in the
@@ -195,14 +195,14 @@ executed using the captured variables in the closure represented by
 These two definitions allow MIL to represent function application
 uniformly. For a function with $n$ arguments, $n - 1$ \cc blocks will
 be generated. At least one normal block, \lab b/, will also be generated,
-representing the body of the function. Each \lab k_i/ \cc block,
+representing the body of the function. Each \lab k$!+_i+!$/ \cc block,
 except the last, returns a new closure pointing to the next \lab
-k_{i+1}/ \cc block. The closure created by block \lab b_i/ contains
+k$!+_{i+1}+!$/ \cc block. The closure created by block \lab b$!+_i+!$/ contains
 all values found in the closure it was given, plus the argument
-passed. The last block, \lab k_{n-1}/, does not return a new closure
+passed. The last block, \lab k$!+_{n-1}+!$/, does not return a new closure
 immediately. Instead, it calls block \lab b/, unpacking all necessary
 arguments. The value returned from block \lab b/ is then returned by
-block \lab k_{n-1}/.
+block \lab k$!+_{n-1}+!$/.
 
 \intent{Show how partial application is
   implemented.}  For example, Figure~\ref{uncurry_fig_compose_a} shows
@@ -420,9 +420,9 @@ Equation~\eqref{uncurry_df_uses} finds the facts in $F$ that represent
 a closure capturing the variable \var v/. We remove any facts in $F$
 that refer to \var v/ by subtracting the results of \mfun{uses}
 function from $F$.  We combine this set with a a new fact associating
-\var v/ with the \setL{Clo} value \clo[l: v_1, \dots, v_n]. Our result
-set shows that \var v/ now refers to the closure \clo[l: v_1, \dots,
-  v_n], and does not include any previous facts that referred to \var
+\var v/ with the \setL{Clo} value \clo[l:$!+v_1, \dots, v_n+!$]. Our result
+set shows that \var v/ now refers to the closure \clo[l:$!+v_1, \dots,
+  v_n+!$], and does not include any previous facts that referred to \var
 v/.
 
 Equation~\eqref{uncurry_df_transfer_other} applies when the \rhs of a
@@ -440,11 +440,11 @@ applies, and $t$ acts like identity --- $F$ is returned unchanged.
 gathered by $t$ allow us to replace \enter expressions with closure
 allocations if we know the value that the expression results in. For
 example, let $F$ be the facts computed so far and \app f * x/ an
-expression we may rewrite. If $(\var f/, p) \in F$ and $p = \clo[l:
-  v_1, \dots, v_n]$, then we know \var f/ represents the closure
-\clo[l: v_1, \dots, v_n]. We can rewrite \app f * x/ to \app \mkclo[l:
-  v_1, \dots, v_n] * x/. If !+l+! is also a closure-capturing block
-that returns \clo[m: c_1, \dots, c_m], we can then rewrite \app 
+expression we may rewrite. If $(\var f/, p) \in F$ and $p = $\clo[l:
+$!+v_1, \dots, v_n+!$], then we know \var f/ represents the closure
+\clo[l:$!+v_1, \dots, v_n+!$]. We can rewrite \app f * x/ to 
+\app \mkclo[l:  v_1, \dots, v_n] * x/. If !+l+! is also a closure-capturing block
+that returns \clo[m:$!+c_1, \dots, c_m+!$], we can then rewrite \app 
 \mkclo[l: v_1, \dots, v_n] * x/ to \mkclo[m: v_1, \dots, v_n, x].
 Notice we needed to add the \var x/ argument to the resulting closure
 as the block !+l+! would do the same if we had entered it.
@@ -458,8 +458,8 @@ general, optimization that inlines simple blocks into their
 predecessor. We describe the optimization in detail in
 Chapter~\ref{ref_chapter_monadic}, but in short that optimization will
 inline calls to blocks such as !+compose+!, so a statement like \binds v <-
-compose(); becomes \binds v <- \mkclo[absBodyL201:];, where !+absBodyL201+! is the
-label in the closure returned by !+compose()+!.
+\goto compose(); becomes \binds v <- \mkclo[absBodyL201:];, where !+absBodyL201+! is the
+label in the closure returned by \lab compose()/.
 
 \section{Implementation}
 \label{uncurry_sec_impl}
@@ -558,9 +558,9 @@ included in the closure returned. Otherwise, the argument will be
 ignored.
 
 \intent{Details on |Jump| value.} A |Jump| block always has the form
-\ccblock: k (v_1,\dots,v_n)  x: \goto b (\dots)/end where the
+\ccblock k (v$!+_1+!$, \dots, v$!+_n+!$)  x: \goto b ($!+\dots+!$)/end where the
 arguments to \lab b/ are not necessarily in the same order as in the
-closure \clo[:v_1,\dots,v_n] recieved by \lab k/. Each integer in the
+closure \clo[:$!+v_1, \dots, v_n+!$] recieved by \lab k/. Each integer in the
 list given to |Jump| gives the position of a variable in the closure
 received \lab k/. The arguments to the block \lab b/ are built by
 traversing the list from beginning to end, putting the variable
@@ -655,7 +655,7 @@ to the set returned by |kill| and return the result.
     \binds v0 <- \mkclo[k0:]; & $\top$ & . & . & . \\
     \binds v1 <- \app v0 * n/; & . & \clo[k0:] & . & . \\
     \binds v2 <- \app v1 * n/; & . & . & $\top$ & . \\
-    \return: v2; & . & . & . & $\top$ \\
+    \return v2; & . & . & . & $\top$ \\
   \end{tabular}
   \caption{Facts about each variable in the \lab main/ block of
     our example program from Figure~\ref{uncurry_fig_eg}.}
@@ -740,7 +740,7 @@ not find any more \bind statements to transform.
         \vbinds v0 <- \mkclo[k0:];
         \vbinds v1 <- \app v0 * n/;
         \vbinds v2 <- \app v1 * n/;
-        \return: v2; 
+        \return v2; 
       \end{AVerb}
     \end{minipage}  \\\\
     1 & \begin{minipage}[t]{2in}
@@ -749,7 +749,7 @@ not find any more \bind statements to transform.
         \vbinds v0 <- \mkclo[k0:];
         \llap{\ensuremath{\rightarrow} }\vbinds v1 <- \mkclo[k1:n]; \ensuremath{\leftarrow}
         \vbinds v2 <- \app v1 * n/;
-        \return: v2;
+        \return v2;
       \end{AVerb}
     \end{minipage}  \\\\
     2 & \begin{minipage}[t]{2in}
@@ -758,7 +758,7 @@ not find any more \bind statements to transform.
         \vbinds v0 <- \mkclo[k0:];
         \vbinds v1 <- \mkclo[k1:n];
         \llap{\ensuremath{\rightarrow} }\vbinds v2 <- \goto add(n, n); \ensuremath{\leftarrow}
-        \return: v2;
+        \return v2;
       \end{AVerb}
     \end{minipage} 
   \end{tabular}
@@ -805,8 +805,8 @@ appear in the closure. However, if \lab add/ took arguments in
 opposite order, \lab k1/ and \lab add/ would look like:
 \begin{singlespace}
   \begin{AVerb}
-    \ccblock:k1(a)b:\goto add(b, a)/end
-    \block:add(x, y):\ldots/end
+    \ccblock 1(a)b:\goto add(b, a)/end
+    \block add(x, y):\ldots/end
   \end{AVerb}
 \end{singlespace}
 \noindent And the |DestOf| value associated with \lab k1/ would be |Jump

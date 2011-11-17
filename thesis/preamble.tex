@@ -234,27 +234,30 @@
 
 %% Uncurrrying Chapter 
 
-\def\rhs{right--hand side\xspace}
-\def\lhs{left--hand side\xspace}
-\def\bind{\texttt{<-}\xspace}
-\def\var#1/{\texttt{\removespaces#1}\xspace}
-\let\sp=\ 
-\def\removespaces{\afterassignment\removesp\let\next=}
-\def\removesp{\ifx\next\sp\let\next=\removespaces%%
-\fi\next}  
-\protected\def\lab#1/{\ensuremath{\mathbf{\mathtt{\removespaces#1}}}\xspace}
+{\def\.{\global\let\sp= } \. } 
+%% Disable fancyvrb's space macro. Use \begingroup to keep change
+%% local.
+\makeatletter
+\def\removespaces{\begingroup\removespaceswork}
+\def\removespaceswork{\futurelet\next\removesp}
+\newtoks\rmspace 
+\def\removesp{\ifcat\noexpand\next\sp%%
+    \rmspace={\afterassignment\removespaceswork\let\next= }%%
+    \else\rmspace={\endgroup}%%
+    \fi\the\rmspace} \makeatother 
+\def\lab#1/{\ensurett{\textbf{\removespaces #1}}}
 %% Constructs a closure: l { v1, ..., vN }
 \long\def\mkclo[#1:#2]{\text{\texttt{\textbf{#1}}}\ \ensuremath{\ensurett{\{#2\}}}\xspace}
 %% Tuple version of closurs: {l: v1, ..., vN}.
-\long\def\clo[#1:#2]{\ensuremath{\ensurett{\{%%
+\long\def\clo[#1:#2]{\ensuremath{\{}\ensurett{%%
       \ifx#1\relax%%
-      \else\texttt{\textbf{#1}}%%
+      \else\lab #1/%%
         \ifx#2\relax%%
         \else:\ %%
         \fi%%
-      \fi#2\}}\xspace}}
+      \fi#2\ensuremath{\}}}\xspace}
 %% Binding statement: v <- {...}
-\long\def\binds#1<-#2;{\ensurett{\removespaces#1<-#2}\xspace}
+\long\def\binds#1<-#2;{\ensurett{\removespaces #1<-#2}\xspace}
 %% In order to use \binds in verbatim environment, have to define
 %% delimiters while they are active. The below defines \vbinds which
 %% must be used in AVerb environments.  Notice the active space as
@@ -263,16 +266,20 @@
 \begingroup\catcode`\!=\active \lccode`\!=`\< \lccode`\~=`\- 
   \catcode`\ =\active\lowercase{\endgroup\def\vbinds#1!~#2;}{\binds#1<-#2;}
 %% Return statement: return ... ;
-\long\def\return#1;{\ensuremath{\ensurett{return\ \removespaces#1}}\xspace}
+\long\def\return#1;{\ensurett{return\ \removespaces #1}\xspace}
 %% A closure capturing block. k {v1, ..., vN} x: ...
-\long\def\ccblock#1(#2)#3:#4/end{\lab#1/\ \ensuremath{\ensurett{\{\ensurett{#2}\}\ #3:\ #4}}}
+\long\def\ccblock#1(#2)#3:#4/end{\lab#1/\ \ensuremath{\{}\ensurett{#2}\ensuremath{\}}\ \ensurett{#3:\ #4}}
 %% A normal block
-\long\def\block#1(#2):#3/end{\lab#1/\ \ensuremath{\ensurett(#2):\ #3}}
+\long\def\block#1(#2):#3/end{\lab #1/\ \ensuremath{(}\ensurett{#2}\ensuremath{)}:\ #3}
 %% A goto expression
-\long\def\goto#1(#2){\texttt{\textbf{#1}}\ \ensuremath{\ensurett{(#2)}}}
+\long\def\goto#1(#2){\texttt{\textbf{\removespaces #1}}\ \ensuremath{(}\ensurett{#2}\ensuremath{)}}
 %% An enter expression
 \long\def\app#1*#2/{\texttt{\removespaces #1@#2}}
+\def\bind{\texttt{<-}\xspace}
+\def\var#1/{\texttt{\removespaces #1}\xspace}
 
+\def\rhs{right--hand side\xspace}
+\def\lhs{left--hand side\xspace}
 \def\enter{\texttt{@}\xspace}
 \def\cc{closure--capturing\xspace}
 \def\Cc{Closure--capturing\xspace}
@@ -321,7 +328,6 @@
   \fi}
 \def\unhslabel{\let\prefix=\relax}
 \newenvironment{withHsNum}[1]{\numberson\numbersreset\mkhslabel{#1}}{\unhslabel\numbersoff}
-\numbersoff
 
 %% Paragraph run-in
 \newcommand{\runin}[1]{\begingroup\noindent\sffamily\textbf{#1}\qquad\endgroup}
