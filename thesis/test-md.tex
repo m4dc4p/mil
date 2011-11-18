@@ -2,11 +2,23 @@
 \input{preamble}
 \begin{document}
 
+  \begin{AVerb}
+    \block absBlockL209 (f):/end
+      \vbinds v210 <- \mkclo[absBodyL201:];
+      \mkclo[absBodyL202:f]
+  \end{AVerb}
+
 \begin{AVerb}
   \vbinds v1 <- \app v0 * n/;
   \vbinds v2 <- \app v1 * n/;
   \return v2; 
 \end{AVerb}
+
+function from $F$.  We combine this set with a a new fact associating
+\var v/ with the \setL{Clo} value \clo[l:v_1, \dots, v_n]. Our result
+set shows that \var v/ now refers to the closure \clo[l:v_1, \dots,
+  v_n], and does not include any previous facts that referred to \var
+v/.
 
 Recall \clo[k0:] 
 that MIL defines two types of blocks: ``\cc'' and ``normal.''

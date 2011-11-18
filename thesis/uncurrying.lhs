@@ -26,7 +26,7 @@ application can be very convenient for programmers, but it can also be
 very inefficient. Conceptually, an uncurried function does real work
 with each application --- that is, each application executes the body
 of the function. A curried function does not do any real work until 
-given all its arguments; each in-between application essentially creates
+given all its arguments; each in--between application essentially creates
 a new function. 
 
 \intent{Introduce uncurrying optimization.} This chapter describes our
@@ -61,18 +61,18 @@ our experience in Section~\ref{uncurry_sec_refl}.
 \section{Partial Application}
 \label{uncurry_sec_papp}
 \intent{Motivate partial application --- what does it buy us?}  Partial
-application in functional programming promotes re-usability and
+application in functional programming promotes reusability and
 abstraction. It allows the programmer to define specialized functions
 by fixing some of the arguments to a general function.
 
 \begin{myfig}
 > map1 :: (a -> b) -> [a] -> [b]
-> map1 = {-"\ldots"-}
+> map1 f xs = {-"\ldots"-}
 >
 > map2 :: ((a -> b), [a]) -> b
-> map2 = {-"\ldots"-}
-  \caption{Haskell definitions in curried and uncurried style. |map|
-    can be easily partially applied to produce specialized functions; |foldr|
+> map2 (f, xs) = {-"\ldots"-}
+  \caption{Haskell definitions in curried and uncurried style. |map1|
+    can be easily partially applied to produce specialized functions; |map2|
     cannot.}
   \label{uncurry_fig_partapp}
 \end{myfig}
@@ -113,11 +113,9 @@ we cannot define |upCase1| very easily:\footnote{Again, the
   implementation of map is not relevant here, so we elide it.}
 
 \begin{singlespace}\correctspaceskip
-  \begin{MILVerb}[gobble=4]
-    function map (f, xs) { 
-      \ldots
-    };
-  \end{MILVerb}
+  \begin{Verb}[gobble=4]
+    function map (f, xs) { \ldots };
+  \end{Verb}
 \end{singlespace}
 
 \noindent
@@ -125,7 +123,7 @@ However, the following definition of |curry| converts a
 two-argument function to one that can be partially applied:
 
 \begin{singlespace}\correctspaceskip
-  \begin{MILVerb}[gobble=4]
+  \begin{Verb}[gobble=4]
     function curry(f) {
       return function (a) {
         return function(b) {
@@ -133,18 +131,18 @@ two-argument function to one that can be partially applied:
         };
       }; 
     }
-  \end{MILVerb}
+  \end{Verb}
 \end{singlespace}
 
 \noindent
 And now we can define |upCase1|:
 
 \begin{singlespace}\correctspaceskip
-  \begin{MILVerb}[gobble=4]
+  \begin{Verb}[gobble=4]
     var upCase1 = curry(map)(function(c) { 
       return c.toUpper(); 
     });
-  \end{MILVerb}
+  \end{Verb}
 \end{singlespace}
 
 \section{Cost of Partial Application}
@@ -152,11 +150,11 @@ And now we can define |upCase1|:
 \intent{Demonstrates why partial application can be inefficient.}
 Function application, regardless of whether partial application is
 supported or not, almost always generates code that jumps from one
-section of the program to another.\footnote{Inlining can remove the
-  need for jumps, but of course increases code size.} At the assembly
+section of the program to another.\footnote{Inlining can remove some
+  jumps, at the cost of increasing code size.} At the assembly
 language level, function application is expensive because multiple
 operations must take place to implement it: saving registers, loading
-addresses, and finally jumping to the target location. 
+addresses, and finally jumping to the target location.
 
 Partial application exagerates all these costs by essentially creating
 a \emph{series} of functions, each of which gathers arguments and
@@ -165,44 +163,56 @@ when all the arguments are gathered does the function do ``real work''
 --- that is, something besides allocating closures and gathering up
 arguments.
 
-Partial application also influences the code
-generated to implement function application. Rather than generate
-specialized code for partially versus fully-applied functions, it is
-simplest to generate the same code for all applications, partial or
-otherwise. That means every function application pays the price of
-partial application, even if the function is ``obviously''
-fully-applied.
+Partial application also influences the code generated to implement
+function application. Rather than generate specialized code for
+partially versus fully-applied functions, it is simplest to generate
+the same code for all applications, partial or otherwise. That means
+every function application pays the price of partial application, even
+if the function is ``obviously'' fully-applied.
 
 \section{Partial Application in MIL}
 \label{uncurry_sec_examples}
 \intent{Remind reader how MIL \cc blocks are written and used.}
 Recall that MIL defines two types of blocks: ``\cc'' and ``normal.''
 Normal blocks act much like labeled locations in a program and are
-written \block b(v$!+_1+!$, \dots, v$!+_n+!$): \dots/end.  A normal block is
-called using MIL's !+goto+! expression, and receives any arguments
-given. 
+written:
 
-\Cc blocks are written \ccblock k(v$!+_1+!$, $!+\dots+!$, v$!+_n+!$) x: \dots/end. A \cc
-block is always executed as the result of an \enter expression, and it
-expects to receive a closure containing captured variables $!+\{v1_,
-\dots, v_n\}+!$ as well as the argument \var x/.  That is, in the
-expression \app f * x/, \var f/ represents a closure that points to
-some \cc block \lab k/ which expects a set of captured variables and
-an argument. The \enter expression causes the block \lab k/ to be
-executed using the captured variables in the closure represented by
-\var f/ and with the argument \var x/.
+\block b(v_1, \dots, v_n): \ldots
+
+\noindent  A normal block is
+executed by writing \goto b(v_1, \dots, v_n) (``goto''). 
+
+\Cc blocks are also like labelled locations, except they expect to
+recieve a closure and an argument when called. We write \cc blocks as:
+
+\ccblock k(v_1, \dots, v_n) x: \ldots
+
+\noindent A \cc block is always executed as the result of an
+expression like \app f * x/, and expects to receive the argument \var
+x/ and a closure containing captured variables $!+\{v_1, \dots,
+v_n\}+!$. In the expression \app f * x/, \var f/ represents a closure
+that points to some \cc block \lab k/ which expects a set of captured
+variables and an argument. The \enter expression causes the block \lab
+k/ to be executed using the captured variables in the closure
+represented by \var f/ and with the argument \var x/.
 
 These two definitions allow MIL to represent function application
-uniformly. For a function with $n$ arguments, $n - 1$ \cc blocks will
-be generated. At least one normal block, \lab b/, will also be generated,
-representing the body of the function. Each \lab k$!+_i+!$/ \cc block,
-except the last, returns a new closure pointing to the next \lab
-k$!+_{i+1}+!$/ \cc block. The closure created by block \lab b$!+_i+!$/ contains
-all values found in the closure it was given, plus the argument
-passed. The last block, \lab k$!+_{n-1}+!$/, does not return a new closure
-immediately. Instead, it calls block \lab b/, unpacking all necessary
-arguments. The value returned from block \lab b/ is then returned by
-block \lab k$!+_{n-1}+!$/.
+uniformly. For a function with $n$ arguments, $n - 1$ \cc blocks and
+at least one normal block will be generated. We will label the \cc
+blocks as \lab k$!+_i+!$/ and the normal block as \lab b/. We write each
+\lab k$!+_i+!$/ block, except the last, as:
+
+\ccblock k$!+_i+!$(v_1,\dots,v_n) x: \mkclo[k$!+_{i+1}+!$:v_1,\dots,v_n, x].
+
+\noindent This means the block \lab k$!+_i+!$/ returns a new closure
+that points to the next \lab k$!+_{i+1}+!$/ \cc block, contains all values
+in the closure given (i.e., $!+v_1, \dots, v_n+!$), plus the
+new argument \var x/. 
+
+The last block, \lab k$!+_{n-1}+!$/, does not return a new closure
+immediately. Instead, it calls the normal block, \lab b/, unpacking
+all necessary arguments. The value returned from block \lab b/ is then
+returned by block \lab k$!+_{n-1}+!$/.
 
 \intent{Show how partial application is
   implemented.}  For example, Figure~\ref{uncurry_fig_compose_a} shows
@@ -212,9 +222,9 @@ partial application.
 
 Figure~\ref{uncurry_fig_compose_b} shows the MIL code for the
 definitions in Part~\subref{uncurry_fig_compose_a}. In particular, the
-block !+compose1+! acts as the top-level entry point for |compose1|,
-returning a closure pointing to !+absBodyL208+!. When entered,
-!+absBodyL208+! will jump to the block !+absBlockL209+! with !+f+!,
+block \lab compose1/ acts as the top-level entry point for |compose1|,
+returning a closure pointing to \lab absBodyL208/. When entered,
+\lab absBodyL208/ will jump to the block \lab absBlockL209/ with \var f/,
 the captured argument. 
 
 \begin{myfig}
@@ -226,21 +236,21 @@ the captured argument.
     \end{minipage} \\
     \hss\scap{uncurry_fig_compose_a}\hss \\
     \begin{minipage}{\hsize}
-      \begin{MILVerb}
-compose1 (): absBodyL208 {}
-absBodyL208 {} f: absBlockL209(f)
-absBlockL209 (f):
-  v210 <- compose()
-  v210 @@ f
+      \begin{AVerb}
+\block compose1(): \mkclo[absBodyL208:]
+\ccblock absBodyL208()f: \goto absBlockL209(f)
+\block absBlockL209(f):
+  \vbinds v210 <- \goto compose();
+  \app v210 * f/
 
-compose (): absBodyL201 {} 
-absBodyL201 {} f: absBodyL202 {f}
-absBodyL202 {f} g: absBodyL203 {f, g}
-absBodyL203 {f, g} x: absBlockL204(f, g, x)
-absBlockL204 (f, g, x):
-  v205 <- g @@ x
-  f @@ v205
-      \end{MILVerb}
+\block compose(): \mkclo[absBodyL201:]
+\ccblock absBodyL201()f: \mkclo[absBodyL202:f]
+\ccblock absBodyL202(f)g: \mkclo[absBodyL203:f, g]
+\ccblock absBodyL203(f, g)x: \goto absBlockL204(f, g, x)
+\block absBlockL204(f, g, x):
+  \vbinds v205 <- \app g * x/;
+  \app f * v205/
+      \end{AVerb}
     \end{minipage} \\
     \hss\scap{uncurry_fig_compose_b}\hss
   \end{tabular}
@@ -250,11 +260,11 @@ absBlockL204 (f, g, x):
   \label{uncurry_fig_compose}
 \end{myfig}
 
-Block~!+absBlockL209+! actually implements partial application. It
-evaluates the !+compose+! block, getting a closure that points to the
-top-level entry point for |compose|. !+absBlockL209+! applies that
-value to !+f+! and returns the result. The value returned by
-block~!+absBlockL209+! is a closure that points to !+absBodyL202+!,
+Block~\lab absBlockL209/ actually implements partial application. It
+evaluates the \lab compose/ block, getting a closure that points to the
+top-level entry point for |compose|. \lab absBlockL209/ applies that
+value to \var f/ and returns the result. The value returned by
+block~\lab absBlockL209/ is a closure that points to \lab absBodyL202/,
 second in the chain of \cc blocks that eventually result
 in executing |compose| with all its arguments. In other words, the
 result of applying |compose1| is a function that will take two more
@@ -263,40 +273,47 @@ arguments and then execute |compose| with them.
 \section{Uncurrying MIL blocks}
 \label{uncurry_sec_mil}
 \intent{Show uncurrying by example, continuing discussion in previous
-  section.}  Examination of !+absBlockL209+! in
+  section.}  Examination of \lab absBlockL209/ in
 Figure~\ref{uncurry_fig_compose_b} reveals one opportunity for
-optimization: the call to !+compose()+! results in a closure that is
-entered on the next line with argument !+f+!. We could rewrite the
+optimization: the call to \goto compose() results in a closure that is
+entered on the next line with argument \var f/. We could rewrite the
 program to use the closure directly:
+
 \begin{singlespace}\correctspaceskip
-  \begin{MILVerb}[gobble=4]
-    absBlockL209 (f):
-      v210 <- closure absBodyL201 {} 
-      v210 @@ f
-  \end{MILVerb}
+  \begin{AVerb}[gobble=4]
+    \block absBlockL209(f):
+      \vbinds v210 <- \mkclo[absBodyL201:];
+      \app v210 * f/
+  \end{AVerb}
 \end{singlespace}
-\noindent Now we can see that !+v210+! refers to a closure pointing to
-!+absBodyL201+! that captures no variables. Block~!+absBodyL201+! also
-returns a closure, this time capturing its argument and pointing to 
-block~!+absBodyL202+!. We can rewrite our program again to use
-the value returned by !+absBodyL201+! directly:
+
+\noindent Now we can see that \var v210/ refers to a closure pointing
+to \lab absBodyL201/ that captures no variables. Block~\lab
+absBodyL201/ also returns a closure, this time capturing its argument
+and pointing to block~\lab absBodyL202/. With this knowledge, we can
+replace the expression \app v210 * f/ with the closure we know it will
+evaluate to:
+
 \begin{singlespace}\correctspaceskip
-  \begin{MILVerb}[gobble=4]
-    absBlockL209 (f):
-      v210 <- closure absBodyL201 {} 
-      closure absBodyL202 {f}
-  \end{MILVerb}
+  \begin{AVerb}[gobble=4]
+    \block absBlockL209(f):
+      \vbinds v210 <- \mkclo[absBodyL201:];
+      \mkclo[absBodyL202:f]
+  \end{AVerb}
 \end{singlespace}
-\noindent The first value, !+v210+!, becomes irrelevant after our
-second rewrite, allowing us to rewrite !+absBlockL209+! one more time,
+
+\noindent The first value, \var v210/, becomes irrelevant after our
+second rewrite, allowing us to rewrite \lab absBlockL209/ one more time,
 producing:
+
 \begin{singlespace}\correctspaceskip
-  \begin{MILVerb}[gobble=4]
-    absBlockL209 (f): closure absBodyL202 {f}
-  \end{MILVerb}
+  \begin{AVerb}[gobble=4]
+    \block absBlockL209(f): \mkclo[absBodyL202:f]
+  \end{AVerb}
 \end{singlespace}
+
 \noindent Thus, by uncurrying we have eliminated the creation of one
-closure and the execution of at least one |Enter| instruction.
+closure and the execution of at least one \enter instruction.
 
 \intent{Describe uncurrying in more general terms-- what do we do,
   what don't we do.}  Our uncurrying optimization transforms MIL
@@ -420,9 +437,9 @@ Equation~\eqref{uncurry_df_uses} finds the facts in $F$ that represent
 a closure capturing the variable \var v/. We remove any facts in $F$
 that refer to \var v/ by subtracting the results of \mfun{uses}
 function from $F$.  We combine this set with a a new fact associating
-\var v/ with the \setL{Clo} value \clo[l:$!+v_1, \dots, v_n+!$]. Our result
-set shows that \var v/ now refers to the closure \clo[l:$!+v_1, \dots,
-  v_n+!$], and does not include any previous facts that referred to \var
+\var v/ with the \setL{Clo} value \clo[l:v_1, \dots, v_n]. Our result
+set shows that \var v/ now refers to the closure \clo[l:v_1, \dots,
+  v_n], and does not include any previous facts that referred to \var
 v/.
 
 Equation~\eqref{uncurry_df_transfer_other} applies when the \rhs of a
@@ -440,14 +457,14 @@ applies, and $t$ acts like identity --- $F$ is returned unchanged.
 gathered by $t$ allow us to replace \enter expressions with closure
 allocations if we know the value that the expression results in. For
 example, let $F$ be the facts computed so far and \app f * x/ an
-expression we may rewrite. If $(\var f/, p) \in F$ and $p = $\clo[l:
-$!+v_1, \dots, v_n+!$], then we know \var f/ represents the closure
-\clo[l:$!+v_1, \dots, v_n+!$]. We can rewrite \app f * x/ to 
-\app \mkclo[l:  v_1, \dots, v_n] * x/. If !+l+! is also a closure-capturing block
-that returns \clo[m:$!+c_1, \dots, c_m+!$], we can then rewrite \app 
+expression we may rewrite. If $(\var f/, p) \in F$ and $p = \clo[l:
+v_1, \dots, v_n]$, then we know \var f/ represents the closure
+\clo[l:v_1, \dots, v_n]. We can rewrite \app f * x/ to 
+\app \mkclo[l:  v_1, \dots, v_n] * x/. If \lab l/ is also a closure-capturing block
+that returns \clo[m:c_1, \dots, c_m], we can then rewrite \app 
 \mkclo[l: v_1, \dots, v_n] * x/ to \mkclo[m: v_1, \dots, v_n, x].
 Notice we needed to add the \var x/ argument to the resulting closure
-as the block !+l+! would do the same if we had entered it.
+as the block \lab l/ would do the same if we had entered it.
 
 \intent{Point out we don't inline closures from |Goto| expressions.}
 The example we discussed in Section~\ref{uncurry_sec_mil} does not
@@ -457,9 +474,9 @@ their closure result. Our implementation relies on another, more
 general, optimization that inlines simple blocks into their
 predecessor. We describe the optimization in detail in
 Chapter~\ref{ref_chapter_monadic}, but in short that optimization will
-inline calls to blocks such as !+compose+!, so a statement like \binds v <-
-\goto compose(); becomes \binds v <- \mkclo[absBodyL201:];, where !+absBodyL201+! is the
-label in the closure returned by \lab compose()/.
+inline calls to blocks such as \lab compose/, so a statement like \binds v <-
+\goto compose(); becomes \binds v <- \mkclo[absBodyL201:];, where \lab absBodyL201/ is the
+label in the closure returned by \goto compose().
 
 \section{Implementation}
 \label{uncurry_sec_impl}
@@ -499,19 +516,19 @@ that applies the optimization to a given program.
 
 \begin{myfig}
   \begin{minipage}{\hsize}\singlespacing
-    \begin{MILVerb}[gobble=6]
-      main(s):
-        n <- toInt(s)
-        v0 <- k0 {}
-        v1 <- v0 @@ n
-        v2 <- v1 @@ n
-        return v2
+    \begin{AVerb}[gobble=6]
+      \block main(s):
+        \vbinds n <- \goto toInt(s);
+        \vbinds v0 <- \mkclo[k0:];
+        \vbinds v1 <- \app v0 * n/;
+        \vbinds v2 <- \app v1 * n/;
+        \return v2;
 
-      k0 {} a: k1 {a} 
-      k1 {a} b: add(a, b)
-      add(x, y): plus*(x, y)
-      toInt(s): atoi*(s)
-    \end{MILVerb}
+      \ccblock k0()a: \mkclo[k1:a]
+      \ccblock k1(a)b: \goto add(a, b)
+      \block add(x, y): \prim plus(x, y)
+      \block toInt(s): \prim atoi(s)
+    \end{AVerb}
   \end{minipage} \\
   \caption{Example program.}
   \label{uncurry_fig_eg}
@@ -558,19 +575,19 @@ included in the closure returned. Otherwise, the argument will be
 ignored.
 
 \intent{Details on |Jump| value.} A |Jump| block always has the form
-\ccblock k (v$!+_1+!$, \dots, v$!+_n+!$)  x: \goto b ($!+\dots+!$)/end where the
+``\ccblock k (v_1, \dots, v_n) x: \goto b (\ldots)'' where the
 arguments to \lab b/ are not necessarily in the same order as in the
-closure \clo[:$!+v_1, \dots, v_n+!$] recieved by \lab k/. Each integer in the
+closure \clo[k:v_1, \dots, v_n] recieved by \lab k/. Each integer in the
 list given to |Jump| gives the position of a variable in the closure
 received \lab k/. The arguments to the block \lab b/ are built by
 traversing the list from beginning to end, putting the variable
 indicated by the index into the corresponding argument for the
-block. For example, the block !+c+!  in the following:
+block. For example, the block \lab c/  in the following:
 \begin{singlespace}\correctspaceskip
-  \begin{MILVerb}[gobble=4]
-    c {a, b} x: l (x, a, b)
-    l (x, a, b): \dots
-  \end{MILVerb}
+  \begin{AVerb}[gobble=4]
+    \ccblock c(a, b)x: \goto l(x, a, b)
+    \block l(x, a, b): \ldots
+  \end{AVerb}
 \end{singlespace}
 \noindent would be represented by the value |Jump {-"\lab l/\ "-} [2, 0,
   1]|, because the variables from the closure \clo[:a, b] and the
@@ -805,8 +822,8 @@ appear in the closure. However, if \lab add/ took arguments in
 opposite order, \lab k1/ and \lab add/ would look like:
 \begin{singlespace}
   \begin{AVerb}
-    \ccblock 1(a)b:\goto add(b, a)/end
-    \block add(x, y):\ldots/end
+    \ccblock 1(a)b: \goto add(b, a)
+    \block add(x, y): \ldots
   \end{AVerb}
 \end{singlespace}
 \noindent And the |DestOf| value associated with \lab k1/ would be |Jump
