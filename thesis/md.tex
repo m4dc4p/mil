@@ -54,10 +54,13 @@
 %% Step 2 of startTT. Compare captured token to + and go to step 3 if true. Otherwise
 %% output a ! (since that started our macro), the argument captured and stop
 %% processing.
-\long\def\startTTB{\ifx\next+\expandafter\startTTC\expandafter\@gobble\else\mdbang\fi} %%
+\newtoks\starttoks
+\long\def\startTTB{\starttoks={\mdbang}%%
+  \ifx\next+\starttoks={\startTTC\begingroup\@gobble}\fi%%
+\the\starttoks} %%
 %% Step 3 of startTT. Start a new group and set up
 %% tt conditional. 
-\def\startTTC{\begingroup%%
+\def\startTTC#1{\toks255={#1}\showthe\toks255#1%%
   \ifmmode%%
   \let \math@bgroup \relax%%
   \def \math@egroup {\let \math@bgroup \@@math@bgroup%%
@@ -68,22 +71,18 @@
 %% Step 1, 2  and 3 of stopTT follow the same pattern as startTT.
 %% Step 1, 2  and 3 of stopTT follow the same pattern as startTT.
 \def\stopTTA{\futurelet\next\stopTTB} %%
-\long\def\stopTTB{\ifx\next!\expandafter\stopTTC\expandafter\@gobble\else\mdplus\fi} %%
-\def\stopTTC{\endgroup}%%
+\long\def\stopTTB{\starttoks={\mdplus}%%
+  \ifx\next!\starttoks={\stopTTC\endgroup\@gobble}\fi%%
+\the\starttoks} %%
+\def\stopTTC#1{#1}%%
 %% Shift into typewriter mode if not already in it.
 %% Only applies when a group immediately follows \ensurett.
+\newtoks\ensuretoks %%
 \def\ensurett{%%
-\def\ensurettB{\ifx\next\bgroup%% test for group
-  \startTTC%% enter tt mode
-  \let\next=\ensurettC%%
-  \else\let\next=\relax%% not followed by a group, do nothing
+\def\ensurettB{\ensuretoks={\next}\ifx\next\bgroup%% test for group
+  \ensuretoks={\next\startTTC\relax}
   \fi%%
-  \next}%%
-\def\ensurettC{\afterassignment\ensurettD\let\next=}%% capture { character, run \ensurettD
-\def\ensurettD{\next%% re-insert captured { character.
-  %% inside group now, now we can ensure \stopTTC runs 
-  %% when we leave it.
-  \aftergroup\stopTTC}%%
-\futurelet\next\ensurettB}%%
+  \the\ensuretoks}%%
+\afterassignment\ensurettB\let\next= }%%
 \catcode`!=12\catcode`+=12
 \makeatother

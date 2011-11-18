@@ -135,7 +135,7 @@
 \def\removesp{\foo={\next}\ifcat\noexpand\next\sp\foo={\removespace}%%
  \else\ifx\next\spa\foo={\removespaces}\fi%%
  \fi\the\foo}
-\protected\def\lab#1/{\startTTC\textbf{\removespaces #1}\stopTTC}
+\protected\def\lab#1/{\ensurett{\textbf{\removespaces #1}}}
 %% Constructs a closure: l { v1, ..., vN }
 \protected\long\def\mkclo[#1:#2]{\text{\texttt{\textbf{#1}}}\ \ensuremath{\ensurett{\{#2\}}}\xspace}
 %% Tuple version of closurs: {l: v1, ..., vN}.
@@ -156,17 +156,17 @@
 \begingroup\catcode`\!=\active \lccode`\!=`\< \lccode`\~=`\- 
   \catcode`\ =\active\lowercase{\endgroup\def\vbinds#1!~#2;}{\binds#1<-#2;}
 %% Return statement: return ... ;
-\protected\long\def\return#1;{\startTTC return\ \removespaces #1\stopTTC\xspace}
+\protected\long\def\return#1;{\ensurett{return\ \removespaces #1}\xspace}
 %% A closure capturing block. k {v1, ..., vN} x: ...
-\protected\long\def\ccblock#1(#2)#3:{\lab#1/\ \ensuremath{\{\startTTC #2\stopTTC\}}\ \ensurett{#3:}}
+\protected\long\def\ccblock#1(#2)#3:{\lab#1/\ \ensuremath{\{\ensurett{#2}\}}\ \ensurett{#3:}}
 %% A normal block
-\protected\long\def\block#1(#2):{\lab #1/\ \ensuremath{(\startTTC #2\stopTTC)}\ensurett{:}}
+\protected\long\def\block#1(#2):{\lab #1/\ \ensuremath{(\ensurett{#2})}\ensurett{:}}
 %% A goto expression
 \protected\long\def\goto#1(#2){\texttt{\textbf{\removespaces #1}}\ \ensuremath{(\ensurett{#2})}}
 %% An enter expression
 \protected\long\def\app#1*#2/{\texttt{\removespaces #1@#2}}
 \protected\def\bind{\texttt{<-}\xspace}
-\protected\def\prim#1(#2){\lab #1/*\ensuremath{(\startTTC #2\stopTTC)}}
+\protected\def\prim#1(#2){\lab #1/*\ensuremath{(\ensurett{#2})}}
 \protected\def\var#1/{\texttt{\removespaces #1}\xspace}
 
 \def\rhs{right--hand side\xspace}

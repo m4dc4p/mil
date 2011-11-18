@@ -202,11 +202,11 @@ at least one normal block will be generated. We will label the \cc
 blocks as \lab k$!+_i+!$/ and the normal block as \lab b/. We write each
 \lab k$!+_i+!$/ block, except the last, as:
 
-\ccblock k$!+_i+!$(v_1,\dots,v_n) x: \mkclo[k$!+_{i+1}+!$:v_1,\dots,v_n, x].
+\ccblock k$!+_i+!$(v_1,\dots,v_n)x: \mkclo[k$!+_{i+1}+!$:v_1,\dots,v_n, x].
 
 \noindent This means the block \lab k$!+_i+!$/ returns a new closure
 that points to the next \lab k$!+_{i+1}+!$/ \cc block, contains all values
-in the closure given (i.e., $!+v_1, \dots, v_n+!$), plus the
+in the closure given (i.e., $\{!+v_1, \dots, v_n+!\}$), plus the
 new argument \var x/. 
 
 The last block, \lab k$!+_{n-1}+!$/, does not return a new closure
