@@ -123,6 +123,10 @@
 
 %% Uncurrrying Chapter 
 
+%% A space equal to a \thinspace, but we
+%% break a line at it.
+\newskip\thinskipamt \thinskipamt=.16666em 
+\protected\def\thinskip{\hskip \thinskipamt\relax}
 %% Capture a space token. Use a ``control-symbol'' (\. instead of \mksp)
 %% to keep the trailing space from getting gobbled.
 {\def\.{\global\let\sp= } \. }
@@ -135,19 +139,19 @@
 \def\removesp{\foo={\next}\ifcat\noexpand\next\sp\foo={\removespace}%%
  \else\ifx\next\spa\foo={\removespaces}\fi%%
  \fi\the\foo}
-\protected\def\lab#1/{\ensurett{\textbf{\removespaces #1}}}
+\protected\long\def\lab#1/{\textbf{\ensurett{\removespaces #1}}}
 %% Constructs a closure: l { v1, ..., vN }
-\protected\long\def\mkclo[#1:#2]{\text{\texttt{\textbf{#1}}}\ \ensuremath{\ensurett{\{#2\}}}\xspace}
+\protected\long\def\mkclo[#1:#2]{\lab #1/\ensuremath{\thinspace\{\ensurett{#2}\}}\xspace}
 %% Tuple version of closurs: {l: v1, ..., vN}.
-\protected\long\def\clo[#1:#2]{\ensuremath{\{}%%
+\protected\long\def\clo[#1:#2]{\ensuremath{\{%%
       \ifx#1\relax%%
       \else\lab #1/%%
         \ifx#2\relax%%
-        \else\ensurett{:\ }%%
+        \else\ensurett{:\thinskip}%%
         \fi%%
-      \fi\ensuremath{\ensurett{#2}}\ensuremath{\}}\xspace}
+      \fi\ensurett{#2}\}}\xspace}
 %% Binding statement: v <- {...}
-\protected\long\def\binds#1<-#2;{\ensurett{\removespaces #1<-#2}\xspace}
+\protected\long\def\binds#1<-#2;{\ensurett{\removespaces #1\texttt{<-}#2}\xspace}
 %% In order to use \binds in verbatim environment, have to define
 %% delimiters while they are active. The below defines \vbinds which
 %% must be used in AVerb environments.  Notice the active space as
@@ -158,16 +162,16 @@
 %% Return statement: return ... ;
 \protected\long\def\return#1;{\ensurett{return\ \removespaces #1}\xspace}
 %% A closure capturing block. k {v1, ..., vN} x: ...
-\protected\long\def\ccblock#1(#2)#3:{\lab#1/\ \ensuremath{\{\ensurett{#2}\}}\ \ensurett{#3:}}
+\protected\long\def\ccblock#1(#2)#3:{\lab#1/\ensuremath{\thinspace\{\ensurett{#2}\}}\ \ensurett{#3:}}
 %% A normal block
-\protected\long\def\block#1(#2):{\lab #1/\ \ensuremath{(\ensurett{#2})}\ensurett{:}}
+\protected\long\def\block#1(#2):{\lab #1/\ensuremath{\thinspace(\ensurett{#2})}\ensurett{:}}
 %% A goto expression
-\protected\long\def\goto#1(#2){\texttt{\textbf{\removespaces #1}}\ \ensuremath{(\ensurett{#2})}}
+\protected\long\def\goto#1(#2){\texttt{\textbf{\removespaces #1}}\ensuremath{\thinspace(\ensurett{#2})}}
 %% An enter expression
-\protected\long\def\app#1*#2/{\texttt{\removespaces #1@#2}}
+\protected\long\def\app#1*#2/{\ensurett{\removespaces #1@#2}}
 \protected\def\bind{\texttt{<-}\xspace}
-\protected\def\prim#1(#2){\lab #1/*\ensuremath{(\ensurett{#2})}}
-\protected\def\var#1/{\texttt{\removespaces #1}\xspace}
+\protected\long\def\prim#1(#2){\lab #1/*\ensuremath{(\ensurett{#2})}}
+\protected\long\def\var#1/{\ensurett{\removespaces #1}\xspace}
 
 \def\rhs{right--hand side\xspace}
 \def\lhs{left--hand side\xspace}

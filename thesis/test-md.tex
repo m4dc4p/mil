@@ -1,13 +1,24 @@
 \documentclass{article}
 \input{preamble}
 \begin{document}
+
+\var v/ with the \setL{Clo} value $(\lab l/, \var v_1/, \dots, \var
+v_n/)$. Our result set shows that \var v/ now refers to the closure
+
+\begin{math}
+  \begin{array}{rlr}
+    \setL{Clo} &= \{(\lab l/, \var v_1/, \dots, \var v_n/)\ ||\ \lab l/ \in \setL{Labels}, \var v_i/ \in \setL{Var}, n \geq 0\}.\\
+    t (F, \binds v\ <-\ \mkclo[l:v_1, \dots, v_n];) &= \\
+  \end{array}
+\end{math}
+
 !+foo+!
-\show\foo
-  \begin{AVerb}
-    \block absBlockL209 (f):/end
-      \vbinds v210 <- \mkclo[absBodyL201:];
-      \mkclo[absBodyL202:f]
-  \end{AVerb}
+
+\begin{AVerb}
+  \block absBlockL209 (f):
+  \vbinds v210 <- \mkclo[absBodyL201:];
+  \mkclo[absBodyL202:f]
+\end{AVerb}
 
 \begin{AVerb}
   \vbinds v1 <- \app v0 * n/;
@@ -24,7 +35,7 @@ v/.
 Recall \clo[k0:] 
 that MIL defines two types of blocks: ``\cc'' and ``normal.''
 Normal blocks act much like labeled locations in a program and are
-written \block b($!+v_1, \dots, v_n+!$): \dots/end.  A normal block is
+written \block b(v_1, \dots, v_n): \dots.  A normal block is
 called using MIL's !+goto+! expression, and receives any arguments
 given. 
 
