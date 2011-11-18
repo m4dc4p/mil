@@ -60,7 +60,7 @@
 \the\starttoks} %%
 %% Step 3 of startTT. Start a new group and set up
 %% tt conditional. 
-\def\startTTC#1{\toks255={#1}\showthe\toks255#1%%
+\def\startTTC#1{#1%%
   \ifmmode%%
   \let \math@bgroup \relax%%
   \def \math@egroup {\let \math@bgroup \@@math@bgroup%%
@@ -80,7 +80,7 @@
 \newtoks\ensuretoks %%
 \def\ensurett{%%
 \def\ensurettB{\ensuretoks={\next}\ifx\next\bgroup%% test for group
-  \ensuretoks={\next\startTTC\relax}
+  \ensuretoks={\next\startTTC\relax}%%
   \fi%%
   \the\ensuretoks}%%
 \afterassignment\ensurettB\let\next= }%%
