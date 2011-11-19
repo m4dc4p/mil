@@ -571,16 +571,15 @@ respectively.
 \end{myfig}
 
 \intent{Explain |DestOf| values.}  When rewriting, we need to know the
-result of every block in the program. Specifically, we need to know if
-a given block is \cc, if it jumps directly to another block, or if it
-does something else. The |DestOf| type, which does not appear in
+result of every \cc block in the program. Specifically, we need to
+know if a given block resturns a closure or if it jumps directly to
+another block. The |DestOf| type, which does not appear in
 Figure~\ref{uncurry_fig_df} but is defined in
 Figure~\ref{uncurry_fig_types}, uses the |Capture| and |Jump|
-constructors to represent the first and second case, respecitvely. The
-|Dest| value in both is a destination: either the label stored
-in the closure returned, or the block that the closure jumps to
-immediately. The third case is not represented directly --- we just
-omit those blocks.
+constructors to represent the first and second case, respectively. The
+|Dest| value in both is a destination: either the label stored in the
+closure returned, or the block that the closure jumps to
+immediately. 
 
 \intent{Details on |Capture| value.}  A \cc block receives a closure
 and an argument. The flag in the |Capture| constructor indicates how
@@ -589,30 +588,37 @@ included in the closure returned. Otherwise, the argument will be
 ignored.
 
 \intent{Details on |Jump| value.} A |Jump| block always has the form
-``\ccblock k(v_1, \dots, v_n)x: \goto b(\ldots)'' where the
-arguments to \lab b/ are not necessarily in the same order as in the
-closure \clo[k:v_1, \dots, v_n] recieved by \lab k/. Each integer in the
-list given to |Jump| gives the position of a variable in the closure
-received \lab k/. The arguments to the block \lab b/ are built by
-traversing the list from beginning to end, putting the variable
-indicated by the index into the corresponding argument for the
-block. For example, the block \lab c/  in the following:
+``\ccblock k(v_1, \dots, v_n)x: \goto b(\ldots)'' where the arguments
+to \lab b/ are not necessarily in the same order as in the closure
+\clo[k:v_1, \dots, v_n] recieved by \lab k/. Each integer in the list
+given to |Jump| indicates the position of a variable in the closure
+received by the block \lab k/. The arguments to the block \lab b/ are
+built by traversing the list, putting the variable indicated by each
+index into the corresponding argument for the block. \footnote{This
+  situation can also apply to |Capture| blocks and we would need to
+  update our implementation our compiler's code generation strategy
+  changed or if we began writing MIL programs directly.}
+
+For example, in the following the variables in the closure received
+by \lab c/ do not appear in the same order as expected by block \lab l/:
+
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
     \ccblock c(a, b)x: \goto l(x, a, b)
     \block l(x, a, b): \ldots
   \end{AVerb}
 \end{singlespace}
-\noindent would be represented by the value |Jump {-"\lab l/\ "-} [2, 0,
-  1]|, because the variables from the closure \clo[:a, b] and the
-argument \var x/ must be given to \lab l/ in the order $!+(x, a,
-b)+!$.
+
+\noindent 
+We represent \lab c/ using |Jump {-"\lab
+  l/\ "-} [2, 0, 1]|, because the variables from the closure \clo[:a,
+  b] and the argument \var x/ must be given to \lab l/ in the order
+$!+(x, a, b)+!$.
 
 \intent{Details on |CloDest| values.}  We use |CloDest| to represent
-all \setL{Clo} values except $\top$. Recall that \setL{Clo} represents
-a closure, holding a label and captured variables. |CloDest| stores a
-|Dest| value, representing the label the closure refers to, and a list
-of captured variables, |[Name]|. 
+all \setL{Clo} values. |CloDest| stores a |Dest| value, representing
+the label the closure refers to, and a list of captured variables,
+|[Name]|.
 
 \intent{Explain how |WithTop CloDest| and |CollapseFact| represent
   \setL{Fact}.}  We use a finite map, aliased as |CollapseFact|, to
@@ -644,24 +650,25 @@ that operates over finite maps.
 \subsection{Transfer}
 The definition |t| in Figure~\ref{uncurry_fig_transfer} gives the
 implementation of $t$ from Figure~\ref{uncurry_fig_df}. The top-level
-definition in the figure, |collapseTransfer|, just serves to turn |t| into a
-|FwdTransfer| value.  As in all Hoopl-based forwards analysis, the
-second argument to |t| is our facts so far. We define |t| for each statement type 
-in MIL. 
+definition, |collapseTransfer|, serves to turn |t|
+into a |FwdTransfer| value.  As in all Hoopl-based forwards analysis,
+the second argument to |t| is our facts so far. We define |t| for each
+statement type in MIL.
 
-|BlockEntry| and |CloEntry| just pass the facts given
-along.\footnote{Note these will always be empty maps, because our
+The |BlockEntry| and |CloEntry| cases return the facts given
+unchanged.\footnote{Note these will always be empty maps, because our
   analysis does not extend across blocks and |fact_bot| in our lattice
   is |Map.empty|.} Because we do not propagate facts between blocks,
-|CaseM| and |Done| pass an empty map to each successor, using the
-Hoopl--provided |mkFactBase| function to create a |FactBase| from
-empty facts.
+the |CaseM| and |Done| cases pass an empty map to each successor,
+using the Hoopl--provided |mkFactBase| function to create a |FactBase|
+from empty facts.
 
 \begin{myfig}
-  \begin{minipage}{\hsize}
+  \begin{minipage}{\hsize}\begin{withHsLabeled}{uncurry_fig_transfer}
 %let includeTransfer = True
 %include Uncurry.lhs
 %let includeTransfer = False
+    \end{withHsLabeled}
   \end{minipage}
   \caption{The Haskell implementation of our transfer function $t$
     from Figure~\ref{uncurry_fig_df}.}
@@ -672,21 +679,22 @@ empty facts.
 both cases, we use the |kill| function to create a new set of facts
 that does not contain any closures from the existing fact set which
 refered to |v|, the variable bound. If the statement does not directly
-create a closure, we create a fact associating |v| with |Top|, just as
-in Equation~\eqref{uncurry_df_transfer_other}. If the expression
-creates a closure, we create a new fact using the closure's
-destination and captured variables, corresponding to
-Equation~\eqref{uncurry_df_transfer_closure}. We add the new fact
+create a closure (Line~\ref{uncurry_fig_tranfer_rest}), we create a
+fact associating |v| with |Top|, just as in
+Equation~\eqref{uncurry_df_transfer_other}. If the expression creates
+a closure (Line~\ref{uncurry_fig_tranfer_rest}), we create a new fact
+with the closure's destination and captured variables, corresponding
+to Equation~\eqref{uncurry_df_transfer_closure}. We add the new fact
 to the set returned by |kill| and return the result.
 
 \begin{myfig}
   \begin{tabular}{lcccc}
     Statement & \var n/ & \var v0/ & \var v1/ & \var v2/ \\\cmidrule{2-2}\cmidrule{3-3}\cmidrule{4-4}\cmidrule{5-5}
-    \binds n <- \goto toInt(s); & . & . & . & . \\
-    \binds v0 <- \mkclo[k0:]; & $\top$ & . & . & . \\
-    \binds v1 <- \app v0 * n/; & . & \clo[k0:] & . & . \\
-    \binds v2 <- \app v1 * n/; & . & . & $\top$ & . \\
-    \return v2; & . & . & . & $\top$ \\
+    \binds n <- \goto toInt(s); & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\
+    \binds v0 <- \mkclo[k0:]; & $\top$ & $\cdot$ & $\cdot$ & $\cdot$ \\
+    \binds v1 <- \app v0 * n/; & $\cdot$ & \clo[k0:] & $\cdot$ & $\cdot$ \\
+    \binds v2 <- \app v1 * n/; & $\cdot$ & $\cdot$ & $\top$ & $\cdot$ \\
+    \return v2; & $\cdot$ & $\cdot$ & $\cdot$ & $\top$ \\
   \end{tabular}
   \caption{Facts about each variable in the \lab main/ block of
     our example program from Figure~\ref{uncurry_fig_eg}.}
@@ -694,13 +702,13 @@ to the set returned by |kill| and return the result.
 \end{myfig}
 
 Figure~\ref{uncurry_fig_impl_transfer} shows the facts gathered for
-each variable in the \lab main/ block of our sample program from
-Figure~\ref{uncurry_fig_eg}. The variables \var n/, \var v1/, and \var
-v2/ are assigned $\top$ because the \rhs of the \bind statement for
-each does not directly create a closure. Only \var v0/ is assigned a
-|CloDest| value (\clo[k0:]) because the \rhs of its \bind statement is
-in the right form. We will see in the next section how these facts
-evolve as the program is rewritten.
+each variable in the \lab main/ block of our sample program. The
+variables \var n/, \var v1/, and \var v2/ are assigned $\top$ because
+the \rhs of the \bind statement for each does not directly create a
+closure. Only \var v0/ is assigned a |CloDest| value (\clo[k0:])
+because the \rhs of its \bind statement is in the right form. We will
+see in the next section how these facts evolve as the program is
+rewritten.
 
 \subsection{Rewrite}
 \intent{Describe how |collapse| looks up closure information for an
@@ -721,69 +729,71 @@ optimization. We will describe it in pieces.
 
 |collapseRewrite| takes one argument and creates a rewriter that can
 be applied to our MIL program. The |blocks| argument associates every
-block in our program with a |DestOf| value. |DestOf|, as explained in
-Section~\ref{uncurry_impl_types}, indicates if the block returns a
-closure or  jumps immediately to another block. 
-
-For example, Figure~\ref{fig_uncurry_destof} shows the |DestOf| values
-in |blocks| for each block in the example program from
-Figure~\ref{uncurry_fig_eg}. The $\bot$ value associated with blocks
-\lab toInt/, \lab add/ and \lab main/ means they do not appear in |blocks|.
-
-\begin{myfig}
-    \begin{tabular}{ll}
-      Block & |DestOf| \\\cmidrule{1-1} \cmidrule{2-2} 
-      \lab main/ & $\bot$ \\
-      \lab k0/ &  |Capture {-"\lab k1/\ "-} True| \\
-      \lab k1/ &  |Jump {-"\lab add/\ "-} [0, 1]| \\
-      \lab add/ & $\bot$ \\
-      \lab toInt/ & $\bot$ \\
-    \end{tabular}
-  \caption{|DestOf| values associated with each block in our example
-program.}
-  \label{fig_uncurry_destof}
-\end{myfig}
+\cc block in our program with a |DestOf| value. |DestOf|, as explained
+in Section~\ref{uncurry_impl_types}, indicates if the block returns a
+closure or jumps immediately to another block.
 
 On Line~\ref{uncurry_fig_rewrite_top}, |collapseRewrite| applies
 Hoopl's |iterFwdRw| and |mkFRewrite| functions to our locally defined
 |rewriter| function, creating a |FwdRewrite| value. The |iterFwdRw|
-combinator applies |rewriter| to the program over and over, until the
-program stops changing. This ensures that a ``chain'' of closure
-allocations get collapsed into a single allocation, if possible.
+combinator applies |rewriter| repeatedly, until the |Graph|
+representing the program stops changing. Each time the program is
+rewritten, new facts are computed as well. This ensures that a ``chain''
+of closure allocations get collapsed into a single allocation, if
+possible.
 
 Figure~\ref{uncurry_fig_rewrite_iterations} shows how the \lab main/
 block in our example program changes as Hoopl iteratively applies
-|rewriter|. The first row (iteration 0) shows the original
-program. During the first iteration, |rewriter| transforms \binds v1 <- \app v0 * n/; 
-to \binds v1 <- \mkclo[k1: n]; (because \var v0/
+|rewriter| and the value of |facts| after each iteration. Each row
+shows facts computed for the program text shown. Rewrites occur
+between rows. During the first iteration, |rewriter| transforms \binds
+v1 <- \app v0 * n/; to \binds v1 <- \mkclo[k1: n]; (because \var v0/
 holds the closure \clo[k0:], and |blocks| tells us \lab k0/ returns a
-closure pointing to \lab k1/). During the second iteration, |rewriter|
-transforms the line \binds v2 <- \app v1 * n/; to \binds v2 <- \goto
-add(n, n);. No more iterations occur after this, as |rewriter| will
-not find any more \bind statements to transform.
+closure pointing to \lab k1/).
+
+The facts shown for the second iteration reflect the rewrite made,
+associating \var v1/ with \clo[k1:n]. Now |rewriter| transforms \binds
+v2 <- \app v1 * n/; to \binds v2 <- \goto add(n, n);. No changes occur
+in the third iteration because no statements remain that can be
+rewritten, and Hoopl stops applying |rewriter|.
 
 \begin{myfig}
-  \begin{tabular}{cl}
-    Iteration & \lab main/ \\\midrule
-    0 & \begin{minipage}[t]{2in}    
+  \begin{tabular}{clll}
+    Iteration & \lab main/ & Facts & |blocks| \\
+    1 & \begin{minipage}[t]{\widthof{\binds n <- \goto toInt(s);}}    
       \begin{AVerb}[gobble=8]
         \vbinds n <- \goto toInt(s);
         \vbinds v0 <- \mkclo[k0:];
         \vbinds v1 <- \app v0 * n/;
         \vbinds v2 <- \app v1 * n/;
         \return v2; 
-      \end{AVerb}
-    \end{minipage}  \\\\
-    1 & \begin{minipage}[t]{2in}
+      \end{AVerb} 
+    \end{minipage} & \begin{minipage}[t]{\widthof{\ \phantom{\{}(\var v2/, \goto add(n,n))\}\ }}\raggedright
+      \{(\var n/, $\top$),\break
+      \phantom{\{}(\var v0/, \clo[k0:]),\break
+      \phantom{\{}(\var v1/, $\top$),\break
+      \phantom{\{}(\var v2/, $\top$)\}
+    \end{minipage} & 
+    \begin{minipage}{\widthof{\phantom{\{}\lab k1/:\thinspace|Jump {-"\lab add/\ "-} [0, 1]|\}\ }}\raggedright
+      \{\lab k0/:\thinspace|Capture {-"\lab k1/\ "-} True|,\break
+      \phantom{\{}\lab k1/:\thinspace|Jump {-"\lab add/\ "-} [0, 1]|\}
+    \end{minipage}
+    \\\\
+    2 & \begin{minipage}[t]{\widthof{\binds n <- \goto toInt(s);}}
       \begin{AVerb}[gobble=8]
         \vbinds n <- \goto toInt(s);
         \vbinds v0 <- \mkclo[k0:];
         \llap{\ensuremath{\rightarrow} }\vbinds v1 <- \mkclo[k1:n]; \ensuremath{\leftarrow}
         \vbinds v2 <- \app v1 * n/;
         \return v2;
-      \end{AVerb}
-    \end{minipage}  \\\\
-    2 & \begin{minipage}[t]{2in}
+      \end{AVerb} 
+    \end{minipage} & \begin{minipage}[t]{\widthof{\ \phantom{\{}(\var v2/, \goto add(n,n))\}\ }}\raggedright
+      \{(\var n/, $\top$),\break
+      \phantom{\{}(\var v0/, \clo[k0:]),\break
+      \phantom{\{}(\var v1/, \clo[k1:n]),\break
+      \phantom{\{}(\var v2/, $\top$)\}
+    \end{minipage} \\\\
+    3 & \begin{minipage}[t]{\widthof{\binds v2 <- \goto add(n, n); \ensuremath{\leftarrow}}}
       \begin{AVerb}[gobble=8]
         \vbinds n <- \goto toInt(s);
         \vbinds v0 <- \mkclo[k0:];
@@ -791,7 +801,12 @@ not find any more \bind statements to transform.
         \llap{\ensuremath{\rightarrow} }\vbinds v2 <- \goto add(n, n); \ensuremath{\leftarrow}
         \return v2;
       \end{AVerb}
-    \end{minipage} 
+    \end{minipage} & \begin{minipage}[t]{\widthof{\ \phantom{\{}(\var v2/, \goto add(n,n))\}\ }}\raggedright
+      \{(\var n/, $\top$),\break
+      \phantom{\{}(\var v0/, \clo[k0:]),\break
+      \phantom{\{}(\var v1/, \clo[k1:n]),\break
+      \phantom{\{}(\var v2/, \goto add(n,n))\}
+    \end{minipage}
   \end{tabular}
   \caption{How |rewriter| transforms the \lab main/ block. Each
     row represents \lab main/ after the particular iteration. The
@@ -804,7 +819,7 @@ not find any more \bind statements to transform.
 The |rewriter| function checks if it can rewrite |Enter| expressions
 when they occur in a |Done| statement or on the \rhs of a |Bind|. In
 the first case (Line~\ref{uncurry_fig_rewrite_done}), |done n l
-(collapse col f x)| will produce a new |Done| statement with the
+(collapse facts f x)| will produce a new |Done| statement with the
 |TailM| expression returned by |collapse|, if |collapse| returns a
 |Just| value. Otherwise, |done| does not rewrite. Therefore, |done|
 rewrites an |Enter| only when |collapse| indicates that rewriting can

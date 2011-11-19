@@ -116,10 +116,10 @@ closure or jump to the block.
 > collapseTransfer = mkFTransfer t
 >   where
 >     t :: StmtM e x -> CollapseFact -> Fact x CollapseFact
->     t (Bind v (Closure dest args)) facts = 
+>     t (Bind v (Closure dest args)) facts = {-"\hslabel{closure}"-}
 >       Map.insert v (PElem (CloDest dest args)) 
 >                    (kill v facts)
->     t (Bind v _) facts = Map.insert v Top (kill v facts)
+>     t (Bind v _) facts = Map.insert v Top (kill v facts) {-"\hslabel{rest}"-}
 >     t (CaseM _ _) facts = mkFactBase collapseLattice []
 >     t (Done _ _ _) facts = mkFactBase collapseLattice []
 >     t (BlockEntry _ _ _) facts = facts
@@ -142,8 +142,8 @@ closure or jump to the block.
 >   where
 >     rewriter :: FuelMonad m => forall e x. StmtM e x -> CollapseFact 
 >                 -> m (Maybe (ProgM e x))
->     rewriter (Done n l (Enter f x)) col = done n l (collapse col f x) {-"\hslabel{done}"-}
->     rewriter (Bind v (Enter f x)) col = bind v (collapse col f x) {-"\hslabel{bind}"-}
+>     rewriter (Done n l (Enter f x)) facts = done n l (collapse facts f x) {-"\hslabel{done}"-}
+>     rewriter (Bind v (Enter f x)) facts = bind v (collapse facts f x) {-"\hslabel{bind}"-}
 >     rewriter _ _ = return Nothing {-"\hslabel{rest}"-}
 >                    
 >     collapse :: CollapseFact -> Name -> Name -> Maybe TailM

@@ -125,7 +125,7 @@
 
 %% A space equal to a \thinspace, but we
 %% break a line at it.
-\newskip\thinskipamt \thinskipamt=.16666em 
+\newskip\thinskipamt \thinskipamt=.16667em 
 \protected\def\thinskip{\hskip \thinskipamt\relax}
 %% Capture a space token. Use a ``control-symbol'' (\. instead of \mksp)
 %% to keep the trailing space from getting gobbled.
@@ -170,9 +170,10 @@
 %% An enter expression
 \protected\long\def\app#1*#2/{\ensurett{\removespaces #1@#2}}
 \protected\def\bind{\texttt{<-}\xspace}
+%% Primitive expression
 \protected\long\def\prim#1(#2){\lab #1/*\ensuremath{(\ensurett{#2})}}
+%% Program variable
 \protected\long\def\var#1/{\ensurett{\removespaces #1}\xspace}
-
 \def\rhs{right--hand side\xspace}
 \def\lhs{left--hand side\xspace}
 \def\enter{\texttt{@}\xspace}
