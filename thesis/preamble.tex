@@ -2,6 +2,7 @@
 \usepackage{calc}
 %% \usepackage{fourier}
 \usepackage{palatino}
+\usepackage{amsfonts}
 \renewcommand\ttdefault{lmtt}
 \usepackage{helvet}
 %% \usepackage{inconsolata}
@@ -121,8 +122,14 @@
 \newcommand{\milCtx}[1]{\ensuremath{\llfloor}#1\ensuremath{\rrfloor}}
 %% End MIL chapter
 
-%% Uncurrrying Chapter 
+%% Dataflow Chapter
+% Domain function
+\def\dom(#1){\ensuremath{\mfun{dom}(#1)}\xspace}
+% Set of all integers.
+\def\ZZ{\ensuremath{\mathbb{Z}}}
+%%
 
+%% Uncurrrying Chapter 
 %% A space equal to a \thinspace, but we
 %% break a line at it.
 \newskip\thinskipamt \thinskipamt=.16667em 

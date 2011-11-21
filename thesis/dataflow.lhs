@@ -209,12 +209,12 @@ categories at each point in the control-flow graph: \emph{unknown}, a
 \emph{known integer constant}, or
 \emph{indeterminate}. \emph{Unknown}, represented by $\bot$
 (``bottom''), is the initial value for all variables in our
-analysis. A \emph{known integer constant}, $C \in \mathbb{Z}$, means
+analysis. A \emph{known integer constant}, $C \in \ZZ$, means
 our analysis identified that the variable was assigned a specific
 value that does not change. \emph{Indeterminate}, indicated by $\top$
 (``top''), means our analysis found that the variable might have more
 than one value at a given point. Together, $\{\bot, \top\} \cup
-\mathbb{Z}$ forms a set which we will denote as \setLC.
+\ZZ$ forms a set which we will denote as \setLC.
 
 \begin{myfig}
   \input{lst_back17}
@@ -308,9 +308,9 @@ $(a,x)$ where $a$ is a variable and $x$ a value in \setLC; \inE and
 operator to apply \lub to sets of facts ($F_1$ and $F_2$ below):
 \begin{align*}\allowdisplaybreaks[0]
   F_1 \wedge F_2 &= \setdef{(a, x_1 \lub x_2)}{(a,x_1) \in F_1, (a,x_2) \in F_2} \\
-  &\; \cup \setdef{(a,x_1)}{(a,x_1) \in F_1, a \not\in \mfun{dom}(F_2)} \\
-  &\; \cup \setdef{(a,x_2)}{(a,x_2) \in F_2, a \not\in \mfun{dom}(F_1)} \label{eqn_back18}\addtag\\
-  \mfun{dom}(F) &= \setdef{a}{(a,x) \in F} \addtag
+  &\; \cup \setdef{(a,x_1)}{(a,x_1) \in F_1, a \not\in \dom(F_2)} \\
+  &\; \cup \setdef{(a,x_2)}{(a,x_2) \in F_2, a \not\in \dom(F_1)} \label{eqn_back18}\addtag\\
+  \dom(F) &= \setdef{a}{(a,x) \in F} \addtag
 \end{align*}
 Our $\wedge$ operator acts like union when a variable in $F_1$ does
 not appear in the domain of $F_2$; likewise for a variable only in
@@ -350,7 +350,7 @@ lattice.
 
 We have established that our analysis computes \emph{facts} at each
 node in our programs control-flow graph. The facts assign the value
-$\bot$, $C \in \mathbb{Z}$, or $\top$ to each variable in the program,
+$\bot$, $C \in \ZZ$, or $\top$ to each variable in the program,
 at each node in the graph. We defined a \emph{meet operator}, \lub,
 which is used to combing conflicting values when computing \inBa.  The
 facts and meet operator together define a \emph{lattice}. We next
@@ -429,7 +429,7 @@ our transfer function in terms of a single fact:
 \begin{equation}
   f (a,x) = 
   \begin{cases}
-    (a,x \lub C) & \text{when \texttt{a = \emph{C}}, with \texttt{C} $\in \mathbb{Z}$.} \\
+    (a,x \lub C) & \text{when \texttt{a = \emph{C}}, with \texttt{C} $\in \ZZ$.} \\
     (a,\top) & \text{when \texttt{a} updated}. \\
     (a,x) & \text{otherwise}. \\
   \end{cases}

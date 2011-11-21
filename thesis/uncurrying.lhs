@@ -372,8 +372,8 @@ the variable with the new value.
         
         F_1 \wedge F_2 &= \begin{array}{l}
           \{(\var v/, p \lub q)\ ||\ (\var v/, p) \in F_1, (\var v/, q) \in F_2\}\ \cup \\
-          \{(\var v/, \top)\ ||\ \var v/ \in \mfun{dom}(F_1), \var v/ \not\in \mfun{dom}(F_2)\ \text{or} \\
-          \phantom{\{(v, \top)\ ||\ } \var v/ \not\in \mfun{dom}(F_1), \var v/ \in \mfun{dom}(F_2)\},
+          \{(\var v/, \top)\ ||\ \var v/ \in \dom(F_1), \var v/ \not\in \mfun{dom}(F_2)\ \text{or} \\
+          \phantom{\{(v, \top)\ ||\ } \var v/ \not\in \dom(F_1), \var v/ \in \mfun{dom}(F_2)\},
         \end{array} \labeleq{uncurry_df_meet} & \eqref{uncurry_df_meet} \\ 
         & \multicolumn{2}{l}{\phantom{=} \text{where\ } F_1, F_2 \in \setL{Fact}.}\\\\
 
