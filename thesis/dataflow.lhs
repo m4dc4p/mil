@@ -264,7 +264,7 @@ $C_2$, result in $\top$, while equal constants give the same constant.
       C_1 & C_2 & C_1 & \text{($C_1 = C_2$)}
     \end{array}
   \end{math}
-  \caption{Definition of the \emph{meet operator}, lub, for the
+  \caption{Definition of the \emph{meet operator}, \lub, for the
     lattice used in our constant propagation analysis. $v_1$ and $v_2$
     are values in \setLC. The table shows how lub combines any two
     values.}
@@ -288,7 +288,7 @@ follows that intuition and tells us that \inB{fig_back15_b3} should be
 
 \begin{myfig}
   \input{lst_back19}
-  \caption{A control-flow graph illustrating the behavior of \protect\lub with
+  \caption{A control-flow graph illustrating the behavior of \lub with
     $\bot$ (i.e., undefined) values.}
   \label{fig_back15}
 \end{myfig}
@@ -554,7 +554,7 @@ with this iteration; it will no longer change.
 
 The above example raises an important question: how do we know we have
 reached a fixed point? How do we know we have gotten the best possible
-answer?  Both of these questsion can be answered if our lattice has
+answer?  Both of these questions can be answered if our lattice has
 \emph{finite height} and the transfer function is \emph{monotone}.
 
 Let us begin with the lattice. Consider again the meet operator, \lub,
@@ -699,57 +699,73 @@ Equation~\eqref{eqn_back5}.
 \section{Dataflow Equations}
 \label{back_subsec_eq}
 
-As we stated in the beginning of this chapter, the dataflow algorithm
-is \emph{parameterized} by four items: facts, meet operator,
-direction, and transfer function. The prior section presented each
-parameter for the constant propagation analysis
-separately. Figure~\ref{fig_back10} presents all of them together, as
-a set of \emph{dataflow equations}. Pairs of elements from the sets
-\setLC and \setL{Var} define our facts. Equations~\eqref{eqn_back12}
-and \eqref{eqn_back13} define our meet operator; together with the set
-\setLC, they define our lattice. Equations~\eqref{eqn_back3} and
-\eqref{eqn_back16} together defieshow we are defining a \emph{forwards}
-  analysis. Equations~\eqref{eqn_back15} and \eqref{eqn_back16} define
-our transfer function.
+As stated at the beginning of this chapter, the dataflow algorithm
+specifies four parameters: facts, meet operator, transfer function,
+and direction. The prior section presented each parameter for the
+constant propagation analysis separately. Figure~\ref{fig_back10}
+presents all of them together, as a set of \emph{dataflow
+  equations}. Pairs of elements from \setLC and \setL{Var} define
+\setL{Fact}, our set of facts. Equation~\eqref{eqn_back12} defines our
+meet operator, $\wedge$, on \setL{Fact} values. Our transfer function $t$,
+defined by Equation~\eqref{eqn_back14}, shows how we create new facts based on
+the statements in each node and our existing
+facts. Equation~\eqref{eqn_back3} shows that we compute \outBa using
+the transfer function $t$ and the \inBa facts for the
+block. Equation~\eqref{eqn_back16} states that we apply $\wedge$ to
+all of the \out sets for the predecessors of a block $B$ in order to
+calculate \inBa. Together, Equations~\eqref{eqn_back3} and
+\eqref{eqn_back16} specify a forwards dataflow analysis.
 
-\input{fig_back10}
+\begin{myfig}
+  \input{fig_back10}
+  \caption{The transfer function and associated definitions for the
+    constant propagation analysis. Equation~\eqref{eqn_back3} shows
+    how \out facts are created from \inE facts. \InBa facts, for some
+    block $B$, are created from the \outBa facts of its
+    predecessors. Facts are combined using the set-wise $\bigwedge$
+    operator.}
+\label{fig_back10}
+\end{myfig}
 
 We can now define any dataflow analysis in terms of these four
 parameters:
-\begin{align*}
-  \setL{Facts} & \qquad & \text{\it Our set of facts}. \\
-  \wedge & \qquad & \text{\it Our \emph{meet} operator.} \\
-  D & \qquad & \text{\it Direction, \emph{forwards} or \emph{backwards}}. \\
-  \mathit{transfer}(v) & \qquad & \text{\it Our transfer function, with $v \in \setL{Facts}$.}
-\end{align*}
 
-In turn, we can define the iterative dataflow algorithm for the
-\emph{forwards} direction. Figure~\ref{fig_back14} gives the
-algorithm.\footnote{The \emph{backwards} algorithm is almost
-  identical.} The algorithm initializes all \out sets to $\bot$, or
-some suitable initial value from \setL{Facts}. The entry node gets
-special treatment in some cases, so we set \outXa{Entry} to its own
-initial value (though in many cases \outXa{Entry} is set to the same
-value as other \out sets). We now enter the main loop of the
-algorithm. The body of the loop always executes at least once. We
-first calculate all \inE sets from their predecessors' \out sets on
-Line~\ref{fig_back14_in}. On the next line, the new \inE sets are used
-to calculate \out sets for each node.  Line~\ref{fig_back14_loop}
-gives our termination condition: when \out sets stop changing, we are
-done. The superscript on each \out set represents the
-iteration. $\outBa^{i}$ means the $i$-th iteration, and $\outBa^{i-1}$
-the previous ($i - 1$) iteration. The loop repeats if any \out set has
-changed since the last iteration. Otherwise, the algorithm terminates.
+\begin{singlespace}\correctspaceskip
+  \begin{align*}
+    \setL{Fact} & \; & \text{\emph{Our set of facts}}. \\
+    \wedge  & \; & \text{\emph{Our \emph{meet} operator.}} \\
+    \mathit{t}(f, s) & \; & \text{\emph{Our transfer function, with $f \in \setL{Fact}$ and $s$ a node in the CFG.}} \\
+    D & \; & \text{\emph{Direction, \emph{forwards} or \emph{backwards}}}. 
+  \end{align*}
+\end{singlespace}
+
+We can define an iterative dataflow algorithm in terms of these
+parameters. Figure~\ref{fig_back14} gives the algorithm for a forwards
+analysis.\footnote{The backwards case is almost identical.} On
+Line~\ref{fig_back14_init}, we initialize all \out and \inE sets to
+some suitable initial value from \setL{Fact}. The superscript on \inE
+and \out sets refer to sets from the $i^{th}$ iteration;
+initialization constitutes the ``zeroth'' iteration. Sometimes the
+entry node's \out set gets special treatment, in which case we could
+add the line:
+
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    Out(\emph{Entry})$^0$ = $v$, $v \in \setL{Fact}$.
+  \end{AVerb}
+\end{singlespace}
+
+\noindent However, \outXa{Entry} normally gets the same value as
+other \out sets.
 
 \begin{myfig}
-  \begin{minipage}{3in}
+  \begin{minipage}{\hsize}
     \begin{AVerb}[numbers=left,gobble=6]
-      Out(\emph{Entry}) = \emph{initial}, \emph{initial} $\in \setL{Facts}$.
-      $\text{In(B)}^0$ = $\bot$, for all blocks $B$.
+      in($B$)$^0$ = $u$, out($B$)$^0$ = $f$, $\forall$\ nodes $B$; $f, u \in$\ \setL{Fact} \label{fig_back14_init}
       \textbf{do} \{
-        In(B) = $\bigwedge_{P \in pred(B)} \text{Out}(P)$. \label{fig_back14_in}
-        Out(B) = \emph{transfer}(In(B)).  \label{fig_back14_out}
-      \} \textbf{until}($\text{Out(B)}^{i} == \text{Out(B)}^{i - 1}$, for all $B$)\label{fig_back14_loop}
+        in($B$)$^{i+1}$ = $\bigwedge\limits_{\mathclap{P \in pred(B)}} \text{out}^{i}$($P$) \label{fig_back14_in}
+        out($B$)$^{i+1}$ = $t$(in($B$)$^{i+1}$, $B$)  \label{fig_back14_out}
+      \} \textbf{until} out($B$)$^{i+1}$ = out($B$)$^{i}$, $\forall B$ \label{fig_back14_loop}
     \end{AVerb}
   \end{minipage}
   \caption{The dataflow algorithm, using parameters for facts, the meet operator,
@@ -757,13 +773,27 @@ changed since the last iteration. Otherwise, the algorithm terminates.
   \label{fig_back14}
 \end{myfig}
 
+The main loop of the algorithm always executes at least once. On
+Line~\ref{fig_back14_in}, we calculate \inE facts for each node $B$ in
+the next iteration, $\inBa^{i+1}$, by applying $\wedge$ to the
+$\out^i$ sets of $B$'s predecessors from the current
+iteration. Line~\ref{fig_back14_out} calculates $\outBa^{i+1}$ for
+each node by applying the transfer function, $t$, to that node, along
+with $\inBa^{i}$, the \inE facts for the current iteration.
+
+Line~\ref{fig_back14_loop} checks if all \out$^{i+1}$ sets are equal
+to their previous value, \out$\mathllap{^i}$. If not, the loop
+repeats. Otherwise the algorithm terminates. The final values for each
+\outBa set then hold the facts representing the result of our
+analysis.
+
 We have presented the iterative, forwards dataflow algorithm and shown
 how the algorithm can be parameterized for a particular analysis. We
 gave the parameterization for our constant propagation analysis in
-Figure~\ref{fig_back10}. We know the algorithm will terminate if
-our transfer function is \emph{monotone} and we have defined lattice
-with \emph{finite} height. However, we have not discussed how to measure
-the results our analysis gives us -- how do we know that they are the 
+Figure~\ref{fig_back10}. We know the algorithm will terminate if our
+transfer function is \emph{monotone} and we have defined lattice with
+\emph{finite} height. However, we have not discussed how to measure
+the results our analysis gives us -- how do we know that they are the
 best possible? We will address that question in the next section.
 
 \section{Quality of Solutions to the Dataflow Equations}

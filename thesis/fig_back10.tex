@@ -1,44 +1,36 @@
-\begin{myfig}
-  \begin{math}
-    \begin{array}{rlr}
+\begin{math}
+  \begin{array}{rlr}
 
-      \multicolumn{3}{c}{\emph{Facts}} \\
+    \multicolumn{3}{c}{\emph{Facts}} \\
 
-      \setLC &= \{\bot, \top\} \cup \ZZ.\\
-      \setL{Var} &= \text{Set of all variables.} \\
-      \setL{Fact} &= \setL{Var} \times \setLC. \\\\
+    \setLC &= \{\bot, \top\} \cup \ZZ.\\
+    \setL{Var} &= \text{Set of all variables.} \\
+    \setL{Fact} &= \setL{Var} \times \setLC. \\\\
 
-      \multicolumn{3}{c}{\emph{Meet}} \\
+    \multicolumn{3}{c}{\emph{Meet}} \\
 
-      F_1 \wedge\ F_2 &= \begin{array}{rl}
-        \{(a, x \lub y)\ | & a \in \dom(F_1), a \in \dom(F_2)\}\ \cup \\
-        \{(a, y)\ | & a \in \dom(F_1), a \not\in \dom(F_2)\ \text{or} \\
-                     & a \not\in \dom(F_1), a \in \dom(F_2)\},
-      \end{array} \labeleq{eqn_back13} \labeleq{eqn_back12} & \eqref{eqn_back12} \\
-      & \text{where\ } F_1, F_2 \in \setL{Fact}, \lub\ \text{as in Table~\ref{tbl_back4}.} \\\\
+    F_1 \wedge\ F_2 &= \begin{array}{rl}
+      \{(a, x \lub y)\ | & a \in \dom(F_1), a \in \dom(F_2)\}\ \cup \\
+      \{(a, y)\ | & a \in \dom(F_1), a \not\in \dom(F_2)\ \text{or} \\
+      & a \not\in \dom(F_1), a \in \dom(F_2)\},
+    \end{array} \labeleq{eqn_back13} \labeleq{eqn_back12} & \eqref{eqn_back12} \\
+    & \text{where\ } F_1, F_2 \in \setL{Fact}, \lub\ \text{as in Figure~\ref{tbl_back4}.} \\\\
 
-      \multicolumn{3}{c}{\emph{Transfer}} \\
-      t (F, a\ \text{\tt =}\ C) &= \{(a, x \lub C), \text{when\ } (a, x) \in F\ \text{or} \\
-                     & \phantom{= \{}(a, C), \text{when\ } a \not\in \dom(F)\}\ \cup \\
-                     & \phantom{=} F\ \backslash\ \mfun{uses}(F, a),\\
-          & \text{where\ } F \in \setL{Fact}, C \in \ZZ. \\
-      t (F, a\text{\tt ++}) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)), \\
-      & \text{where\ } F \in \setL{Fact}. \labeleq{eqn_back14} & \eqref{eqn_back14} \\\\
-      \mfun{uses}(F, a) &= \{(a, x)\ |\ a \in \dom(F)\}, \\
-      & \text{where\ } F \in \setL{Fact}, a \in \setL{Var}. \\\\
+    \multicolumn{3}{c}{\emph{Transfer}} \\
+    t (F, a\ \text{\tt =}\ C) &= \{(a, x \lub C), \text{when\ } (a, x) \in F\ \text{or} \\
+    & \phantom{= \{}(a, C), \text{when\ } a \not\in \dom(F)\}\ \cup \\
+    & \phantom{=} F\ \backslash\ \mfun{uses}(F, a),\\
+    & \text{where\ } F \in \setL{Fact}, C \in \ZZ. \labeleq{eqn_back14} & \eqref{eqn_back14} \\
+    t (F, a\text{\tt ++}) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)), \\
+    & \text{where\ } F \in \setL{Fact}. \\\\
+    \mfun{uses}(F, a) &= \{(a, x)\ |\ a \in \dom(F)\}, \\
+    & \text{where\ } F \in \setL{Fact}, a \in \setL{Var}. \\\\
 
-      \multicolumn{3}{c}{\emph{Direction}} \\
+    \multicolumn{3}{c}{\emph{Direction}} \\
 
-      \outBa &= t(\inBa, s), \labeleq{eqn_back3} & \eqref{eqn_back3} \\
-      & \text{where $s$ a statement in block\ } B.\\
-      \inBa &= \bigwedge\limits_{\mathclap{P \in \mathit{pred}(B)}} \outXa{P} \labeleq{eqn_back16} & \eqref{eqn_back16} \\\\ 
-      \mfun{pred}(B) &= \text{Predecessors of block }\ B.
-    \end{array}
-  \end{math}
-  \caption{The transfer function and associated definitions for the constant
-  propagation analysis. Equation~\eqref{eqn_back3} shows how \out facts are
-  created from \inE facts. \InBa facts, for some block $B$, are created from
-  the \outBa facts of its predecessors. Facts are combined using the set-wise
-  $\bigwedge$ operator.}
-\label{fig_back10}
-\end{myfig}
+    \outBa &= t(\inBa, s), \labeleq{eqn_back3} & \eqref{eqn_back3} \\
+    & \text{where $s$ a statement in block\ } B.\\
+    \inBa &= \bigwedge\limits_{\mathclap{P \in \mathit{pred}(B)}} \outXa{P} \labeleq{eqn_back16} & \eqref{eqn_back16} \\\\ 
+    \mfun{pred}(B) &= \text{Predecessors of block }\ B.
+  \end{array}
+\end{math}
