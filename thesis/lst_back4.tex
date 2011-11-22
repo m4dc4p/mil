@@ -1,16 +1,16 @@
 \begin{tikzpicture}[>=stealth, node distance=.5in]
-  \node[invis] (entry) {};
+  \withmd{\node[invis] (entry) {};
 
-  \node[stmt, below of=entry] (assigna) {#a = 1#\labelNode{lst_back4_assigna}};
+  \node[stmt, below of=entry] (assigna) {!+a = 1+!\labelNode{lst_back4_assigna}};
   \node[labelfor=assigna] () {\refNode{lst_back4_assigna}};
 
-  \node[stmt, below of=assigna] (assignb) {#b = 2#\labelNode{lst_back4_assignb}};
+  \node[stmt, below of=assigna] (assignb) {!+b = 2+!\labelNode{lst_back4_assignb}};
   \node[labelfor=assignb] () {\refNode{lst_back4_assignb}};
 
-  \node[stmt, below of=assignb] (assignc) {#c = 3#\labelNode{lst_back4_assignc}};
+  \node[stmt, below of=assignb] (assignc) {!+c = 3+!\labelNode{lst_back4_assignc}};
   \node[labelfor=assignc] () {\refNode{lst_back4_assignc}};
 
-  \node[stmt, below of=assignc] (assignd) {#d = 4#\labelNode{lst_back4_assignd}};
+  \node[stmt, below of=assignc] (assignd) {!+d = 4+!\labelNode{lst_back4_assignd}};
   \node[labelfor=assignd] () {\refNode{lst_back4_assignd}};
 
   \node[invis, below of=assignd] (exit) {};
@@ -19,6 +19,6 @@
   \draw [->] (assigna) to (assignb);
   \draw [->] (assignb) to (assignc);
   \draw [->] (assignc) to (assignd);
-  \draw [->>] (assignd) to (exit);
+  \draw [->>] (assignd) to (exit);}
 
 \end{tikzpicture}

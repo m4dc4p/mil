@@ -52,7 +52,7 @@ Figure~\ref{fig_back1} shows a simple C program and its
 \subref{fig_back1_b} represents a statement or expression in the
 original program. For example, \refNode{lst_back2_assigna} and
 \refNode{lst_back2_assignb} represent the assignment statements on
-line \ref{lst_back1_assign}. Notice that the declaration of #c# does
+line \ref{lst_back1_assign}. Notice that the declaration of !+c+! does
 not appear in a corresponding node; because the declaration does not
 cause a runtime effect, we do not represent it in the graph.  Nodes
 \entryN and \exitN designate where program execution \emph{enters} and
@@ -165,8 +165,8 @@ dictated by the type of analysis -- each particular analysis runs
 %% Constant-propagation
 Consider Figure~\ref{fig_back7}, Part~\subref{fig_back7_initial}, which
 shows a C function containing a loop that multiplies the argument by 10
-some number of times. Line~\ref{fig_back7_m} declares #m# and assigns
-it the value 10. The function uses #m# in the loop body on
+some number of times. Line~\ref{fig_back7_m} declares !+m+! and assigns
+it the value 10. The function uses !+m+! in the loop body on
 Line~\ref{fig_back7_loop} to multiply the value passed in
 repeatedly. 
 
@@ -175,27 +175,27 @@ repeatedly.
     \input{lst_back11} & \input{lst_back12} \\
     \scap{fig_back7_initial} & \scap{fig_back7_opt} 
   \end{tabular}
-  \caption{A C program which multiplies its argument, \texttt{val}, by
-    10 \texttt{cnt} times. Part~\subref{fig_back7_initial} shows the
+  \caption{A C program which multiplies its argument, !+val+!, by
+    10 !+cnt+! times. Part~\subref{fig_back7_initial} shows the
     original program. In Part~\subref{fig_back7_opt}, we have used
-    \emph{constant propagation} to replace the use of \texttt{m} in
+    \emph{constant propagation} to replace the use of !+m+! in
     the loop body with 10.}
   \label{fig_back7}
 \end{myfig}
 
 This function is just used for illustration -- we do not expect anyone
-would actually write code this way (after all, #mult10# is just
-\texttt{10 * val * cnt}). In any case, the program in
+would actually write code this way (after all, !+mult10+! is just
+!+10 * val * cnt+!). In any case, the program in
 Figure~\ref{fig_back7_initial} can be transformed by replacing the
-variable #m# with 10 in the loop body. This may allow the compiler to
-generate code that directly multiplies #val# times 10 and saves using
-a register to hold the value of #m#. We can use a dataflow analysis
+variable !+m+! with 10 in the loop body. This may allow the compiler to
+generate code that directly multiplies !+val+! times 10 and saves using
+a register to hold the value of !+m+!. We can use a dataflow analysis
 known as \emph{constant propagation} to justify this
 transformation. The constant propagation analysis recognizes when a
 variable's value does not change in some context and then replaces
 references to the variable with the constant
 value. Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt} shows the
-optimized program, replacing #m# with 10 on
+optimized program, replacing !+m+! with 10 on
 Line~\ref{fig_back7_opt_loop}.
 
 \subsection{Facts and Lattices} 
@@ -371,9 +371,9 @@ explore how \out facts are computed for each node.
 
 %% Figure~\ref{fig_back10} shows our program with the final facts
 %% computed. The sets \inB{lst_back13_mult} and \outB{lst_back13_mult}
-%% show that #m# has the value 10 when block \refNode{lst_back13_mult}
-%% executes. The variables #n# and #i# have the value $\top$, indicating
-%% they could one of many different values. However, #cnt# and #val#
+%% show that !+m+! has the value 10 when block \refNode{lst_back13_mult}
+%% executes. The variables !+n+! and !+i+! have the value $\top$, indicating
+%% they could one of many different values. However, !+cnt+! and !+val+!
 %% still have $\bot$, because their values are not modified anywhere in
 %% the control-flow graph.
 
@@ -429,15 +429,15 @@ our transfer function in terms of a single fact:
 \begin{equation}
   f (a,x) = 
   \begin{cases}
-    (a,x \lub C) & \text{when \texttt{a = \emph{C}}, with \texttt{C} $\in \ZZ$.} \\
-    (a,\top) & \text{when \texttt{a} updated}. \\
+    (a,x \lub C) & \text{when !+a = \emph{C}+!, with !+C+! $\in \ZZ$.} \\
+    (a,\top) & \text{when !+a+! updated}. \\
     (a,x) & \text{otherwise}. \\
   \end{cases}
   \label{eqn_back4}
 \end{equation}
 
 Equation~\eqref{eqn_back4} considers two kinds of statements: constant
-and non-constant updates. If the statement #a = C# appears in the
+and non-constant updates. If the statement !+a = C+! appears in the
 node, our new fact is $(a,x \lub C)$, indicating we combine our
 previous knowledge about $x$ with the new constant assigned. We create
 the fact $(a,\top)$ for any other update.\footnote{In practice this
@@ -465,7 +465,7 @@ Equation~\eqref{eqn_back4}. The assignments in
 \factC{n}{1}, and \factC{i}{0} in \outB{lst_back18_assign}. The
 multiplication in \refNode{lst_back18_mult} is a non-constant update,
 so \outB{lst_back18_mult} contains \factC{n}{\top}. However,
-\outB{lst_back18_mult} also shows that #m# is not modified in
+\outB{lst_back18_mult} also shows that !+m+! is not modified in
 \refNode{lst_back18_mult}; the value from \inB{lst_back18_mult} is
 just copied to \outB{lst_back18_mult}.
 
@@ -519,7 +519,7 @@ shows which \out sets are used to calcuate \inE sets.
 \end{myfig}
 
 Consider the value for $i$ in \inB{lst_back15_test}, the node that
-tests the condition #i < cnt#. In the first iteration,
+tests the condition !+i < cnt+!. In the first iteration,
 \inB{lst_back15_test} still assigns $\bot$ to
 $i$. Equation~\eqref{eqn_back8} states that \inB{lst_back15_test} is
 derived from the \out sets of \refNode{lst_back15_test}'s
@@ -537,8 +537,8 @@ attaching the iteration number to each set:
 \end{align*}
 Now consider the second iteration, where \inB{lst_back15_test} assigns
 $\top$ to $i$. \outB{lst_back15_assign} gives $i$ the value
-0 (by #i = 0#). However, \outB{lst_back15_incr} assigns $i$ the value $\top$,
-because #i++# is a non-constant update. We can see why by
+0 (by !+i = 0+!). However, \outB{lst_back15_incr} assigns $i$ the value $\top$,
+because !+i+++! is a non-constant update. We can see why by
 Equations~\eqref{eqn_back8}, \eqref{eqn_back6}, and
 \eqref{eqn_back7}. Again we attach the iteration number to each set,
 emphasizing its origin:
@@ -811,7 +811,7 @@ solution in that the maximum fixed point solution may make more
 conservative estimates than necessary. In particular,
 the algorithm does not consider branches that will never be taken. For
 example, the C program from Figure~\ref{fig_back1_a} will never
-execute Line~\ref{lst_back19_test_true}, because the test #if(a > b)#
+execute Line~\ref{lst_back19_test_true}, because the test !+if(a > b)+!
 is always false:
 \begin{center}
 \begin{minipage}{2in}\singlespacing\vskip-\baselineskip
@@ -840,23 +840,23 @@ probably will not be as good as the ideal.
 Figure~\ref{fig_back7}, Part~\subref{fig_back7_initial} gave a sample
 program which we wished to optimize using a \emph{constant propagation}
 dataflow analysis. Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt} gave
-the result, replacing all occurrences of #m# with 10. Now knowing
+the result, replacing all occurrences of !+m+! with 10. Now knowing
 the dataflow algorithm and the equations for constant propagation, we
 can derive how that transformation is made.
 
 Table~\ref{fig_back12} gives the facts calculated for all nodes in our
 program, during each iteration of the analysis. The first iteration
-calculates that \outB{lst_back15_assign} assigns #m# the value 10, due
-to the assignment #m = 10# on Line~\ref{fig_back7_m}. The second
+calculates that \outB{lst_back15_assign} assigns !+m+! the value 10, due
+to the assignment !+m = 10+! on Line~\ref{fig_back7_m}. The second
 iteration propagates this value to \inB{lst_back15_test} and in turn
 to \outB{lst_back15_test}, because the test on
-Line~\ref{fig_back7_test} does not affect #m#. In the third iteration,
+Line~\ref{fig_back7_test} does not affect !+m+!. In the third iteration,
 we see the same with \inB{lst_back15_mult} and \outB{lst_back15_mult}
 on Line~\ref{fig_back7_loop}. The analysis continues for two more
 iterations as other values propagate, but at this point we have all
 the information we need to optimize the program. Once the analysis
-reaches a fixed point, we can safely replace all occurrences of #m#
-with #10#, resulting in the optimized program given in
+reaches a fixed point, we can safely replace all occurrences of !+m+!
+with !+10+!, resulting in the optimized program given in
 Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt}.
 
 \begin{myfig}
@@ -880,7 +880,7 @@ We have now seen how we can use constant propagation to optimize a
 simple program. Typically many more optimizations will be run over the
 same code, each (hopefully) improving it a little more. For example,
 we could use an optimization called \emph{dead-code elimination} to
-remove the declaration of #m# altogether from our optimized program,
+remove the declaration of !+m+! altogether from our optimized program,
 as it is no longer used. 
 
 \section{Summary}
@@ -927,7 +927,7 @@ whatever that means for the particular optimization applied.
 %% node in the CFG. Facts are a data structure that describe the state of
 %% the program before and after execution of the block represented by the
 %% node. Figure~\ref{fig_back5} annotates the program fragment in
-%% Figure~\ref{fig_back1} with facts about #a#, #b#, and #c# (the only
+%% Figure~\ref{fig_back1} with facts about !+a+!, !+b+!, and !+c+! (the only
 %% state we care about in this program). Each \inBa gives the variables'
 %% values just prior to executing block $B$, while each \outBa gives
 %% their values just after $B$ has executed.  
@@ -965,17 +965,17 @@ whatever that means for the particular optimization applied.
 %%   c/\top}, assigns the value ``$\top$'' (``top'') to all variables,
 %% indicating that we do not know the value for the given variable. Our
 %% transfer function determines that \outB{lst_back7_assign} should be
-%% \facts{a/1, b/2, c/\top}, showing that we know #a# is 1, #b# is 2, and
-%% that we still do not know the value of #c#. At each block we perform a
+%% \facts{a/1, b/2, c/\top}, showing that we know !+a+! is 1, !+b+! is 2, and
+%% that we still do not know the value of !+c+!. At each block we perform a
 %% similar analysis, except \refNode{lst_back7_print}, where we need to
 %%   take special action.
 
 %% When a node has multiple predecessors, like \refNode{lst_back7_print},
 %% we must combine multiple \outBa values into a single \inBa. The value
-%% for #c# in \outB{lst_back7_true} is 4, while in \outB{lst_back7_false}
-%% #c# is 3. We have two distinct values for #c# and no way to determine
+%% for !+c+! in \outB{lst_back7_true} is 4, while in \outB{lst_back7_false}
+%% !+c+! is 3. We have two distinct values for !+c+! and no way to determine
 %% which will be the case when \refNode{lst_back7_print} executes. We
-%% must be conservative, so we assign the value $\top$ to #c# in
+%% must be conservative, so we assign the value $\top$ to !+c+! in
 %% \inB{lst_back7_print}.
 
 %% \begin{table}[tbh]
@@ -1143,7 +1143,7 @@ whatever that means for the particular optimization applied.
 %%   \end{split}
 %% \end{equation}
 %% At this point, our facts have stopped changing so we stop
-%% iterating. Our final result $\bot$ for #c# in \outB{lst_back9_test}.
+%% iterating. Our final result $\bot$ for !+c+! in \outB{lst_back9_test}.
 
 %% \section{Rewriting}
 %% \label{sec_back7}
@@ -1176,7 +1176,7 @@ whatever that means for the particular optimization applied.
 %% sense than the first summary).
 
 %% Consider Figure \ref{fig_back2}, again showing a C-language fragment.
-%% The assignment to #b# on line~\ref{fig_back2_dead_line} has no visible
+%% The assignment to !+b+! on line~\ref{fig_back2_dead_line} has no visible
 %% effect and can be removed without affecting the meaning of the
 %% program. We call this optimization \emph{dead-code elimination}.
 
@@ -1201,7 +1201,7 @@ whatever that means for the particular optimization applied.
 %% elimination.
 
 %% The assignment on line~\ref{fig_back2_dead_line} can be eliminated
-%% because #b# does not get referenced again. If a variable is referenced
+%% because !+b+! does not get referenced again. If a variable is referenced
 %% after assignment, we say it is ``live.'' We call the dataflow
 %% analysis that finds all live variables a ``liveness'' analysis. 
 
@@ -1257,9 +1257,9 @@ whatever that means for the particular optimization applied.
 %%       & |use|(B) & |def|(B) & \outBa & \inBa \\
 %%       \cmidrule(r){2-5} %%\cmidrule(r){1-1}\cmidrule(r){2-2}\cmidrule(r){3-3}\cmidrule(r){4-4}\cmidrule(r){5-5}
 %%       \exitN & \emptyset & \emptyset & \emptyset & \emptyset \\
-%%       #return a + 1# & \{a\} & \emptyset & \emptyset & \{a\} \\
-%%       #b = a + 1# & \{a\} & \{b\} & \{a\} & \{a\} \\
-%%       #a = 1# & \emptyset & \{a\} & \{a\} & \emptyset \\
+%%       !+return a + 1+! & \{a\} & \emptyset & \emptyset & \{a\} \\
+%%       !+b = a + 1+! & \{a\} & \{b\} & \{a\} & \{a\} \\
+%%       !+a = 1+! & \emptyset & \{a\} & \{a\} & \emptyset \\
 %%     \end{array}
 %%   \end{math}
 %%   \caption{The $|use|$, $|def|$, \inBa and \outBa sets computed using
@@ -1272,9 +1272,9 @@ whatever that means for the particular optimization applied.
 %% determine which statements to eliminate. Only
 %% \refNode{lst_back10_assigna} and \refNode{lst_back10_assignb} in
 %% Figure~\ref{fig_back3} perform an assignment. The live set for
-%% \refNode{lst_back10_assigna} (``#a = 1#'') contains #a#, so we do not
-%% eliminate it. For \refNode{lst_back10_assignb} (``#b = a + 1#''), the
-%% live set does \emph{not} contain #b#. Therefore, we can eliminate
+%% \refNode{lst_back10_assigna} (``!+a = 1+!'') contains !+a+!, so we do not
+%% eliminate it. For \refNode{lst_back10_assignb} (``!+b = a + 1+!''), the
+%% live set does \emph{not} contain !+b+!. Therefore, we can eliminate
 %% \refNode{lst_back10_assignb}, giving us the new program in
 %% Figure~\ref{fig_back6}.
 
@@ -1359,7 +1359,7 @@ whatever that means for the particular optimization applied.
 
 %% Table \ref{tbl_back1} shows the |use| and |def| sets for each
 %% statement. The live set computed, |live|, becomes the input, $\Varid{in}$, for
-%% the statement's predecessor. We include the exit node (``#X#'') in the
+%% the statement's predecessor. We include the exit node (``!+X+!'') in the
 %% table to show the initial value of $\Varid{in}$ for the last statement --
 %% $\emptyset$, the empty set. Our analysis then works backwards through the
 %% program. If our program (and its CFG) contained any loops, we would
@@ -1371,10 +1371,10 @@ whatever that means for the particular optimization applied.
 %%   \begin{tabular}{lcccc}
 %%     $s$ & $|use|(s)$ & $|def|(s)$ & $\Varid{in}(s)$ &  $|live|(s)$ \\
 %%     \cmidrule(r){1-1}\cmidrule(r){2-2}\cmidrule(r){3-3}\cmidrule(r){4-4}\cmidrule(r){5-5}
-%%     #X# & & & & $\emptyset$ \\
-%%     #return a + 1# & $\{a\}$ & $\emptyset$ & $\emptyset$ & $\{a\}$ \\
-%%     #b = a + 1# & $\{a\}$ & $\{b\}$ & $\{a\}$ & $\{a\}$ \\
-%%     #a = 1# & $\emptyset$ & $\{a\}$ & $\{a\}$ & $\emptyset$ \\
+%%     !+X+! & & & & $\emptyset$ \\
+%%     !+return a + 1+! & $\{a\}$ & $\emptyset$ & $\emptyset$ & $\{a\}$ \\
+%%     !+b = a + 1+! & $\{a\}$ & $\{b\}$ & $\{a\}$ & $\{a\}$ \\
+%%     !+a = 1+! & $\emptyset$ & $\{a\}$ & $\{a\}$ & $\emptyset$ \\
 %%     \bottomrule
 %%   \end{tabular}
 %%   \caption{The $|use|$, $|def|$ and $|live|$ sets computed using equation \ref{eqn_back1} for our example program.}
@@ -1383,9 +1383,9 @@ whatever that means for the particular optimization applied.
 
 %% With the live set computed for each statement, our analysis can now
 %% determine which statements to eliminate. Only nodes 1 and 2 in Figure
-%% \ref{fig_back3} perform an assignment. The live set for node 1 (``#a = 1#'')
-%% contains #a#, so we do not eliminate it. In node 2 (``#b = a + 1#''),
-%% the live set does \emph{not} contain #b#. Therefore, we can eliminate
+%% \ref{fig_back3} perform an assignment. The live set for node 1 (``!+a = 1+!'')
+%% contains !+a+!, so we do not eliminate it. In node 2 (``!+b = a + 1+!''),
+%% the live set does \emph{not} contain !+b+!. Therefore, we can eliminate
 %% node 2, giving us a new program without any dead code:
 
 %% \begin{Verbatim}
@@ -1410,7 +1410,7 @@ whatever that means for the particular optimization applied.
 %% leaves from the same instruction, so only one ``branch'' can exist in
 %% each node.
 
-%% For example, consider the ``fall-through'' implied by the use of #case#
+%% For example, consider the ``fall-through'' implied by the use of !+case+!
 %% statements in this C-language program fragment:
 
 %% \begin{verbatim}

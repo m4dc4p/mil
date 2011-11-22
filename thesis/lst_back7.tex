@@ -14,26 +14,26 @@ b = 1
   \node[fact, below=3mm of assign, anchor=west] {\outFacts{lst_back7_assign}{a/1, b/2, c/\top}};
 
   \node[stmt,
-    below=.75in of assign] (test) {#if(a > b)#\labelNode{lst_back7_test}};
+    below=.75in of assign] (test) {!+if(a > b)+!\labelNode{lst_back7_test}};
   \node[labelfor=test] {\refNode{lst_back7_test}};
   \node[fact, above=3mm of test, anchor=east] {\inFacts{lst_back7_test}{a/1, b/2, c/\top}};
   \node[fact, below=3mm of test, anchor=east] {\outFacts{lst_back7_test}{a/1, b/2, c/\top}};
   \node[fact, below right=0mm and 0mm of test, anchor=west] {\outFacts{lst_back7_test}{a/1, b/2, c/\top}};
   
   \node[stmt,
-    right=2in of test] (true) {#c = 4#\labelNode{lst_back7_true}};
+    right=2in of test] (true) {!+c = 4+!\labelNode{lst_back7_true}};
   \node[labelfor=true] {\refNode{lst_back7_true}};
   \node[fact, above=3mm of true, anchor=east] {\inFacts{lst_back7_true}{a/1, b/2, c/\top}};
   \node[fact, below=3mm of true, anchor=west] {\outFacts{lst_back7_true}{a/1, b/2, c/4}};
 
   \node[stmt,
-    below=.75in of test] (false) {#c = 3#\labelNode{lst_back7_false}};
+    below=.75in of test] (false) {!+c = 3+!\labelNode{lst_back7_false}};
   \node[labelfor=false] {\refNode{lst_back7_false}};
   \node[fact, above=5mm of false, anchor=west] {\inFacts{lst_back7_false}{a/1, b/2, c/\top}};
   \node[fact, below=3mm of false, anchor=west] {\outFacts{lst_back7_false}{a/1, b/2, c/3}};
 
   \node[stmt,
-    below=.75in of false] (print) {#print(c)#\labelNode{lst_back7_print}};
+    below=.75in of false] (print) {!+print(c)+!\labelNode{lst_back7_print}};
   \node[labelfor=print] {\refNode{lst_back7_print}};
   \node[fact, above=3mm of print, anchor=east] {\inFacts{lst_back7_print}{a/1, b/2, c/\top}};
   \node[fact, below=3mm of print, anchor=east] {\outFacts{lst_back7_print}{a/1, b/2, c/\top}};
