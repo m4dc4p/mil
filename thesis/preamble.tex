@@ -167,7 +167,7 @@
 \begingroup\catcode`\!=\active \lccode`\!=`\< \lccode`\~=`\- 
   \catcode`\ =\active\lowercase{\endgroup\def\vbinds#1!~#2;}{\binds#1<-#2;}
 %% Return statement: return ... ;
-\protected\long\def\return#1;{\ensurett{return\ \removespaces #1}\xspace}
+\protected\long\def\return#1;{\ensurett{return\ \removespaces #1}}
 %% A closure capturing block. k {v1, ..., vN} x: ...
 \protected\long\def\ccblock#1(#2)#3:{\lab#1/\ensuremath{\thinspace\{\ensurett{#2}\}}\ \ensurett{#3:}}
 %% A normal block

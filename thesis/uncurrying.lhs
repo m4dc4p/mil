@@ -679,10 +679,10 @@ from empty facts.
 both cases, we use the |kill| function to create a new set of facts
 that does not contain any closures from the existing fact set which
 refered to |v|, the variable bound. If the statement does not directly
-create a closure (Line~\ref{uncurry_fig_tranfer_rest}), we create a
+create a closure (Line~\ref{uncurry_fig_transfer_rest}), we create a
 fact associating |v| with |Top|, just as in
 Equation~\eqref{uncurry_df_transfer_other}. If the expression creates
-a closure (Line~\ref{uncurry_fig_tranfer_rest}), we create a new fact
+a closure (Line~\ref{uncurry_fig_transfer_rest}), we create a new fact
 with the closure's destination and captured variables, corresponding
 to Equation~\eqref{uncurry_df_transfer_closure}. We add the new fact
 to the set returned by |kill| and return the result.
@@ -711,10 +711,14 @@ see in the next section how these facts evolve as the program is
 rewritten.
 
 \subsection{Rewrite}
-\intent{Describe how |collapse| looks up closure information for an
-  |Enter| expression.}  Figure~\ref{uncurry_fig_rewrite} shows the
-implementation of our rewrite function for the uncurrying
-optimization. We will describe it in pieces.
+\intent{Give an example demonstrating iterative rewriting.}
+Figure~\ref{uncurry_fig_rewrite} shows the
+top-level implementation of our rewrite function for the uncurrying
+optimization. |collapseRewrite| creates the rewriter that can 
+uncurry a MIL program. The |blocks| argument associates every \cc
+block in our program with a |DestOf| value. |DestOf|, as explained in
+Section~\ref{uncurry_impl_types}, indicates if the block returns a
+closure or jumps immediately to another block.
 
 \begin{myfig}
   \begin{minipage}{\hsize}\begin{withHsLabeled}{uncurry_fig_rewrite}
@@ -722,40 +726,29 @@ optimization. We will describe it in pieces.
 %include Uncurry.lhs
 %let includeRewrite = False
   \end{withHsLabeled}\end{minipage} \\
-  \caption{Our rewrite function that replaces \app f * x/ expressions
-    with closure allocations, if possible.}
+  \caption{The top-level implementation of our uncurrying rewriter..}
   \label{uncurry_fig_rewrite}
 \end{myfig}
 
-|collapseRewrite| takes one argument and creates a rewriter that can
-be applied to our MIL program. The |blocks| argument associates every
-\cc block in our program with a |DestOf| value. |DestOf|, as explained
-in Section~\ref{uncurry_impl_types}, indicates if the block returns a
-closure or jumps immediately to another block.
-
 On Line~\ref{uncurry_fig_rewrite_top}, |collapseRewrite| applies
-Hoopl's |iterFwdRw| and |mkFRewrite| functions to our locally defined
-|rewriter| function, creating a |FwdRewrite| value. The |iterFwdRw|
-combinator applies |rewriter| repeatedly, until the |Graph|
-representing the program stops changing. Each time the program is
-rewritten, new facts are computed as well. This ensures that a ``chain''
-of closure allocations get collapsed into a single allocation, if
-possible.
+Hoopl's |iterFwdRw| and |mkFRewrite| to create a |FwdRewrite|
+value. The |iterFwdRw| combinator applies |rewriter| repeatedly, until
+the |Graph| representing the program stops changing. Hoopl computes
+new facts (using |collapseTransfer|) after each rewrite. This ensures
+that a ``chain'' of closure allocations get collapsed into a single
+allocation, if possible.
 
-Figure~\ref{uncurry_fig_rewrite_iterations} shows how the \lab main/
-block in our example program changes as Hoopl iteratively applies
-|rewriter| and the value of |facts| after each iteration. Each row
-shows facts computed for the program text shown. Rewrites occur
-between rows. During the first iteration, |rewriter| transforms \binds
-v1 <- \app v0 * n/; to \binds v1 <- \mkclo[k1: n]; (because \var v0/
-holds the closure \clo[k0:], and |blocks| tells us \lab k0/ returns a
-closure pointing to \lab k1/).
+Figure~\ref{uncurry_fig_rewrite_iterations} demonstrates this
+iterative process by showing how the \lab main/ block in our example
+program changes over three iterations. The second column of each row
+shows facts computed for the program text in the first column. The
+value of |blocks| stays constant throughout, so we only show it
+once. Rewrites occur between rows.
 
-The facts shown for the second iteration reflect the rewrite made,
-associating \var v1/ with \clo[k1:n]. Now |rewriter| transforms \binds
-v2 <- \app v1 * n/; to \binds v2 <- \goto add(n, n);. No changes occur
-in the third iteration because no statements remain that can be
-rewritten, and Hoopl stops applying |rewriter|.
+During the first iteration, |rewriter| transforms \binds v1 <- \app v0
+* n/; to \binds v1 <- \mkclo[k1: n];, because \var v0/ holds the
+closure \clo[k0:], and |blocks| tells us \lab k0/ returns a closure
+pointing to \lab k1/.
 
 \begin{myfig}
   \begin{tabular}{clll}
@@ -769,14 +762,14 @@ rewritten, and Hoopl stops applying |rewriter|.
         \return v2; 
       \end{AVerb} 
     \end{minipage} & \begin{minipage}[t]{\widthof{\ \phantom{\{}(\var v2/, \goto add(n,n))\}\ }}\raggedright
-      \{(\var n/, $\top$),\break
-      \phantom{\{}(\var v0/, \clo[k0:]),\break
-      \phantom{\{}(\var v1/, $\top$),\break
-      \phantom{\{}(\var v2/, $\top$)\}
+      (\var n/, $\top$),\break
+      (\var v0/, \clo[k0:]),\break
+      (\var v1/, $\top$),\break
+      (\var v2/, $\top$)
     \end{minipage} & 
-    \begin{minipage}{\widthof{\phantom{\{}\lab k1/:\thinspace|Jump {-"\lab add/\ "-} [0, 1]|\}\ }}\raggedright
-      \{\lab k0/:\thinspace|Capture {-"\lab k1/\ "-} True|,\break
-      \phantom{\{}\lab k1/:\thinspace|Jump {-"\lab add/\ "-} [0, 1]|\}
+    \begin{minipage}[t]{\widthof{\phantom{\{}\lab k1/:\thinspace|Jump {-"\lab add/\ "-} [0, 1]|\}\ }}\raggedright
+      \lab k0/:\thinspace|Capture {-"\lab k1/\ "-} True|,\break
+      \lab k1/:\thinspace|Jump {-"\lab add/\ "-} [0, 1]|
     \end{minipage}
     \\\\
     2 & \begin{minipage}[t]{\widthof{\binds n <- \goto toInt(s);}}
@@ -788,10 +781,10 @@ rewritten, and Hoopl stops applying |rewriter|.
         \return v2;
       \end{AVerb} 
     \end{minipage} & \begin{minipage}[t]{\widthof{\ \phantom{\{}(\var v2/, \goto add(n,n))\}\ }}\raggedright
-      \{(\var n/, $\top$),\break
-      \phantom{\{}(\var v0/, \clo[k0:]),\break
-      \phantom{\{}(\var v1/, \clo[k1:n]),\break
-      \phantom{\{}(\var v2/, $\top$)\}
+      (\var n/, $\top$),\break
+      (\var v0/, \clo[k0:]),\break
+      (\var v1/, \clo[k1:n]),\break
+      (\var v2/, $\top$)
     \end{minipage} \\\\
     3 & \begin{minipage}[t]{\widthof{\binds v2 <- \goto add(n, n); \ensuremath{\leftarrow}}}
       \begin{AVerb}[gobble=8]
@@ -802,10 +795,10 @@ rewritten, and Hoopl stops applying |rewriter|.
         \return v2;
       \end{AVerb}
     \end{minipage} & \begin{minipage}[t]{\widthof{\ \phantom{\{}(\var v2/, \goto add(n,n))\}\ }}\raggedright
-      \{(\var n/, $\top$),\break
-      \phantom{\{}(\var v0/, \clo[k0:]),\break
-      \phantom{\{}(\var v1/, \clo[k1:n]),\break
-      \phantom{\{}(\var v2/, \goto add(n,n))\}
+      (\var n/, $\top$),\break
+      (\var v0/, \clo[k0:]),\break
+      (\var v1/, \clo[k1:n]),\break
+      (\var v2/, \goto add(n,n))
     \end{minipage}
   \end{tabular}
   \caption{How |rewriter| transforms the \lab main/ block. Each
@@ -816,62 +809,95 @@ rewritten, and Hoopl stops applying |rewriter|.
   \label{uncurry_fig_rewrite_iterations}
 \end{myfig}
 
-The |rewriter| function checks if it can rewrite |Enter| expressions
-when they occur in a |Done| statement or on the \rhs of a |Bind|. In
-the first case (Line~\ref{uncurry_fig_rewrite_done}), |done n l
-(collapse facts f x)| will produce a new |Done| statement with the
-|TailM| expression returned by |collapse|, if |collapse| returns a
-|Just| value. Otherwise, |done| does not rewrite. Therefore, |done|
-rewrites an |Enter| only when |collapse| indicates that rewriting can
-occur. In the second case (Line~\ref{uncurry_fig_rewrite_bind}) |bind|
-behaves similarly, only rewriting if |collapse| returns a |Just|
-value. In all other cases, |rewriter| does no rewriting.
+The facts shown for the second iteration reflect the rewrite made,
+associating \var v1/ with \clo[k1:n]. |rewriter| transforms \binds v2
+ <- \app v1 * n/; to \binds v2 <- \goto add(n, n); after this iteration
+because \var v1/ refers to \lab k1/ and |blocks| tells us that \lab
+k1/ jumps immediately to \lab add/. No changes occur after the third
+iteration because no statements remain that can be rewritten, and
+Hoopl stops applying |rewriter|.
+
+Figure~\ref{uncurry_fig_rewrite_impl} shows the functions that
+implement our uncurrying optimization.\footnote{Note that these
+  definition are local to |collapseRewrite|, so the |blocks| argument remains
+  in scope.} Line
+\ref{uncurry_fig_rewrite_impl_done} of |rewriter| rewrites \app f * x/
+expressions when they occur in a \return;
+statement. Line~\ref{uncurry_fig_rewrite_impl_bind} rewrites when \app
+f * x/ appears on the \rhs of a \bind statement.  In
+the first case, |done n l (collapse facts f x)| produces \return |e|;
+when |collapse| returns |Just e| (i.e., a rewritten
+expression). In the second case, |bind v (collapse facts f x)|
+behaves similarly, producing \binds v <- |e|; when |collapse| returns
+|Just e|.\footnote{Both |done| and |bind| are defined in a separate file, not shown.}
+
+\begin{myfig}
+  \begin{minipage}{\hsize}\begin{withHsLabeled}{uncurry_fig_rewrite_impl}
+%let includeRewriteImpl = True
+%include Uncurry.lhs
+%let includeRewriteImpl = False
+  \end{withHsLabeled}\end{minipage} \\
+  \caption{The implementation of our uncurrying rewriter.}
+  \label{uncurry_fig_rewrite_impl}
+\end{myfig}
 
 The |collapse| function takes a set of facts and two names,
-representing the left and \rhs of a \enter expression,
-respectively. When \var f/ is associated with a |CloDest| value (as
-opposed to |Top|) in the |facts| map
-(Line~\ref{uncurry_fig_rewrite_collapse_clo}), |collapse| uses the
-|blocks| argument to look up the behavior of the destination in the
-|CloDest| value. Lines~\ref{uncurry_fig_rewrite_collapse_jump} and
-\ref{uncurry_fig_rewrite_collapse_capt} test if the block associated
-\var f/ returns a closure or jumps immediately to another block. 
+representing the left and \rhs of the expression \app f * x/. When
+\var f/ is associated with a closure value, \clo[k:\dots], in the
+|facts| map (Line~\ref{uncurry_fig_rewrite_impl_collapse_clo}),
+|collapse| uses the |blocks| argument to look up the behavior of the
+destination \lab
+k/. Lines~\ref{uncurry_fig_rewrite_impl_collapse_jump} and
+\ref{uncurry_fig_rewrite_impl_collapse_capt} test if \lab k/
+returns a closure or jumps immediately to
+another block. In the first case, |collapse| returns a new
+closure--creating expression (\mkclo[|dest|:\dots]). In the
+second case, |collapse| returns a new goto expression (\goto |dest|(\dots)).
 
 If the destination immediately jumps to another block
-(Line~\ref{uncurry_fig_rewrite_collapse_jump}) then we will rewrite
-the \app f * x/ expression to call the block directly. The list of
-integers associated with |Jump| specifies the order in which arguments
-were taken from the closure and passed to the block. |collapse| uses
-the |fromUses| function to re-order arguments appropriately.
+(Line~\ref{uncurry_fig_rewrite_impl_collapse_jump}) then we will
+rewrite \app f * x/ to call the block directly. The list of integers
+associated with |Jump| specifies the order in which arguments were
+taken from the closure and passed to the block. |collapse| uses the
+|fromUses| function to re-order arguments appropriately.
 
-In Figure~\ref{fig_uncurry_destof}, we showed that the |DestOf| value
-associated with \lab k1/ is |Jump {-"\lab add/\ "-} [0, 1]|. The list |[0,
-  1]| indicates that \lab add/ takes arguments in the same order as the
-appear in the closure. However, if \lab add/ took arguments in
-opposite order, \lab k1/ and \lab add/ would look like:
-\begin{singlespace}
+{\tolerance=1000 In Figure~\ref{uncurry_fig_rewrite_iterations}, we showed that the
+|DestOf| value associated with \lab k1/ is |Jump {-"\lab add/\ "-} [0,
+  1]|. The list |[0, 1]| indicates that \lab add/ takes arguments in
+the same order as the appear in the closure. However, if \lab add/
+took arguments in opposite order, \lab k1/ and \lab add/ would look
+like:
+
+\begin{singlespace}\correctspaceskip
   \begin{AVerb}
     \ccblock k1(a)b: \goto add(b, a)
     \block add(x, y): \ldots
   \end{AVerb}
 \end{singlespace}
+
 \noindent And the |DestOf| value associated with \lab k1/ would be |Jump
-{-"\lab add/\ "-} [1, 0]|.
+{-"\lab add/\ "-} [1, 0]|.}
 
 If the destination returns a closure
-(Line~\ref{uncurry_fig_rewrite_collapse_capt}), we will rewrite \app f
-* x/ to directly allocate the closure. The boolean argument to
+(Line~\ref{uncurry_fig_rewrite_impl_collapse_capt}), we will rewrite
+\app f * x/ to directly allocate the closure. The boolean argument to
 |Capture| indicates if the closure ignores the argument passed, which
 |collapse| uses to determine if it should place the \var x/ argument
 in the closure that is allocated or not.
 
 \subsection{Optimization Pass}
 
-\intent{Describe how we recognize when a closure is created} 
+\begin{myfig}
+  \begin{minipage}{\hsize}\begin{withHsLabeled}{uncurry_fig_collapse}
+%let includeCollapse = True
+%include Uncurry.lhs
+%let includeCollapse = False
+  \end{withHsLabeled}\end{minipage}
+  \caption{The function which puts together all definitions for our
+    implementation of the uncurrying optimization.}
+  \label{uncurry_fig_collapse}
+\end{myfig}
 
-\intent{Describe how we re-write an Enter instruction to a closure or goto}
-
-\intent{Describe how deep rewrite progressively captures closures.}
 
 \section{Prior Work}
 \label{uncurry_sec_prior}

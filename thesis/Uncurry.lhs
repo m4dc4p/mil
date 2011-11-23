@@ -85,29 +85,39 @@ to a block, then avoid that extra step and directly allocate the
 closure or jump to the block.
 
 %endif
-%if includeAll
+%if includeCollapse || includeAll
 
 > collapse :: ProgM C C -> ProgM C C
-> collapse body = deadCode . runSimple $ do
->       (p, _, _) <- analyzeAndRewriteFwd fwd (JustC labels) body initial
+> collapse body = deadCode . runSimple $ do {-"\hslabel{run}"-}
+>       (p, _, _) <- analyzeAndRewriteFwd fwd (JustC labels) body initial {-"\hslabel{analyze}"-}
 >       return p
 >   where
->     labels = entryLabels body
->     initial = mapFromList (zip labels (repeat Map.empty))
->     fwd = FwdPass { fp_lattice = collapseLattice
+>     labels :: [Label]
+>     labels = entryLabels body {-"\hslabel{labels}"-}
+>
+>     initial :: FactBase CollapseFact
+>     initial = mapFromList (zip labels (repeat Map.empty)) {-"\hslabel{initial}"-}
+>
+>     fwd :: FwdPass SimpleFuelMonad StmtM CollapseFact
+>     fwd = FwdPass { fp_lattice = collapseLattice {-"\hslabel{fwd}"-}
 >                   , fp_transfer = collapseTransfer 
 >                   , fp_rewrite = collapseRewrite (destinations labels) }
->     destinations = Map.fromList . catMaybes . map (uncurry destOf) . catMaybes .  map (blockOfLabel body)
+>     
+>     destinations :: [Label] -> Map Label DestOf
+>     destinations = Map.fromList . catMaybes . {-"\hslabel{destinations}"-}
+>                    map (uncurry destOf) . catMaybes .  map (blockOfLabel body)
+>
 >     destOf :: Dest -> Block StmtM C C -> Maybe (Label, DestOf)
->     destOf (_, l)  block = 
+>     destOf (_, l)  block = {-"\hslabel{destOf}"-}
 >       case blockToNodeList' block of
 >         (JustC (CloEntry _ _ args arg), _, JustC (Done _ _ (Goto d uses))) -> 
 >           Just (l, Jump d (mapUses uses (args ++ [arg])))
 >         (JustC (CloEntry _ _ _ arg), _, JustC (Done _ _ (Closure d args))) -> 
 >           Just (l, Capture d (arg `elem` args))
 >         _ -> Nothing
+>     
 >     mapUses :: [Name] -> [Name] -> [Int]
->     mapUses uses args = catMaybes (map (`elemIndex` args) uses)
+>     mapUses uses args = catMaybes (map (`elemIndex` args) uses) {-"\hslabel{mapUses}"-}
 
 %endif
 %if includeAll || includeTransfer
@@ -139,7 +149,15 @@ closure or jump to the block.
 > collapseRewrite :: FuelMonad m => Map Label DestOf 
 >                    -> FwdRewrite m StmtM CollapseFact
 > collapseRewrite blocks = iterFwdRw (mkFRewrite rewriter) {-"\hslabel{top}"-}
+
+%endif
+%if includeAll
+
 >   where
+
+%endif
+%if includeRewriteImpl || includeAll
+
 >     rewriter :: FuelMonad m => forall e x. StmtM e x -> CollapseFact 
 >                 -> m (Maybe (ProgM e x))
 >     rewriter (Done n l (Enter f x)) facts = done n l (collapse facts f x) {-"\hslabel{done}"-}
@@ -158,6 +176,9 @@ closure or jump to the block.
 >                     (if usesArg then vs ++[x] else vs))
 >             _ -> Nothing
 >         _ -> Nothing
+>
+>     fromUses :: [Int] -> [Name] -> [Name]
+>     fromUses idxs args = map (args !!) idxs
 
 %endif
 %if False
@@ -166,12 +187,6 @@ Idxs is a list of positions which represent
 how a Goto used the arguments given in a CloEntry. We
 take local arguments and re-order them according to
 the positions given.
-
-%endif
-%if includeRewrite || includeAll
-
->     fromUses :: [Int] -> [Name] -> [Name]
->     fromUses idxs args = map (args !!) idxs
 
 %endif
 %if includeAll || includeLattice
