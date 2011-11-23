@@ -267,6 +267,9 @@
 %% indented but all other lines are.
 \def\itempar#1{\noindent\hangindent=\parindent\hangafter=1 #1\quad}
 
+%% Disable overfull messages with ridiculous hfuzz value
+\def\disableoverfull{\hfuzz=10in}
+
 \include{md}
 \domd
 

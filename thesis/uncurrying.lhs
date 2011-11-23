@@ -45,11 +45,10 @@ Section~\ref{uncurry_sec_examples} and discuss uncurrying as applied
 to MIL in Section~\ref{uncurry_sec_mil}. We present our dataflow
 equations for uncurrying in Section~\ref{uncurry_sec_df} and our
 rewriting strategy in Section~\ref{uncurry_sec_rewriting}. We show our
-implementation in Section~\ref{uncurry_sec_impl}. Previous approaches
-to uncurrying are discussin in Section~\ref{uncurry_sec_prior}; we
-describe alternate (but unimplemented) strategies for our own approach
-in Section~\ref{uncurry_sec_future}. We conclude with a discussion of
-our experience in Section~\ref{uncurry_sec_refl}.
+implementation in Section~\ref{uncurry_sec_impl}. We describe
+alternate (but unimplemented) strategies for our own approach in
+Section~\ref{uncurry_sec_future}. We conclude with a discussion of our
+experience in Section~\ref{uncurry_sec_refl}.
 
 %% \emph{Describes our optimization for collapsing intermediate
 %% closures. Our choice of representation is analyzed to
@@ -234,7 +233,7 @@ returning a closure pointing to \lab absBodyL208/. When entered,
 \lab absBodyL208/ will jump to the block \lab absBlockL209/ with \var f/,
 the captured argument. 
 
-\begin{myfig}
+\begin{myfig}\disableoverfull
   \begin{tabular}{l}
     \begin{minipage}{\hsize}
 > compose1 f = compose f
@@ -557,7 +556,7 @@ definitions are not shown, correspond to \setL{Label} and \setL{Var},
 respectively.
 
 \begin{myfig}
-  \begin{minipage}{\hsize}
+  \begin{minipage}{\hsize}\disableoverfull
 %let includeTypes = True
 %include Uncurry.lhs
 %let includeTypes = False
@@ -623,12 +622,13 @@ the label the closure refers to, and a list of captured variables,
 \intent{Explain how |WithTop CloDest| and |CollapseFact| represent
   \setL{Fact}.}  We use a finite map, aliased as |CollapseFact|, to
 represent our \setL{Fact} set. Hoopl provides |WithTop|, a type that
-adds a $\top$ value to any other type. We use |WithTop CloDest| to
-represent the set $\{\top\} \cup \{\setL{Clo}\}$. |CollapseFact| then
+adds a $\top$ value to any other type. |WithTop CloDest| then 
+represents the set $\{\top\} \cup \{\setL{Clo}\}$. In turn, |CollapseFact| 
 represents a finite map from variables to $\{\top\} \cup
 \{\setL{Clo}\}$.
 
 \subsection{Lattice \& Meet}
+\label{uncurry_impl_lattice}
 Figure~\ref{uncurry_fig_lattice} shows the |DataflowLattice| structure
 defined for our analysis. We set |fact_bot| to an empty map, meaning
 we start without any information. We define |lub| over |CloDests|, just
@@ -637,7 +637,7 @@ lub)| (Hoopl provides |joinMaps|) to transform |lub| into a function
 that operates over finite maps.
 
 \begin{myfig}
-  \begin{minipage}{\hsize}
+  \begin{minipage}{\hsize}\disableoverfull
 %let includeLattice = True
 %include Uncurry.lhs
 %let includeLattice = False
@@ -648,6 +648,7 @@ that operates over finite maps.
 \end{myfig}
 
 \subsection{Transfer}
+\label{uncurry_impl_transfer}
 The definition |t| in Figure~\ref{uncurry_fig_transfer} gives the
 implementation of $t$ from Figure~\ref{uncurry_fig_df}. The top-level
 definition, |collapseTransfer|, serves to turn |t|
@@ -664,7 +665,7 @@ using the Hoopl--provided |mkFactBase| function to create a |FactBase|
 from empty facts.
 
 \begin{myfig}
-  \begin{minipage}{\hsize}\begin{withHsLabeled}{uncurry_fig_transfer}
+  \begin{minipage}{\hsize}\begin{withHsLabeled}{uncurry_fig_transfer}\disableoverfull
 %let includeTransfer = True
 %include Uncurry.lhs
 %let includeTransfer = False
@@ -711,6 +712,7 @@ see in the next section how these facts evolve as the program is
 rewritten.
 
 \subsection{Rewrite}
+\label{uncurry_impl_rewrite}
 \intent{Give an example demonstrating iterative rewriting.}
 Figure~\ref{uncurry_fig_rewrite} shows the
 top-level implementation of our rewrite function for the uncurrying
@@ -721,7 +723,7 @@ Section~\ref{uncurry_impl_types}, indicates if the block returns a
 closure or jumps immediately to another block.
 
 \begin{myfig}
-  \begin{minipage}{\hsize}\begin{withHsLabeled}{uncurry_fig_rewrite}
+  \begin{minipage}{\hsize}\begin{withHsLabeled}{uncurry_fig_rewrite}\disableoverfull
 %let includeRewrite = True
 %include Uncurry.lhs
 %let includeRewrite = False
@@ -832,7 +834,7 @@ behaves similarly, producing \binds v <- |e|; when |collapse| returns
 |Just e|.\footnote{Both |done| and |bind| are defined in a separate file, not shown.}
 
 \begin{myfig}
-  \begin{minipage}{\hsize}\begin{withHsLabeled}{uncurry_fig_rewrite_impl}
+  \begin{minipage}{\hsize}\begin{withHsLabeled}{uncurry_fig_rewrite_impl}\disableoverfull
 %let includeRewriteImpl = True
 %include Uncurry.lhs
 %let includeRewriteImpl = False
@@ -887,8 +889,19 @@ in the closure that is allocated or not.
 
 \subsection{Optimization Pass}
 
+\intent{Describe how |collapse| creates initial values for uncurrying,
+  applies the optimization, and cleans up.}
+Figure~\ref{uncurry_fig_collapse} presents |collapse|, which applies
+the uncurrying dataflow analysis and rewrite to the MIL program
+represented by the argument
+|program|. Line~\ref{uncurry_fig_collapse_analyze} analyzes and
+transforms |program| by passing appropriate arguments to Hoopl's
+|analyzeAndRewriteFwd| function. On Line~\ref{uncurry_fig_collapse_run} we evaluate Hoopl's
+monadic program using |runSimple|. |runSimple| provides a monad with
+infinite optimization fuel.
+
 \begin{myfig}
-  \begin{minipage}{\hsize}\begin{withHsLabeled}{uncurry_fig_collapse}
+  \begin{minipage}{\hsize}\begin{withHsLabeled}{uncurry_fig_collapse}\disableoverfull
 %let includeCollapse = True
 %include Uncurry.lhs
 %let includeCollapse = False
@@ -898,14 +911,65 @@ in the closure that is allocated or not.
   \label{uncurry_fig_collapse}
 \end{myfig}
 
+Half of Figure~\ref{uncurry_fig_collapse} creates arguments for
+|analyzeAndRewriteFwd|, which we will detail in order.
 
-\section{Prior Work}
-\label{uncurry_sec_prior}
-\intent{Discuss other approaches to uncurrying.}
+\begin{description}
+\item[|fwd|] --- This argument packages the lattice, transfer and
+  rewrite definitions we described in
+  Sections~\ref{uncurry_impl_lattice}, \ref{uncurry_impl_transfer},
+  and \ref{uncurry_impl_rewrite}.
+\item[|JustC labels|] --- We must give Hoopl all entry points for the
+  program analyzed. These labels tell Hoopl where to start
+  traversing the program graph. Because our analysis does not extend
+  across blocks we give all labels, so all blocks in |program| will be
+  analyzed. This argument's type is |MaybeC C [Label]|, which requires
+  us to use the |JustC| constructor. 
+\item[|program|] --- This argument gives the program that will be 
+  analyzed and (possibly) transformed.
+\item[|initial|] --- The final argument gives initial facts for each
+  label. Our analysis does not specify any prior knowledge at each
+  label, so we set all initial facts to |Map.empty|. That is the value
+  we gave |fact_bot| when defining our |Data{-"\-"-}flow{-"\-"-}Lattice| value
+  (Figure~\ref{uncurry_fig_lattice}).
+\end{description}
+
+The other half of Figure~\ref{uncurry_fig_collapse} describes how we
+create the |blocks| argument passed to |collapseRewrite|. The
+|destinations| function enumerates all blocks in |program| to find all
+\cc blocks. |destOf| determines the behavior of each \cc block and
+creates the appropriate |Jump| or |Capture| value. The result of
+|destinations| becomes the |blocks| argument for |collapseRewrite|.
 
 \section{Future Work}
 \label{uncurry_sec_future}
-\intent{Discuss strategies for uncurrying: local only, across blocks, by duplication.}
+\intent{Discuss strategies for uncurrying: local only, across blocks,
+  by duplication.}  The uncurrying optimization described in this
+chapter only works within single blocks. We only apply the
+optimization to closures. However, the optimization can be extended to
+work across blocks and to work with monadic thunks. We discuss these
+extensions in Sections~\ref{uncurry_sec_blocks} and
+\ref{uncurry_sec_thunks}, respectively.
+
+\subsection{Uncurrying Across Blocks}
+
+\intent{Motivate multi-block uncurrying with example}
+Uncurrying across blocks can further reduce the number of
+\enter operations and closures created. For example, consider
+a program that creates a partially applied function and passes
+it through a case statement.
+
+\begin{myfig}
+  \caption{A MIL program that would benefit from uncurrying across
+    blocks.}
+  \label{uncurry_fig_blocks}
+\end{myfig}
+
+\intent{Discuss live variable analysis difficulty}
+
+\intent{Discuss implications for separate compilation}
+
+\subsection{Extending Uncurrying to Thunks}
 
 \section{Reflection}
 \label{uncurry_sec_refl}

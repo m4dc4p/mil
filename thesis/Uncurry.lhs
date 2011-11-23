@@ -88,12 +88,12 @@ closure or jump to the block.
 %if includeCollapse || includeAll
 
 > collapse :: ProgM C C -> ProgM C C
-> collapse body = deadCode . runSimple $ do {-"\hslabel{run}"-}
->       (p, _, _) <- analyzeAndRewriteFwd fwd (JustC labels) body initial {-"\hslabel{analyze}"-}
+> collapse program = runSimple $ do {-"\hslabel{run}"-}
+>       (p, _, _) <- analyzeAndRewriteFwd fwd (JustC labels) program initial {-"\hslabel{analyze}"-}
 >       return p
 >   where
 >     labels :: [Label]
->     labels = entryLabels body {-"\hslabel{labels}"-}
+>     labels = entryLabels program {-"\hslabel{labels}"-}
 >
 >     initial :: FactBase CollapseFact
 >     initial = mapFromList (zip labels (repeat Map.empty)) {-"\hslabel{initial}"-}
@@ -105,7 +105,7 @@ closure or jump to the block.
 >     
 >     destinations :: [Label] -> Map Label DestOf
 >     destinations = Map.fromList . catMaybes . {-"\hslabel{destinations}"-}
->                    map (uncurry destOf) . catMaybes .  map (blockOfLabel body)
+>                    map (uncurry destOf) . catMaybes .  map (blockOfLabel program)
 >
 >     destOf :: Dest -> Block StmtM C C -> Maybe (Label, DestOf)
 >     destOf (_, l)  block = {-"\hslabel{destOf}"-}

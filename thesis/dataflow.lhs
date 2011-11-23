@@ -63,7 +63,9 @@ which reason we say \emph{enters} and \emph{leaves}.
 
 \begin{myfig}[th]
 \begin{tabular}{cc}
-\input{lst_back1} & \input{lst_back2} \\
+  \begin{minipage}[b]{\hsize/2-0.5in}
+    \input{lst_back1} 
+  \end{minipage} & \input{lst_back2} \\
 \scap{fig_back1_a} & \scap{fig_back1_b} 
 \end{tabular}
 \caption{\subref{fig_back1_a} A C-language program fragment. \subref{fig_back1_b} The
@@ -170,7 +172,7 @@ it the value 10. The function uses !+m+! in the loop body on
 Line~\ref{fig_back7_loop} to multiply the value passed in
 repeatedly. 
 
-\begin{myfig}[tbh]
+\begin{myfig}[tbh]\disableoverfull
   \begin{tabular}{cc}
     \input{lst_back11} & \input{lst_back12} \\
     \scap{fig_back7_initial} & \scap{fig_back7_opt} 

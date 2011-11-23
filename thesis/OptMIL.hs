@@ -298,6 +298,7 @@ mostOpt tops prelude@(prims, _) = id .
     deadBlocks tops .  
     collapse . 
     inlineReturn .
+    deadCode . 
     collapse . 
     deadCode . 
     bindSubst . 
