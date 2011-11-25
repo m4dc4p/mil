@@ -16,7 +16,7 @@
 %% and basic concepts.
 
 The \emph{dataflow algorithm}, as described by Gary Kildall
-\citep{Kildall1973}, provides a framework analyzing and optimizing
+\citep{Kildall1973}, provides a framework for analyzing and optimizing
 programs.  The algorithm \emph{iteratively} traverses the
 \emph{control-flow graph} for a program either \emph{forwards} or
 \emph{backwards}, computing \emph{facts} at each node using a
@@ -49,7 +49,7 @@ on the particular analysis performed. In essence, the dataflow
 
 Figure~\ref{fig_back1} shows a simple C program and its
 \emph{control-flow graph} (CFG). Each \emph{node} in
-\subref{fig_back1_b} represents a statement or expression in the
+Part~\subref{fig_back1_b} represents a statement or expression in the
 original program. For example, \refNode{lst_back2_assigna} and
 \refNode{lst_back2_assignb} represent the assignment statements on
 line \ref{lst_back1_assign}. Notice that the declaration of !+c+! does
@@ -73,7 +73,7 @@ which reason we say \emph{enters} and \emph{leaves}.
 
 Directed edges show the order in which nodes execute. The edges
 leaving \refNode{lst_back2_test} (representing the test
-``\verb=if(a > b)='' on line \ref{lst_back1_test}) show that
+``!+if(a > b)+!'' on line \ref{lst_back1_test}) show that
 execution can branch to either \refNode{lst_back2_true} (when
 $a > b$) or \refNode{lst_back2_false} (when
 $a \leq b$). A node followed by multiple successors
@@ -109,11 +109,11 @@ Consider the C-language fragment and control-flow graphs (CFG) in
 Figure~\ref{fig_back4}.  Part~\subref{fig_back4_b} shows the CFG for
 Part~\subref{fig_back4_a}: a long, straight sequence of nodes, one
 after another. Part~\subref{fig_back4_c} represents the assignment statements on
-lines~\ref{lst_back3_start} -- \ref{lst_back3_end} as a \emph{basic
+lines~\ref{lst_back3_start} --- \ref{lst_back3_end} as a \emph{basic
   block}: a sequence of statements with one entry, one exit, and no
 branches in-between. Execution cannot start in the ``middle'' of the
 block, nor can it branch anywhere but at the end of the block. In fact,
-Part~\ref{fig_back4_b} also shows four basic blocks -- they just happen
+Part~\ref{fig_back4_b} also shows four basic blocks --- they just happen
 to consist of one statement each.
 
 \begin{myfig}
@@ -140,9 +140,9 @@ to consist of one statement each.
 The representation given in Part~\subref{fig_back4_c} has a number of
 advantages. It tends to reduce both the number of nodes and the number
 of edges in the graph. The dataflow algorithm maintains two sets of
-\emph{facts} for every node -- reducing the number of nodes obviously
+\emph{facts} for every node --- reducing the number of nodes obviously
 reduces the number of facts stored. The algorithm also iteratively
-propagates facts along edges -- so reducing the number of edges
+propagates facts along edges --- so reducing the number of edges
 reduces the amount of work we need to do. When rewriting, blocks allow
 us to move larger amounts of the program at once. It also can be shown
 (see \citep{Aho2006}) that we do not lose any information by collapsing
@@ -159,7 +159,7 @@ choice of \emph{facts}, \emph{meet operator}, \emph{transfer
 lattice. Together, they approximate some property of the program that
 we wish to analyze. The transfer function transforms facts to mimic
 the flow of information in the control-flow graph. The direction is
-dictated by the type of analysis -- each particular analysis runs
+dictated by the type of analysis --- each particular analysis runs
 \emph{forwards} or \emph{backwards}.
 
 %% Constant-propagation
@@ -183,7 +183,7 @@ repeatedly.
   \label{fig_back7}
 \end{myfig}
 
-This function is just used for illustration -- we do not expect anyone
+This function is just used for illustration --- we do not expect anyone
 would actually write code this way (after all, !+mult10+! is just
 !+10 * val * cnt+!). In any case, the program in
 Figure~\ref{fig_back7_initial} can be transformed by replacing the
@@ -209,12 +209,12 @@ categories at each point in the control-flow graph: \emph{unknown}, a
 \emph{known integer constant}, or
 \emph{indeterminate}. \emph{Unknown}, represented by $\bot$
 (``bottom''), is the initial value for all variables in our
-analysis. A \emph{known integer constant}, $C \in \ZZ$, means
-our analysis identified that the variable was assigned a specific
-value that does not change. \emph{Indeterminate}, indicated by $\top$
-(``top''), means our analysis found that the variable might have more
-than one value at a given point. Together, $\{\bot, \top\} \cup
-\ZZ$ forms a set which we will denote as \setLC.
+analysis. A \emph{known integer constant}, $C \in \ZZ$, means our
+analysis identified that the variable was assigned a specific value
+that does not change. \emph{Indeterminate}, indicated by $\top$
+(``top''), means our analysis could not identify a constant value
+for the variable. Together, $\{\bot, \top\} \cup \ZZ$ forms a set
+which we will denote as \setLC.
 
 \begin{myfig}
   \input{lst_back17}
@@ -619,7 +619,7 @@ inputs. If $x$ is ``less than or equal to'' $y$, $f(x)$ will also be
 ``less than or equal to'' $f(y)$. 
 
 The transfer function moves our facts along the lattice. A monotone
-transfer function will never ``decrease'' its argument -- $f$ will
+transfer function will never ``decrease'' its argument --- $f$ will
 always produce a value that is at the same ``height'' or ``higher'' in
 the lattice. The lattice represents the information we have gathered
 during our analysis. In turn, the ordering of values represents ``how
@@ -643,7 +643,7 @@ monotone and, by a simple extension to sets, so is is
 Equation~\eqref{eqn_back5}.
 
 %% If our lattice has finite height, we can be sure that our
-%% algorithm will terminate -- our transfer function will not oscillate
+%% algorithm will terminate --- our transfer function will not oscillate
 %% up and down the lattice!
 %% By requiring the our analysis uses a \emph{lattice} with \emph{finite
 %%   height} and a \emph{monotone} transfer function, we know our
@@ -793,7 +793,7 @@ gave the parameterization for our constant propagation analysis in
 Figure~\ref{fig_back10}. We know the algorithm will terminate if our
 transfer function is \emph{monotone} and we have defined lattice with
 \emph{finite} height. However, we have not discussed how to measure
-the results our analysis gives us -- how do we know that they are the
+the results our analysis gives us --- how do we know that they are the
 best possible? We will address that question in the next section.
 
 \section{Quality of Solutions to the Dataflow Equations}
@@ -830,7 +830,7 @@ Our algorithm, however, does not take such conditions into
 account. The ideal solution is called the \emph{meet over paths}
 solution because it takes into account only the paths that will taken
 by the program. Determining the actual paths taken is an undecidable
-problem -- thus we settle for the maximum fixed point. Fortunately,
+problem --- thus we settle for the maximum fixed point. Fortunately,
 the algorithm is conservative --- it never ignores (or adds) paths ---
 so we can be sure that its analysis will never be wrong, just that it
 probably will not be as good as the ideal.
