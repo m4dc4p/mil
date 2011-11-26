@@ -9,12 +9,14 @@
 
     \multicolumn{3}{c}{\emph{Meet}} \\
 
-    F_1 \wedge\ F_2 &= \begin{array}{rl}
-      \{(a, x \lub y)\ | & a \in \dom(F_1), a \in \dom(F_2)\}\ \cup \\
-      \{(a, y)\ | & a \in \dom(F_1), a \not\in \dom(F_2)\ \text{or} \\
-      & a \not\in \dom(F_1), a \in \dom(F_2)\},
+
+    F_1 \wedge\ F_2 &= \begin{array}{l}
+      \setdef{(a, x_1 \lub x_2)}{(a,x_1) \in F_1, (a,x_2) \in F_2} \\
+        \cup \; \setdef{(a,x_1)}{(a,x_1) \in F_1, a \not\in \dom(F_2)} \\
+        \cup \; \setdef{(a,x_2)}{(a,x_2) \in F_2, a \not\in \dom(F_1)},
     \end{array} \labeleq{eqn_back13} \labeleq{eqn_back12} & \eqref{eqn_back12} \\
-    & \text{where\ } F_1, F_2 \in \setL{Fact}, \lub\ \text{as in Figure~\ref{tbl_back4}.} \\\\
+    & \multicolumn{2}{l}{\ensuremath{\text{where\ } F_1, F_2 \in \setL{Fact}, \lub\ \text{as in Figure~\ref{tbl_back4},
+          \mfun{dom} from Equation~\eqref{eqn_back_dom}.}}} \\\\
 
     \multicolumn{3}{c}{\emph{Transfer}} \\
     t (F, a\ \text{\tt =}\ C) &= \{(a, x \lub C), \text{when\ } (a, x) \in F\ \text{or} \\

@@ -227,12 +227,14 @@ which we will denote as \setLC.
 \end{myfig}
 
 Figure~\ref{fig_back11} shows the control-flow graph of our program,
-partly annotated with sets of \emph{facts} before (\inE) and after
-(\out) the nodes that reference the variable $i$. This analysis
-defines facts as pairs, $(a,x)$, where $a$ is the name of a variable
-and $x \in \setLC$. The \inE and \out annotations are sets of
-facts, representing our knowledge of each variable's value at that
-point in the program.
+annotated with \emph{facts} about the variable $i$ before and
+after nodes \refNode{lst_back17_assign}, \refNode{lst_back17_test}
+and \refNode{lst_back17_incr}. This analysis defines facts as pairs,
+$(a,x)$, where $a$ is the name of a variable and $x \in \setLC$. The
+\inE sets represent the value of the variables \emph{before} the
+statement in the node executes; the \out sets give the value of the
+variables afterwards. Together these sets represent our knowledge
+about each variable's value at each point in the program.
 
 Constant propagation is a \emph{forwards} analysis, meaning the values
 for each \inE set are calculated based on the \out values of its
@@ -246,9 +248,9 @@ predecessors: \refNode{lst_back17_assign} and
 values to $i$: 0 and $\top$. To combine these values when computing
 \inB{lst_back17_test}, we use a \emph{meet operator}.
 
-The \emph{meet operator}, \lub (also pronounced ``least upper bound'' or
+The \emph{meet operator}, \lub (pronounced ``least upper bound'' or
 ``lub''), defines how we will combine values in
-\setLC. Table~\ref{tbl_back4} gives the definition of \lub. For any
+\setLC. Figure~\ref{tbl_back4} gives the definition of \lub. For any
 value of $x \in \setLC$, $\bot \lub x$ results in $x$. Conversely, $x
 \lub \top$ results in $\top$. Two differing constants, $C_1$ and
 $C_2$, result in $\top$, while equal constants give the same constant. 
@@ -306,12 +308,16 @@ We have defined \lub on elements in \setLC, but our facts are pairs
 $(a,x)$ where $a$ is a variable and $x$ a value in \setLC; \inE and
 \out are sets of facts.  Therefore, we define the $\wedge$ (``wedge'')
 operator to apply \lub to sets of facts ($F_1$ and $F_2$ below):
-\begin{align*}\allowdisplaybreaks[0]
-  F_1 \wedge F_2 &= \setdef{(a, x_1 \lub x_2)}{(a,x_1) \in F_1, (a,x_2) \in F_2} \\
-  &\; \cup \setdef{(a,x_1)}{(a,x_1) \in F_1, a \not\in \dom(F_2)} \\
-  &\; \cup \setdef{(a,x_2)}{(a,x_2) \in F_2, a \not\in \dom(F_1)} \label{eqn_back18}\addtag\\
-  \dom(F) &= \setdef{a}{(a,x) \in F} \addtag
-\end{align*}
+
+\begin{singlespace}\correctspaceskip
+  \begin{align*}\allowdisplaybreaks[0]
+    F_1 \wedge F_2 &= \setdef{(a, x_1 \lub x_2)}{(a,x_1) \in F_1, (a,x_2) \in F_2} \\
+    &\; \cup \setdef{(a,x_1)}{(a,x_1) \in F_1, a \not\in \dom(F_2)} \\
+    &\; \cup \setdef{(a,x_2)}{(a,x_2) \in F_2, a \not\in \dom(F_1)} \label{eqn_back18}\addtag\\
+    \dom(F) &= \setdef{a}{(a,x) \in F} \label{eqn_back_dom}\addtag
+  \end{align*}
+\end{singlespace}
+
 Our $\wedge$ operator acts like union when a variable in $F_1$ does
 not appear in the domain of $F_2$; likewise for a variable only in
 $F_2$. When a variable appears in both $F_1$ and $F_2$, the values for
@@ -320,12 +326,17 @@ the variable are combined using \lub.
 To compute \inBa, we apply $\wedge$ to each \out set of $B$'s
 predecessors. We use a subscripted $\bigwedge$ to indicate we combine
 all of the \out sets into one using $\wedge$:
+
+\begin{singlespace}\correctspaceskip
 \begin{equation}
   \inBa = \bigwedge\limits_{\mathclap{P \in \mathit{pred}(B)}} \outXa{P} \label{eqn_back8}.
 \end{equation}
+\end{singlespace}
 
 Using these equations, we can show how the \inB{lst_back17_test}
 set in Figure~\ref{fig_back11} is derived:
+
+\begin{singlespace}\correctspaceskip
 \begin{align*}\allowdisplaybreaks[0]
   \inB{lst_back17_test} &= \bigwedge\limits_{\mathclap{P \in \mathit{pred}(\refNode{lst_back17_test})}} \outXa{P} \\
   \shortintertext{\hbox to 1\textwidth{\hfil\textit{Predecessors of \refNode{lst_back17_test}; Equation~\eqref{eqn_back8}.}}}
@@ -339,6 +350,7 @@ set in Figure~\ref{fig_back11} is derived:
   \shortintertext{\hbox to 1\textwidth{\hfil\textit{Definition of \inB{lst_back17_test}.}}}
   \{\factC{i}{\top}\} &= \{\factC{i}{\top}\}.
 \end{align*}
+\end{singlespace}
 
 Together, \setLC and \lub form a \emph{lattice}.\footnote{The lattice
   can also have a \emph{join} operator, but for our purposes we solely
@@ -349,61 +361,12 @@ computes different facts, but those facts are always represented by a
 lattice.
 
 We have established that our analysis computes \emph{facts} at each
-node in our programs control-flow graph. The facts assign the value
-$\bot$, $C \in \ZZ$, or $\top$ to each variable in the program,
+node in our programs control-flow graph. The facts assign a value from
+the set $\{\bot, \top\} \cup \ZZ$ to each variable in the program,
 at each node in the graph. We defined a \emph{meet operator}, \lub,
 which is used to combing conflicting values when computing \inBa.  The
 facts and meet operator together define a \emph{lattice}. We next
 explore how \out facts are computed for each node.
-
-%% Figure~\ref{fig_back11} demonstrates how the lattice computes facts
-%% for constant propagation. The set \out{lst_back17_assign} indicates,
-%% among other things, that $i$ is assigned 0: \factC{i}{0}. However,
-%% \out{lst_back17_incr} indicates that the value of $i$ is indeterminate: 
-%% \factC{i}{\top}. 
-
-%% First, the values
-%% computed for variables at each program point are in \setLC. Second,
-%% the meet operator, \lub, is used to combine facts  The
-%% lattice defines our facts. That is, the values in \setLC The lattice
-%% defines how our facts will indicate if a variable has a constant
-%% value.
-
-%% Figure~\ref{fig_back10} shows our program with the final facts
-%% computed. The sets \inB{lst_back13_mult} and \outB{lst_back13_mult}
-%% show that !+m+! has the value 10 when block \refNode{lst_back13_mult}
-%% executes. The variables !+n+! and !+i+! have the value $\top$, indicating
-%% they could one of many different values. However, !+cnt+! and !+val+!
-%% still have $\bot$, because their values are not modified anywhere in
-%% the control-flow graph.
-
-%% \begin{myfig}
-%%   \input{lst_back14}
-%%   \label{fig_back10}
-%%   \caption{Our program, annotated with the final facts computed by the
-%%     constant propagation analysis. Notice the \inB{lst_back14_mult}
-%%     and \outB{lst_back14_mult} indicate that \texttt{m} has the value 10
-%%     while \refNode{lst_back14_mult} executes.}
-%% \end{myfig}
-
-%% values. 
-%% values $\bot$, an integer value, and $\top$ can be ordered such
-%% that $\bot \le x \le \top$, for all integers $x$. The \emph{meet
-%% operator} defines this ordering
-
-%% Before
-%% and after each block we will determine 
-
-%% To track
-%% the value of each variable, we use a \emph{lattice}. This particular
-%% lattice encodes three types of values: 
-%% Even so,
-%% for this analysis all we care to know is if the value remains
-%% the same or changes. 
-
-%% approximate by determining, at each point in the control-flow graph,
-%% whether a variable has one of three values: an \emph{unknown}, a
-%% \emph{constant}, or
 
 \subsection{Transfer Functions}
 \label{back_subsec_transfer}
@@ -641,60 +604,6 @@ if $B$ assigns some constant $C$ to $x$, then $x' = x \lub C$, which
 again satisfies our relation. Therefore, Equation~\eqref{eqn_back4} is
 monotone and, by a simple extension to sets, so is is
 Equation~\eqref{eqn_back5}.
-
-%% If our lattice has finite height, we can be sure that our
-%% algorithm will terminate --- our transfer function will not oscillate
-%% up and down the lattice!
-%% By requiring the our analysis uses a \emph{lattice} with \emph{finite
-%%   height} and a \emph{monotone} transfer function, we know our
-%% analysis will eventually reach a fixed point and terminate. We will
-%% now discuss how these same properties guarantee we have reached the
-%% \emph{maximum fixpoint} and thus have the best possible answer.
-
-
-
-%% Our goal is to find the ``largest amount'' of ``smallest'' information
-%% about each variable. That is, if we assigned $\top$ to all variables,
-%% we have the ``largest'' amount of information, but we do not know
-%% anything useful. Assigning $\bot$ puts is in the opposite situation,
-%% where we know the ``least.'' We want something in the middle, where we
-%% have gathered the greatest amount of useful information. 
-
-
-
-%% have this
-%% property. 
-%% In terms of \setLC and
-%% Equation~\eqref{eqn_back4} (our transfer function), that means the
-%% value for a variable will either stay the same or get ``bigger,'' as
-%% defined by the lattice. For example, if \inBa (for some $B$) says $i$ is 10,
-%% then $i$ in \outBa will be either 10 or $\top$. If $i$ could become $\bot$ (or
-%% some other constant), Equation~\eqref{eqn_back4} would not be monotone. 
-
-
-%% Trivially holds for our transfer function because it is defined in terms of \lub.
-
-%% Together, guarantees we terminate. How do we get the ``best'' answer?
-
-
-%% Monotonic
-%% Finite height lattice
-%% Partial orders
-%% Maximum fixed point
-
-%% \begin{myfig}
-%%   \begin{tabular}[c]
-%%     \subfloat{\input{lst_back15}\label{fig_back8_initial}} \\
-%%     \subref{fig_back8_initial} \\
-%%     \subfloat{\input{lst_back13}\label{fig_back8_final}} \\
-%%     \subref{fig_back8_final} 
-%%   \end{tabular}
-%%   \caption{The control flow graph for our program. Part~\subref{fig_back8_initial}
-%%     shows the initial facts associated with each node. Part~\subref{fig_back8_final}
-%%     shows the final facts computed by our constant propagation analysis.}
-%%   \label{fig_back8}
-%% \end{myfig}
-
 
 \section{Dataflow Equations}
 \label{back_subsec_eq}
