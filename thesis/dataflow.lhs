@@ -412,26 +412,23 @@ $i!++++!$.
 
 We define a transfer function, $t$, for our analysis in terms over
 these two types of statements. Our function takes a set of input facts
-and produces a set of output facts:
+($F$), and a statement; it produces a set of output facts:
 
 \begin{singlespace}\correctspaceskip
   \begin{equation}\allowdisplaybreaks[0]
     \begin{array}{rl}
       t (F, a\ \text{\tt =}\ C) &= \{(a, x \lub C), \text{when\ } (a, x) \in F\ \text{or} \\
       & \phantom{= \{}(a, C), \text{when\ } a \not\in \dom(F)\}\ \cup \\
-      & \phantom{=} F\ \backslash\ \mfun{uses}(F, a),\\
-      & \text{where\ } F \in \setL{Fact}, C \in \ZZ. \\
-      t (F, a\text{\tt ++}) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)), \\
-      t (F, a\text{\tt +=\ } b) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)), \\
-      & \text{where\ } F \in \setL{Fact}. \\\\
-      \mfun{uses}(F, a) &= \{(a, x)\ ||\ a \in \dom(F)\}, \\
-      & \text{where\ } F \in \setL{Fact}, a \in \setL{Var}. \\\\
+      & \phantom{=} F\ \backslash\ \mfun{uses}(F, a).\\
+      t (F, a\text{\tt ++}) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)). \\
+      t (F, a\ \text{\tt +=\ } b) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)). \\\\
+      \mfun{uses}(F, a) &= \{(a, x)\ ||\ a \in \dom(F)\}. 
     \end{array}\label{eqn_back4}
   \end{equation}
 \end{singlespace}
 
 When a node contains a constant update ($a !+=+! C$) and the input
-facts ($F$) do not contain fact for $a$, then
+facts do not contain a fact for $a$, then
 Equation~\eqref{eqn_back4} combines the fact \factC{a}{C} with the
 input set. Otherwise, the \lub operator is used to combine the
 existing fact \factC{a}{x} with the new fact. For a non--constant

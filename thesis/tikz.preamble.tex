@@ -96,8 +96,10 @@
     \setcounter{factctr}{0}%%
     \foreach \var in {#1}{%%
       \setcounter{breakctr}{\value{factctr}/2}
-      %% Separate list with a comma
-      \ifthenelse{\value{factctr}>0}{\text{,}\allowbreak}{}%%
+      %% Separate list with a comma, putting glue so that
+      %% all stretching occurs between elements. Also allow
+      %% line breaks between elements.
+      \ifthenelse{\value{factctr}>0}{,\hskip 0pt plus 1in\allowbreak}{}%%
       %% \tracingmacros=1%%
       %% If key/val arguments, use first form. Otherwise
       %% use second.
@@ -110,11 +112,17 @@
 }
 \newcommand{\factC}[2]{{\ensuremath{(\mathit{#1},#2)}}}
 \newcommand{\factT}[2]{{\ensuremath{(\withmd{!+#1+!},#2)}}}
-\newcommand{\doFacts}[4]{\ensuremath{#3{#1}: %%
-    \left\{\vcenter{\hsize=#4\facts{#2}}\right\}}}
+\newcommand{\doFacts}[4]{\ensuremath{#3{#1}:%%
+    \left\{%%
+    %% Set parfillskip so stretching does NOT occur at the end of
+    %% a paragraph (i.e., list of elements). Also turn off underfull
+    %% hbox warnings.
+    \vcenter{\hbadness=100000\parindent=0pt\parfillskip=0pt\hsize=#4\facts{#2}}%%
+    \right\}}}
 
-\newtoks\facttoks \newbox\factbox 
-\global\def\setfacts#1{\global\edef\facttoks{#1} %%
-  \setbox\factbox=\hbox{\facts{\facttoks}}}
+%% Used to determine width of box that will
+%% display facts on our CFG.
+\newbox\factbox 
+\global\def\setfacts#1{\setbox\factbox=\hbox{\ensuremath{\facts{#1}}}}
 %% End dataflow
 
