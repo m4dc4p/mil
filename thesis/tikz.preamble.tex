@@ -106,10 +106,15 @@
                   {\var}%%
       %% \tracingmacros=0%%
       \stepcounter{factctr}%%
-    }}}
+  }} %%
+}
 \newcommand{\factC}[2]{{\ensuremath{(\mathit{#1},#2)}}}
+\newcommand{\factT}[2]{{\ensuremath{(\withmd{!+#1+!},#2)}}}
 \newcommand{\doFacts}[4]{\ensuremath{#3{#1}: %%
     \left\{\vcenter{\hsize=#4\facts{#2}}\right\}}}
 
+\newtoks\facttoks \newbox\factbox 
+\global\def\setfacts#1{\global\edef\facttoks{#1} %%
+  \setbox\factbox=\hbox{\facts{\facttoks}}}
 %% End dataflow
 

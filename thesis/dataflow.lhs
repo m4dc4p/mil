@@ -451,9 +451,9 @@ the same graph with annotations updated using
 Equation~\eqref{eqn_back4}. The assignments in
 \refNode{lst_back18_assign} create the facts \factC{m}{10},
 \factC{n}{1}, and \factC{i}{0} in \outB{lst_back18_assign}. The
-multiplication in \refNode{lst_back18_mult} is a non-constant update,
-so \outB{lst_back18_mult} contains \factC{n}{\top}. However,
-\outB{lst_back18_mult} also shows that !+m+! is not modified in
+assignment to !+n+! in \refNode{lst_back18_mult} is a non-constant
+update so \outB{lst_back18_mult} contains \factC{n}{\top}. However,
+\outB{lst_back18_mult} also shows that $m$ is not modified in
 \refNode{lst_back18_mult}; the value from \inB{lst_back18_mult} is
 just copied to \outB{lst_back18_mult}.
 
