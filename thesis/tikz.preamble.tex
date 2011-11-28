@@ -80,9 +80,10 @@
 %% Argument should be like \facts{a/1, b/2, foobar/\bot, baz/\top}.
 %% 
 \newcounter{factctr}
+\newcounter{breakctr}
 \newtoks\varVal
 \newtoks\varName
-\newcommand{\facts}[1]{\begingroup%%
+\newcommand{\facts}[1]{%%
   %% Test if the argument given contains a forward slash (/). Expands
   %% slashTest with argument such that if a slash is NOT present the 
   %% token \noSlash will be given as argument 2 to slashTest. Otherwise
@@ -94,8 +95,9 @@
   \ensuremath{%%
     \setcounter{factctr}{0}%%
     \foreach \var in {#1}{%%
+      \setcounter{breakctr}{\value{factctr}/2}
       %% Separate list with a comma
-      \ifthenelse{\value{factctr}>0}{,\allowbreak}{}%%
+      \ifthenelse{\value{factctr}>0}{\text{,}\allowbreak}{}%%
       %% \tracingmacros=1%%
       %% If key/val arguments, use first form. Otherwise
       %% use second.
@@ -104,14 +106,15 @@
                   {\var}%%
       %% \tracingmacros=0%%
       \stepcounter{factctr}%%
-    }}%%
-\endgroup}
+  }} %%
+}
 \newcommand{\factC}[2]{{\ensuremath{(\mathit{#1},#2)}}}
+\newcommand{\factT}[2]{{\ensuremath{(\withmd{!+#1+!},#2)}}}
 \newcommand{\doFacts}[4]{\ensuremath{#3{#1}: %%
-    \left\{%%
-    \begin{minipage}[c]{#4}\raggedright%%
-      \facts{#2}%%
-  \end{minipage}\right\}}}
+    \left\{\vcenter{\hsize=#4\facts{#2}}\right\}}}
 
+\newtoks\facttoks \newbox\factbox 
+\global\def\setfacts#1{\global\edef\facttoks{#1} %%
+  \setbox\factbox=\hbox{\facts{\facttoks}}}
 %% End dataflow
 

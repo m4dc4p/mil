@@ -15,28 +15,43 @@
 %% A short section giving the history of dataflow optimization techniques
 %% and basic concepts.
 
-The \emph{dataflow algorithm}, as described by Gary Kildall
-\citep{Kildall1973}, provides a framework analyzing and optimizing
-programs.  The algorithm \emph{iteratively} traverses the
-\emph{control-flow graph} for a program either \emph{forwards} or
-\emph{backwards}, computing \emph{facts} at each node using a
-\emph{transfer function}, until the facts reach a \emph{fixed
-  point}. The choice of facts, transfer function, and direction depend
-on the particular analysis performed. In essence, the dataflow
-\emph{algorithm} is parameterized by these choices; a dataflow
-\emph{analysis} is a specific instance of the algorithm.
+In 1973, Gary Kildall described a framework for analyzing and
+transforming programs, calling it a \emph{global analysis algorithm}
+\citep{Kildall1973}. His algorithm represents programs as
+\emph{directed graphs}, where each node is a statement or expression
+in the program. The edges between nodes represent possible runtime
+execution paths. An \emph{optimizing function} is applied to each node
+in the graph, transforming an \emph{input pool} of facts into an
+\emph{output pool}. When cycles occur in the graph, output pools can
+change input pools, causing the algorithm to apply the optimizing
+function again. His algorithm terminates when all output pools stop
+changing; the facts gathered can then be used to transform the
+program.
 
-%% This chapter describes the concepts necessary to understand the
-%% dataflow algorithm and gives an extended example demonstrating the use
-%% of \emph{liveness analysis} to eliminate
-%% \emph{dead-code}. Section~\ref{sec_back1} describes control-flow
-%% graphs. We discuss facts, direction, the transfer function and the
-%% meet operator in Section \ref{sec_back4}. We illustrate why dataflow
-%% must be an iterative algorithm (and define what a fixed point means in
-%% this context) in Section~\ref{sec_back6}. We treat rewriting in
-%% Section~\ref{sec_back7}. To demonstrate these concepts together, we
-%% give an extended example of \emph{dead-code elimination} in
-%% Section~\ref{sec_back2}.
+Though Kildall named his algorithm ``global,'' he also applied it to
+smaller pieces of programs such as subroutines or function
+definitions. He showed that some analysis' required reversing the
+input and output pools; in other words, running the algorithm
+backwards.
+
+This chapter describes Kildall's algorithm, now known as \emph{the
+  dataflow algorithm} or the technique of \emph{dataflow analysis}. In
+Section~\ref{sec_back1} we define \emph{control--flow graphs} (CFGs),
+which the directed graphs representing the program are now called.
+Section~\ref{sec_back3} introduces ``basic blocks,'' not something
+originally defined by Kildall but now a fundamental way of
+representing nodes in CFGs. We then show an the modern representation
+of the dataflow algorithm in Section~\ref{back_sec_df}, introducing
+terms and definitions that have been defined since Kildall's original
+work. In Section~\ref{back_subsec_eq} we show the general form of
+\emph{dataflow equations} that can be used to describe any dataflow
+analysis; we will use these equations later in the thesis to describe
+our own analysis'. Section~\ref{back_sec_quality} discusses the
+trustworthiness of the dataflow algorithm --- that is, it shows how we
+can know a particular analysis has given the best possible
+solution. Transforming programs based on a dataflow analysis is
+discussed in Section~\ref{back_sec_apply}, and we conclude in
+Section~\ref{sec_back9}.
 
 \section{Control-Flow Graphs}
 \label{sec_back1}
@@ -49,7 +64,7 @@ on the particular analysis performed. In essence, the dataflow
 
 Figure~\ref{fig_back1} shows a simple C program and its
 \emph{control-flow graph} (CFG). Each \emph{node} in
-\subref{fig_back1_b} represents a statement or expression in the
+Part~\subref{fig_back1_b} represents a statement or expression in the
 original program. For example, \refNode{lst_back2_assigna} and
 \refNode{lst_back2_assignb} represent the assignment statements on
 line \ref{lst_back1_assign}. Notice that the declaration of !+c+! does
@@ -75,7 +90,7 @@ which reason we say \emph{enters} and \emph{leaves}.
 
 Directed edges show the order in which nodes execute. The edges
 leaving \refNode{lst_back2_test} (representing the test
-``\verb=if(a > b)='' on line \ref{lst_back1_test}) show that
+``!+if(a > b)+!'' on line \ref{lst_back1_test}) show that
 execution can branch to either \refNode{lst_back2_true} (when
 $a > b$) or \refNode{lst_back2_false} (when
 $a \leq b$). A node followed by multiple successors
@@ -111,11 +126,11 @@ Consider the C-language fragment and control-flow graphs (CFG) in
 Figure~\ref{fig_back4}.  Part~\subref{fig_back4_b} shows the CFG for
 Part~\subref{fig_back4_a}: a long, straight sequence of nodes, one
 after another. Part~\subref{fig_back4_c} represents the assignment statements on
-lines~\ref{lst_back3_start} -- \ref{lst_back3_end} as a \emph{basic
+lines~\ref{lst_back3_start} --- \ref{lst_back3_end} as a \emph{basic
   block}: a sequence of statements with one entry, one exit, and no
 branches in-between. Execution cannot start in the ``middle'' of the
 block, nor can it branch anywhere but at the end of the block. In fact,
-Part~\ref{fig_back4_b} also shows four basic blocks -- they just happen
+Part~\ref{fig_back4_b} also shows four basic blocks --- they just happen
 to consist of one statement each.
 
 \begin{myfig}
@@ -142,9 +157,9 @@ to consist of one statement each.
 The representation given in Part~\subref{fig_back4_c} has a number of
 advantages. It tends to reduce both the number of nodes and the number
 of edges in the graph. The dataflow algorithm maintains two sets of
-\emph{facts} for every node -- reducing the number of nodes obviously
+\emph{facts} for every node --- reducing the number of nodes obviously
 reduces the number of facts stored. The algorithm also iteratively
-propagates facts along edges -- so reducing the number of edges
+propagates facts along edges --- so reducing the number of edges
 reduces the amount of work we need to do. When rewriting, blocks allow
 us to move larger amounts of the program at once. It also can be shown
 (see \citep{Aho2006}) that we do not lose any information by collapsing
@@ -152,6 +167,7 @@ statements into blocks. For efficiency and brevity, we will work with
 basic blocks rather than statements from here forward.
 
 \section{The Dataflow Algorithm}
+\label{back_sec_df}
 
 Kildall's dataflow algorithm provides a general-purpose mechanism for
 analyzing control-flow graphs of programs. The algorithm itself does
@@ -161,7 +177,7 @@ choice of \emph{facts}, \emph{meet operator}, \emph{transfer
 lattice. Together, they approximate some property of the program that
 we wish to analyze. The transfer function transforms facts to mimic
 the flow of information in the control-flow graph. The direction is
-dictated by the type of analysis -- each particular analysis runs
+dictated by the type of analysis --- each particular analysis runs
 \emph{forwards} or \emph{backwards}.
 
 %% Constant-propagation
@@ -185,7 +201,7 @@ repeatedly.
   \label{fig_back7}
 \end{myfig}
 
-This function is just used for illustration -- we do not expect anyone
+This function is just used for illustration --- we do not expect anyone
 would actually write code this way (after all, !+mult10+! is just
 !+10 * val * cnt+!). In any case, the program in
 Figure~\ref{fig_back7_initial} can be transformed by replacing the
@@ -211,12 +227,12 @@ categories at each point in the control-flow graph: \emph{unknown}, a
 \emph{known integer constant}, or
 \emph{indeterminate}. \emph{Unknown}, represented by $\bot$
 (``bottom''), is the initial value for all variables in our
-analysis. A \emph{known integer constant}, $C \in \ZZ$, means
-our analysis identified that the variable was assigned a specific
-value that does not change. \emph{Indeterminate}, indicated by $\top$
-(``top''), means our analysis found that the variable might have more
-than one value at a given point. Together, $\{\bot, \top\} \cup
-\ZZ$ forms a set which we will denote as \setLC.
+analysis. A \emph{known integer constant}, $C \in \ZZ$, means our
+analysis identified that the variable was assigned a specific value
+that does not change. \emph{Indeterminate}, indicated by $\top$
+(``top''), means our analysis could not identify a constant value
+for the variable. Together, $\{\bot, \top\} \cup \ZZ$ forms a set
+which we will denote as \setLC.
 
 \begin{myfig}
   \input{lst_back17}
@@ -229,12 +245,14 @@ than one value at a given point. Together, $\{\bot, \top\} \cup
 \end{myfig}
 
 Figure~\ref{fig_back11} shows the control-flow graph of our program,
-partly annotated with sets of \emph{facts} before (\inE) and after
-(\out) the nodes that reference the variable $i$. This analysis
-defines facts as pairs, $(a,x)$, where $a$ is the name of a variable
-and $x \in \setLC$. The \inE and \out annotations are sets of
-facts, representing our knowledge of each variable's value at that
-point in the program.
+annotated with \emph{facts} about the variable $i$ before and
+after nodes \refNode{lst_back17_assign}, \refNode{lst_back17_test}
+and \refNode{lst_back17_incr}. This analysis defines facts as pairs,
+$(a,x)$, where $a$ is the name of a variable and $x \in \setLC$. The
+\inE sets represent the value of the variables \emph{before} the
+statement in the node executes; the \out sets give the value of the
+variables afterwards. Together these sets represent our knowledge
+about each variable's value at each point in the program.
 
 Constant propagation is a \emph{forwards} analysis, meaning the values
 for each \inE set are calculated based on the \out values of its
@@ -248,9 +266,9 @@ predecessors: \refNode{lst_back17_assign} and
 values to $i$: 0 and $\top$. To combine these values when computing
 \inB{lst_back17_test}, we use a \emph{meet operator}.
 
-The \emph{meet operator}, \lub (also pronounced ``least upper bound'' or
+The \emph{meet operator}, \lub (pronounced ``least upper bound'' or
 ``lub''), defines how we will combine values in
-\setLC. Table~\ref{tbl_back4} gives the definition of \lub. For any
+\setLC. Figure~\ref{tbl_back4} gives the definition of \lub. For any
 value of $x \in \setLC$, $\bot \lub x$ results in $x$. Conversely, $x
 \lub \top$ results in $\top$. Two differing constants, $C_1$ and
 $C_2$, result in $\top$, while equal constants give the same constant. 
@@ -308,12 +326,16 @@ We have defined \lub on elements in \setLC, but our facts are pairs
 $(a,x)$ where $a$ is a variable and $x$ a value in \setLC; \inE and
 \out are sets of facts.  Therefore, we define the $\wedge$ (``wedge'')
 operator to apply \lub to sets of facts ($F_1$ and $F_2$ below):
-\begin{align*}\allowdisplaybreaks[0]
-  F_1 \wedge F_2 &= \setdef{(a, x_1 \lub x_2)}{(a,x_1) \in F_1, (a,x_2) \in F_2} \\
-  &\; \cup \setdef{(a,x_1)}{(a,x_1) \in F_1, a \not\in \dom(F_2)} \\
-  &\; \cup \setdef{(a,x_2)}{(a,x_2) \in F_2, a \not\in \dom(F_1)} \label{eqn_back18}\addtag\\
-  \dom(F) &= \setdef{a}{(a,x) \in F} \addtag
-\end{align*}
+
+\begin{singlespace}\correctspaceskip
+  \begin{align*}\allowdisplaybreaks[0]
+    F_1 \wedge F_2 &= \setdef{(a, x_1 \lub x_2)}{(a,x_1) \in F_1, (a,x_2) \in F_2} \\
+    &\; \cup \setdef{(a,x_1)}{(a,x_1) \in F_1, a \not\in \dom(F_2)} \\
+    &\; \cup \setdef{(a,x_2)}{(a,x_2) \in F_2, a \not\in \dom(F_1)} \label{eqn_back18}\addtag\\
+    \dom(F) &= \setdef{a}{(a,x) \in F} \label{eqn_back_dom}\addtag
+  \end{align*}
+\end{singlespace}
+
 Our $\wedge$ operator acts like union when a variable in $F_1$ does
 not appear in the domain of $F_2$; likewise for a variable only in
 $F_2$. When a variable appears in both $F_1$ and $F_2$, the values for
@@ -322,12 +344,17 @@ the variable are combined using \lub.
 To compute \inBa, we apply $\wedge$ to each \out set of $B$'s
 predecessors. We use a subscripted $\bigwedge$ to indicate we combine
 all of the \out sets into one using $\wedge$:
+
+\begin{singlespace}\correctspaceskip
 \begin{equation}
   \inBa = \bigwedge\limits_{\mathclap{P \in \mathit{pred}(B)}} \outXa{P} \label{eqn_back8}.
 \end{equation}
+\end{singlespace}
 
 Using these equations, we can show how the \inB{lst_back17_test}
 set in Figure~\ref{fig_back11} is derived:
+
+\begin{singlespace}\correctspaceskip
 \begin{align*}\allowdisplaybreaks[0]
   \inB{lst_back17_test} &= \bigwedge\limits_{\mathclap{P \in \mathit{pred}(\refNode{lst_back17_test})}} \outXa{P} \\
   \shortintertext{\hbox to 1\textwidth{\hfil\textit{Predecessors of \refNode{lst_back17_test}; Equation~\eqref{eqn_back8}.}}}
@@ -336,11 +363,12 @@ set in Figure~\ref{fig_back11} is derived:
   &= \{\factC{i}{0}\} \wedge \{\factC{i}{\top}\} \\
   \shortintertext{\hbox to 1\textwidth{\hfil\textit{Equation~\eqref{eqn_back18}.}}}
   &= \{\factC{i}{0 \lub \top}\} \\
-  \shortintertext{\hbox to 1\textwidth{\hfil\textit{Definition of \lub from Table~\ref{tbl_back4}.}}}
+  \shortintertext{\hbox to 1\textwidth{\hfil\textit{Definition of \lub from Figure~\ref{tbl_back4}.}}}
   &= \{\factC{i}{\top}\} \\
   \shortintertext{\hbox to 1\textwidth{\hfil\textit{Definition of \inB{lst_back17_test}.}}}
   \{\factC{i}{\top}\} &= \{\factC{i}{\top}\}.
 \end{align*}
+\end{singlespace}
 
 Together, \setLC and \lub form a \emph{lattice}.\footnote{The lattice
   can also have a \emph{join} operator, but for our purposes we solely
@@ -351,61 +379,12 @@ computes different facts, but those facts are always represented by a
 lattice.
 
 We have established that our analysis computes \emph{facts} at each
-node in our programs control-flow graph. The facts assign the value
-$\bot$, $C \in \ZZ$, or $\top$ to each variable in the program,
+node in our programs control-flow graph. The facts assign a value from
+the set $\{\bot, \top\} \cup \ZZ$ to each variable in the program,
 at each node in the graph. We defined a \emph{meet operator}, \lub,
 which is used to combing conflicting values when computing \inBa.  The
 facts and meet operator together define a \emph{lattice}. We next
 explore how \out facts are computed for each node.
-
-%% Figure~\ref{fig_back11} demonstrates how the lattice computes facts
-%% for constant propagation. The set \out{lst_back17_assign} indicates,
-%% among other things, that $i$ is assigned 0: \factC{i}{0}. However,
-%% \out{lst_back17_incr} indicates that the value of $i$ is indeterminate: 
-%% \factC{i}{\top}. 
-
-%% First, the values
-%% computed for variables at each program point are in \setLC. Second,
-%% the meet operator, \lub, is used to combine facts  The
-%% lattice defines our facts. That is, the values in \setLC The lattice
-%% defines how our facts will indicate if a variable has a constant
-%% value.
-
-%% Figure~\ref{fig_back10} shows our program with the final facts
-%% computed. The sets \inB{lst_back13_mult} and \outB{lst_back13_mult}
-%% show that !+m+! has the value 10 when block \refNode{lst_back13_mult}
-%% executes. The variables !+n+! and !+i+! have the value $\top$, indicating
-%% they could one of many different values. However, !+cnt+! and !+val+!
-%% still have $\bot$, because their values are not modified anywhere in
-%% the control-flow graph.
-
-%% \begin{myfig}
-%%   \input{lst_back14}
-%%   \label{fig_back10}
-%%   \caption{Our program, annotated with the final facts computed by the
-%%     constant propagation analysis. Notice the \inB{lst_back14_mult}
-%%     and \outB{lst_back14_mult} indicate that \texttt{m} has the value 10
-%%     while \refNode{lst_back14_mult} executes.}
-%% \end{myfig}
-
-%% values. 
-%% values $\bot$, an integer value, and $\top$ can be ordered such
-%% that $\bot \le x \le \top$, for all integers $x$. The \emph{meet
-%% operator} defines this ordering
-
-%% Before
-%% and after each block we will determine 
-
-%% To track
-%% the value of each variable, we use a \emph{lattice}. This particular
-%% lattice encodes three types of values: 
-%% Even so,
-%% for this analysis all we care to know is if the value remains
-%% the same or changes. 
-
-%% approximate by determining, at each point in the control-flow graph,
-%% whether a variable has one of three values: an \emph{unknown}, a
-%% \emph{constant}, or
 
 \subsection{Transfer Functions}
 \label{back_subsec_transfer}
@@ -425,38 +404,47 @@ facts that were true \emph{before} a node executed.  In both cases,
 the transfer function also considers known facts (i.e., \inE facts for
 forwards, \out for backwards) as well as the statements in the node.
 
-We choose to use pairs $(a,x)$, where $a$ is variable in the program
-and $x$ a value in \setLC, as the facts for our analysis. We define
-our transfer function in terms of a single fact:
-\begin{equation}
-  f (a,x) = 
-  \begin{cases}
-    (a,x \lub C) & \text{when !+a = \emph{C}+!, with !+C+! $\in \ZZ$.} \\
-    (a,\top) & \text{when !+a+! updated}. \\
-    (a,x) & \text{otherwise}. \\
-  \end{cases}
-  \label{eqn_back4}
-\end{equation}
+For our example analysis, we only consider two kinds of statements:
+constant and non--constant updates. A constant update is one of the
+form $a !+=+! C$, where $C$ is a known integer value. A non--constant
+update is any other type of assignment; in our example, something like
+$i!++++!$.
 
-Equation~\eqref{eqn_back4} considers two kinds of statements: constant
-and non-constant updates. If the statement !+a = C+! appears in the
-node, our new fact is $(a,x \lub C)$, indicating we combine our
-previous knowledge about $x$ with the new constant assigned. We create
-the fact $(a,\top)$ for any other update.\footnote{In practice this
-  analysis is much more sophisticated, capable of analyzing
-  complicated arithmetic expressions. Algebraic properties such as
-  associativity and distributivity are also usually considered.}
-Finally, if neither type of statement appears in the node, we just
-pass $x$ through unchanged.
+We define a transfer function, $t$, for our analysis in terms over
+these two types of statements. Our function takes a set of input facts
+and produces a set of output facts:
 
-Though we have defined Equation~\eqref{eqn_back4} in terms of a single
-fact, we can easily extend it to sets of facts. To create \outBa for
-some node $B$, we apply Equation~\eqref{eqn_back4} element-wise to
-each fact in \inBa and combine the results into a set:
-\begin{equation}
-  \outBa = \bigcup\limits_{\mathclap{(a,x) \in \inBa}} f(a,x).
-  \label{eqn_back5}
-\end{equation}
+\begin{singlespace}\correctspaceskip
+  \begin{equation}\allowdisplaybreaks[0]
+    \begin{array}{rl}
+      t (F, a\ \text{\tt =}\ C) &= \{(a, x \lub C), \text{when\ } (a, x) \in F\ \text{or} \\
+      & \phantom{= \{}(a, C), \text{when\ } a \not\in \dom(F)\}\ \cup \\
+      & \phantom{=} F\ \backslash\ \mfun{uses}(F, a),\\
+      & \text{where\ } F \in \setL{Fact}, C \in \ZZ. \\
+      t (F, a\text{\tt ++}) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)), \\
+      t (F, a\text{\tt +=\ } b) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)), \\
+      & \text{where\ } F \in \setL{Fact}. \\\\
+      \mfun{uses}(F, a) &= \{(a, x)\ ||\ a \in \dom(F)\}, \\
+      & \text{where\ } F \in \setL{Fact}, a \in \setL{Var}. \\\\
+    \end{array}\label{eqn_back4}
+  \end{equation}
+\end{singlespace}
+
+When a node contains a constant update ($a !+=+! C$) and the input
+facts ($F$) do not contain fact for $a$, then
+Equation~\eqref{eqn_back4} combines the fact \factC{a}{C} with the
+input set. Otherwise, the \lub operator is used to combine the
+existing fact \factC{a}{x} with the new fact. For a non--constant
+update, a new fact \factC{a}{\top} is always added to the output
+set. In both cases, all mentions of $a$ in the input set are removed
+before being combined with the new fact --- this ensures that no more
+than one fact per variable exists in our fact set.
+
+The definition in Equation~\eqref{eqn_back4} matches our intuition for
+constant propagation. When we know a variable is assigned a constant,
+we add that fact to our knowledge. When we know it is changed in a
+non--constant way, we update our knowledge to show we no longer know
+the value of the variable.
 
 Figure~\ref{fig_back9}, Part \subref{fig_back9_initial}, shows our
 program, annotated with initial \inE and \out
@@ -465,9 +453,9 @@ the same graph with annotations updated using
 Equation~\eqref{eqn_back4}. The assignments in
 \refNode{lst_back18_assign} create the facts \factC{m}{10},
 \factC{n}{1}, and \factC{i}{0} in \outB{lst_back18_assign}. The
-multiplication in \refNode{lst_back18_mult} is a non-constant update,
-so \outB{lst_back18_mult} contains \factC{n}{\top}. However,
-\outB{lst_back18_mult} also shows that !+m+! is not modified in
+assignment to !+n+! in \refNode{lst_back18_mult} is a non-constant
+update so \outB{lst_back18_mult} contains \factC{n}{\top}. However,
+\outB{lst_back18_mult} also shows that $m$ is not modified in
 \refNode{lst_back18_mult}; the value from \inB{lst_back18_mult} is
 just copied to \outB{lst_back18_mult}.
 
@@ -508,7 +496,7 @@ shows which \out sets are used to calcuate \inE sets.
   \setlength{\tabcolsep}{2pt}
   \hbox to \textwidth{\hss
   \begin{tabular}{cc}
-    \input{fig_back13_tbl} & \input{fig_back12_cfg} \\
+    \input{fig_back13_tbl} & \def\prefix{fig_back13}\input{df_eg_cfg} \\
     \scap{fig_back13_tbl} & \scap{fig_back13_cfg}
   \end{tabular}\hss}
   \caption{This figure shows the values for $i$ calculated by all nodes in our
@@ -560,7 +548,7 @@ answer?  Both of these questions can be answered if our lattice has
 \emph{finite height} and the transfer function is \emph{monotone}.
 
 Let us begin with the lattice. Consider again the meet operator, \lub,
-defined in Table~\ref{tbl_back4} and our set of values, \setLC:
+defined in Figure~\ref{tbl_back4} and our set of values, \setLC:
 \begin{align*}
   \setLC &= \bot, \dots \mathit{all\ integers} \dots, \top. \\\\
   \bot \lub x &= x. \\
@@ -621,7 +609,7 @@ inputs. If $x$ is ``less than or equal to'' $y$, $f(x)$ will also be
 ``less than or equal to'' $f(y)$. 
 
 The transfer function moves our facts along the lattice. A monotone
-transfer function will never ``decrease'' its argument -- $f$ will
+transfer function will never ``decrease'' its argument --- $f$ will
 always produce a value that is at the same ``height'' or ``higher'' in
 the lattice. The lattice represents the information we have gathered
 during our analysis. In turn, the ordering of values represents ``how
@@ -643,60 +631,6 @@ if $B$ assigns some constant $C$ to $x$, then $x' = x \lub C$, which
 again satisfies our relation. Therefore, Equation~\eqref{eqn_back4} is
 monotone and, by a simple extension to sets, so is is
 Equation~\eqref{eqn_back5}.
-
-%% If our lattice has finite height, we can be sure that our
-%% algorithm will terminate -- our transfer function will not oscillate
-%% up and down the lattice!
-%% By requiring the our analysis uses a \emph{lattice} with \emph{finite
-%%   height} and a \emph{monotone} transfer function, we know our
-%% analysis will eventually reach a fixed point and terminate. We will
-%% now discuss how these same properties guarantee we have reached the
-%% \emph{maximum fixpoint} and thus have the best possible answer.
-
-
-
-%% Our goal is to find the ``largest amount'' of ``smallest'' information
-%% about each variable. That is, if we assigned $\top$ to all variables,
-%% we have the ``largest'' amount of information, but we do not know
-%% anything useful. Assigning $\bot$ puts is in the opposite situation,
-%% where we know the ``least.'' We want something in the middle, where we
-%% have gathered the greatest amount of useful information. 
-
-
-
-%% have this
-%% property. 
-%% In terms of \setLC and
-%% Equation~\eqref{eqn_back4} (our transfer function), that means the
-%% value for a variable will either stay the same or get ``bigger,'' as
-%% defined by the lattice. For example, if \inBa (for some $B$) says $i$ is 10,
-%% then $i$ in \outBa will be either 10 or $\top$. If $i$ could become $\bot$ (or
-%% some other constant), Equation~\eqref{eqn_back4} would not be monotone. 
-
-
-%% Trivially holds for our transfer function because it is defined in terms of \lub.
-
-%% Together, guarantees we terminate. How do we get the ``best'' answer?
-
-
-%% Monotonic
-%% Finite height lattice
-%% Partial orders
-%% Maximum fixed point
-
-%% \begin{myfig}
-%%   \begin{tabular}[c]
-%%     \subfloat{\input{lst_back15}\label{fig_back8_initial}} \\
-%%     \subref{fig_back8_initial} \\
-%%     \subfloat{\input{lst_back13}\label{fig_back8_final}} \\
-%%     \subref{fig_back8_final} 
-%%   \end{tabular}
-%%   \caption{The control flow graph for our program. Part~\subref{fig_back8_initial}
-%%     shows the initial facts associated with each node. Part~\subref{fig_back8_final}
-%%     shows the final facts computed by our constant propagation analysis.}
-%%   \label{fig_back8}
-%% \end{myfig}
-
 
 \section{Dataflow Equations}
 \label{back_subsec_eq}
@@ -795,10 +729,11 @@ gave the parameterization for our constant propagation analysis in
 Figure~\ref{fig_back10}. We know the algorithm will terminate if our
 transfer function is \emph{monotone} and we have defined lattice with
 \emph{finite} height. However, we have not discussed how to measure
-the results our analysis gives us -- how do we know that they are the
+the results our analysis gives us --- how do we know that they are the
 best possible? We will address that question in the next section.
 
 \section{Quality of Solutions to the Dataflow Equations}
+\label{back_sec_quality}
 
 Aho \citep{Aho2006} shows that for a dataflow analysis defined with a
 finite lattice and monotone transfer function, Figure~\ref{fig_back14}
@@ -832,12 +767,13 @@ Our algorithm, however, does not take such conditions into
 account. The ideal solution is called the \emph{meet over paths}
 solution because it takes into account only the paths that will taken
 by the program. Determining the actual paths taken is an undecidable
-problem -- thus we settle for the maximum fixed point. Fortunately,
+problem --- thus we settle for the maximum fixed point. Fortunately,
 the algorithm is conservative --- it never ignores (or adds) paths ---
 so we can be sure that its analysis will never be wrong, just that it
 probably will not be as good as the ideal.
 
 \section{Applying Results}
+\label{back_sec_apply}
 
 Figure~\ref{fig_back7}, Part~\subref{fig_back7_initial} gave a sample
 program which we wished to optimize using a \emph{constant propagation}
@@ -846,7 +782,7 @@ the result, replacing all occurrences of !+m+! with 10. Now knowing
 the dataflow algorithm and the equations for constant propagation, we
 can derive how that transformation is made.
 
-Table~\ref{fig_back12} gives the facts calculated for all nodes in our
+Figure~\ref{fig_back12} gives the facts calculated for all nodes in our
 program, during each iteration of the analysis. The first iteration
 calculates that \outB{lst_back15_assign} assigns !+m+! the value 10, due
 to the assignment !+m = 10+! on Line~\ref{fig_back7_m}. The second
@@ -865,12 +801,12 @@ Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt}.
   \setlength{\tabcolsep}{2pt}
   \hbox to \textwidth{\hss
   \begin{tabular}{cc}
-    \input{fig_back12_tbl} & \input{fig_back12_cfg} \\
-    \scap{fig_back12_tbl} & \scap{fig_back12_cfg}
+    \input{fig_back12_tbl} & \def\prefix{fig_back12}\input{df_eg_cfg} \\
+    \scap{fig_back12_tbl} & \scap{df_eg_cfg}
   \end{tabular}\hss}
   \caption{This figure shows the facts calculated for all nodes in our
     example program. Part~\subref{fig_back12_tbl} shows the \inE and
-    \out facts associated with each node. Part~\subref{fig_back12_cfg}
+    \out facts associated with each node. Part~\subref{df_eg_cfg}
     reproduces the control-flow graph for our program. After 5
     iterations the facts reach a fixed point (i.e., they stop
     changing) and we can see that \inB{lst_back15_mult} shows that $m$
@@ -902,586 +838,6 @@ facts\emph{iteratively}, stopping when they reach a \emph{fixed
   point}. Finally, we \emph{rewrite} the CFG using the facts computed. The 
 meaning of our program does not change, but its behavior will be ``better,'' 
 whatever that means for the particular optimization applied.
-
-
-
-%% \runin{Transfer Function} Our transfer function creates 
-
-%% \section{Facts, Transfer Functions, Direction \& The Meet Operator}
-%% \label{sec_back4}
-
-%% Begin by placing the specific concept in the overall context of
-%% dataflow. Give a small example highlighting the concept. Point
-%% out fine points or subtleties that occur when generalizing the concept. End
-%% by summarizing how the concept fits into dataflow (in a bit larger
-%% sense than the first summary).
-%% \begin{myfig}[th]
-%% \centering
-%% \input{lst_back7}
-%% \caption{The CFG for the C-language fragment from
-%%   Figure~\ref{fig_back1_a}, annotated with \emph{facts} about the
-%%   value of \texttt{a}, \texttt{b}, and \texttt{c} before (``\inBa'') and
-%%   after (``\outBa'') each node.}
-%% \label{fig_back5}
-%% \end{myfig}
-
-%% The dataflow algorithm computes two sets of \emph{facts} for every
-%% node in the CFG. Facts are a data structure that describe the state of
-%% the program before and after execution of the block represented by the
-%% node. Figure~\ref{fig_back5} annotates the program fragment in
-%% Figure~\ref{fig_back1} with facts about !+a+!, !+b+!, and !+c+! (the only
-%% state we care about in this program). Each \inBa gives the variables'
-%% values just prior to executing block $B$, while each \outBa gives
-%% their values just after $B$ has executed.  
-
-%% Figure~\ref{fig_back5} shows a \emph{forwards} analysis, where \outBa
-%% is computed from \inBa, for each block. Facts are created by a
-%% \emph{transfer function} that inspects the statements in each node and
-%% updates values assigned to variables, if any. Sometimes a dataflow
-%% analysis will run \emph{backwards}, computing \inBa from
-%% \outBa. Section \ref{sec_back2} gives a detailed example illustrating
-%% a \emph{backwards} analysis. In general, the transfer function and
-%% direction vary depending on the particular analysis performed.
-
-%% To help define our transfer function, we define |valueOf|,
-%% which either returns the value assigned to a variable, or its value
-%% from \inBa:
-%% \begin{equation} |valueOf|(v) = 
-%%   \begin{cases}
-%%     |assign|(v) & \text{when $v$ is assigned a value in the node,} \\
-%%     \text{\inBa}(v) & \text{when $v$ is not assigned.} 
-%%   \end{cases}
-%% \label{eqn_back2}
-%% \end{equation}
-%% In the above, $v$ represents a variable; |assign| retrieves the value
-%% assigned to that variable, if any.  Our transfer function just needs
-%% to apply |valueOf| to all variables in \inBa, as well as all
-%% variable assignments in the node itself. If |assigned| is the set of
-%% all assigned variables in the node, we can define how our transfer
-%% function relates \inBa and \outBa using set notation:
-%% \begin{equation}
-%%   \text{\outBa} = [|valueOf|(v) || v \in (\text{\inBa} \cup |assigned|)].
-%% \end{equation}
-
-%% Our initial fact, \inB{lst_back7_assign}:~\facts{a/\top, b/\top,
-%%   c/\top}, assigns the value ``$\top$'' (``top'') to all variables,
-%% indicating that we do not know the value for the given variable. Our
-%% transfer function determines that \outB{lst_back7_assign} should be
-%% \facts{a/1, b/2, c/\top}, showing that we know !+a+! is 1, !+b+! is 2, and
-%% that we still do not know the value of !+c+!. At each block we perform a
-%% similar analysis, except \refNode{lst_back7_print}, where we need to
-%%   take special action.
-
-%% When a node has multiple predecessors, like \refNode{lst_back7_print},
-%% we must combine multiple \outBa values into a single \inBa. The value
-%% for !+c+! in \outB{lst_back7_true} is 4, while in \outB{lst_back7_false}
-%% !+c+! is 3. We have two distinct values for !+c+! and no way to determine
-%% which will be the case when \refNode{lst_back7_print} executes. We
-%% must be conservative, so we assign the value $\top$ to !+c+! in
-%% \inB{lst_back7_print}.
-
-%% \begin{table}[tbh]
-%%   \centering
-%%   \figbegin
-%%   \begin{math}
-%%     \begin{array}{ccccc}
-%%       & v_1 & v_2 & v_1 \lub v_2 \\
-%%       \cmidrule(r){2-2}\cmidrule(r){3-3}\cmidrule(r){4-4}
-%%       1. & \top & v_2 & \top & \\ 
-%%       2. & v_1 & \top & \top & \\
-%%       3. & v_1 & v_2 & \top & \text{($v_1 \neq v_2$)}\\
-%%       4. & v_1 & v_1 & v_1 
-%%     \end{array}
-%%   \end{math}
-%%   \caption{How the meet operator used in Figure \ref{fig_back5}
-%%     combines facts. $v_1$ and $v_2$ are values given by separate
-%%     \outBa facts to the same variable. The table shows how they are
-%%     combined.}
-%%   \label{tbl_back2}
-%%   \figend
-%% \end{table}
-
-%% A \emph{meet operator} defines how we combine facts when values
-%% conflict. Table~\ref{tbl_back2} defines ``\lub'' (``least upper
-%% bound'' or ``lub''), which combines values as we did for
-%% \outB{lst_back7_true} and \outB{lst_back7_false}. $v_1$~and $v_2$
-%% represent values given to the same variable by different
-%% facts. Lines~1 and 2 show that when either value is $\top$, the result
-%% is $\top$. When values differ, as in Line~3, again the result is
-%% $\top$. Only when values are equal, as shown in the last line, do we
-%% preserve the value.
-
-%% Facts define the state of the program that we are analyzing. The
-%% transfer function transforms input facts into output facts. In a
-%% forwards analysis, input facts come from predecessor nodes and output
-%% facts flow to successors. For a backwards analysis, the opposite
-%% occurs. When multiple facts need to be combined, we use a meet
-%% operator. Each of these elements will vary depending on the specific
-%% analysis performed.
-
-%% \section{Iterative Analysis}
-%% \label{sec_back6}
-%% Begin by placing the specific concept in the overall context of
-%% dataflow. Give a small example highlighting the concept. Point
-%% out fine points or subtleties that occur when generalizing the concept. End
-%% by summarizing how the concept fits into dataflow (in a bit larger
-%% sense than the first summary).
-
-%% \begin{equation}
-%%   \begin{split}
-%%     B \bigwedge\ \emptyset\ &= B \\
-%%     B \bigwedge\ C &= [\{a=v_b\} \wedge\ \{a=v_c\} || \{a=v_b\}\ \in\ B, \{a=v_c\}\ \in\ C] \\%%
-%%                    &\; \cup\ [\{b=v_b\} || \{b=v_b\}\ \in\ B, \{b=v_c\}\ \not\in\ C] \\%%
-%%                    &\; \cup\ [\{c=v_c\} || \{c=v_b\}\ \not\in\ B, \{c=v_c\}\ \in\ C] \\
-%%     \{a=\bot\} \wedge\ \{a=v\} &= \{a=v\} \\
-%%     \{a=\top\} \wedge\ \{a=v\} &= \{a=\top\} \\
-%%     \{a=v\} \wedge\ \{a=u\} &= \{a=\top\} (u \neq v) \\
-%%     \{a=v\} \wedge\ \{a=v\} &= \{a=v\} \\
-%%   \end{split}
-%% \end{equation}
-
-%% \begin{equation}
-%%   \begin{split}
-%%     f_B(In) &= [\mathit{assign}(v) || v \in\ In], \text{where $B$ is a block in the CFG} \\
-%%     assign(v) &= %%
-%%     \begin{cases}
-%%       c & \text{when $v$ assigned $c$ in B.} \\
-%%       In(v) & \text{when v not assigned in B.}
-%%     \end{split}
-%%   \end{align}
-%% \end{equation}
-
-%% \begin{tabular}{ll}
-%%   \textbf{Lattice} & $\bot$, 0, 1, \ldots, and $\top$. \\
-%%   \textbf{Meet} &  As above. \\
-%%   \textbf{Transfer} & As above. \\
-%%   \textbf{Direction} & Forward.
-%% \end{tabular}
-
-
-%% As we saw in Figure \ref{fig_back5}, facts can conflict when nodes
-%% have multiple predecessors. Even more complicated situations arise
-%% when a program contains loops. Consider the fragment in
-%% \ref{fig_back6}. To compute \inB{lst_back9_test}, we need
-%% \outB{lst_back9_assign} and and \outB{lst_back9_incr}. To compute
-%% \inB{lst_back9_incr} (in order to find \outB{lst_back9_incr}, we need
-%% \outB{lst_back9_test}. But to compute \outB{lst_back9_test} we need
-%% \inB{lst_back9_test}.  How do we apply our |valueOf| function
-%% (Equation \ref{eqn_back2}) to a \refNode{lst_back9_test} when
-%% \inB{lst_back9_test} depends on \outB{lst_back9_test}?
-
-%% \begin{myfig}
-%% \begin{tabular}{cc}
-%%   \subfloat{\input{lst_back8}%%
-%%     \label{fig_back6_a}} \vline &%%
-%%   \subfloat{\input{lst_back9}%%
-%%     \label{fig_back6_b}} \\ 
-%%   \subref{fig_back1_a} & \subref{fig_back1_b}
-%% \end{tabular}
-%% \caption{\subref{fig_back6_a}: A simple C-language program with a loop. \subref{fig_back6_b}: The CFG 
-%% for the fragment.}
-%% \label{fig_back6}
-%% \end{myfig}
-
-%% We solve this problem by applying our transfer function
-%% \emph{iteratively}. In the case of Figure \ref{fig_back6}, we first
-%% initialize each all \inBa and \outBa facts to some default. We then use
-%% |valueOf| to compute each \outBa. Of course, facts will change over
-%% the course of iteration -- especially in the case of node
-%% \ref{lst_back9_test}. We keep iterating until we reach a \emph{fixed
-%%   point}, meaning the facts stop changing.
-
-%% \begin{table}
-%%   \centering
-%%   \begin{math}
-%%     \begin{array}{lcccc}
-%%       \mathit{Iteration} & \outB{lst_back9_assign} & \outB{lst_back9_incr} & \inB{lst_back9_test} & \outB{lst_back9_test} \\
-%%       \cmidrule(r){1-1}\cmidrule(r){2-5} 
-%%       0 & \bot & \bot & \bot & \bot  \\
-%%       1 & 0 & 10 & \bot & \bot \\
-%%       2 & 0 & 10 & \bot & \bot \\
-%%       \multicolumn{5}{c}{\dots} \\
-%%       \multicolumn{5}{l}{\inB{lst_back9_test} = \outB{lst_back9_assign} \lub \outB{lst_back9_incr}} \\
-%%     \end{array}
-%%   \end{math}
-%%   \caption{Iterative analysis of the CFG from Figure
-%%     \ref{fig_back6}. We how the inputs used to calculate
-%%     \outB{lst_back9_test} change in one iteration. The zeroth
-%%     iteration represents the initial values given to \inBa and \outBa
-%%     for all nodes.}  
-%%   \figend
-%%   \label{tbl_back3}
-%% \end{table}
-
-%% Table \ref{tbl_back3} shows \inE and \out for
-%% \refNode{lst_back9_test}. To compute \inB{lst_back9_test}, we combine
-%% \outB{lst_back9_assign} and \outB{list_back9_incr} using the meet
-%% operator from Section~\ref{sec_back4}:
-%% \begin{equation}
-%%   \inB{lst_back9_test} = \outB{lst_back9_assign} \lub \outB{lst_back9_incr}.
-%% \end{equation}
-%% The zeroth iteration shows the initial
-%% value for all sets. On the first iteration, we can see \inB{lst_back9_test} is $\bot$:
-%% \begin{equation}
-%%   \begin{split}
-%%     \inB{lst_back9_test} &= \outB{lst_back9_assign} \lub \outB{lst_back9_incr} \\
-%%     &= \bot \lub \bot \\
-%%     &= \bot.
-%%   \end{split}
-%% \end{equation}
-%% When computing \inBa, we always use \outBa from the
-%% \emph{previous} iteration. In the above we use $\bot$ for \outB{lst_back9_incr} and
-%% \outB{lst_back9_assign}. 
-
-%% When computing \inB{lst_back9_test} in the second iteration,
-%% \outB{lst_back9_incr} is 10 and \outB{lst_back9_assign} is
-%% 0. According to our meet operator, \inB{lst_back9_test} still equals
-%% $\bot$:
-%% \begin{equation}
-%%   \begin{split}
-%%     \inB{lst_back9_test} &= \outB{lst_back9_assign} \lub \outB{lst_back9_incr} \\
-%%     &= 0 \lub 10 \\
-%%     &= \bot.
-%%   \end{split}
-%% \end{equation}
-%% At this point, our facts have stopped changing so we stop
-%% iterating. Our final result $\bot$ for !+c+! in \outB{lst_back9_test}.
-
-%% \section{Rewriting}
-%% \label{sec_back7}
-
-%% Begin by placing the specific concept in the overall context of
-%% dataflow. Give a small example highlighting the concept. Point
-%% out fine points or subtleties that occur when generalizing the concept. End
-%% by summarizing how the concept fits into dataflow (in a bit larger
-%% sense than the first summary).
-
-%% Direction, the meet operator, facts, and the transfer function
-%% together define a particular dataflow analysis. We can use the result
-%% of the analysis to alter, or ``rewrite,'' the CFG of the program. The
-%% meaning of the program should not change, but it should behave
-%% differently: execute faster, use less memory, or whatever
-%% characteristic the optimization should improve.  We do not have to
-%% rewrite, of course. In some cases, we use the analysis to drive later
-%% optimizations, or to report errors to the programmer. For example, a
-%% \emph{reaching definitions} \citep{AhoXX} analysis can warn if
-%% variables are used without being initialized. However, in most cases
-%% we do want to rewrite the CFG.
-
-%% \section{Example: Dead-Code Elimination}
-%% \label{sec_back2}
-
-%% Begin by placing the specific concept in the overall context of
-%% dataflow. Give a small example highlighting the concept. Point
-%% out fine points or subtleties that occur when generalizing the concept. End
-%% by summarizing how the concept fits into dataflow (in a bit larger
-%% sense than the first summary).
-
-%% Consider Figure \ref{fig_back2}, again showing a C-language fragment.
-%% The assignment to !+b+! on line~\ref{fig_back2_dead_line} has no visible
-%% effect and can be removed without affecting the meaning of the
-%% program. We call this optimization \emph{dead-code elimination}.
-
-%% \begin{myfig}[ht]
-%% \begin{minipage}{1in}
-%%   \begin{AVerb}[numbers=left]
-%%     a = 1;
-%%     b = a + 1;\label{fig_back2_dead_line}
-%%     return a + 1;
-%%   \end{AVerb}
-%% \end{minipage}
-%% \caption{A C-language fragment illustrating \emph{dead code}. After
-%% assignment on line \ref{fig_back2_dead_line}, \verb=b= is not used
-%% and can be considered ``dead.''}
-%% \label{fig_back2}
-%% \end{myfig}
-
-%% Of course, programmers do not normally write programs with such
-%% obviously useless statements, but other compiler optimizations can
-%% leave behind many such statements. \emph{Uncurrying}, described in
-%% Chapter~\ref{ref_chapter_uncurrying}, in fact depends on dead-code
-%% elimination.
-
-%% The assignment on line~\ref{fig_back2_dead_line} can be eliminated
-%% because !+b+! does not get referenced again. If a variable is referenced
-%% after assignment, we say it is ``live.'' We call the dataflow
-%% analysis that finds all live variables a ``liveness'' analysis. 
-
-%% \begin{myfig}[th]
-%% \begin{minipage}{2in}
-%% \input{lst_back10}
-%% \end{minipage}
-%% \caption{The CFG for our example program, annotated with the live
-%% set for each node.}
-%% \label{fig_back3}
-%% \end{myfig}
-
-%% Figure \ref{fig_back3} shows the CFG for this example. The annotations
-%% on edges show the facts computed for this analysis: the set of live
-%% variables. Recall from Section~\ref{sec_back4} that we can choose to
-%% traverse the CFG forwards or backwards. Going forwards would require
-%% us to track each assignment and then, after traversing the CFG,
-%% determine if the variable was referenced again. The backwards case
-%% requires that we add each variable reference to the live set. When an
-%% assignment occurs, we can check if the variable appears in the live
-%% set. If not, we know the variable was never referenced and is not
-%% live. For simplicity and efficiency, we choose to go backwards rather
-%% than forwards.
-
-%% We define our transfer function such that, for some statement $B$,
-%% \inBa represents the variables that are live in the statement. A live
-%% variable is referenced (i.e., \emph{used}) in $B$ or one
-%% of its successors. A variable that appears in \outBa but not \inBa must
-%% not be live. The only way to remove a variable from \outBa is if it is 
-%% assigned (i.e. or \emph{defined}) in $B$. We can then define our transfer
-%% function from \outBa to \inBa in terms of the \emph{use} and \emph{def} sets:
-%% \begin{align}
-%%   & \inBa = (\outBa \cup |use|(B)) - |def|(B), \label{eqn_back1} \\
-%% \text{where} \notag\\
-%%   & B     & \text{Statement considered.} \notag\\
-%%   & |use|(B) & \text{Variables referenced in $B$}. \notag\\
-%%   & |def|(B) & \text{Variables assigned $B$}. \notag\\
-%% \end{align}
-
-%% Table \ref{tbl_back1} shows the |use|, |def|, \inBa and \outBa sets for
-%% each statement. We include the exit node (``\exitN'') in the table to
-%% show the initial value of \outBa for the last statement -- $\emptyset$,
-%% the empty set. Our analysis then works backwards through the
-%% program. Each \inBa becomes the input, \outBa, for the statement's
-%% predecessor. If our program (and its CFG) contained any loops, we
-%% would need to run this algorithm multiple times, until the live set
-%% for each statement reached a fixed point.
-
-%% \begin{table}
-%%   \centering
-%%   \begin{math}
-%%     \begin{array}{lcccc}
-%%       & |use|(B) & |def|(B) & \outBa & \inBa \\
-%%       \cmidrule(r){2-5} %%\cmidrule(r){1-1}\cmidrule(r){2-2}\cmidrule(r){3-3}\cmidrule(r){4-4}\cmidrule(r){5-5}
-%%       \exitN & \emptyset & \emptyset & \emptyset & \emptyset \\
-%%       !+return a + 1+! & \{a\} & \emptyset & \emptyset & \{a\} \\
-%%       !+b = a + 1+! & \{a\} & \{b\} & \{a\} & \{a\} \\
-%%       !+a = 1+! & \emptyset & \{a\} & \{a\} & \emptyset \\
-%%     \end{array}
-%%   \end{math}
-%%   \caption{The $|use|$, $|def|$, \inBa and \outBa sets computed using
-%%     equation \ref{eqn_back1} for our example program.}
-%%   \label{tbl_back1}
-%%   \figend
-%% \end{table}
-
-%% With the live set computed for each statement, our analysis can now
-%% determine which statements to eliminate. Only
-%% \refNode{lst_back10_assigna} and \refNode{lst_back10_assignb} in
-%% Figure~\ref{fig_back3} perform an assignment. The live set for
-%% \refNode{lst_back10_assigna} (``!+a = 1+!'') contains !+a+!, so we do not
-%% eliminate it. For \refNode{lst_back10_assignb} (``!+b = a + 1+!''), the
-%% live set does \emph{not} contain !+b+!. Therefore, we can eliminate
-%% \refNode{lst_back10_assignb}, giving us the new program in
-%% Figure~\ref{fig_back6}.
-
-%% \begin{myfig}[th]
-%%   \centering
-%%   \begin{minipage}{1in}
-%%   \begin{AVerb}[numbers=left]
-%% a = 1;
-%% return a + 1;
-%%   \end{AVerb}
-%%   \end{minipage}
-%%   \caption{The program from Figure~\ref{fig_back3} with the useless assignment to
-%%     \verb=b= eliminated.}
-%% \end{myfig}
-
-%% In the
-%% forwards case, we must track each assignment and determine, when we
-%% exit the CFG, if the variable was ever used. We would need to track
-%% every assignment until our traversal finished. However, if we traverse
-%% backwards, we only need to add each reference to our live set. When we
-%% see an assignment to a variable \emph{not} in our live set, we know it
-%% has never been referenced.
-
-%% \emph{live set} The \inE and \out sets show the facts computed for this
-%% analysis. The computed show the live variables for that program point
-%% \emph{live set}, annotates edges between each statement. The live set
-%% is the \emph{fact} we compute for this analysis.
-
-%% Annotations
-%% show the facts we will compute
-%% Recall from Section~\ref{sec_back4} that a dataflow analysis can
-%% go \emph{forwards} or \emph{backwards}. 
-
-%% To eliminate the assignment like that on
-%% line~\ref{fig_back2_dead_line}, we need to determine which variables
-%% are ``live'' -- that is, variables referenced after assignment. Such variables are ``live''; if a
-%% variable is \emph{not} live, then it is dead. We use this ``liveness''
-%% analysis to determine if a particular assignment is dead.
-
-%% To determine if a variable is live, we need to know if it is
-%% referenced after assignment. Such variables make up a \emph{live set}
-%% that we can compute between each statement. To compute the live set,
-%% we can choose to traverse the CFG for the program forwards or
-%% backwards.  In the forwards case, we must track each assignment and
-%% determine, when we exit the CFG, if the variable was ever used. We
-%% would need to track every assignment until our traversal
-%% finished. However, if we traverse backwards, we only need to add each
-%% reference to our live set. When we see an assignment to a variable
-%% \emph{not} in our live set, we know it has never been
-%% referenced. Therefore we compute ``liveness'' using a backwards
-%% traversal over the CFG.
-
-%% \begin{myfig}[th]
-%% \begin{minipage}{2in}
-%% \input{lst_back10}
-%% \end{minipage}
-%% \caption{The CFG for our example program, annotated with the live
-%% set for each node.}
-%% \label{fig_back3}
-%% \end{myfig}
-
-%% Figure \ref{fig_back3} shows the CFG for this example. Annotations
-%% show the facts we will compute: the live set before and after. Though
-%% execution follows the arrows in the CFG, our analysis proceeds
-%% backwards. For example, the input to node 2 is the live set computed
-%% for node 3 (``$\{a\}$'' in this case).
-
-%% Our transfer function computes the live set based on \emph{uses} and
-%% \emph{definitions} in a statement. Any reference (or use) of a
-%% variable goes into the live set. Any assignment (or definition) of a
-%% variable removes it from the live set. We can then define our transfer
-%% function, |live|, for a statement as:
-
-%% \begin{align}
-%%   & |live|(s) = (\Varid{in}(s) \cup |use|(s)) - |def|(s), \label{eqn_back1} \\
-%% \intertext{where}
-%%   & s     & \text{Statement considered.} \notag\\
-%%   & |use|(s) &  \text{Set of variables used in $s$}. \notag\\
-%%   & |def|(s) & \text{Variable assigned to in $s$ (a singleton set)}. \notag\\
-%%   & \Varid{in}(s) & \text{Live variables computed for $s$' successor}. \notag
-%% \end{align}
-
-%% Table \ref{tbl_back1} shows the |use| and |def| sets for each
-%% statement. The live set computed, |live|, becomes the input, $\Varid{in}$, for
-%% the statement's predecessor. We include the exit node (``!+X+!'') in the
-%% table to show the initial value of $\Varid{in}$ for the last statement --
-%% $\emptyset$, the empty set. Our analysis then works backwards through the
-%% program. If our program (and its CFG) contained any loops, we would
-%% need to run this algorithm multiple times, until the live set for each
-%% statement reached a fixed point.
-
-%% \begin{table}
-%%   \centering
-%%   \begin{tabular}{lcccc}
-%%     $s$ & $|use|(s)$ & $|def|(s)$ & $\Varid{in}(s)$ &  $|live|(s)$ \\
-%%     \cmidrule(r){1-1}\cmidrule(r){2-2}\cmidrule(r){3-3}\cmidrule(r){4-4}\cmidrule(r){5-5}
-%%     !+X+! & & & & $\emptyset$ \\
-%%     !+return a + 1+! & $\{a\}$ & $\emptyset$ & $\emptyset$ & $\{a\}$ \\
-%%     !+b = a + 1+! & $\{a\}$ & $\{b\}$ & $\{a\}$ & $\{a\}$ \\
-%%     !+a = 1+! & $\emptyset$ & $\{a\}$ & $\{a\}$ & $\emptyset$ \\
-%%     \bottomrule
-%%   \end{tabular}
-%%   \caption{The $|use|$, $|def|$ and $|live|$ sets computed using equation \ref{eqn_back1} for our example program.}
-%%   \label{tbl_back1}
-%% \end{table}
-
-%% With the live set computed for each statement, our analysis can now
-%% determine which statements to eliminate. Only nodes 1 and 2 in Figure
-%% \ref{fig_back3} perform an assignment. The live set for node 1 (``!+a = 1+!'')
-%% contains !+a+!, so we do not eliminate it. In node 2 (``!+b = a + 1+!''),
-%% the live set does \emph{not} contain !+b+!. Therefore, we can eliminate
-%% node 2, giving us a new program without any dead code:
-
-%% \begin{Verbatim}
-%% a = 1;
-%% return a + 1;
-%% \end{Verbatim}
-
-%% \subsection{Basic Blocks and Control-Flow Graphs}
-
-%% A dataflow optimization operates over a ``control-flow graph'' (CFG)
-%% of the program -- a directed graph where edges encode branches or
-%% jumps and nodes represent statements. Programs run by entering a node
-%% from a predecessor, executing the statements in turn, and exiting the
-%% node to a successor. Multiple successors imply a conditional branch,
-%% though the program can only choose one. A special ``entry'' node, with
-%% no predecssors, exists to give the program a starting point.
-
-%% The statements in each node must define a ``basic block,'' which means
-%% there can only be one entry and one exit to the node. Each
-%% predeccessor starts at the same statement; execution cannot start in
-%% the ``middle'' of the statements in the node. Each successor also
-%% leaves from the same instruction, so only one ``branch'' can exist in
-%% each node.
-
-%% For example, consider the ``fall-through'' implied by the use of !+case+!
-%% statements in this C-language program fragment:
-
-%% \begin{verbatim}
-%%   switch(i) {
-%%   case 1:
-%%     printf("1");
-%%     break;
-%%   case 2:
-%%     printf("2");
-%%   case 3:
-%%     printf("3");
-%%   }
-%% \end{verbatim}
-
-%% \begin{figure}[h]
-%% \begin{verbatim}
-%%    A
-%%   switch   ----<-
-%%   | |  |  |      |
-%%   | |  |  v C    ^
-%%   | |   ->case 3 |
-%%   | |     |      |
-%%   | |      ->----_--
-%%   | | B          |  |
-%%   |  ->case 2 ->-   v
-%%   |                 |
-%%   |   D       ----<-
-%%    ->case 1  |
-%%      |       v
-%%      v       |
-%%    --+-----<-
-%%   |
-%%    -> ...
-%% \end{verbatim}
-%% \caption{CFG illustrating \emph{fall-through} allowed by the
-%%   C-language \texttt{switch} statement.}
-%% \label{switchCfgEg}
-%% \end{figure}
-
-%% Figure \ref{switchCfgEg} shows a CFG for this fragment. Execution
-%% begins at node A. Node C has two predeccessors: A and B. The edge
-%% between Node B and C represents fall-through from the second to third
-%% case. They cannot be combined because the node would need two distinct
-%% entry points. Encoding a program into basic blocks usually involves
-%% inserting similar branches. The CFG makes explicit control--flow that
-%% exists by implication in the source program.
-
-%% \subsection{Direction, Facts and Rewrites}
-
-%% \subsection{Example: Bind/Return Collapse}
-
-%% Dataflow optimizations transform the CFG representation of a program,
-%% with the goal of making a faster (or smaller, or more efficient, etc.)
-%% program. Dataflow computes a set of ``entry'' assumptions and ``exit''
-%% facts for each node in the graph. Facts for one node become
-%% assumptions for the nodes' successors (thus the term
-%% ``dataflow''). The algorithm iteratves over the entire graph until a
-%% fixed point is reached -- that is, facts and assumptions no longer
-%% change. The computed facts can then be used to transform the graph.
-
-%% \emph{Constant propagation example -- or something more functional?}
-
-%% \emph{Introduce forward and backwards dataflow.}
-
-% What does dataflow mean?
-
-% How do you use it?
-
-% Example
 
 \standaloneBib
 \end{document}
