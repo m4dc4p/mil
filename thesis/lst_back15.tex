@@ -4,34 +4,34 @@
   \input{lst_back16}
   \setfacts{m/\bot,n/\bot,i/\bot}
   \node[fact, above=6mm of assign, anchor=west] () 
-       {\outFactsM{\prefix assign}{m/\bot,n/\bot,i/\bot}{\wd\factbox}};
+       {\inFactsM{\prefix assign}{m/\bot,n/\bot,i/\bot}{\wd\factbox}};
 
   \setfacts{m/\bot,n/\bot,i/\bot}
   \node[fact, below=3mm of assign, anchor=west] () 
        {\outFactsM{\prefix assign}{m/\bot,n/\bot,i/\bot}{\wd\factbox}};
 
-  \setfacts{m/\bot}
-  \node[fact, above=8mm of test, anchor=east] () 
+  \setfacts{m/\bot,n/\bot,i/\bot}
+  \node[fact, above=6mm of test, anchor=west] () 
        {\inFactsM{\prefix  test}{m/\bot,n/\bot,i/\bot}{\wd\factbox}};
 
-  \setfacts{m/\bot}
-  \node[fact, below=8mm of test, anchor=east] () 
+  \setfacts{m/\bot,n/\bot,i/\bot}
+  \node[fact, below=3mm of test, anchor=west] () 
        {\outFactsM{\prefix test}{m/\bot,n/\bot,i/\bot}{\wd\factbox}};
 
   \setfacts{m/\bot,n/\bot,i/\bot}
-  \node[fact, above=5mm of mult, anchor=west] () 
+  \node[fact, above right=2mm and -11.75mm of mult] () 
        {\inFactsM{\prefix mult}{m/\bot,n/\bot,i/\bot}{\wd\factbox}};
 
   \setfacts{m/\bot,n/\bot,i/\bot}
-  \node[fact, below=3mm of mult, anchor=west] () 
+  \node[fact, below right=3mm and -14mm of mult,anchor=west] () 
        {\outFactsM{\prefix mult}{m/\bot,n/\bot,i/\bot}{\wd\factbox}};
 
   \setfacts{m/\bot,n/\bot,i/\bot}
-  \node[fact, above=5mm of incr, anchor=west] () 
+  \node[fact, above right=6mm and -2mm of incr, anchor=west] () 
        {\inFactsM{\prefix incr}{m/\bot,n/\bot,i/\bot}{\wd\factbox}};
 
   \setfacts{m/\bot,n/\bot,i/\bot}
-  \node[fact, below=3mm of incr, anchor=west] () 
+  \node[fact, below right=3mm and -4.25mm of incr, anchor=west] () 
        {\outFactsM{\prefix incr}{m/\bot,n/\bot,i/\bot}{\wd\factbox}};
 
   \setfacts{m/\bot,n/\bot,i/\bot}

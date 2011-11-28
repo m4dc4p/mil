@@ -22,11 +22,13 @@
     t (F, a\ \text{\tt =}\ C) &= \{(a, x \lub C), \text{when\ } (a, x) \in F\ \text{or} \\
     & \phantom{= \{}(a, C), \text{when\ } a \not\in \dom(F)\}\ \cup \\
     & \phantom{=} F\ \backslash\ \mfun{uses}(F, a),\\
-    & \text{where\ } F \in \setL{Fact}, C \in \ZZ. \labeleq{eqn_back14} & \eqref{eqn_back14} \\
+    & \text{where\ } F \in \setL{Fact}, C \in \ZZ. \\
     t (F, a\text{\tt ++}) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)), \\
-    & \text{where\ } F \in \setL{Fact}. \\\\
+    & \text{where\ } F \in \setL{Fact}. \\
+    t (F, a\ \text{\tt +=\ } b) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)). \\
+    & \text{where\ } F \in \setL{Fact}. \labeleq{eqn_back14} & \eqref{eqn_back14} \\\\
     \mfun{uses}(F, a) &= \{(a, x)\ |\ a \in \dom(F)\}, \\
-    & \text{where\ } F \in \setL{Fact}, a \in \setL{Var}. \\\\
+    & \text{where\ } F \in \setL{Fact}, a \in \setL{Var}. \labeleq{eqn_back19} & \eqref{eqn_back19} \\\\
 
     \multicolumn{3}{c}{\emph{Direction}} \\
 

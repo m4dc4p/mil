@@ -449,12 +449,18 @@ facts. Figure~\ref{fig_back9}, Part \subref{fig_back9_transfer}, shows
 the same graph with annotations updated using
 Equation~\eqref{eqn_back4}. The assignments in
 \refNode{lst_back18_assign} create the facts \factC{m}{10},
-\factC{n}{1}, and \factC{i}{0} in \outB{lst_back18_assign}. The
-assignment to !+n+! in \refNode{lst_back18_mult} is a non-constant
-update so \outB{lst_back18_mult} contains \factC{n}{\top}. However,
-\outB{lst_back18_mult} also shows that $m$ is not modified in
-\refNode{lst_back18_mult}; the value from \inB{lst_back18_mult} is
-just copied to \outB{lst_back18_mult}.
+\factC{n}{0}, and \factC{i}{0} in \outB{lst_back18_assign}. The
+assignment to $n$ in \refNode{lst_back18_mult} is a non-constant
+update so \outB{lst_back18_mult} contains \factC{n}{\top}. Similary,
+the increment to $i$ in \refNode{lst_back18_incr} creates the fact
+\factC{i}{\top} in \outB{lst_back17_incr}.  
+
+Notice that the updated \out sets do not affect subsequent \inE sets.
+\InB{lst_back18_mult} does not contain the fact \factC{m}{10} from
+\outB{lst_back18_assign}. \InB{lst_back18_test} also does not show the
+facts \factC{i}{\top} or \factC{i}{0} from either
+\outB{lst_back18_incr} or \outB{lst_back18_test}. The next section on
+iteration will discuss how we update \inE sets as \out sets change.
 
 \input{fig_back9}
 
@@ -463,11 +469,9 @@ creating (or updating) facts. The function is specific to both the
 analysis performed and the semantics of the underlying
 program. Equation~\eqref{eqn_back4}, the transfer function for our
 constant propagation example, defines how we derive information about
-a variable's value after the statements in the given node execute.
-Equation~\eqref{eqn_back5} extended Equation~\eqref{eqn_back4} to sets,
-showing how we can create \outBa from \inBa. In the next section, we
-iteratively apply our transfer function and lattice to the
-control-flow graph. 
+a variable's value after the statements in the given node execute.  In
+the next section, we iteratively apply our transfer function and
+lattice to the control-flow graph.
 
 \subsection{Iteration \& Fixed Points}
 \label{back_subsec_iter}
@@ -511,30 +515,39 @@ tests the condition !+i < cnt+!. In the first iteration,
 $i$. Equation~\eqref{eqn_back8} states that \inB{lst_back15_test} is
 derived from the \out sets of \refNode{lst_back15_test}'s
 predecessors: \refNode{lst_back15_assign} and
-\refNode{lst_back15_incr}. By Equations~\eqref{eqn_back8},
-\eqref{eqn_back6}, and \eqref{eqn_back7} we can calculate the value of
-$i$ in \inB{lst_back15_test}. Crucially, the \out set used comes from
-the \emph{previous} iteration of the analysis, which we emphasize by
-attaching the iteration number to each set:
-\begin{align*}
-  \inB{lst_back15_test}^1 &= \outB{lst_back15_assign}^0 \bigwedge \outB{lst_back15_incr}^0 \\
-  &= {\factC{i}{\bot}} \wedge {\factC{i}{\bot}} \\
-  &= {\factC{i}{\bot \lub \bot}} \\
-  {\factC{i}{\bot}} &= {\factC{i}{\bot}}.
-\end{align*}
+\refNode{lst_back15_incr}. By Equation~\eqref{eqn_back8} we can
+calculate the value of $i$ in \inB{lst_back15_test}. Crucially, the
+\out set used comes from the \emph{previous} iteration of the
+analysis, which we emphasize by attaching the iteration number to each
+set:
+
+\begin{singlespace}\correctspaceskip
+  \begin{align*}
+    \inB{lst_back15_test}^1 &= \bigwedge\limits_{\mathclap{P \in \mathit{pred}(B)}} \outXa{P} .\\
+    &= \outB{lst_back15_assign}^0 \bigwedge \outB{lst_back15_incr}^0 \\
+    &= \left\{\dots, \factC{i}{\bot}, \dots\right\} \wedge \left\{\dots, \factC{i}{\bot}, \dots\right\} \\
+    &= \left\{\dots, \factC{i}{\bot \lub \bot}, \dots\right\} \\
+        \left\{\dots, \factC{i}{\bot}, \dots\right\} &= \left\{\dots, \factC{i}{\bot}, \dots\right\}.
+  \end{align*}
+\end{singlespace}
+
 Now consider the second iteration, where \inB{lst_back15_test} assigns
-$\top$ to $i$. \outB{lst_back15_assign} gives $i$ the value
-0 (by !+i = 0+!). However, \outB{lst_back15_incr} assigns $i$ the value $\top$,
-because !+i+++! is a non-constant update. We can see why by
-Equations~\eqref{eqn_back8}, \eqref{eqn_back6}, and
-\eqref{eqn_back7}. Again we attach the iteration number to each set,
-emphasizing its origin:
-\begin{align*}
-  \inB{lst_back15_test}^2 &= \outB{lst_back15_assign}^1 \bigwedge \outB{lst_back15_incr}^1 \\
-  &= {\factC{i}{0}} \wedge {\factC{i}{\top}} \\
-  &= {\factC{i}{0 \lub \top}} \\
-  {\factC{i}{\top}} &= {\factC{i}{\top}}.
-\end{align*}
+$\top$ to $i$. \outB{lst_back15_assign} gives $i$ the value 0 (by !+i
+= 0+!). However, \outB{lst_back15_incr} assigns $i$ the value $\top$,
+because !+i+++! is a non-constant update. We can see why
+$\factC{i}{\top} \in \inB{lst_back15_test}$ by
+Equation~\eqref{eqn_back8}. Again we attach the iteration number to
+each set, emphasizing its origin:
+
+\begin{singlespace}\correctspaceskip
+  \begin{align*}
+    \inB{lst_back15_test}^2 &= \outB{lst_back15_assign}^1 \bigwedge \outB{lst_back15_incr}^1 \\
+    &= \left\{\dots, \factC{i}{0}, \dots\right\} \wedge \left\{\dots, \factC{i}{\top}, \dots\right\} \\
+    &= \left\{\dots, \factC{i}{0 \lub \top}, \dots\right\} \\
+    \left\{\dots, \factC{i}{\top}, \dots\right\} &= \left\{\dots, \factC{i}{\top}, \dots\right\}.
+  \end{align*}
+\end{singlespace}
+
 Notice how the conflicting values for $i$ are resolved with the \lub
 operator. The value of $i$ in \outB{lst_back15_test} has reached a fixed point
 with this iteration; it will no longer change.
@@ -546,13 +559,15 @@ answer?  Both of these questions can be answered if our lattice has
 
 Let us begin with the lattice. Consider again the meet operator, \lub,
 defined in Figure~\ref{tbl_back4} and our set of values, \setLC:
-\begin{align*}
-  \setLC &= \bot, \dots \mathit{all\ integers} \dots, \top. \\\\
-  \bot \lub x &= x. \\
-  x \lub \top &= \top.\\
-  C_1 \lub C_2 &= \top, \text{where}\ C_1 \neq C_2.\\
-  C_1 \lub C_1 &= C_1.
-\end{align*}
+\begin{singlespace}\correctspaceskip
+  \begin{align*}
+    \setLC &= \left\{ \bot, \top \right\} \cup \ZZ. \\\\
+    \bot \lub x &= x. \\
+    x \lub \top &= \top.\\
+    C_1 \lub C_2 &= \top, \text{where}\ C_1 \neq C_2.\\
+    C_1 \lub C_1 &= C_1.
+  \end{align*}
+\end{singlespace}
 The definition of \lub imposes a \emph{partial order} on the values
 in \setLC. That is, we can define an operator, \sqlte, such that
 for all $x$ and $y$ in \setLC:
@@ -585,7 +600,7 @@ And now we can redefine height as the largest $n$ such that:
 \end{equation}
 
 We can show by contradiction that the height of our lattice is
-3. Given $x_1 \sqlt x_2 \sqlt \dots \sqlt x_n$, such that n = 4. If
+3. Suppose there exists $x_1 \sqlt x_2 \sqlt \dots \sqlt x_n$, such that n = 4. If
 $x_4$ is $\top$, then $x_3$ must be an integer or $\bot$. If $x_3$ is
 $\bot$, by Equation~\eqref{eqn_back17}, there is no such $x_2$ such
 that $x_2 \sqlt \bot$. Therefore, $x_3$ cannot be $\bot$. If $x_3$ is
@@ -616,7 +631,7 @@ many'' assignments (or some other update).  This means our transfer
 function always increases (or does not change) the information we
 have. 
 
-To show that our transfer function (from Equation~\eqref{eqn_back4}) is
+To show that our transfer function (Equation~\eqref{eqn_back4}) is
 monotone, consider some fact $(v,x)$ and some block $B$. $v$ is a
 variable in the program; $x$ is a value in \setLC; and $B$ contains
 some number of statements.  We analyze the fact, $(v,x')$ produced
@@ -625,9 +640,8 @@ assignment affecting $v$, then $x = x'$, and we already know that $x \sqlte
 x'$. If $B$ makes a non-constant update to $v$, then $x' = \top$ and we
 know $x \sqlte \top$ for all $x$ by the definition of \lub. Finally,
 if $B$ assigns some constant $C$ to $x$, then $x' = x \lub C$, which
-again satisfies our relation. Therefore, Equation~\eqref{eqn_back4} is
-monotone and, by a simple extension to sets, so is is
-Equation~\eqref{eqn_back5}.
+again satisfies our relation. Therefore our transfer function is
+monotone.
 
 \section{Dataflow Equations}
 \label{back_subsec_eq}
@@ -697,7 +711,7 @@ other \out sets.
       in($B$)$^0$ = $u$, out($B$)$^0$ = $f$, $\forall$\ nodes $B$; $f, u \in$\ \setL{Fact} \label{fig_back14_init}
       \textbf{do} \{
         in($B$)$^{i+1}$ = $\bigwedge\limits_{\mathclap{P \in pred(B)}} \text{out}^{i}$($P$) \label{fig_back14_in}
-        out($B$)$^{i+1}$ = $t$(in($B$)$^{i+1}$, $B$)  \label{fig_back14_out}
+        out($B$)$^{i+1}$ = $t$(in($B$)$^i$, $B$)  \label{fig_back14_out}
       \} \textbf{until} out($B$)$^{i+1}$ = out($B$)$^{i}$, $\forall B$ \label{fig_back14_loop}
     \end{AVerb}
   \end{minipage}
@@ -724,7 +738,7 @@ We have presented the iterative, forwards dataflow algorithm and shown
 how the algorithm can be parameterized for a particular analysis. We
 gave the parameterization for our constant propagation analysis in
 Figure~\ref{fig_back10}. We know the algorithm will terminate if our
-transfer function is \emph{monotone} and we have defined lattice with
+transfer function is \emph{monotone} and our lattice has 
 \emph{finite} height. However, we have not discussed how to measure
 the results our analysis gives us --- how do we know that they are the
 best possible? We will address that question in the next section.
@@ -775,23 +789,23 @@ probably will not be as good as the ideal.
 Figure~\ref{fig_back7}, Part~\subref{fig_back7_initial} gave a sample
 program which we wished to optimize using a \emph{constant propagation}
 dataflow analysis. Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt} gave
-the result, replacing all occurrences of !+m+! with 10. Now knowing
+the result, replacing all occurrences of $m$ with 10. Now knowing
 the dataflow algorithm and the equations for constant propagation, we
 can derive how that transformation is made.
 
 Figure~\ref{fig_back12} gives the facts calculated for all nodes in our
 program, during each iteration of the analysis. The first iteration
-calculates that \outB{lst_back15_assign} assigns !+m+! the value 10, due
+calculates that \outB{lst_back15_assign} assigns $m$ the value 10, due
 to the assignment !+m = 10+! on Line~\ref{fig_back7_m}. The second
 iteration propagates this value to \inB{lst_back15_test} and in turn
 to \outB{lst_back15_test}, because the test on
-Line~\ref{fig_back7_test} does not affect !+m+!. In the third iteration,
+Line~\ref{fig_back7_test} does not affect $m$. In the third iteration,
 we see the same with \inB{lst_back15_mult} and \outB{lst_back15_mult}
 on Line~\ref{fig_back7_loop}. The analysis continues for two more
 iterations as other values propagate, but at this point we have all
 the information we need to optimize the program. Once the analysis
-reaches a fixed point, we can safely replace all occurrences of !+m+!
-with !+10+!, resulting in the optimized program given in
+reaches a fixed point, we can safely replace all occurrences of $m$
+with 10, resulting in the optimized program given in
 Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt}.
 
 \begin{myfig}
@@ -815,7 +829,7 @@ We have now seen how we can use constant propagation to optimize a
 simple program. Typically many more optimizations will be run over the
 same code, each (hopefully) improving it a little more. For example,
 we could use an optimization called \emph{dead-code elimination} to
-remove the declaration of !+m+! altogether from our optimized program,
+remove the declaration of $m$ altogether from our optimized program,
 as it is no longer used. 
 
 \section{Summary}
@@ -831,7 +845,7 @@ facts produce \outBa facts) or \emph{backwards} (where \outBa facts
 produce \inBa facts). Each optimization defines a specific \emph{meet
   operator} that combines facts for nodes with multiple predecessors
 (for forwards analysis) or successors (for backwards). We compute
-facts\emph{iteratively}, stopping when they reach a \emph{fixed
+facts \emph{iteratively}, stopping when they reach a \emph{fixed
   point}. Finally, we \emph{rewrite} the CFG using the facts computed. The 
 meaning of our program does not change, but its behavior will be ``better,'' 
 whatever that means for the particular optimization applied.
