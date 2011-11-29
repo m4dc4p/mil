@@ -40,7 +40,7 @@ Section~\ref{sec_back1} we define \emph{control--flow graphs} (CFGs),
 which the directed graphs representing the program are now called.
 Section~\ref{sec_back3} introduces ``basic blocks,'' not something
 originally defined by Kildall but now a fundamental way of
-representing nodes in CFGs. We then show an the modern representation
+representing nodes in CFGs. We show the modern representation
 of the dataflow algorithm in Section~\ref{back_sec_df}, introducing
 terms and definitions that have been defined since Kildall's original
 work. In Section~\ref{back_subsec_eq} we show the general form of
@@ -126,9 +126,9 @@ Consider the C-language fragment and control-flow graphs (CFG) in
 Figure~\ref{fig_back4}.  Part~\subref{fig_back4_b} shows the CFG for
 Part~\subref{fig_back4_a}: a long, straight sequence of nodes, one
 after another. Part~\subref{fig_back4_c} represents the assignment statements on
-lines~\ref{lst_back3_start} --- \ref{lst_back3_end} as a \emph{basic
+lines~\ref{lst_back3_start} -- \ref{lst_back3_end} as a \emph{basic
   block}: a sequence of statements with one entry, one exit, and no
-branches in-between. Execution cannot start in the ``middle'' of the
+branches in--between. Execution cannot start in the ``middle'' of the
 block, nor can it branch anywhere but at the end of the block. In fact,
 Part~\ref{fig_back4_b} also shows four basic blocks --- they just happen
 to consist of one statement each.
@@ -162,7 +162,7 @@ reduces the number of facts stored. The algorithm also iteratively
 propagates facts along edges --- so reducing the number of edges
 reduces the amount of work we need to do. When rewriting, blocks allow
 us to move larger amounts of the program at once. It also can be shown
-(see \citep{Aho2006}) that we do not lose any information by collapsing
+(see \cite{Aho2006}) that we do not lose any information by collapsing
 statements into blocks. For efficiency and brevity, we will work with
 basic blocks rather than statements from here forward.
 
