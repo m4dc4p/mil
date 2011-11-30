@@ -115,6 +115,23 @@
 \newcommand{\compMILV}[1]{\ensuremath{\left\llbracket #1 \right\rrbracket}}
 \newcommand{\compMILQ}[2]{\ensuremath{\left\llbracket #2 \right\rrbracket}}
 \newcommand{\milCtx}[1]{\ensuremath{\llfloor}#1\ensuremath{\rrfloor}}
+
+%% This dimension makes sure the same amount of space
+%% follows | and := in syntax rules like:
+%%
+%% term := var       (Variable)
+%%      |  var var    (Application)
+%%      |  \x. var    (Abstraction)
+%%
+\newdimen\termalign
+\setbox0=\hbox{\ensuremath{:=\ \ }}
+\termalign=\wd0 
+\def\term#1/{\ensuremath{\mathit{#1}}}
+\def\syntaxrule#1/{\hfil\text{\emph{#1}}}
+\def\termrule#1:#2:#3/{\term #1/ &:= #2 & \syntaxrule #3/}
+\def\termcase#1:#2/{&\hbox to \termalign{\ensuremath{\phantom{:}|}}\ensuremath{#1} & \syntaxrule #2/}
+
+
 %% End MIL chapter
 
 %% Dataflow Chapter

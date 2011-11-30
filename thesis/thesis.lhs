@@ -21,8 +21,6 @@
 
 \input{hoopl}
 
-\input{languages}
-
 \input{mil}
 
 \input{uncurrying}

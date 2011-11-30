@@ -1,4 +1,5 @@
 \documentclass[12pt]{report}
+\usepackage{standalone}
 %include polycode.fmt
 \input{tikz.preamble}
 \input{preamble}
@@ -75,20 +76,242 @@ Chapter~\ref{ref_chapter_languages}. Section \ref{mil_sec7} shows
 how Hoopl influenced the implementation the MIL language from Chapter
 \ref{ref_chapter_mil} and discusses the design choices we made.
 
-%% Examples of intermediate forms: SSA, RTL, a-normal, bytecode
+\section{Our Source Language}
+\label{mil_src}
 
-%% MIL overture
+Section~\ref{lang_sec1} should make it clear that the \lamA is capable
+of general-purpose programming, but also quite cumbersome. In
+particular, representing conditional statements and values in purely
+``functional'' form is extremely verbose. Therefore we extend the
+\lamA in our work by adding two new terms: \emph{algebraic data
+  types}\ and \emph{case discrimination}.
 
-%% Plan of the chapter
+\emph{Algebraic data types} (ADTs) are a new type of value, alongside
+$\lambda$-abstractions.  They consist of a \emph{constructor} tag and
+zero or more fields. For example, we can create boolean values by
+defining two constructors:
 
-%% This chapter describes our intermediate language, MIL
+> Boolean = True | False
 
-%% Our intermediate language, MIL (``monadic intermediate language''),
-%% directly supports several concepts fundamental to functional language
-%% compilers. 
+Here, |Boolean| is the name of the data we will create, while |True| and
+|False| represent the different possible values for |Boolean| data. Our syntax
+does not actually support naming data types like |Boolean|; we only are able
+to name the constructors |True| and |False|. For presentation, however, this
+shorthand is convenient and will be used as needed.
 
-%% We describe our intermediate language, MIL (``monadic intermediate language''). Before
-%% introducing MIL, however, we first discuss  
+Constructors can take also take arguments. This allows us to build
+composite data values from simpler pieces. For example, lists
+typically have one constructor taking no arguments that represents the
+empty list, and another taking two arguments, one of which holds an
+element of the list and other which holds the ``rest'' of the list:
+
+> List = Nil | Cons x xs
+
+Here, |Nil| represents the empty list. |Cons| holds an element of the
+list (|x|) and the rest of the list (|xs|). While the |x| argument can
+hold any value, the |xs| argument must be another |Cons| or |Nil|
+value. If |xs| is some other value, we do not have a valid list. For
+example, the list |[True, False, True]| translates to the following
+sequence of |List| constructors:
+
+> Cons True (Cons False (Cons True Nil))) 
+
+However, for convenience, we will write lists using brackets. The
+empty list, |Nil|, is written as empty brackets: |[]|.
+
+Natural numbers can be represented as successors to zero, otherwise
+known as \emph{Peano} numbers. We define two constructors, |Z| for
+zero and |S| for successor:
+
+> Natural = Z | S n
+
+The |n| argument to |S| will be either another |S| or a
+|Z|.\footnote{At least, if we want our program to execute properly.} We
+then represent each natural as some number of |S| constructors,
+terminated by a |Z|:
+
+> 0 = Z
+> 1 = S Z
+> 2 = S (S Z)
+> 3 = S (S (S Z))
+> {-"\ldots"-}
+
+Constructors are just like functions, except for one crucial
+difference: we do not write their ``body.'' Instead, the body of the
+constructor creates new data, in some way that we cannot explicitly express
+in \lamC. 
+
+We use ADTs to construct values; we take them apart using \emph{case
+  expressions} (or \emph{case discrimination}). Case expressions are a
+generalized form of the \emph{if} or \emph{switch} statements found in
+languages such as C, Java, and JavaScript. The case expression
+inspects a value (the \emph{discriminant}) and selects one of many
+\emph{case alternatives} (or \emph{arms}) based on the value
+found. The value of the alternative becomes the value of the case
+expression.
+
+For example, we can implement \emph{if} over booleans using \emph{case}:
+
+> case b of
+>   True -> {-"\ldots"-}
+>   False -> {-"\ldots"-}
+
+Each alternative specifies a constructor to the left of the arrow. The
+right-hand side gives the body that will be evaluated if the
+discriminant matches the constructor. 
+
+When the constructor used in the case alternatives takes arguments,
+then those values become available in the arm associated with the
+alternative.  Looking at lists, we can write \emph{takeOne}, which
+will take 1 element from a list and return a list. If the list
+given has no elements, an empty list is returned:
+
+> takeOne = {-"\lamAbs{l}{}"-} case l of
+>               Cons a as -> Cons a Nil
+>               Nil -> Nil   
+
+We use |a| and |as| to emphasize that these bindings are new and based on
+the value of |l|.
+
+It is possible to write a case expression with undefined behavior, if
+the discriminant contains a value that does not match one of the arms. For
+example, this expression would have undefined behavior:
+
+> case (Cons True Nil) of
+>   Nil -> Nil
+
+Figure~\ref{lang_fig5} shows the syntax for ADTs and case
+discrimination. An ADT consists of a constructor name, |C|, and zero
+or more arguments ($t_1$, $t_2$, \ldots). Each argument can be a
+term. The ADT term itself can only appear where our syntax allows
+terms. Specifically, they cannot be used as the parameter variable in
+an abstraction. That is, we do not support ``pattern-matching,'' as
+found in many functional languages. Case discrimination consists of
+the determinant term, $t$, and one or more alternatives (or
+``arms''). Each arm consists of a constructor ($C_1$, $C_2$, \ldots)
+and a ``binding'' for each argument that the constructor was defined
+with ($a_1$, $b_1$, \ldots). The number of bindings must exactly match
+the number of arguments defined for the constructor. Each binding is
+also a \emph{variable} -- we do \emph{not} allow terms. Each arm
+defines a body ($t_1$, $t_2$, \ldots). Both the new bindings from the
+arm \emph{and} the discriminant are in scope in the arm.\footnote{Any
+  other variables bound by enclosing $\lambda$'s are in scope as well,
+  of course.}  Bindings in the arm will ``shadow'' any bindings with
+the same name that are already in scope.
+
+\begin{myfig}[tbh]
+  \begin{minipage}{3in}
+  \begin{align*}
+    term &= \mathit{C}\ t_1\ t_2\ \ldots\ t_n, n \ge 0 & \hfil\text{\emph{(ADTs)}} \\ \\
+      &= |case|\ t\ |of| & \hfil\text{\emph{(Case Discrimination)}} \\
+      & \qquad\mathit{C}_1\ a_1\ a_2\ \ldots\ a_n \rightarrow t_1, n \ge 0 \\
+      & \qquad\mathit{C}_2\ b_1\ b_2\ \ldots\ b_n \rightarrow t_2, n \ge 0 
+  \end{align*}
+  \end{minipage}
+  \caption{The syntax of \lamC, which extends \lamA from
+    Figure~\ref{lang_fig3} with \emph{algebraic data types} (ADTs) and
+    \emph{case discrimination}. $t$ again represents an arbitrary
+    term. $C$ stands for a constructor name. $a$ and $b$ represent
+    variables, not terms.}
+  \label{lang_fig5}
+\end{myfig}
+
+Figure~\ref{lang_fig6} shows how we evaluate our new terms. In {\sc
+  Case1}, the discriminant must evaluate to a constructor. Otherwise,
+the behavior is undefined. If we allowed evaluation to an arbitrary
+value, that would imply a $\lambda$ could appear as a discriminant,
+which does not make sense. {\sc Case2} shows two important
+actions. First, the discriminate value is matched to an alternative
+with the same constructor \emph{and} number of arguments.\footnote{The
+  behavior is undefined if a single match is not found.}  Second, the
+alternative's body will be evaluated with new bindings, where $v_1$
+maps to $a_1$, $v_2$ maps to $a_2$, etc. The {\sc Value} rule shows
+that constructors will evaluate all of their arguments to
+values.\footnote{Note that order of evaluation for arguments is
+  \emph{not} specified.}
+
+\begin{myfig}[tbh]
+  \begin{minipage}{5in}
+    \centering
+    \begin{math}
+      \begin{array}{lclr}
+        \begin{minipage}{1in}
+          \begin{math}
+            \begin{array}{l}
+              |case|\ t\ |of| \\
+              \;\ldots \\
+            \end{array}
+          \end{math}
+        \end{minipage} & %%
+        \rightarrow & %%
+        \begin{minipage}{1in}
+          \begin{math}
+            \begin{array}{l}
+              |case|\ |C|\ v_1\ \ldots\ v_n\ |of| \\
+              \;\ldots
+            \end{array}
+          \end{math}
+        \end{minipage} & \text{({\sc Case1})} \\ \\
+
+        \begin{minipage}{2in}
+          \begin{math}
+            \begin{array}{l}
+              |case|\ |C|\ v_1\ \ldots\ v_n\ |of| \\
+              \;\ldots \\
+              \; |C|\ a_1\ \ldots\ a_n \rightarrow\ t \\
+              \;\ldots
+            \end{array}
+          \end{math}
+        \end{minipage} & %% 
+        \rightarrow & [v_1 \mapsto a_1, \ldots, v_n \mapsto a_n]\ t & \text{({\sc Case2})} \\ \\
+
+        \;|C|\ t_1\ \ldots\ t_n& %%
+        \rightarrow & |C|\ v_1 \ldots\ v_n & \text{({\sc Value})}
+
+      \end{array}
+    \end{math}
+  \end{minipage}
+  \caption{Evaluation rules for the new elements in \lamC. Constructors
+    require that their arguments be values. Case discrimination evaluates
+    its argument, but does \emph{not} evaluate every arm -- only the one
+    which matches.}
+  \label{lang_fig6}
+\end{myfig}
+
+With our new terms, we can more easily define functions from
+Section~\ref{lang_sec1}. Rather than the Church numerals,
+we can define \emph{plus} in terms of Peano numbers:
+
+> plus = {-"\lamAbs{m}{\lamAbs{n}{}}"-} case m of
+>   S m' -> S (plus m' n)
+>   Z -> n
+
+Multiplication can be defined in terms of |plus|:
+
+> mult = {-"\lamAbs{m}{\lamAbs{n}{}}"-} case m of
+>   S m' -> plus n (mult m' n)
+>   Z -> Z
+
+This allows us to define our |multiplier| and |mag| function from
+Section~\ref{lang_sec2}:\footnote{We use ``2'' here to represent the
+  Peano number |S (S Z)|.}
+
+> multiplier = {-"\lamAbs{multiple}{\lamAbs{a}{}}"-} mult multiple a
+> mag = multiplier 2
+
+Figure~\ref{lang_fig7} collects the syntax and evaluation rules for
+\lamC into one place. Part~\subref{lang_fig7_syntax} gives the full
+syntax for \lamC, and Part~\subref{lang_fig7_eval} gives our
+evaluation rules. We extend the syntax for convenience in two ways. We
+have added the ability to define top-level definitions, so that a
+program is formed of multiple definitions, each of which is available
+to all top-level functions. We have also allowed arguments to be
+written to the left of the equals when defining a function.  We also
+updated the abstraction notation from ``$\lamAbs{x}{t}$'' to ``|\x ->
+t|.''
+
+\afterpage{\clearpage\input{lang_fig7}\clearpage}
+
 
 \section{Closures}
 \label{mil_sec1}
@@ -180,107 +403,6 @@ values for all free variables in the body of the $\lambda$. The code
 implementing the body of the $\lambda$ refers to fixed locations
 within the closure to find the values of free variables when that
 code executes.
-
-%% When the compiler generates code that implements the |compose| function,
-%% it ensures that the closure is constructed such that the function
-%% can execute with the correct arguments. One strategy the compiler can
-%% use is to put the function's arguments in the same location within the
-%% closure, simplifying the code in the function's body for locating
-%% arguments.
-
-%% can use is to put the function's arguments
-%% in the same location within the closure, simplifying the code in the
-%% function's body for locating arguments.  
-
-%% \subsection{Variables}
-%% \label{mil_subsec1}
-
-%% A variable names a value -- in essence, it associates some storage
-%% location with a name, allowing our program to use a consistent label
-%% for some location. Our compiler must be able to associate names with
-%% locations. For example, consider this function (a fragment of the
-%% |compose| function given in Expression~\ref{lang_eq_const1}):
-%% \begin{equation}
-%%   \lamAbs{x}{\lamApP{f}{\lamApp{g}{x}}}.  \label{mil_eq1}
-%% \end{equation}
-%% We see three variables: $f$, $g$, and $x$. We say $x$ is \emph{bound},
-%% because it is given as an argument, and that $f$ and $g$ are
-%% \emph{free} because, in this context, they are not arguments in a 
-%% $\lambda$-abstraction. To evaluate this expression, though, we need
-%% a way to find the values of these terms.  
-
-%% We can describe where to find $f, g$ and $x$ in terms of memory
-%% locations. We can say that $x$ will appear in a special location,
-%% |arg|, because it is the argument to the function and we will always
-%% put arguments in the same place. We can further say that another
-%% special location, |clo|, will have two
-%% slots. The first will contain $g$ and the second will contain
-%% $f$. Conceptually, then, our expression can be represented as:
-%% \begin{center}
-%%   \begin{tabular}{c}
-%%     \begin{math}\begin{aligned}[b]
-%%       |arg| &= x, \\
-%%       |clo|[0] &= g, \\
-%%       |clo|[1] &= f 
-%%     \end{aligned}\text{\ in}\end{math} \\
-%%     \lamAbs{|arg|}{\lamApp{|clo|[1]}{\lamPApp{|clo|[0]}{arg}}}.
-%%   \end{tabular}
-%% \end{center}
-
-%% \par
-%% In general, the $|clo|$ location holds the \emph{environment} for our
-%% expression. For any given expression, we will be able to find all the
-%% free variables (i.e., all those except the argument) in the
-%% environment. The compiler will be responsible for ensuring the correct
-%% environment is available whenever a given expression is evaluated.
-
-%% Our machine, then, must have instructions for storing and retrieving
-%% values. #Store# and #Load# (from Table \ref{tbl_mil1}) serve this
-%% purpose. 
-
-%% \subsection{Function Application}
-%% \label{mil_subsec2}
-
-%% Associating locations with names is not enough, however. Looking again
-%% at expression \ref{mil_eq1}, $g$ clearly represents a function to
-%% which we pass the argument $x$. To compute the value of
-%% $\lamPApp{g}{x}$, we must be able to execute the code representing
-%% $g$. We already assigned a storage location for $g$ ($|clo|[0]$) -- now
-%% we just say that the value in $|clo|[0]$ is a \emph{label} that tells
-%% us where to find the code representing $g$. However, $g$ will need
-%% an environment of its own, to hold any free variables for $g$. Therefore,
-%% we pair the label indicating where to find $g$ with a list of free
-%% variables. We call this structure a \emph{closure}.
-
-%% Closures are the fundamental data structures used to compile
-%% functional languages. They may not have the exact form described here
-%% but they always have the same purpose: they pair a label with the free
-%% variables used in the function represented. 
-
-%% \subsection{Abstraction}
-%% \label{mil_subsec3}
-%% The \lamA lets us define functions which return new functions. We have
-%% seen how to access variables in the environment and how to execute
-%% unknown functions using closures. Now we come to the final element
-%% needed to compile the \lamA\ -- creating closures.
-
-%% Consider the following expression, where we apply the $|const|$ function (expression 
-%% \ref{mil_eq4}) to an argument:
-%% \begin{equation}
-%%   \begin{split}
-%%     |main| &= \lamApp{|const|}{s} \\
-%%          &= \lamAppP{\lamAbs{a}{\lamAbs{b}{a}}}{s}.
-%%   \end{split}
-%% \end{equation}
-%% In order to evaluate $|main|$, we need to apply the $|const|$ function
-%% to $s$. From the previous section we know that a closure is required to
-%% implement function application. It follows that
-%% \lamAbs{a}{\lamAbs{b}{a}} must create a closure which will
-%% then be used to execute the body of the $\lambda$-abstraction with the
-%% argument $s$. In fact, the ``value'' created by a
-%% $\lambda$-abstraction is always a closure. The closure will point to
-%% the body of the $\lambda$-abstraction and will hold the free variables
-%% necessary to evaluate it.
 
 \section{Three-address Code}
 \label{mil_sec2}
