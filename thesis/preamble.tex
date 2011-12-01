@@ -1,4 +1,3 @@
-\synctex=1
 \usepackage[T1]{fontenc}
 \usepackage{calc}
 \usepackage{palatino}
@@ -96,6 +95,27 @@
 \newcommand{\lamAPP}[2]{\ensuremath{(#1)\ (#2)}}
 \let\lamApPp=\lamApP
 \let\lamAppP=\lamAPp
+%% LC definition
+\newtoks\toksA
+\def\lcdef#1(#2)=#3;{\def\arg{#2}\ifx\empty\arg\toksA={\ }%%
+  \else\toksA={\ \lcargs #2,/lcargs\ }%%
+  \fi%%
+  \ensuremath{#1\the\toksA =\ #3}}
+\def\lcargs#1,/lcargs{%%
+  %% Split head from the list. When
+  %% tail is nil, insert ",/lcargs"
+  %% so \lcargs gets the delimiter it expects. Otherwise, 
+  %% ##2 ends with "," already, so just use ##2 with "/lcargs".
+  \def\rest##1,##2/rest{\def\arg{##2}\ifx\empty\arg\global\toks0={,/lcargs}%%
+    \else\global\toks0={##2/lcargs}%%
+    \fi}%%
+  \def\lcarg##1,##2/lcarg{\def\arg{##2}\ifx\empty\arg\toks2={\relax}%%
+    \else\toks2={\ }\fi ##1\the\toks2}%%
+  \def\arg{#1}%%
+  \ifx\empty\arg%%
+  \else\lcarg#1,/lcarg\rest#1,/rest\expandafter\lcargs\the\toks0%%
+  \fi}
+\def\lcapp #1*#2/{\ensuremath{#1\ #2}}
 
 \newcommand{\lamId}{\lamAbs{x}{x}}
 \newcommand{\lamCompose}{\lamAbs{f}{\lamAbs{g}{\lamAbs{x}{\lamApp{f}{(\lamApp{g}{x})}}}}}
@@ -129,7 +149,7 @@
 \termalign=\wd0 
 \def\term#1/{\mathit{#1}}
 \def\syntaxrule#1/{\hfil\text{\emph{#1}}}
-\def\termrule#1:#2:#3/{\term #1/ &\ensuremath{:=\ #2} & \syntaxrule #3/}
+\def\termrule#1:#2:#3/{\term #1/ &\hbox{$:=$}\ensuremath{\ #2} & \syntaxrule #3/}
 \def\termcase#1:#2/{&\hbox to \termalign{$|$\hss}\ensuremath{\ #1} & \syntaxrule #2/}
 
 

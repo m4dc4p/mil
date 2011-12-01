@@ -64,20 +64,30 @@ specifies evaluation order and separates stateful computation using a
 monadic programming style. MIL's syntax enforces basic-block structure
 on programs, making them ideal for dataflow analysis.
 
-Section~\ref{mil_sec1} describes closures, a fundamental data
-structure used to implement functional languages. We then describe
-``three-address code,'' the intermediate form from which MIL partly
-derives, in Section~\ref{mil_sec2}.  MIL syntax and examples follow in
-Section~\ref{mil_sec3}. Section~\ref{mil_sec4} shows our compiler for
-translating \lamC to MIL. We sketch how MIL programs can be evaluated
-in Section~\ref{mil_sec5}, using the same structural operational
-semantics (SOS) style as in
-Chapter~\ref{ref_chapter_languages}. Section \ref{mil_sec7} shows
-how Hoopl influenced the implementation the MIL language from Chapter
+We first describe our source language, \lamC, in
+Section~\ref{mil_src}.  Section~\ref{mil_sec1} describes closures, a
+fundamental data structure used to implement functional languages. We
+then describe ``three-address code,'' the intermediate form from which
+MIL partly derives, in Section~\ref{mil_sec2}.  MIL syntax and
+examples follow in Section~\ref{mil_sec3}. Section~\ref{mil_sec4}
+shows our compiler for translating \lamC to MIL. We sketch how MIL
+programs can be evaluated in Section~\ref{mil_sec5}, using the same
+structural operational semantics (SOS) style as in
+Chapter~\ref{ref_chapter_languages}. Section \ref{mil_sec7} shows how
+Hoopl influenced the implementation the MIL language from Chapter
 \ref{ref_chapter_mil} and discusses the design choices we made.
 
 \section{Our Source Language}
 \label{mil_src}
+
+\intent{Introduce \lamC as extension to \lamA. Motivate \lamC as used by Habit; 
+something to write a compiler for.}
+
+\intent{Brief tour of \lamC's features except bind: constructors, case, primitives and let.}
+
+\intent{Description of \lamC's bind feature.}
+
+\intent{Present syntax of \lamC.}
 
 Section~\ref{lang_sec1} should make it clear that the \lamA is capable
 of general-purpose programming, but also quite cumbersome. In
@@ -332,14 +342,18 @@ which the code will execute.
 
 For example, consider the value created when we apply the |compose|
 function to two arguments:
-\begin{equation}
-  \begin{split}
-    t_1 &= \lamApp{compose}{\lamApp{a}{b}} \\
-    &= \lamAPp{\lamCompose}{\lamApp{a}{b}} \\
-    & \dots \\
-    t_1 &= \lamAbs{x}{\lamApP{\lamSubst{a}{f}}{\lamApp{\lamSubst{b}{g}}{x}}}.
-  \end{split}\label{mil_eq1}
-\end{equation}
+
+\begin{singlespace}\correctspaceskip
+  \begin{equation}
+    \begin{split}
+      t_1 &= \lamApp{compose}{\lamApp{a}{b}} \\
+      &= \lamAPp{\lamCompose}{\lamApp{a}{b}} \\
+      & \dots \\
+      t_1 &= \lamAbs{x}{\lamApP{\lamSubst{a}{f}}{\lamApp{\lamSubst{b}{g}}{x}}}.
+    \end{split}\label{mil_eq1}
+  \end{equation}
+\end{singlespace}
+
 The result of Expression~\eqref{mil_eq1}, $t_1$, is itself a
 function. We say $x$ is \emph{bound},
 because it is given as an argument, and that $f$ and $g$ are
@@ -372,7 +386,7 @@ value given for it.
                    {(\lamApp{\tikz[remember picture,overlay]{\node[invis] (comp_g) {\phantom{\fbox{g}}}; \draw[->] (comp_g.north) -- (compclo_g.south);}\fbox{g}}%%
                      {x})}}}}.
   \end{tabular}
-  \caption{\subref{mil_fig4a}
+  \caption{Part~\subref{mil_fig4a}
     shows the closure representing function value
     \lamAbs{x}{\lamApP{\lamSubst{a}{f}}{\lamApp{\lamSubst{b}{g}}{x}}}. The
     definition of |compose| is given in \subref{mil_fig4b}. Arrows
@@ -421,12 +435,12 @@ For example, the expression:
   a = \frac{(b * c + d)}{2},
 \end{equation}
 would be expressed in three-address code as:
-\begin{AVerb}
+\begin{AVerb}[gobble=2]
   s = b * c;
   t = s + d;
   a = t / 2;
 \end{AVerb}
-where !+s+! and !+t+! are new temporaries created by the compiler. This 
+where \var s/ and \var t/ are new temporaries created by the compiler. This 
 representation makes it easier for the compiler to re-order expressions,
 unravel complex control-flow, and manipulate intermediate values. 
 
@@ -483,28 +497,30 @@ that do not.
 \subsection*{MIL Example: $compose$}
 
 To give a sense of MIL, consider the definition of $compose$ given in
-Figure~\ref{mil_fig1a}. Figure~\ref{mil_fig1b} shows a fragment of this 
-expression in MIL. The \emph{block declaration}
-on Line~\ref{mil_block_decl_fig1b} gives the name of
-the block (!+compose+!) and arguments that will be passed in (!+f+!, !+g+!,
-and !+x+!). Line~\ref{mil_gofx_fig1b} applies !+g+! to !+x+! and assigns
-the result to !+t1+!. The ``enter'' operator (!+@@+!), represents function application.
-\footnote{So called because in the expression !+g @@ x+!, we ``enter''
-  function !+g+! with the argument !+x+!.}  We assume !+g+! refers to a
-function (or, more precisely, a \emph{closure}). The ``bind'' operator
-(!+<-+!) assigns the result of the operation on its right-hand side to
-the location on the left. In turn, Line~\ref{mil_fofx_fig1b} applies
-!+f+! to !+t1+! and assigns the result to !+t2+!. The last line returns
-!+t2+!. Thus, the !+compose+! block returns the value of
+Figure~\ref{mil_fig1a}. Figure~\ref{mil_fig1b} shows a fragment of
+this expression in MIL. The \emph{block declaration} on
+Line~\ref{mil_block_decl_fig1b} gives the name of the block (\label
+compose/) and arguments that will be passed in (\var f/, \var g/, and
+\var x/). Line~\ref{mil_gofx_fig1b} applies \var g/ to \var x/ and
+assigns the result to \var t1/. The ``enter'' operator (\enter),
+represents function application.
+\footnote{So called because in the expression \app g * x/, we
+  ``enter'' function \var g/ with the argument \var x/.}  We assume
+\var g/ refers to a function (or, more precisely, a
+\emph{closure}). The ``bind'' operator (\bind) assigns the result of
+the operation on its right-hand side to the location on the left. In
+turn, Line~\ref{mil_fofx_fig1b} applies \var f/ to \var t1/ and
+assigns the result to \var t2/. The last line returns \var t2/. Thus,
+the \lab compose/ block returns the value of
 \lamApPp{f}{\lamApp{g}{x}}, just as in our original \lamA expression.
 
 \begin{myfig}[t]
-  \begin{tabular}{cc}
-    $compose = \lamCompose$ & 
+  \begin{tabular}{c@@{\hspace{2em}}c}
+    \lcdef compose(f,g,x)=\lcapp f * (\lcapp g * x/)/; & 
     \input{lst_mil1} \\
     \scap{mil_fig1a} & \scap{mil_fig1b}
   \end{tabular} 
-  \caption{\subref{mil_fig1a} gives a \lamA definition of the composition
+  \caption{Part~\subref{mil_fig1a} gives a \lamC definition of the composition
     function; \subref{mil_fig1b} shows a fragment of the MIL program
     for $compose$.}
   \label{mil_fig1}
@@ -516,44 +532,59 @@ However, according to rules in Figure~\ref{lang_fig6},
 Chapter~\ref{ref_chapter_languages} on page~\pageref{lang_fig6},
 evaluating an expression which applies $compose$ actually involves the
 creation of several intermediate values. Consider the expression
-\begin{equation}
-  main = \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}, \label{mil_eqn4}
-\end{equation}
-where $a$, $b$ and $c$ are given values elsewhere. Using the
+
+\begin{singlespace}\correctspaceskip
+  \begin{equation}
+    main = \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}, \label{mil_eqn4}
+  \end{equation}
+\end{singlespace}
+
+\noindent where $a$, $b$ and $c$ are given values elsewhere. Using the
 rules for call-by-value evaluation order from Figure~\ref{lang_fig6} in 
 Chapter \ref{ref_chapter_languages}, we can compute the value of the expression
 as follows:
-\begin{align*}
-  main &= \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c} \\
-  &= \lamApp{\lamApp{\lamAPp{\lamCompose}{a}}{b}}{c} & \text{\emph{Definition of |compose|.}} \\
-  &= \lamApp{\lamAPp{\lamAbs{g}{\lamAbs{x}{\lamApP{a}{\lamApp{g}{x}}}}}{b}}{c} & \text{\emph{E-App.}} \\
-  &= \lamAPp{\lamAbs{x}{\lamApP{a}{\lamApp{b}{x}}}}{c} & \text{\emph{E-App.}} \\
-  &= \lamApP{a}{\lamApp{b}{c}}. & \text{\emph{E-App.}} 
-\end{align*}
+
+\begin{singlespace}\correctspaceskip
+  \begin{align*}
+    main &= \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c} \\
+    &= \lamApp{\lamApp{\lamAPp{\lamCompose}{a}}{b}}{c} & \text{\emph{Definition of |compose|.}} \\
+    &= \lamApp{\lamAPp{\lamAbs{g}{\lamAbs{x}{\lamApP{a}{\lamApp{g}{x}}}}}{b}}{c} & \text{\emph{E-App.}} \\
+    &= \lamAPp{\lamAbs{x}{\lamApP{a}{\lamApp{b}{x}}}}{c} & \text{\emph{E-App.}} \\
+    &= \lamApP{a}{\lamApp{b}{c}}. & \text{\emph{E-App.}} 
+  \end{align*}
+\end{singlespace}
 
 We can capture each intermediate value created when evaluating this
 expression by assigning each result to a new variable. 
 
-\begin{align*}
-  main &= \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c} \\
-  &= \lamApp{\lamApp{\lamAPp{\lamCompose}{a}}{b}}{c} & \text{\emph{Definition of |compose|.}} \\
-  t_1 &\leftarrow \lamAbs{g}{\lamAbs{x}{\lamApP{a}{\lamApp{g}{x}}}} & \text{\emph{Result of E-App.}}\\
-  &= \lamApp{t_1}{\lamApp{b}{c}} \\
-  t_2 &\leftarrow \lamAbs{x}{\lamApP{a}{\lamApp{b}{x}}} & \text{\emph{Result of E-App.}} \\
-  &= \lamApp{t_2}{c} \\
-  t_3 &\leftarrow \lamApP{a}{\lamApp{b}{c}} & \text{\emph{Result of E-App.}} \\
-  &= t_3.
-\end{align*}
+\begin{singlespace}
+  \begin{align*}
+    main &= \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c} \\
+    &= \lamApp{\lamApp{\lamAPp{\lamCompose}{a}}{b}}{c} & \text{\emph{Definition of |compose|.}} \\
+    t_1 &\leftarrow \lamAbs{g}{\lamAbs{x}{\lamApP{a}{\lamApp{g}{x}}}} & \text{\emph{Result of E-App.}}\\
+    &= \lamApp{t_1}{\lamApp{b}{c}} \\
+    t_2 &\leftarrow \lamAbs{x}{\lamApP{a}{\lamApp{b}{x}}} & \text{\emph{Result of E-App.}} \\
+    &= \lamApp{t_2}{c} \\
+    t_3 &\leftarrow \lamApP{a}{\lamApp{b}{c}} & \text{\emph{Result of E-App.}} \\
+    &= t_3.
+  \end{align*}
+\end{singlespace}
 
-We apply $t_1$ to $b$ to create our next intermediate value, $t_2$:
-\begin{equation}
-  t_2 = \lamApp{t_1}{b} = \lamAbs{x}{\lamApp{a}{\lamApp{b}{x}}}. \label{mil_eqn2}
-\end{equation}
-Finally, we compute our final value, $main$, by applying $t_2$ to $c$:
-\begin{equation}
-  main = \lamApp{t_2}{c} = \lamApp{a}{\lamApp{b}{c}}. \label{mil_eqn3}  
-\end{equation}
+\noindent We apply $t_1$ to $b$ to create our next intermediate value, $t_2$:
 
+\begin{singlespace}\correctspaceskip
+  \begin{equation}
+    t_2 = \lamApp{t_1}{b} = \lamAbs{x}{\lamApp{a}{\lamApp{b}{x}}}. \label{mil_eqn2}
+  \end{equation}
+\end{singlespace}
+
+\noindent Finally, we compute our final value, $main$, by applying $t_2$ to $c$:
+
+\begin{singlespace}\correctspaceskip
+  \begin{equation}
+    main = \lamApp{t_2}{c} = \lamApp{a}{\lamApp{b}{c}}. \label{mil_eqn3}  
+  \end{equation}
+\end{singlespace}
 Both $t_1$ and $t_2$ will hold \emph{closures} when evaluating
 expression \eqref{mil_eqn4}. As detailed in Section \ref{mil_subsec2}, a closure
 holds a pointer to a body of code and any \emph{free variables}. In this case,

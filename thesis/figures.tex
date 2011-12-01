@@ -6,5 +6,8 @@
 \setboolean{standaloneFlag}{false}
 \begin{document}
 \input{document.preamble}
-\input{lst_back19}
+\tracingmacros=1
+\lcdef compose(a,b,c)=\lcapp f * (\lcapp g * x/)/; 
+\tracingmacros=0
+
 \end{document}

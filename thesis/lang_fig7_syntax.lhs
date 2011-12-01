@@ -21,7 +21,7 @@
     & \multicolumn{2}{l}{\hbox to 5in{\vbox{\disableparspacing %%
           5in;\parfillskip=0pt plus 1fil\relax where\ $t, t_1, \ldots, t_n$ are terms, $a, a_1, \ldots,
           a_n$ are variables, $C,\allowbreak C_1,\allowbreak \ldots,\allowbreak C_n$ are constructor
-          names, $p$ names a primitive and $f$ names a definition.}}}
+          names, $p$ names a primitive and $f$ names a definition.}}}\\\\
   \end{array}
 \end{math}
 %}
