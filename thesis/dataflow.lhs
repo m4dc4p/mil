@@ -308,7 +308,7 @@ follows that intuition and tells us that \inB{fig_back15_b3} should be
 
 \begin{myfig}
   \input{lst_back19}
-  \caption{A control-flow graph illustrating the behavior of \lub with
+  \caption{A control--flow graph illustrating the behavior of \lub with
     $\bot$ (i.e., undefined) values.}
   \label{fig_back15}
 \end{myfig}

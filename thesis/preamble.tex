@@ -1,3 +1,4 @@
+\synctex=1
 \usepackage[T1]{fontenc}
 \usepackage{calc}
 \usepackage{palatino}
@@ -124,12 +125,12 @@
 %%      |  \x. var    (Abstraction)
 %%
 \newdimen\termalign
-\setbox0=\hbox{\ensuremath{:=\ \ }}
+\setbox0=\hbox{$:=$}
 \termalign=\wd0 
-\def\term#1/{\ensuremath{\mathit{#1}}}
+\def\term#1/{\mathit{#1}}
 \def\syntaxrule#1/{\hfil\text{\emph{#1}}}
-\def\termrule#1:#2:#3/{\term #1/ &:= #2 & \syntaxrule #3/}
-\def\termcase#1:#2/{&\hbox to \termalign{\ensuremath{\phantom{:}|}}\ensuremath{#1} & \syntaxrule #2/}
+\def\termrule#1:#2:#3/{\term #1/ &\ensuremath{:=\ #2} & \syntaxrule #3/}
+\def\termcase#1:#2/{&\hbox to \termalign{$|$\hss}\ensuremath{\ #1} & \syntaxrule #2/}
 
 
 %% End MIL chapter
@@ -210,7 +211,7 @@
 \subcaption{}\label{#2}\end{minipage}}
 
 %% Produce a sub-caption with text.
-\newcommand{\lscap}[3][1in]{\begin{minipage}{#1}%%
+\newcommand{\lscap}[3][\hsize]{\begin{minipage}{#1}%%
 \subcaption{#3}\label{#2}\end{minipage}}
 
 % single-argument comment. Do not put
@@ -282,6 +283,14 @@
 %% Disable overfull messages with ridiculous hfuzz value
 \def\disableoverfull{\hfuzz=10in}
 
+%% Set parfillskip so stretching does NOT occur at the end of
+%% a paragraph (i.e., list of elements). Disable indent at beginning
+%% of paragraph. Also turn off underfull hbox warnings.
+%%
+%% Intended to be used in a \vbox that forms part of a table or graphic,
+%% which we want to be line-broken but not exactly like a normal paragraph.
+\long\def\disableparspacing#1;{\hbadness=100000\parindent=0pt\parfillskip=0pt\leftskip=0pt\rightskip=0pt%%
+  \ifx#1\relax\else\hsize=#1\relax\fi}
 \include{md}
 \domd
 

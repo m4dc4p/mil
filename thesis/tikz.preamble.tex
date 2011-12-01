@@ -82,7 +82,6 @@
 %% Argument should be like \facts{a/1, b/2, foobar/\bot, baz/\top}.
 %% 
 \newcounter{factctr}
-\newcounter{breakctr}
 \newtoks\varVal
 \newtoks\varName
 \newcommand{\facts}[1]{%%
@@ -97,7 +96,6 @@
   \ensuremath{%%
     \setcounter{factctr}{0}%%
     \foreach \var in {#1}{%%
-      \setcounter{breakctr}{\value{factctr}/2}
       %% Separate list with a comma, putting glue so that
       %% all stretching occurs between elements. Also allow
       %% line breaks between elements.
@@ -110,16 +108,13 @@
                   {\var}%%
       %% \tracingmacros=0%%
       \stepcounter{factctr}%%
-  }} %%
+  }}%%
 }
 \newcommand{\factC}[2]{{\ensuremath{(\mathit{#1},#2)}}}
 \newcommand{\factT}[2]{{\ensuremath{(\withmd{!+#1+!},#2)}}}
 \newcommand{\doFacts}[4]{\ensuremath{#3{#1}:%%
     \left\{%%
-    %% Set parfillskip so stretching does NOT occur at the end of
-    %% a paragraph (i.e., list of elements). Also turn off underfull
-    %% hbox warnings.
-    \vcenter{\hbadness=100000\parindent=0pt\parfillskip=0pt\hsize=#4\facts{#2}}%%
+    \vcenter{\disableparspacing #4;\facts{#2}}%%
     \right\}}}
 
 %% Used to determine width of box that will
