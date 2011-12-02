@@ -327,18 +327,17 @@ t|.''
 \label{mil_sec1}
 
 Closures are the fundamental data structures used to implement
-functional languages. A closure always results when a function value is
-created. They may not have the exact form described here but they
+functional languages. A closure always results when a function value
+is created. They may not have the exact form described here but they
 always have the same purpose: they pair a location with a list of
 values. The location tells where to find the code implementing the
 body of the function. The list of values defines the environment in
-which the code will execute. 
-\footnote{The values are not necessarily stored in the immediate
-  environment. For example, static links (described by
-  \citet[pg.~125]{Appel2003}) might be used to implement a chain of
-  environments. In any case the environment is always used to find
-  values for arguments, so we say they ``can be located'' in the
-  environment.} 
+which the code will execute.\footnote{The values are not necessarily
+  stored in the immediate environment. For example, static links
+  (described by \citet[pg.~125]{Appel2003}) might be used to implement
+  a chain of environments. In any case the environment is always used
+  to find values for arguments, so we say they ``can be located'' in
+  the environment.}
 
 For example, consider the value created when we apply the |compose|
 function to two arguments:
@@ -431,22 +430,31 @@ than registers in real hardware.
 Three-address code makes all intermediate expression values explicit, 
 by reducing complicated expressions to a series of assignments. 
 For example, the expression:
-\begin{equation}
-  a = \frac{(b * c + d)}{2},
-\end{equation}
-would be expressed in three-address code as:
-\begin{AVerb}[gobble=2]
-  s = b * c;
-  t = s + d;
-  a = t / 2;
-\end{AVerb}
-where \var s/ and \var t/ are new temporaries created by the compiler. This 
-representation makes it easier for the compiler to re-order expressions,
-unravel complex control-flow, and manipulate intermediate values. 
+
+\begin{singlespace}\correctspaceskip
+  \begin{equation}
+    a = \frac{(b * c + d)}{2},
+  \end{equation}
+\end{singlespace}
+
+\noindent would be expressed in three-address code as:
+
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=2]
+    s = b * c;
+    t = s + d;
+    a = t / 2;
+  \end{AVerb}
+\end{singlespace}
+
+\noindent where \var s/ and \var t/ are new temporaries created by the
+compiler. This representation makes it easier for the compiler to
+re-order expressions, unravel complex control-flow, and manipulate
+intermediate values.
 
 Three-address code intends to simplify the analysis of programs while
 not revealing all details of the underlying hardware. Three-address
-code accomplishes these goals by reducing the all expressions to a
+code accomplishes these goals by reducing all expressions to a
 uniform representation, exposing the intermediate values (and thus,
 memory operations) created while expressions are evaluated. It hides
 some details by deferring decisions about the actual location of
@@ -469,38 +477,54 @@ functional languages: the ability to treat functions as first-class
 values, and the representation of stateful computations in a monad.
 
 \subsection*{Monads \& Functional Programming}
-As described by \citet{Wadler1990}, \emph{monads} can be used
-distinguish \emph{pure} and \emph{impure} functions. A \emph{pure}
-function has no side-effects: it will not print to the screen, throw
-an exception, write to disk, or in any other way change the observable
-state of the machine. An \emph{impure} function may change the
-machine's state.
+We can divide functions into two types: \emph{pure} and
+\emph{impure}. A \emph{pure} function has no side-effects: it will not
+print to the screen, throw an exception, write to disk, or in any
+other way change the observable state of the
+machine.\footnote{Observable from the programs standpoint. Even a pure
+  computation will make the computer heat up, if nothing else.} An
+\emph{impure} function may change the machine's state in an observable
+way.
 
 %% Presentation drawn from http://en.wikipedia.org/wiki/Monad_%28functional_programming%29, 
-%% accessed April 6 2010.
-A \emph{monad} provides the abstraction that separates pure and impure
-functions. Impure (or ``monadic'') functions execute ``inside'' the
-monad. Values returned from a monadic function are not directly
-accessible -- they are ``wrapped'' in the monad. The only way
-to ``unwrap'' a monadic value is to execute the computation -- inside
-the monad! 
+%% accessed April 6 2010.  
+As described by Wadler \citep{Wadler1990}, \emph{monads} can be used
+distinguish \emph{pure} and \emph{impure} functions. Impure (or
+``monadic'') functions execute ``inside'' the monad. Values returned
+from a monadic function are not directly accessible -- they are
+``wrapped'' in the monad. The only way to ``unwrap'' a monadic value
+is to execute the computation -- inside the monad!
 
 \subsection*{The Monad in MIL}
 
-When designing MIL we wished to make all memory allocation
-explicit. Besides the obvious effect of reducing free memory
-available, allocation can also cause two other effects: the allocation
-may fail, or a garbage-collection may occur. A monad allows us to
-separate computations which (potentially) allocate memory from those
-that do not.
+All MIL programs execute in a monadic context. For example, we
+consider allocation impure, because it affects the machine's
+memory. Some runtime primitives have observable effects (like printing
+to the screen), making them impure. Dividing by zero typically causes
+a program to abort or throw an exception, making division an impure
+operation. Even addition can cause exceptions, due to overflow. 
 
-\subsection*{MIL Example: $compose$}
+Pure operations include inspecting data values (i.e., with the |case|
+statement) or jumping to another location in the program (using
+application). 
 
-To give a sense of MIL, consider the definition of $compose$ given in
-Figure~\ref{mil_fig1a}. Figure~\ref{mil_fig1b} shows a fragment of
-this expression in MIL. The \emph{block declaration} on
-Line~\ref{mil_block_decl_fig1b} gives the name of the block (\label
-compose/) and arguments that will be passed in (\var f/, \var g/, and
+We designed MIL to support the Habit programming language
+\citep{Habit2009}; in particular, we rely on Habit to give meaning to
+the monadic context for each MIL operation. In particular, we assume
+type-correct programs that manage the operations available in each
+monadic context. We further assume that the interpreter (or compiler)
+for MIL will implement underlying monadic primitives (e.g.,
+allocation, arithmetic, etc.).  For the purposes of MIL we do not
+define the operations available in the monadic context, except by
+example.
+
+\subsection*{MIL Example: \lcname compose/}
+
+To give a sense of MIL, consider the definition of \lcname compose/
+given in Figure~\ref{mil_fig1a}. Figure~\ref{mil_fig1b} shows a
+fragment of this expression in MIL. The \emph{block declaration} on
+Line~\ref{mil_block_decl_fig1b} gives the name of the block (\lab
+ compose/) and arguments that will be passed in (\var f/, \var g/, and
 \var x/). Line~\ref{mil_gofx_fig1b} applies \var g/ to \var x/ and
 assigns the result to \var t1/. The ``enter'' operator (\enter),
 represents function application.
@@ -512,12 +536,12 @@ the operation on its right-hand side to the location on the left. In
 turn, Line~\ref{mil_fofx_fig1b} applies \var f/ to \var t1/ and
 assigns the result to \var t2/. The last line returns \var t2/. Thus,
 the \lab compose/ block returns the value of
-\lamApPp{f}{\lamApp{g}{x}}, just as in our original \lamA expression.
+\lcapp f * (g * x)/, just as in our original \lamC expression.
 
 \begin{myfig}[t]
   \begin{tabular}{c@@{\hspace{2em}}c}
-    \lcdef compose(f,g,x)=\lcapp f * (\lcapp g * x/)/; & 
-    \input{lst_mil1} \\
+    \lcdef compose(f,g,x)=\lcapp f * (g * x)/; & 
+    \input{lst_mil1} \\\\
     \scap{mil_fig1a} & \scap{mil_fig1b}
   \end{tabular} 
   \caption{Part~\subref{mil_fig1a} gives a \lamC definition of the composition
@@ -528,69 +552,55 @@ the \lab compose/ block returns the value of
 
 %% Closures
 
-However, according to rules in Figure~\ref{lang_fig6},
-Chapter~\ref{ref_chapter_languages} on page~\pageref{lang_fig6},
-evaluating an expression which applies $compose$ actually involves the
-creation of several intermediate values. Consider the expression
-
-\begin{singlespace}\correctspaceskip
-  \begin{equation}
-    main = \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}, \label{mil_eqn4}
-  \end{equation}
-\end{singlespace}
-
-\noindent where $a$, $b$ and $c$ are given values elsewhere. Using the
-rules for call-by-value evaluation order from Figure~\ref{lang_fig6} in 
-Chapter \ref{ref_chapter_languages}, we can compute the value of the expression
-as follows:
+Using the evaluation rules from Figure~\ref{lang_fig6}, we can compute
+the value of the expression \lcapp compose * a * b * c/:
 
 \begin{singlespace}\correctspaceskip
   \begin{align*}
-    main &= \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c} \\
-    &= \lamApp{\lamApp{\lamAPp{\lamCompose}{a}}{b}}{c} & \text{\emph{Definition of |compose|.}} \\
-    &= \lamApp{\lamAPp{\lamAbs{g}{\lamAbs{x}{\lamApP{a}{\lamApp{g}{x}}}}}{b}}{c} & \text{\emph{E-App.}} \\
-    &= \lamAPp{\lamAbs{x}{\lamApP{a}{\lamApp{b}{x}}}}{c} & \text{\emph{E-App.}} \\
-    &= \lamApP{a}{\lamApp{b}{c}}. & \text{\emph{E-App.}} 
-  \end{align*}
+    main &= \lcapp compose * a * b * c/ \\
+    &= \lcapp (\lcabs f. \lcabs g. \lcabs x. f * (g * x)) * a * b * c/ & \text{\emph{Definition of |compose|.}} \\
+    &= \lcapp (\lcabs g. \lcabs x. a * (g * x)) * b * c/ & \text{\emph{E-App.}} \\
+    &= \lcapp (\lcabs x. a * (b * x)) * c/& \text{\emph{E-App.}} \\
+    &= \lcapp a * (b * c)/ & \text{\emph{E-App.}} 
+  \end{align*} 
 \end{singlespace}
 
-We can capture each intermediate value created when evaluating this
-expression by assigning each result to a new variable. 
+\noindent According to the rules in Figure~\ref{lang_fig6},
+$\lambda$-functions are values. In other words, every evaluation that
+results in a $\lambda$-function creates a new value. Evaluating \lcapp
+compose * a * b * c/ creates two intermediate values: \lcapp (\lcabs
+g. \lcabs x. a * (g * x))/ and \lcapp (\lcabs x. a * (b * x))/. We can 
+make intermediate values explicit by assigning each to a new variable
+during evaluaton:
 
-\begin{singlespace}
+\begin{singlespace}\correctspaceskip
   \begin{align*}
-    main &= \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c} \\
-    &= \lamApp{\lamApp{\lamAPp{\lamCompose}{a}}{b}}{c} & \text{\emph{Definition of |compose|.}} \\
-    t_1 &\leftarrow \lamAbs{g}{\lamAbs{x}{\lamApP{a}{\lamApp{g}{x}}}} & \text{\emph{Result of E-App.}}\\
-    &= \lamApp{t_1}{\lamApp{b}{c}} \\
-    t_2 &\leftarrow \lamAbs{x}{\lamApP{a}{\lamApp{b}{x}}} & \text{\emph{Result of E-App.}} \\
-    &= \lamApp{t_2}{c} \\
-    t_3 &\leftarrow \lamApP{a}{\lamApp{b}{c}} & \text{\emph{Result of E-App.}} \\
-    &= t_3.
-  \end{align*}
+    main &= \lcapp compose * a * b * c/ \\
+    &= \lcapp (\lcabs f. \lcabs g. \lcabs x. f * (g * x)) * a * b * c/ \\
+    &= \lcapp t_1 * b * c/, \text{where\ } t_1 = \lcapp \lcabs g. \lcabs x. a * (g * x)/ \\
+    &= \lcapp t_2 * c/, \text{where\ } t_2 = \lcapp \lcabs x. a * (b * x)/ \\
+    &= \lcapp a * (b * c)/ 
+  \end{align*} 
 \end{singlespace}
 
-\noindent We apply $t_1$ to $b$ to create our next intermediate value, $t_2$:
+Notice that we consumed one argument each to create \lcname t_1/ and
+\lcname t_2/. That is, \lcname t_1/ results from applying \lcapp
+(\lcabs f. \lcabs g. \lcabs x. f * (g * x))/ to \lcname a/, giving
+\lcapp \lcabs g. \lcabs x. a * (g * x)/. Similarly, \lcname t_2/
+results from applying \lcapp (\lcabs g. \lcabs x. a * (g * x))/ (i.e., \lcname
+t_1/) to \lcname b/, giving \lcapp \lcabs x. a * (b * x)/.
 
-\begin{singlespace}\correctspaceskip
-  \begin{equation}
-    t_2 = \lamApp{t_1}{b} = \lamAbs{x}{\lamApp{a}{\lamApp{b}{x}}}. \label{mil_eqn2}
-  \end{equation}
-\end{singlespace}
+Both \lcname t_1/ and \lcname t_2/ represent \emph{closures}. As
+detailed in Section \ref{mil_subsec2}, a closure holds a pointer to a
+body of code and any free variables. In this case, \lcname t_1/ holds
+\lcname a/ and points to code that executes \lcapp \lcabs
+g. \lcabs x. a * (g * x)/. In turn, \lcname t_2/ holds \lcname a/ and \lcname
+b/, and it points to code that executes \lcapp \lcabs x. a * (b * x)/.
 
-\noindent Finally, we compute our final value, $main$, by applying $t_2$ to $c$:
-
-\begin{singlespace}\correctspaceskip
-  \begin{equation}
-    main = \lamApp{t_2}{c} = \lamApp{a}{\lamApp{b}{c}}. \label{mil_eqn3}  
-  \end{equation}
-\end{singlespace}
-Both $t_1$ and $t_2$ will hold \emph{closures} when evaluating
-expression \eqref{mil_eqn4}. As detailed in Section \ref{mil_subsec2}, a closure
-holds a pointer to a body of code and any \emph{free variables}. In this case,
-$t_1$ holds $a$ and points to the code that evaluates to $t_2$. In turn, $t_2$
-holds $a$ and $b$, and points to the code which evaluates to $main$. The
-\lamA does not make this explicit, but our MIL does. 
+In \lamC, these intermediate closures are not explicitly represented
+--- they are really a consequence of implementing function application. 
+MIL, on the other hand, represents all of these values (and code fragements)
+explicitly.
 
 \begin{myfig}[t]
   \input{lst_mil2}

@@ -6,8 +6,16 @@
 \setboolean{standaloneFlag}{false}
 \begin{document}
 \input{document.preamble}
-\tracingmacros=1
-\lcdef compose(a,b,c)=\lcapp f * (\lcapp g * x/)/; 
-\tracingmacros=0
+\obeylines
+hello \lcapp compose * a * b * c/ math!
+hello\lcapp f * g/math
+hello\lcapp f * {\lcname compose/}/math
+!+hello\lcapp f/math+!
 
+\begin{figure}
+  \caption{\lcapp f * g/ math!}
+\end{figure}
+\begin{AVerb}
+  \lcapp hello * f/
+\end{AVerb}
 \end{document}

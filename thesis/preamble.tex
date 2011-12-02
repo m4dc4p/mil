@@ -97,25 +97,30 @@
 \let\lamAppP=\lamAPp
 %% LC definition
 \newtoks\toksA
-\def\lcdef#1(#2)=#3;{\def\arg{#2}\ifx\empty\arg\toksA={\ }%%
-  \else\toksA={\ \lcargs #2,/lcargs\ }%%
-  \fi%%
-  \ensuremath{#1\the\toksA =\ #3}}
-\def\lcargs#1,/lcargs{%%
-  %% Split head from the list. When
-  %% tail is nil, insert ",/lcargs"
-  %% so \lcargs gets the delimiter it expects. Otherwise, 
-  %% ##2 ends with "," already, so just use ##2 with "/lcargs".
-  \def\rest##1,##2/rest{\def\arg{##2}\ifx\empty\arg\global\toks0={,/lcargs}%%
-    \else\global\toks0={##2/lcargs}%%
+\protected\def\lcname#1/{\ensuremath{\mathit{#1}}}
+\protected\def\lcdef#1(#2)=#3;{\def\arg{#2}%%
+  \def\lcargs##1,##2/{\def\arg{##2}%%
+    \ifx\empty\arg%%
+    \lcname ##1/%%
+    \else\lcname ##1/\ \lcargs ##2/%%
     \fi}%%
-  \def\lcarg##1,##2/lcarg{\def\arg{##2}\ifx\empty\arg\toks2={\relax}%%
-    \else\toks2={\ }\fi ##1\the\toks2}%%
-  \def\arg{#1}%%
-  \ifx\empty\arg%%
-  \else\lcarg#1,/lcarg\rest#1,/rest\expandafter\lcargs\the\toks0%%
-  \fi}
-\def\lcapp #1*#2/{\ensuremath{#1\ #2}}
+  \ifx\empty\arg\toksA={\ }%%
+  \else\toksA={\ \lcargs #2,/\ }%%
+  \fi%%
+  \ensuremath{\lcname#1/\the\toksA =\ #3}}
+%% Arbitary number of applied arguments, separated
+%% by asterisks (*).
+\protected\def\lcapp#1/{\def\lcappB##1*##2/{\def\arg{##2}%
+    \ensuremath{\ifx\arg\empty%%
+      \lcname ##1/%%
+      \else%%
+      \lcname##1/\ \lcappB##2/%%
+      \fi}}%%
+  %% Adding a star here makes
+  %% sure our applicaitn always ends with an asterisks, ensuring
+  %% #2 will be \empty at some point.
+  \lcappB#1*/}
+\protected\def\lcabs#1.{\ensuremath{\lambda#1.\ }}
 
 \newcommand{\lamId}{\lamAbs{x}{x}}
 \newcommand{\lamCompose}{\lamAbs{f}{\lamAbs{g}{\lamAbs{x}{\lamApp{f}{(\lamApp{g}{x})}}}}}
