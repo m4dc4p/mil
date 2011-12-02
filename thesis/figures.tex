@@ -6,16 +6,27 @@
 \setboolean{standaloneFlag}{false}
 \begin{document}
 \input{document.preamble}
-\obeylines
-hello \lcapp compose * a * b * c/ math!
-hello\lcapp f * g/math
-hello\lcapp f * {\lcname compose/}/math
-!+hello\lcapp f/math+!
+\noindent According to the rules in Figure~\ref{lang_fig6}, every
+evaluation that results in a $\lambda$-function creates a new
+value. Evaluating \lcapp compose * a * b * c/ creates two intermediate
+values: \lcapp (\lcabs g. \lcabs x. a * (g * x))/ and \lcapp (\lcabs
+x. a * (b * x))/. We can make intermediate values explicit by
+assigning each to a new variable during evaluation:
 
-\begin{figure}
-  \caption{\lcapp f * g/ math!}
-\end{figure}
-\begin{AVerb}
-  \lcapp hello * f/
-\end{AVerb}
+\begin{singlespace}\noindent
+  \begin{math}\begin{array}{lllr}
+    \lcname main/ &= \lcapp compose * a * b * c/ \\
+    &= \rlap{\lcapp (\lcabs f. \lcabs g. \lcabs x. f * (g * x)) * a * b * c/} & & \hfil\text{\emph{Definition of |compose|.}} \\
+    &= \lcapp t_1 * b * c/ & \text{where\ } t_1 = \lcapp \lcabs g. \lcabs x. a * (g * x)/  & \hfil\text{\emph{E-App.}}\\
+    &= \lcapp t_2 * c/ & \text{where\ } t_2 = \lcapp \lcabs x. a * (b * x)/ & \hfil\text{\emph{E-App.}}\\
+    &= \lcapp a * (b * c)/ & & \hfil\text{\emph{E-App.}} \\[-\baselineskip]
+    \multicolumn{4}{l}{\hbox to \hsize{}}
+  \end{array}\end{math}
+\end{singlespace}
+
+Notice that we consumed one argument each to create \lcname t_1/ and
+\lcname t_2/. That is, \lcname t_1/ results from applying \lcapp
+(\lcabs f. \lcabs g. \lcabs x. f * (g * x))/ to \lcname a/, giving
+\lcapp \lcabs g. \lcabs x. a * (g * x)/. Similarly, \lcname t_2/
+
 \end{document}

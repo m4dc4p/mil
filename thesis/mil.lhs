@@ -481,19 +481,17 @@ We can divide functions into two types: \emph{pure} and
 \emph{impure}. A \emph{pure} function has no side-effects: it will not
 print to the screen, throw an exception, write to disk, or in any
 other way change the observable state of the
-machine.\footnote{Observable from the programs standpoint. Even a pure
-  computation will make the computer heat up, if nothing else.} An
+machine.\footnote{We mean ``observable'' from the program's standpoint. Even a pure
+  computation will generate heat, if nothing else.} An
 \emph{impure} function may change the machine's state in an observable
 way.
 
-%% Presentation drawn from http://en.wikipedia.org/wiki/Monad_%28functional_programming%29, 
-%% accessed April 6 2010.  
-As described by Wadler \citep{Wadler1990}, \emph{monads} can be used
-distinguish \emph{pure} and \emph{impure} functions. Impure (or
+As described by Wadler \citeyearpar{Wadler1990}, \emph{monads} can be
+used distinguish \emph{pure} and \emph{impure} functions. Impure (or
 ``monadic'') functions execute ``inside'' the monad. Values returned
-from a monadic function are not directly accessible -- they are
+from a monadic function are not directly accessible --- they are
 ``wrapped'' in the monad. The only way to ``unwrap'' a monadic value
-is to execute the computation -- inside the monad!
+is to execute the computation --- inside the monad!
 
 \subsection*{The Monad in MIL}
 
@@ -509,14 +507,10 @@ statement) or jumping to another location in the program (using
 application). 
 
 We designed MIL to support the Habit programming language
-\citep{Habit2009}; in particular, we rely on Habit to give meaning to
-the monadic context for each MIL operation. In particular, we assume
-type-correct programs that manage the operations available in each
-monadic context. We further assume that the interpreter (or compiler)
-for MIL will implement underlying monadic primitives (e.g.,
-allocation, arithmetic, etc.).  For the purposes of MIL we do not
-define the operations available in the monadic context, except by
-example.
+\citep{Habit2010}; in particular, we rely on Habit to give meaning to
+the monadic context for each MIL operation. We further assume that the
+interpreter (or compiler) for MIL will implement underlying monadic
+primitives (e.g., allocation, arithmetic, etc.).  
 
 \subsection*{MIL Example: \lcname compose/}
 
@@ -540,7 +534,7 @@ the \lab compose/ block returns the value of
 
 \begin{myfig}[t]
   \begin{tabular}{c@@{\hspace{2em}}c}
-    \lcdef compose(f,g,x)=\lcapp f * (g * x)/; & 
+    \lcdef compose()=\lcapp \lcabs f. \lcabs g. \lcabs x. f * (g * x)/; & 
     \input{lst_mil1} \\\\
     \scap{mil_fig1a} & \scap{mil_fig1b}
   \end{tabular} 
@@ -555,32 +549,33 @@ the \lab compose/ block returns the value of
 Using the evaluation rules from Figure~\ref{lang_fig6}, we can compute
 the value of the expression \lcapp compose * a * b * c/:
 
-\begin{singlespace}\correctspaceskip
-  \begin{align*}
-    main &= \lcapp compose * a * b * c/ \\
-    &= \lcapp (\lcabs f. \lcabs g. \lcabs x. f * (g * x)) * a * b * c/ & \text{\emph{Definition of |compose|.}} \\
-    &= \lcapp (\lcabs g. \lcabs x. a * (g * x)) * b * c/ & \text{\emph{E-App.}} \\
-    &= \lcapp (\lcabs x. a * (b * x)) * c/& \text{\emph{E-App.}} \\
-    &= \lcapp a * (b * c)/ & \text{\emph{E-App.}} 
-  \end{align*} 
+\begin{singlespace}\noindent
+  \begin{math}\begin{array}{rlr}
+      main &= \lcapp compose * a * b * c/ & \\
+      &= \lcapp (\lcabs f. \lcabs g. \lcabs x. f * (g * x)) * a * b * c/ & \text{\emph{Definition of |compose|.}} \\
+      &= \lcapp (\lcabs g. \lcabs x. a * (g * x)) * b * c/ & \text{\emph{E-App.}} \\
+      &= \lcapp (\lcabs x. a * (b * x)) * c/ & \text{\emph{E-App.}} \\
+      &= \lcapp a * (b * c)/ & \text{\emph{E-App.}} \\[-\baselineskip]
+      \multicolumn{3}{l}{\hbox to \hsize{}}
+    \end{array}\end{math}
 \end{singlespace}
 
-\noindent According to the rules in Figure~\ref{lang_fig6},
-$\lambda$-functions are values. In other words, every evaluation that
-results in a $\lambda$-function creates a new value. Evaluating \lcapp
-compose * a * b * c/ creates two intermediate values: \lcapp (\lcabs
-g. \lcabs x. a * (g * x))/ and \lcapp (\lcabs x. a * (b * x))/. We can 
-make intermediate values explicit by assigning each to a new variable
-during evaluaton:
+\noindent According to the rules in Figure~\ref{lang_fig6}, every
+evaluation that results in a $\lambda$-function creates a new
+value. Evaluating \lcapp compose * a * b * c/ creates two intermediate
+values: \lcapp (\lcabs g. \lcabs x. a * (g * x))/ and \lcapp (\lcabs
+x. a * (b * x))/. We can make intermediate values explicit by
+assigning each to a new variable during evaluation:
 
-\begin{singlespace}\correctspaceskip
-  \begin{align*}
-    main &= \lcapp compose * a * b * c/ \\
-    &= \lcapp (\lcabs f. \lcabs g. \lcabs x. f * (g * x)) * a * b * c/ \\
-    &= \lcapp t_1 * b * c/, \text{where\ } t_1 = \lcapp \lcabs g. \lcabs x. a * (g * x)/ \\
-    &= \lcapp t_2 * c/, \text{where\ } t_2 = \lcapp \lcabs x. a * (b * x)/ \\
-    &= \lcapp a * (b * c)/ 
-  \end{align*} 
+\begin{singlespace}\noindent
+  \begin{math}\begin{array}{rllr}
+    \lcname main/ &= \lcapp compose * a * b * c/ \\
+    &= \rlap{\lcapp (\lcabs f. \lcabs g. \lcabs x. f * (g * x)) * a * b * c/} & & \hfil\text{\emph{Definition of |compose|.}} \\
+    &= \lcapp t_1 * b * c/ & \text{where\ } t_1 = \lcapp \lcabs g. \lcabs x. a * (g * x)/  & \hfil\text{\emph{E-App.}}\\
+    &= \lcapp t_2 * c/ & \text{where\ } t_2 = \lcapp \lcabs x. a * (b * x)/ & \hfil\text{\emph{E-App.}}\\
+    &= \lcapp a * (b * c)/ & & \hfil\text{\emph{E-App.}} \\[-\baselineskip]
+    \multicolumn{4}{l}{\hbox to \hsize{}}
+  \end{array}\end{math}
 \end{singlespace}
 
 Notice that we consumed one argument each to create \lcname t_1/ and
