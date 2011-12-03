@@ -2,17 +2,17 @@
 \begin{center}%%
 \begin{minipage}{4in}%%
 \begin{AVerb}[numbers=left]
-main(a, b, c): \label{mil_main_fig2}
-  t1 <- k1 @ a \label{mil_t1_fig2}
-  t2 <- t1 @ b \label{mil_t2_fig2}
-  t3 <- t2 @ c \label{mil_t3_fig2}
-  return t3
+\block main(a, b, c): \label{mil_main_fig2}
+  \vbinds t1 <- \app k1 * a/; \label{mil_t1_fig2}
+  \vbinds t2 <- \app t1 * b/; \label{mil_t2_fig2}
+  \vbinds t3 <- \app t2 * c/; \label{mil_t3_fig2}
+  \return t3;
 
-k1 \{\} f: k2 \{f\} \label{mil_k1_fig2}
-k2 \{f\} g: k3 \{f, g\} \label{mil_k2_fig2}
-k3 \{f, g\} x: compose(f, g, x) \label{mil_k3_fig2}
+\ccblock k1()f: \mkclo[k2:f] \label{mil_k1_fig2}
+\ccblock k2(f)g: \mkclo[k3:f, g] \label{mil_k2_fig2}
+\ccblock k3(f, g)x: \goto compose(f, g, x) \label{mil_k3_fig2}
 
-compose(f,g,x): \dots {\rm\emph{as in Figure \ref{mil_fig1b}}} \dots 
+\block compose(f, g, x): \dots {\rm\emph{as in Figure \ref{mil_fig1b}}} \dots 
 \end{AVerb}
 \end{minipage}%%
 \end{center}%%

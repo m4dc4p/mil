@@ -605,38 +605,41 @@ explicitly.
   \label{mil_fig2}
 \end{myfig}
 
-Figure \ref{mil_fig2} shows the complete MIL program for $main =
-\lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}$. !+k1+!, !+k2+! and !+k3+!
-(lines \ref{mil_k1_fig2} -- \ref{mil_fig2_k3}) represent
-\emph{closure-capturing} blocks. As opposed to !+main+!, these blocks
-create new closures. In the definition !+k1 \{\} f = k2 \{f\}+!, the braces
-on the left-hand side represent variables expected in the closure
-given to this function. In this case, !+k1+! does not expect to find any
-variables. !+f+! names the argument given to !+k1+!. The right-hand side,
-!+k2 \{f\}+!, shows the creation of a new closure. The closure points to
-!+k2+! and captures the value of !+f+!. In other words, evaluating !+k1+!
-returns a closure which can be used to execute !+k2+!. !+k2+! behaves
-similarly. It expects to find one value in its closure (!+\{f\}+!) and
-returns a closure pointing to !+k3+! that copies the value !+f+! from the
-existing closure and adds the argument, !+g+! (!+k3 \{f, g\}+!). !+k3+!,
-however, does something new. Instead of returning a closure, it
-executes the !+compose+! block (defined in Figure \ref{mil_fig1b}) with
-three arguments: !+f+!, !+g+!, and !+x+!. This does \emph{not} return a
-closure or ``enter'' a function. Instead, we jump directly to the
-block. The value returned by !+k3+! will be the value computed by
-!+compose+! with the arguments given.
+Figure \ref{mil_fig2} shows the complete MIL program for \lcdef
+main()= \lcapp compose * a * b * c/;. We call the blocks labeled \lab
+k1/, \lab k2/ and \lab k3/ (lines \ref{mil_k1_fig2} --
+\ref{mil_k3_fig2}) \emph{closure-capturing} blocks.\footnote{So called
+  because they \emph{capture} arguments in a closure.}  As opposed to
+\lab main/, these blocks create new closures. In the definition
+\ccblock k1()f: \mkclo[k2:f], the braces on the left-hand side
+represent variables expected in the closure given to this function. In
+this case, \lab k1/ does not expect to find any variables. \var f/
+names the argument given to \lab k1/. The right-hand side,
+\mkclo[k2:f], shows the creation of a new closure. The closure points
+to block \lab k2/ and captures the value of \var f/.  Evaluating \lab
+k1/ returns a closure which can be used to execute \lab k2/. \lab k2/
+expects an argument, \var g/, and a closure with one value (\var
+f/). \lab k2/ returns a closure that points to \lab k3/ and contains
+the variables \var f/ and \var g/: \clo[k3:f, g]. \lab k3/, however,
+does something new. Instead of returning a closure, it executes the
+\lab compose/ block (defined in Figure \ref{mil_fig1b}) with three
+arguments: \var f/, \var g/, and \var x/. The value returned by \lab
+k3/ will be the value computed by \lab compose/ with the arguments
+given.
 
-Returning to !+main+! on line \ref{mil_main_fig2} in Figure
-\ref{mil_fig2}, we can now see how MIL makes explicit the intermediate
-closures created while evaluating
-\lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}. On line
-\ref{mil_t1_fig2}, we enter !+k1+! with the first argument, !+a+!. !+t1+!
-holds the closure returned. On the next line, we enter !+t1+! (which
-will point to !+k2+!) with the second argument, !+b+!. !+t2+! then holds the
-closure returned. Finally, on line \ref{mil_t3_fig2}, we enter !+t2+!
-(which will point to !+k3+!) with the final argument, !+c+!. !+k3+! will directly
-execute !+compose+! with our specific arguments. !+t3+! holds the result returned
-by !+compose+!. On the last line of !+main+! we return the value computed, !+t3+!.
+Returning to the \lab main/ block in Figure \ref{mil_fig2}, we can now
+see how MIL makes explicit the intermediate closures created while
+evaluating \lcapp compose * a * b * c/. On line \ref{mil_t1_fig2}, we
+enter \lab k1/ with the first argument, \var a/ (remember, \app \lab
+k1/ * a/ represents function application). The result on the \lhs of
+the \bind, \var t1/, holds the closure returned. On the next line, we
+enter \var t1/ (which will point to \lab k2/) with the second
+argument, \var b/. \var t2/ then holds the closure returned. Finally,
+on line \ref{mil_t3_fig2}, we enter \var t2/ (which will point to \lab
+k3/) with the final argument, \var c/. \lab k3/ will directly execute
+\lab compose/ with our arguments. \var t3/ holds the result returned
+by \lab compose/. On the last line of \lab main/ we return the value
+computed, \var t3/.
 
 %% Syntax of MIL
 \subsection*{MIL Syntax}
@@ -652,7 +655,7 @@ basic block (\texttt{b(\dots)}). Top-level blocks (line
 they provide a closure which can be used to initially ``enter'' the
 function.
 
-\afterpage{\clearpage{\input{mil_syntax}}\clearpage}
+\input{mil_syntax}
 
 Basic blocks (line \ref{mil_body_fig3}) consist of a sequence of statements that
 execute in order without any intra-block jumps or conditional

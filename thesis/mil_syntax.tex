@@ -1,40 +1,39 @@
-\begin{myfig}[th]
-\begin{tabular}{p{5in}}
-\begin{center}
-\begin{minipage}{4in}
-\begin{AVerb}[numbers=left]
-  $block$ := k \{$v_1$, \dots, $v_n$\} $v$: $tail$ \label{mil_k1_fig3} 
-    | b($v_1$, \dots, $v_n$): $body$ \label{fig_mil3_b} 
-    | t <- k \{\}  \label{mil_t_fig3} 
+\begin{myfig}
+\begin{tabular}{r@{}lrr}
+  \termrule block:{\ccblock k(v_1, \dots, v_n)v:\ \term body/}:Closure-Capturing Block/& \labeleq{mil_syntax_cc}\eqref{mil_syntax_cc} \\
+  \termcase {\block b(v_1, \dots, v_n):\ \term body/}:Block/ \\
+  \termcase {\binds \lab t/\ <-\ \mkclo[k:];}:Top-level Definition/ \\
+  %% This row ensures the table fills the width of the page
+  \multicolumn{4}{l}{\dimen0=-12pt \advance\dimen0\linewidth \hbox to \dimen0{}}\\
 
-  $body$ := do \label{mil_body_fig3}
-    $stmt$ 
-    \dots 
-    $stmt$
+  \termrule body:\rlap{\begin{minipage}[t]{2in}\disableparspacing;%%
+      \term stmt_1/\endgraf%%
+      $\dots$\endgraf%%
+      \term stmt_n/\end{minipage}}:Block Body/\\\\
 
-  $stmt$ := $v$ <- $tail$ \label{fig_mil3_stmt}  \label{mil_bind_fig3}
-    | case $v$ of \label{mil_case_fig3}
-        $alt$
-        \dots
-        $alt$
-    | done $tail$ \label{mil_done_fig3}
+  \termrule stmt:{\binds v\ <-\ \term tail/;}:Bind/ \\
+  \termcase {\begin{minipage}[t]{3in}\disableparspacing;%%
+      \case v;\endgraf%%
+      \quad \term alt_1/\endgraf%%
+      \quad $\dots$\endgraf%%
+      \quad \term alt_n/%%
+  \end{minipage}}:Case Discrimination/ \\
+  \termcase \term tail/:Tail Expression/ \\\\
 
-  $tail$ := return $v$ \label{mil_return_fig3}
-    | $v_1$ @ $v_2$ \label{mil_enter_fig3}
-    | k b \{$v_1$, \dots, $v_n$\} \label{mil_capture_fig3}
-    | b($v_1$, \dots, $v_n$) \label{mil_goto_fig3}
-    | C $v_1$ \dots $v_n$ \label{mil_const_fig3}
-    | p*($v_1$, \dots, $v_n$) \label{mil_prim_fig3}
+  \termrule tail:{\return v;}:Return/ \\
+  \termcase \app v_1 * \ v_2/:Enter/ \\
+  \termcase \goto b(v_1, \dots, v_n):Goto Block/ \\
+  \termcase \prim p(v_1, \dots, v_n):Goto Primitive/ \\
+  \termcase {\mkclo[k:v_1, \dots, v_n]}:Allocate Closure/ \\
+  \termcase \ensurett{C\ v_1\ \dots\ v_n}:Allocate Data/ \\\\
 
-  $alt$ := C $v_1$ \dots $v_n$ -> b(\dots) 
-\end{AVerb}
-\end{minipage}
-\end{center} \\ \\
-  $v$ represents a variable, and only a variable. Expressions
-  cannot be used where $v$ appears. \\ 
+  \termrule alt:\alt C_1(v_1\ \dots\ v_n) -> \goto b(\dots);:Case Alternative/
+  %% $alt$ := C $v_1$ \dots $v_n$ -> b(\dots) \\\\
+  %% $v$ represents a variable, and only a variable. Expressions
+  %% cannot be used where $v$ appears. \\ 
 
-  \texttt{C $v_1$ \dots $v_n$} represents a constructor, for creating
-  values in $tail$ expressions and inspecting values in $alt$ arms. \\
+  %% \texttt{C $v_1$ \dots $v_n$} represents a constructor, for creating
+  %% values in $tail$ expressions and inspecting values in $alt$ arms. \\
 \end{tabular}
 \caption{MIL syntax.}
 \label{mil_fig3}

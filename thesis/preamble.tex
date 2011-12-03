@@ -80,10 +80,14 @@
 \newcommand{\sqlt}{\ensuremath{\sqsubset}\xspace}
 \newcommand{\sqlte}{\ensuremath{\sqsubseteq}\xspace}
 
-
-%\providecommand{\citep}[1]{(\emph{#1})\xspace}
-%\renewcommand{\cite}[1]{\emph{#1}\xspace}
-
+%% Subscripting with typewriter
+\def\subtt#1{\ifmmode_{\ensurett{#1}}%%
+  \else$_{\ensurett{#1}}$%%
+  \fi}
+%% Superscripting with typerwriter
+\def\suptt#1{\ifmmode^{\ensurett{#1}}%%
+  \else$^{\ensurett{#1}}$%%
+  \fi}
 %% Functional languages chapter commands
 \newcommand{\lamA}{\ensuremath{\lambda}-calculus\xspace}
 \newcommand{\LamA}{\ensuremath{\lambda}-Calculus\xspace}
@@ -152,10 +156,10 @@
 \newdimen\termalign
 \setbox0=\hbox{$:=$}
 \termalign=\wd0 
-\def\term#1/{\mathit{#1}}
-\def\syntaxrule#1/{\hfil\text{\emph{#1}}}
-\def\termrule#1:#2:#3/{\term #1/ &\hbox{$:=$}\ensuremath{\ #2} & \syntaxrule #3/}
-\def\termcase#1:#2/{&\hbox to \termalign{$|$\hss}\ensuremath{\ #1} & \syntaxrule #2/}
+\protected\def\term#1/{\ensuremath{\mathit{#1}}}
+\protected\def\syntaxrule#1/{\hfil\text{\emph{#1}}}
+\protected\long\def\termrule#1:#2:#3/{\term #1/ &\hbox{$:=$}\ensuremath{\ #2} & \syntaxrule #3/}
+\protected\def\termcase#1:#2/{&\hbox to \termalign{$|$\hss}\ensuremath{\ #1} & \syntaxrule #2/}
 
 
 %% End MIL chapter
@@ -184,7 +188,7 @@
 \def\removesp{\foo={\next}\ifcat\noexpand\next\sp\foo={\removespace}%%
  \else\ifx\next\spa\foo={\removespaces}\fi%%
  \fi\the\foo}
-\protected\long\def\lab#1/{\textbf{\ensurett{\removespaces #1}}}
+\protected\def\lab#1/{\textbf{\ensurett{\removespaces #1}}}
 %% Constructs a closure: l { v1, ..., vN }
 \protected\long\def\mkclo[#1:#2]{\lab #1/\ensuremath{\thinspace\{\ensurett{#2}\}}\xspace}
 %% Tuple version of closurs: {l: v1, ..., vN}.
@@ -207,18 +211,21 @@
 %% Return statement: return ... ;
 \protected\long\def\return#1;{\ensurett{return\ \removespaces #1}}
 %% A closure capturing block. k {v1, ..., vN} x: ...
-\protected\long\def\ccblock#1(#2)#3:{\lab#1/\ensuremath{\thinspace\{\ensurett{#2}\}}\ \ensurett{#3:}}
+\protected\def\ccblock#1(#2)#3:{\lab#1/\ensuremath{\thinspace\{\ensurett{#2}\}}\ \ensurett{#3\hbox{:}}}
 %% A normal block
-\protected\long\def\block#1(#2):{\lab #1/\ensuremath{\thinspace(\ensurett{#2})}\ensurett{:}}
+\protected\def\block#1(#2):{\lab #1/\ensuremath{\thinspace(\ensurett{#2})}\ensurett{:}}
 %% A goto expression
-\protected\long\def\goto#1(#2){\texttt{\textbf{\removespaces #1}}\ensuremath{\thinspace(\ensurett{#2})}}
+\protected\def\goto#1(#2){\lab #1/\thinspace\ensuremath{(\ensurett{#2})}}
 %% An enter expression
-\protected\long\def\app#1*#2/{\ensurett{\removespaces #1@#2}}
+\protected\def\app#1*#2/{\ensurett{\removespaces #1{\text{\tt @}}#2}}
 \protected\def\bind{\texttt{<-}\xspace}
 %% Primitive expression
-\protected\long\def\prim#1(#2){\lab #1/*\ensuremath{(\ensurett{#2})}}
+\protected\def\prim#1(#2){\lab #1/\suptt*\ensuremath{(\ensurett{#2})}}
 %% Program variable
-\protected\long\def\var#1/{\ensurett{\removespaces #1}\xspace}
+\protected\def\var#1/{\ensurett{\removespaces #1}\xspace}
+%% Case statement
+\protected\def\case#1;{\ensurett{\textbf{case}\ #1\ \textbf{of}}}
+\protected\def\alt#1(#2)#3->#4;{\ensuremath{\ensurett{#1\ \ignorespaces#2\ \texttt{->}\ \ignorespaces #4}}}
 \def\rhs{right--hand side\xspace}
 \def\lhs{left--hand side\xspace}
 \def\enter{\texttt{@}\xspace}
@@ -314,8 +321,8 @@
 %%
 %% Intended to be used in a \vbox that forms part of a table or graphic,
 %% which we want to be line-broken but not exactly like a normal paragraph.
-\long\def\disableparspacing#1;{\hbadness=100000\parindent=0pt\parfillskip=0pt\leftskip=0pt\rightskip=0pt%%
-  \ifx#1\relax\else\hsize=#1\relax\fi}
+\long\def\disableparspacing#1;{\def\arg{#1}\hbadness=100000\parindent=0pt\parfillskip=0pt\leftskip=0pt\rightskip=0pt%%
+  \ifx\arg\empty\else\hsize=#1\relax\fi}
 \include{md}
 \domd
 
