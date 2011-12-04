@@ -1,33 +1,35 @@
 \begin{myfig}
 \begin{tabular}{r@{}lrr}
   \termrule block:{\ccblock k(v_1, \dots, v_n)v:\ \term body/}:Closure-Capturing Block/& \labeleq{mil_syntax_cc}\eqref{mil_syntax_cc} \\
-  \termcase {\block b(v_1, \dots, v_n):\ \term body/}:Block/ \\
-  \termcase {\binds \lab t/\ <-\ \mkclo[k:];}:Top-level Definition/ \\
+  \termcase {\block b(v_1, \dots, v_n):\ \term body/}:Block/ &  \labeleq{mil_syntax_block}\eqref{mil_syntax_block} \\
+  \termcase {\binds \lab t/\ <-\ \mkclo[k:];}:Top-level Definition/ &  \labeleq{mil_syntax_top}\eqref{mil_syntax_top} \\
   %% This row ensures the table fills the width of the page
   \multicolumn{4}{l}{\dimen0=-12pt \advance\dimen0\linewidth \hbox to \dimen0{}}\\
 
   \termrule body:\rlap{\begin{minipage}[t]{2in}\disableparspacing;%%
       \term stmt_1/\endgraf%%
       $\dots$\endgraf%%
-      \term stmt_n/\end{minipage}}:Block Body/\\\\
+      \term stmt_n/\end{minipage}}:Block Body/ &  \labeleq{mil_syntax_body}\eqref{mil_syntax_body} \\\\
 
-  \termrule stmt:{\binds v\ <-\ \term tail/;}:Bind/ \\
+  \termrule stmt:{\binds v\ <-\ \term tail/;}:Bind/ &  \labeleq{mil_syntax_stmt}\eqref{mil_syntax_stmt} \\
   \termcase {\begin{minipage}[t]{3in}\disableparspacing;%%
       \case v;\endgraf%%
       \quad \term alt_1/\endgraf%%
       \quad $\dots$\endgraf%%
       \quad \term alt_n/%%
-  \end{minipage}}:Case Discrimination/ \\
-  \termcase \term tail/:Tail Expression/ \\\\
+  \end{minipage}}:Case Discrimination/ &  \labeleq{mil_syntax_case}\eqref{mil_syntax_case} \\
+  \termcase \term tail/:Tail Expression/ &  \labeleq{mil_syntax_done}\eqref{mil_syntax_done} \\\\
 
-  \termrule tail:{\return v;}:Return/ \\
-  \termcase \app v_1 * \ v_2/:Enter/ \\
-  \termcase \goto b(v_1, \dots, v_n):Goto Block/ \\
-  \termcase \prim p(v_1, \dots, v_n):Goto Primitive/ \\
-  \termcase {\mkclo[k:v_1, \dots, v_n]}:Allocate Closure/ \\
-  \termcase \ensurett{C\ v_1\ \dots\ v_n}:Allocate Data/ \\\\
+  \termrule tail:{\return v;}:Return/ &  \labeleq{mil_syntax_return}\eqref{mil_syntax_return} \\
+  \termcase \app v_1 * \ v_2/:Enter/ &  \labeleq{mil_syntax_enter}\eqref{mil_syntax_enter} \\
+  \termcase \goto b(v_1, \dots, v_n):Goto Block/ &  \labeleq{mil_syntax_goto}\eqref{mil_syntax_goto} \\
+  \termcase \prim p(v_1, \dots, v_n):Goto Primitive/ &  \labeleq{mil_syntax_prim}\eqref{mil_syntax_prim} \\
+  \termcase \invoke v/:Execute Thunk/ &  \labeleq{mil_syntax_invoke}\eqref{mil_syntax_invoke} \\
+  \termcase {\mkclo[k:v_1, \dots, v_n]}:Allocate Closure/ &  \labeleq{mil_syntax_clo}\eqref{mil_syntax_clo} \\
+  \termcase {\mkthunk[m:v_1, \dots, v_n]}:Allocate Monadic Thunk/ &  \labeleq{mil_syntax_thunk}\eqref{mil_syntax_thunk}\\
+  \termcase \ensurett{C\ v_1\ \dots\ v_n}:Allocate Data/ &  \labeleq{mil_syntax_cons}\eqref{mil_syntax_cons} \\\\
 
-  \termrule alt:\alt C_1(v_1\ \dots\ v_n) -> \goto b(\dots);:Case Alternative/
+  \termrule alt:\alt C(v_1\ \dots\ v_n) -> \goto b(v_1, \dots, v_n);:Case Alternative/ &  \labeleq{mil_syntax_alt}\eqref{mil_syntax_alt}
   %% $alt$ := C $v_1$ \dots $v_n$ -> b(\dots) \\\\
   %% $v$ represents a variable, and only a variable. Expressions
   %% cannot be used where $v$ appears. \\ 
