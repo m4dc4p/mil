@@ -188,17 +188,26 @@
 \def\removesp{\foo={\next}\ifcat\noexpand\next\sp\foo={\removespace}%%
  \else\ifx\next\spa\foo={\removespaces}\fi%%
  \fi\the\foo}
+%% MIL reserved word
+\protected\def\milres#1/{\text{\ttfamily\bfseries #1}}
 \protected\def\lab#1/{\textbf{\ensurett{\removespaces #1}}}
 %% Constructs a closure: l { v1, ..., vN }
-\protected\long\def\mkclo[#1:#2]{\lab #1/\ensuremath{\thinspace\{\ensurett{#2}\}}\xspace}
+\protected\long\def\mkclo[#1:#2]{\lab #1/\ensuremath{\,\{\ensurett{#2}\}}\xspace}
 %% Tuple version of closurs: {l: v1, ..., vN}.
-\protected\long\def\clo[#1:#2]{\ensuremath{\{%%
-      \ifx#1\relax%%
+\protected\long\def\clo[#1:#2]{\def\argA{#1}\def\argB{#2}\ensuremath{\{%%
+      \ifx\argA\empty%%
       \else\lab #1/%%
-        \ifx#2\relax%%
+        \ifx\argB\empty%%
         \else\ensurett{:\thinskip}%%
         \fi%%
       \fi\ensurett{#2}\}}\xspace}
+%% Construct a thunk
+\newdimen\brackl\newdimen\brackr 
+\protected\long\def\mkthunk[#1:#2]{\lab #1/\ensuremath{\,%%
+    \setbox0=\hbox{$\{$}\brackl=\wd0\setbox0=\hbox{$\}$}\brackr=\wd0%%
+    \mathopen{\hbox to \brackl{\hfil[}}}%%
+    \ensurett{#2}%%
+    \mathclose{\hbox to \brackr{]\hfil}}\xspace}
 %% Binding statement: v <- {...}
 \protected\long\def\binds#1<-#2;{\ensurett{\removespaces #1\texttt{<-}#2}\xspace}
 %% In order to use \binds in verbatim environment, have to define
@@ -209,7 +218,7 @@
 \begingroup\catcode`\!=\active \lccode`\!=`\< \lccode`\~=`\- 
   \catcode`\ =\active\lowercase{\endgroup\def\vbinds#1!~#2;}{\binds#1<-#2;}
 %% Return statement: return ... ;
-\protected\long\def\return#1;{\ensurett{return\ \removespaces #1}}
+\protected\def\return#1;{\milres return/\ensurett{\ \removespaces #1}}
 %% A closure capturing block. k {v1, ..., vN} x: ...
 \protected\def\ccblock#1(#2)#3:{\lab#1/\ensuremath{\thinspace\{\ensurett{#2}\}}\ \ensurett{#3\hbox{:}}}
 %% A normal block
@@ -217,15 +226,18 @@
 %% A goto expression
 \protected\def\goto#1(#2){\lab #1/\thinspace\ensuremath{(\ensurett{#2})}}
 %% An enter expression
-\protected\def\app#1*#2/{\ensurett{\removespaces #1{\text{\tt @}}#2}}
+\protected\def\app#1*#2/{\ensurett{\removespaces #1\ifmmode\ \fi{\text{\tt @}}\ifmmode\ \fi#2}}
 \protected\def\bind{\texttt{<-}\xspace}
 %% Primitive expression
 \protected\def\prim#1(#2){\lab #1/\suptt*\ensuremath{(\ensurett{#2})}}
 %% Program variable
 \protected\def\var#1/{\ensurett{\removespaces #1}\xspace}
 %% Case statement
-\protected\def\case#1;{\ensurett{\textbf{case}\ #1\ \textbf{of}}}
+\protected\def\case#1;{\milres case\ \ensuremath{\ensurett{\removespaces #1}}\ of/}
+%% Case alternative
 \protected\def\alt#1(#2)#3->#4;{\ensuremath{\ensurett{#1\ \ignorespaces#2\ \texttt{->}\ \ignorespaces #4}}}
+%% Invoke
+\protected\def\invoke#1/{\milres invoke/\ensurett{\ \removespaces #1}}
 \def\rhs{right--hand side\xspace}
 \def\lhs{left--hand side\xspace}
 \def\enter{\texttt{@}\xspace}
