@@ -1058,14 +1058,14 @@ alt cons vs f = (LC.Alt cons [] vs (f (map var vs)) :)
 
 mPrint = EPrim "print" typ []
 mReadChar = EPrim "readChar" typ []
-mkUnit = ECon "Unit" [] 
+mkUnit = ECon "Unit" [] typ
 ret = (EPrim "return" typ [] `app`)
 
 mkNil :: Expr
-mkNil = ECon "Nil" [] 
+mkNil = ECon "Nil" [] typ
 
 mkCons :: Expr
-mkCons = ECon "Cons" [typ, typ] 
+mkCons = ECon "Cons" [typ, typ] typ
 
 bindE :: Id -> Expr -> (Expr -> Expr) -> Expr
 bindE v body rest = EBind v typ body (rest (var v))

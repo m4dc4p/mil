@@ -46,7 +46,7 @@ I will describe the translation of each LC expression into MIL
 instructions, starting with ECon. The ECon term creates a data
 value. 
 
-> compileStmt (ECon (Ident cons _) _) ctx = do 
+> compileStmt (ECon (Ident cons _) _ _) ctx = do 
 
 We implement ECon using a series of pre-generated primitives, one for
 each constructor of each known data type. Therefore, we first look for
@@ -73,11 +73,11 @@ definition, and generate code to create the closure representing the
 function.
 
 > compileStmt body@(ELam (Ident v _) _ b) ctx = withFree (const (setFree body)) $ \free -> do
->   dest <- withNewDest "absBody" $ \(uniqueName, l) -> do
+>   dest <- withNewDest "k" $ \(uniqueName, l) -> do
 >     rest <- case b of
 >               (ELam _ _ _) -> compileStmt b (return . mkLast . Done uniqueName l)
 >               _ -> do 
->                 dest <- blockDefn "absBlock" (free ++ [v]) 
+>                 dest <- blockDefn "b" (free ++ [v]) 
 >                   (\bn bl -> compileStmt b (return . mkLast . Done bn bl))
 >                 return (mkLast (Done uniqueName l (Goto dest (free ++ [v]))))
 >     addProg (mkFirst (CloEntry uniqueName l free v) <*> rest)
@@ -90,7 +90,7 @@ translated code for the monadic expression will evaluate to a monadic
 thunk. 
 
 > compileStmt bind@(EBind (Ident v _) _ _ _) ctx = withFree (return . delete v) $ \fvs -> do
->   dest <- blockDefn "bindBody" fvs $ \n l -> do
+>   dest <- blockDefn "m" fvs $ \n l -> do
 >     let compM (EBind (Ident v _) _ b r) = withFree (return . delete v) $ \_ -> do
 >           rest <- compM r 
 >           compResultVar b $ \n -> return (mkMiddle (v `Bind` (Run n)) <*> rest)
@@ -391,7 +391,7 @@ I report an error if the situation occurs.
 >     free' (EPrim v _ _) = [v]
 >     free' (ENat _) = []
 >     free' (EBits _ _) = []
->     free' (ECon _ _) = []
+>     free' (ECon {}) = []
 >     free' (ELam (Ident v _) _ expr) = v `delete` nub (free' expr)
 >     free' (ELet (Decls decls) expr) = 
 >             (free' expr \\ 
@@ -424,7 +424,7 @@ I report an error if the situation occurs.
 > withNewLabel f = freshLabel >>= f
 >                  
 > withNewDest :: UniqueMonad m => String -> (Dest -> m a) -> m a
-> withNewDest prefix f = freshLabel >>= \l -> f (prefix ++ show l, l)
+> withNewDest prefix f = freshLabel >>= \l -> f (prefix ++ (drop 1 $ show l), l)
 
 > toAlt :: LC.Alt -> Alt Expr
 > toAlt (LC.Alt (Ident cons _) _ vs expr) = Alt cons (map (\(Ident n _) -> n) vs) expr
