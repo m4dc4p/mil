@@ -1,6 +1,8 @@
 \documentclass[12pt]{report}
 \usepackage{standalone}
 %include polycode.fmt
+%format t_1 = "\ensuremath{t_1}"
+%format t_2 = "\ensuremath{t_2}"
 \input{tikz.preamble}
 \input{preamble}
 \begin{document}
@@ -641,8 +643,69 @@ k3/) with the final argument, \var c/. \lab k3/ will directly execute
 by \lab compose/. On the last line of \lab main/ we return the value
 computed, \var t3/.
 
+\subsection*{Monadic Programs}
+
+\intent{Motivate monadic thunks.}
+
+\intent{Contrast pure and monadic values.}  Consider the \lamC
+expressions in Figure~\ref{mil_fig_monadic}. Neither takes any
+arguments; it's valid to evaluate each expression once and re-use the
+result. However, the \emph{value} produced by |m| represents a
+computation that must be executed. If |m| were not treated as a
+computation, the program |do { v1 <- m; v2 <- m; return v1 + v2; }|
+would have a vastly different effect (i.e., it would only print
+|"hello"| once).
+
+\begin{myfig}
+  \begin{tabular}{cc}
+    |f = 1 + 2| & 
+    \begin{minipage}{\widthof{|do {print "hello";}|}}[t]
+      |m = do 
+         print "hello"
+         return 1 + 2 |
+    \end{minipage} \\
+    \scap{mil_fig_monadic_pure} & \scap{mil_fig_monadic_comp}
+  \end{tabular}
+  \caption{}
+  \label{mil_fig_monadic}
+\end{myfig}
+
+\intent{Introduce monadic thunks.} In \lamC and MIL, we say monadic
+programs create \emph{monadic thunks}. Historically, thunks 
+represented \emph{suspended} computation; the term can be synonymous
+with closures, in fact. We use it in the same sense here, in that |m|
+represents a computation that must be invoked explicitly --- we do
+not directly evaluate |m|.
+
+To illustrate, consider the program in Figure~\ref{mil_fig_let}. For 
+convenience, we ignore the result of |print| by using a varialbed
+``named'' "|_|". 
+
+\begin{myfig}
+  \begin{tabular}{c}
+    \begin{minipage}{\hsize}
+> print x = print* x
+    \end{minipage}
+  \end{tabular}
+\end{myfig}
+
+\intent{Point out that monadic thunks are not just for optimization; |let| 
+  example.}
+
+\lamC provides direct support for programs of the form |do { a <- t_1;
+}|. For example, the following program reads a character from input and
+prints it out:
+
+> m = do
+>   c <- readChar
+>   print c
+
+\nonindet If |m| were a pure expression, we could easily see that represents a value, because
+it takes no arguments and has no side-effects. However, |m| is not pure; instead,
+it is a \emph{monadic computation}.  like |m| create pure expressions. In particular, |m| 
+
 %% Syntax of MIL
-\subsection*{MIL Syntax}
+\section{MIL Syntax}
 
 Figure \ref{mil_fig3} gives the syntax for MIL.  A MIL program
 consists of a number of \emph{blocks}: \emph{closure} blocks (line
