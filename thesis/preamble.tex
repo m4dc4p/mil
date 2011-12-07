@@ -52,13 +52,11 @@
             {\baselineskip}
             {\sffamily\bfseries}
             {}
-\usepackage{lipsum}
-\setlipsumdefault{1}
 
 \hyphenation{data-flow mo-na-dic} 
 
-\newboolean{lhs2tex}
-\setboolean{lhs2tex}{true}
+%% Should unindent all haskell code set in a dispay (versus inline)
+\renewcommand{\hscodestyle}{\advance\leftskip -\mathindent}
 
 % Used by included files to know they
 % are NOT standalone
@@ -202,15 +200,16 @@
         \fi%%
       \fi\ensurett{#2}\}}\xspace}
 %% Construct a thunk
-\newdimen\brackl\newdimen\brackr 
-\setbox0=\hbox{\ensuremath{\{}}\brackl=\wd0
-\setbox0=\hbox{\ensuremath{\}}}\brackr=\wd0
-\protected\long\def\mkthunk[#1:#2]{\lab #1/\ensuremath{\,%%
-    \mathopen{\hbox to \brackl{\hfil[}}}%%
+\newbox\bracklbox \newbox\brackrbox
+\setbox0=\hbox{$\{$} \setbox\bracklbox=\hbox to \wd0{\hfil[\kern0.25mm}
+\setbox0=\hbox{$\}$} \setbox\brackrbox=\hbox to \wd0{\kern0.25mm]\hfil}
+\protected\def\mkthunk[#1:#2]{\lab #1/%%
+  \ensuremath{\,%%
+    \mathopen{\copy\bracklbox}%%
     \ensurett{#2}%%
-    \mathclose{\hbox to \brackr{]\hfil}}\xspace}
+    \mathclose{\copy\brackrbox}\xspace}}
 %% Binding statement: v <- {...}
-\protected\long\def\binds#1<-#2;{\ensurett{\removespaces #1\texttt{<-}#2}\xspace}
+\protected\def\binds#1<-#2;{\ensurett{\removespaces #1\texttt{<-}#2}\xspace}
 %% In order to use \binds in verbatim environment, have to define
 %% delimiters while they are active. The below defines \vbinds which
 %% must be used in AVerb environments.  Notice the active space as

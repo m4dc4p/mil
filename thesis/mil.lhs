@@ -648,9 +648,9 @@ computed, \var t3/.
 \intent{Contrast pure and monadic values.}  Consider the \lamC
 functions in Figure~\ref{mil_fig_monadic}.\footnote{Some syntactic
   liberties have been taken here. \lamC only supports monadic binding,
-  so |print 0| really represents |_ <- print 0|. Integers are not
+  so ``|print 0|'' really represents ``|_ <- print 0|.'' Integers are not
   directly part of the language, either.} Neither takes any arguments
-and they ostensibly produce the same sum. Of course, the value
+and they ostensibly produce the same number. Of course, the value
 produced by the \emph{pure} function in
 Part~\subref{mil_fig_monadic_pure} differs markedly from that produced
 by the \emph{impure} function in
@@ -661,7 +661,7 @@ Part~\subref{mil_fig_monadic_comp}.
     |f = 1| & 
     \begin{minipage}{\widthof{|do {print "hello";}|}}
 > m = do 
->   p 0
+>   print 0
 >   return 1
     \end{minipage} \\
     \scap{mil_fig_monadic_pure} & \scap{mil_fig_monadic_comp}
@@ -675,7 +675,7 @@ integer, but |m| returns a \emph{computation}. We call this
 computation a \emph{monadic thunk}, as coined in the Habit Compiler
 Report \citep{HabitComp2010}. Traditionally, thunks have represented
 \emph{suspended} computation. We use it in the same sense here, in
-that |m| evaluates to a program that we can invoke; further,
+that |m| evaluates to a program that we can invoke; moreover,
 evaluating |m| alone will \emph{not} invoke the computation --- we (or
 our run-time) must actively invoke the computation before it will
 produce a result.
@@ -684,7 +684,7 @@ produce a result.
 \lamC functions in Figure~\ref{mil_fig_hello_a}.\footnote{Again, some
   syntactic liberties are taken.} Part~\subref{mil_fig_hello_b} shows
 the corresponding MIL code for each. On
-Line~\ref{mil_fig_thunk_hello}, \lab hello/ returns a thunk pointing
+Line~\ref{mil_fig_thunk_hello}, \lab hello/ returns a thunk pointing to
 \lab m201/. \lab m201/ represents the body of |hello|; it calls
 primitives which we elide. The \lab main/ block, however, shows how we
 invoke the thunk returned by \lab hello/. On
@@ -705,17 +705,17 @@ an effect each time.
 >   hello
 >   hello
     \end{minipage} &
-    \begin{minipage}{4in}
+    \begin{minipage}{\widthof{\ \ \binds \_ <- \invoke v207/;}}
       \begin{AVerb}[gobble=8,numbers=left]
-        \block hello(): mkthunk[m201:] \label{mil_fig_thunk_hello}
+        \block hello(): \mkthunk[m201:] \label{mil_fig_thunk_hello}
         \block m201():
           \ldots
 
-          \block main(): 
-            \vbinds v207 <- \goto hello(); \label{mil_fig_get_hello1}
-            \vbinds \_ <- \invoke v207/; \label{mil_fig_invoke_hello1}
-            \vbinds v206 <- \goto hello(); \label{mil_fig_get_hello2}
-            \vbinds \_ <- \invoke v206/; \label{mil_fig_invoke_hello2}
+        \block main(): 
+          \vbinds v207 <- \goto hello(); \label{mil_fig_get_hello1}
+          \vbinds \_ <- \invoke v207/; \label{mil_fig_invoke_hello1}
+          \vbinds v206 <- \goto hello(); \label{mil_fig_get_hello2}
+          \vbinds \_ <- \invoke v206/; \label{mil_fig_invoke_hello2}
       \end{AVerb}
     \end{minipage} \\
     \scap{mil_fig_hello_a} & \scap{mil_fig_hello_b}
@@ -737,24 +737,26 @@ concepts. Part~\subref{mil_fig_kleisli_a} shows monadic compose (or
 
 \begin{myfig}
   \begin{tabular}{cc}
-    \begin{minipage}{\widthof{|kleisli f g x = do|}}
+    \begin{minipage}{\widthof{|kleisli f g x = do|\quad}}
 > kleisli f g x = do
 >   v <- g x
 >   f v
     \end{minipage} &
-    \begin{minipage}{4in}
+    \begin{minipage}{\widthof{\ \ \binds v2 <- \invoke v208/;}}
       \begin{AVerb}[gobble=8,numbers=left]
-        kleisli (g, f, x):
-        v209 <- g @@ x
-        v1 <- invoke v209
-        v208 <- f @@ v1
-        v2 <- invoke v208
-        v206 <- return()
-        v207 <- v206 @@ v2
-        invoke v207
+        \block kleisli (g, f, x):
+          \vbinds v209 <- \app g * x/;
+          \vbinds v1 <- \invoke v209/;
+          \vbinds v208 <- \app f * v1/;
+          \vbinds v2 <- \invoke v208/;
+          \vbinds v206 <- \goto return()/;
+          \vbinds v207 <- \app v206 * v2/;
+          \invoke v207/;
       \end{AVerb}
     \end{minipage}
   \end{tabular}
+  \caption{Kliesli compose.}
+  \label{mil_fig_kleisli}
 \end{myfig}
 
 %% Syntax of MIL
