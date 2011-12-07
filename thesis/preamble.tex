@@ -203,8 +203,9 @@
       \fi\ensurett{#2}\}}\xspace}
 %% Construct a thunk
 \newdimen\brackl\newdimen\brackr 
+\setbox0=\hbox{\ensuremath{\{}}\brackl=\wd0
+\setbox0=\hbox{\ensuremath{\}}}\brackr=\wd0
 \protected\long\def\mkthunk[#1:#2]{\lab #1/\ensuremath{\,%%
-    \setbox0=\hbox{$\{$}\brackl=\wd0\setbox0=\hbox{$\}$}\brackr=\wd0%%
     \mathopen{\hbox to \brackl{\hfil[}}}%%
     \ensurett{#2}%%
     \mathclose{\hbox to \brackr{]\hfil}}\xspace}

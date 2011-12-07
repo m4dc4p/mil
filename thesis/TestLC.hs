@@ -151,7 +151,7 @@ blockhello (p):
   mkData_Unit()
 
 -}
-hello = [("hello", bindE "v" (mPrint `app` var "p") $ \v -> ret mkUnit)]
+hello = [("hello", bindE "_" (mPrint `app` lit 0) $ \_ -> ret mkUnit)]
 
 {- Monadic compose (from mon6)
 
@@ -1049,7 +1049,12 @@ uncurry_fig_eg = do
       toIntP = mkFirst (BlockEntry "toInt" toInt ["s"]) <*>
                mkLast (Done "toInt" toInt (Prim "toInt" ["s"]))
   return $ mainP |*><*| k0P |*><*| k1P |*><*| addP |*><*| toIntP
-    
+
+mil_print = [("hello", bindE "_" (mPrint `app` lit 0) $ \_ -> ret mkUnit)
+            ,("main", 
+                    bindE "_" (var "hello") $ \_ -> 
+                    bindE "_" (var "hello") $ \_ -> ret mkUnit)]
+                     
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
 

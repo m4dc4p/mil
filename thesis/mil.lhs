@@ -645,24 +645,24 @@ computed, \var t3/.
 
 \subsection*{Monadic Programs}
 
-\intent{Motivate monadic thunks.}
-
 \intent{Contrast pure and monadic values.}  Consider the \lamC
-expressions in Figure~\ref{mil_fig_monadic}. Neither takes any
-arguments; it's valid to evaluate each expression once and re-use the
-result. However, the \emph{value} produced by |m| represents a
-computation that must be executed. If |m| were not treated as a
-computation, the program |do { v1 <- m; v2 <- m; return v1 + v2; }|
-would have a vastly different effect (i.e., it would only print
-|"hello"| once).
+functions in Figure~\ref{mil_fig_monadic}.\footnote{Some syntactic
+  liberties have been taken here. \lamC only supports monadic binding,
+  so |print 0| really represents |_ <- print 0|. Integers are not
+  directly part of the language, either.} Neither takes any arguments
+and they ostensibly produce the same sum. Of course, the value
+produced by the \emph{pure} function in
+Part~\subref{mil_fig_monadic_pure} differs markedly from that produced
+by the \emph{impure} function in
+Part~\subref{mil_fig_monadic_comp}. 
 
 \begin{myfig}
   \begin{tabular}{cc}
-    |f = 1 + 2| & 
-    \begin{minipage}{\widthof{|do {print "hello";}|}}[t]
-      |m = do 
-         print "hello"
-         return 1 + 2 |
+    |f = 1| & 
+    \begin{minipage}{\widthof{|do {print "hello";}|}}
+> m = do 
+>   p 0
+>   return 1
     \end{minipage} \\
     \scap{mil_fig_monadic_pure} & \scap{mil_fig_monadic_comp}
   \end{tabular}
@@ -670,39 +670,92 @@ would have a vastly different effect (i.e., it would only print
   \label{mil_fig_monadic}
 \end{myfig}
 
-\intent{Introduce monadic thunks.} In \lamC and MIL, we say monadic
-programs create \emph{monadic thunks}. Historically, thunks 
-represented \emph{suspended} computation; the term can be synonymous
-with closures, in fact. We use it in the same sense here, in that |m|
-represents a computation that must be invoked explicitly --- we do
-not directly evaluate |m|.
+\intent{Introduce monadic thunks.}  Intuitively, |f| returns an
+integer, but |m| returns a \emph{computation}. We call this
+computation a \emph{monadic thunk}, as coined in the Habit Compiler
+Report \citep{HabitComp2010}. Traditionally, thunks have represented
+\emph{suspended} computation. We use it in the same sense here, in
+that |m| evaluates to a program that we can invoke; further,
+evaluating |m| alone will \emph{not} invoke the computation --- we (or
+our run-time) must actively invoke the computation before it will
+produce a result.
 
-To illustrate, consider the program in Figure~\ref{mil_fig_let}. For 
-convenience, we ignore the result of |print| by using a varialbed
-``named'' "|_|". 
+\intent{Show how MIL thunks are used.}  To illustrate, consider the
+\lamC functions in Figure~\ref{mil_fig_hello_a}.\footnote{Again, some
+  syntactic liberties are taken.} Part~\subref{mil_fig_hello_b} shows
+the corresponding MIL code for each. On
+Line~\ref{mil_fig_thunk_hello}, \lab hello/ returns a thunk pointing
+\lab m201/. \lab m201/ represents the body of |hello|; it calls
+primitives which we elide. The \lab main/ block, however, shows how we
+invoke the thunk returned by \lab hello/. On
+Line~\ref{mil_fig_get_hello1}, \lab hello/ is called, and the thunk
+returned is bound to the variable \var v207/. On the next line, the
+thunk is invoked. Lines~\ref{mil_fig_get_hello2} and
+\ref{mil_fig_invoke_hello2} show the same operation again. In other
+words, \lab main/ executes the \lab hello/ function twice, producing
+an effect each time.
 
 \begin{myfig}
-  \begin{tabular}{c}
-    \begin{minipage}{\hsize}
-> print x = print* x
+  \begin{tabular}{cc}
+    \begin{minipage}{\widthof{|hello = print "hello"|}}
+> hello = do
+>   print 0
+>
+> main = do
+>   hello
+>   hello
+    \end{minipage} &
+    \begin{minipage}{4in}
+      \begin{AVerb}[gobble=8,numbers=left]
+        \block hello(): mkthunk[m201:] \label{mil_fig_thunk_hello}
+        \block m201():
+          \ldots
+
+          \block main(): 
+            \vbinds v207 <- \goto hello(); \label{mil_fig_get_hello1}
+            \vbinds \_ <- \invoke v207/; \label{mil_fig_invoke_hello1}
+            \vbinds v206 <- \goto hello(); \label{mil_fig_get_hello2}
+            \vbinds \_ <- \invoke v206/; \label{mil_fig_invoke_hello2}
+      \end{AVerb}
+    \end{minipage} \\
+    \scap{mil_fig_hello_a} & \scap{mil_fig_hello_b}
+  \end{tabular}
+  \caption{Part~\subref{mil_fig_hello_a} shows two monadic \lamC
+    functions. The MIL blocks that create and use monadic thunks to
+    execute |main| are shown in Part~\subref{mil_fig_hello_b}.}
+  \label{mil_fig_hello}
+\end{myfig}
+
+\intent{Monadic thunks are like closures; but \cc blocks for thunks do
+  not exist.}  Thunks can capture variables just like closures, but
+unlike closures they are not progressively ``built up'' across
+multiple blocks. A series of \lamC bind statements also execute
+together --- they are not split into multiple
+blocks. Figure~\ref{mil_fig_kleisli} illustrates these
+concepts. Part~\subref{mil_fig_kleisli_a} shows monadic compose (or
+``Kleisli'' composition\footnote{reference?}). 
+
+\begin{myfig}
+  \begin{tabular}{cc}
+    \begin{minipage}{\widthof{|kleisli f g x = do|}}
+> kleisli f g x = do
+>   v <- g x
+>   f v
+    \end{minipage} &
+    \begin{minipage}{4in}
+      \begin{AVerb}[gobble=8,numbers=left]
+        kleisli (g, f, x):
+        v209 <- g @@ x
+        v1 <- invoke v209
+        v208 <- f @@ v1
+        v2 <- invoke v208
+        v206 <- return()
+        v207 <- v206 @@ v2
+        invoke v207
+      \end{AVerb}
     \end{minipage}
   \end{tabular}
 \end{myfig}
-
-\intent{Point out that monadic thunks are not just for optimization; |let| 
-  example.}
-
-\lamC provides direct support for programs of the form |do { a <- t_1;
-}|. For example, the following program reads a character from input and
-prints it out:
-
-> m = do
->   c <- readChar
->   print c
-
-\nonindet If |m| were a pure expression, we could easily see that represents a value, because
-it takes no arguments and has no side-effects. However, |m| is not pure; instead,
-it is a \emph{monadic computation}.  like |m| create pure expressions. In particular, |m| 
 
 %% Syntax of MIL
 \section{MIL Syntax}
