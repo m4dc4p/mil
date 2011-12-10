@@ -72,18 +72,18 @@ requires that we accomplish two tasks: create a new function
 definition, and generate code to create the closure representing the
 function.
 
-> compileStmt body@(ELam (Ident v _) _ b) ctx = withFree (const (setFree body)) $ \free -> do
+> compileStmt body@(ELam (Ident v _) _ b) ctx = withFree (const (setFree b)) $ \free -> do
 >   dest <- withNewDest "k" $ \(uniqueName, l) -> do
 >     rest <- case b of
 >               (ELam _ _ _) -> compileStmt b (return . mkLast . Done uniqueName l)
 >               _ -> do 
->                 dest <- blockDefn "b" (free ++ [v]) 
+>                 dest <- blockDefn "b" (free) 
 >                   (\bn bl -> compileStmt b (return . mkLast . Done bn bl))
->                 return (mkLast (Done uniqueName l (Goto dest (free ++ [v]))))
->     addProg (mkFirst (CloEntry uniqueName l free v) <*> rest)
+>                 return (mkLast (Done uniqueName l (Goto dest (free))))
+>     addProg (mkFirst (CloEntry uniqueName l (v `delete` free) v) <*> rest)
 >     return (uniqueName, l)
 >   addDest dest
->   ctx (Closure dest free)
+>   ctx (Closure dest (v `delete` free))
 
 EBind evaluates its right-hand side as a monadic value. Therefore, the 
 translated code for the monadic expression will evaluate to a monadic
@@ -184,7 +184,7 @@ present in the current arm, so |compAlt| starts with a call to |setFree body|
 so compiliation of the body sees the appropriate free variables.
 
 >   compAlt (Alt cons vs body) = withFree (const (setFree body)) $ \afvs -> do
->     altDest <- blockDefn (mkName "altBody" cons) afvs $ \n l -> do
+>     altDest <- blockDefn (mkName "alt" cons) afvs $ \n l -> do
 
 The block for the arm evaulates the body of the arm and places it in
 a new variable. The block ends by returning the value of that variable.
