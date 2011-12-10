@@ -676,9 +676,9 @@ computation a \emph{monadic thunk}, as coined in the Habit Compiler
 Report \citep{HabitComp2010}. Traditionally, thunks have represented
 \emph{suspended} computation. We use it in the same sense here, in
 that |m| evaluates to a program that we can invoke; moreover,
-evaluating |m| alone will \emph{not} invoke the computation --- we (or
-our run-time) must actively invoke the computation before it will
-produce a result.
+evaluating |m| alone will \emph{not} invoke the computation --- |m|
+must be evaluated and then invoked before the computation will produce
+a result.
 
 \intent{Show how MIL thunks are used.}  To illustrate, consider the
 \lamC functions in Figure~\ref{mil_fig_hello_a}.\footnote{Again, some
@@ -729,33 +729,52 @@ an effect each time.
 \intent{Monadic thunks are like closures; but \cc blocks for thunks do
   not exist.}  Thunks can capture variables just like closures, but
 unlike closures they are not progressively ``built up'' across
-multiple blocks. A series of \lamC bind statements also execute
-together --- they are not split into multiple
-blocks. Figure~\ref{mil_fig_kleisli} illustrates these
-concepts. Part~\subref{mil_fig_kleisli_a} shows monadic compose (or
-``Kleisli'' composition\footnote{reference?}). 
+multiple blocks. Figure~\ref{mil_fig_kleisli} illustrates this
+concept. Part~\subref{mil_fig_kleisli_a} shows the monadic, or
+``Kleisli,'' \citep{KleisliXX} composition function. Part~\subref{mil_fig_kleisli_b}
+shows the corresponding MIL code. The blocks \lab k201/, \lab k202/, and \lab k203/
+progressively capture the arguments to |kleisli|. \lab b204/ constructs
+the thunk for |kleisli|, but only after all arguments have been captured. 
+
+\intent{Illustrate that bind statements all run when a thunk is
+  invoked.}  The value returned by \lab b204/ in
+Figure~\ref{mil_fig_kleisli_b} must be invoked before \lab m205/ will
+execute. However, \lab m205/ does not suspend the computations
+represented by \app g * x/ or \app f * v/, even though they are also
+monadic. In general, all bind statements in a given |do| block will be
+invoked once the |do| block itself is invoked.
 
 \begin{myfig}
-  \begin{tabular}{cc}
-    \begin{minipage}{\widthof{|kleisli f g x = do|\quad}}
+  \begin{tabular}{c}
+    \begin{minipage}{\widthof{|kleisli f g x = do|}}
 > kleisli f g x = do
 >   v <- g x
 >   f v
-    \end{minipage} &
-    \begin{minipage}{\widthof{\ \ \binds v2 <- \invoke v208/;}}
+    \end{minipage} \\
+    \scap{mil_fig_kleisli_a} \\
+    \begin{minipage}{\widthof{\ \ \block b204 (g, x, f): \mkthunk[m205:g, x, f]}}
       \begin{AVerb}[gobble=8,numbers=left]
-        \block kleisli (g, f, x):
+        \block kleisli (): \mkclo[k201:]
+        \ccblock k201()f: \mkclo[k202:f]
+        \ccblock k202(f)g: \mkclo[k203:g, f]
+        \ccblock k203(g, f)x: \goto b204(g, x, f)
+        \block b204 (g, x, f): \mkthunk[m205:g, x, f]
+
+        \block m205 (g, x, f):
           \vbinds v209 <- \app g * x/;
           \vbinds v1 <- \invoke v209/;
           \vbinds v208 <- \app f * v1/;
           \vbinds v2 <- \invoke v208/;
-          \vbinds v206 <- \goto return()/;
+          \vbinds v206 <- \goto return();
           \vbinds v207 <- \app v206 * v2/;
-          \invoke v207/;
+          \invoke v207/
       \end{AVerb}
-    \end{minipage}
+    \end{minipage} \\\\
+    \scap{mil_fig_kleisli_b} \\
   \end{tabular}
-  \caption{Kliesli compose.}
+  \caption{Part~\subref{mil_fig_kleisli_a} shows a monadic composition function 
+    (also known as ``Kliesli'' composition). Part~\subref{mil_fig_kleisli_b} shows
+  a MIL program representing the same functipn.}
   \label{mil_fig_kleisli}
 \end{myfig}
 
@@ -763,24 +782,20 @@ concepts. Part~\subref{mil_fig_kleisli_a} shows monadic compose (or
 \section{MIL Syntax}
 
 Figure \ref{mil_fig3} gives the syntax for MIL.  A MIL program
-consists of a number of \emph{blocks}: \emph{closure} blocks (line
-\ref{mil_k1_fig3}), basic blocks (line \ref{mil_b_fig3}) and top-level
-blocks (line \ref{mil_t_fig3}). Though the syntax for closure blocks
-seems to allow any tail, in practice they can only do one of two
-things: either return a closure (\texttt{k \{\dots\}}) or jump to a
-basic block (\texttt{b(\dots)}). Top-level blocks (line
-\ref{mil_t_fig3}) provide an entry point for top-level functions --
-they provide a closure which can be used to initially ``enter'' the
-function.
+consists of a number of \emph{blocks}. Blocks come in two types:
+\emph{\cc} blocks \eqref{mil_syntax_cc} and basic blocks
+\eqref{mil_syntax_block}. Though the syntax for closure blocks allows
+any \term tail/, in practice they either return a closure
+(\mkclo[k:v_1, \dots, v_n]) or jump to a block (\goto b(v_1, \dots,
+v_n)). 
 
 \input{mil_syntax}
 
-Basic blocks (line \ref{mil_body_fig3}) consist of a sequence of statements that
-execute in order without any intra-block jumps or conditional
-branches. Each basic block ends with a branch: either they return a
-value (!+done+!) or take conditional branch (!+case+!). Conditional
-branches can specify multiple destinations, though at any given time
-only one will be taken.
+Basic block bodies \eqref{mil_syntax_body} consist of a sequence of
+statements that execute in order without any intra-block jumps or
+conditional branches. Each basic block ends by evaluating a \term
+tail/ or a conditional branch. A block body cannot end with a 
+bind statement.
 
 The !+case+! statement (line \ref{mil_case_fig3}) specifies a list of
 \emph{alternatives}, each of which matches a \emph{constructor} and

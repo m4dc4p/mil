@@ -123,10 +123,10 @@ printStmtM (Done _ _ t) = printTailM t
 printTailM :: TailM -> Doc
 printTailM (Return n) = text "return" <+> text n
 printTailM (Enter f a) = text f <+> text "@" <+> text a
-printTailM (Closure dest vs) = text "closure" <+> printDest dest <+> braces (commaSep text vs)
+printTailM (Closure dest vs) = printDest dest <+> braces (commaSep text vs)
 printTailM (Goto dest vs) = printDest dest <> parens (commaSep text vs)
 printTailM (ConstrM cons vs) = text cons <> text "*" <+> (hsep $ texts vs)
-printTailM (Thunk dest vs) = text "thunk" <+> printDest dest <+> brackets (commaSep text vs)
+printTailM (Thunk dest vs) = printDest dest <+> brackets (commaSep text vs)
 printTailM (Run v) = text "invoke" <+> text v
 printTailM (Prim p vs) = text p <> text "*" <> parens (commaSep text vs)
 printTailM (LitM n) = text ("num " ++ show n)
