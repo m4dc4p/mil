@@ -797,43 +797,38 @@ conditional branches. Each basic block ends by evaluating a \term
 tail/ or a conditional branch. A block body cannot end with a 
 bind statement.
 
-The !+case+! statement (line \ref{mil_case_fig3}) specifies a list of
-\emph{alternatives}, each of which matches a \emph{constructor} and
-binds new variables to the values held by the constructor. !+case+!
-examines the variable given (note, this cannot be an expression) and
-selects the alternative that matches the constructor
-found. Alternatives always branch immediately to some block -- they do
-not allow any other statement. The result of block called becomes the
-result of the !+case+!, which in turn becomes the result of the calling
-block.
-
-Only the binding statement (line \ref{mil_bind_fig3}) can appear multiple
+The bind statement \eqref{mil_syntax_body} can appear multiple
 times in a block. Each binding assigns the result of the \emph{tail}
-on the right-hand side to a variable on the left. If a variable is
-bound more than once, later bindings will ``shadow'' previous
+on the \rhs to a variable on the left. If a variable is
+bound more than once, later bindings will shadow previous
 bindings.
 
-The !+done+! statement (line \ref{mil_done_fig3}) ends a block and returns
-the value of tail expression specified.
+The \milres case/ statement \eqref{mil_syntax_case} examines a
+discriminant and selects one alternative based on the value found. The
+discriminant is always a simple variable, not an expresssion. Each
+alternative \eqref{mil_syntax_alt} specifies a \emph{constructor} and
+variables for each value held by the constructor. Alternatives always
+jump immediately to a block --- they do not allow any other statement.
 
 \emph{Tail} expressions represent effects -- they create monadic
-values. !+return+! (line \ref{mil_return_fig3}) takes a variable and
-makes its value monadic. Notice it can only take a variable, not an
-expression.  The ``enter'' operator, !+@@+!, expects a closure on its
-left and some value on the right. It will enter the function pointed
-to by the closure, with the argument given, and will evaluate to the
-result of that function. !+k+!, the ``capture'' operator, creates a
-closure from a block name and a list of variables. The name given is
-not an arbitrary code pointer -- it is a location determined during
-compilation. The ``goto'' expression, \texttt{b(\dots)}, jumps to the
-particular block with the arguments given. Again, this is not a
-computed value -- !+b+! represents a known location for the block. The
-variables mentioned in the !+goto+! do not have to have the same names
-as those given in the block's declaration. The constructor expression,
-``C'', will create a data value with the given tag (``C'') and
-variables. Primitives, which are not implemented in MIL, have the form
-!+p*+! and are treated the same as ``goto'' expressions. They are not 
-implemented in MIL, however. 
+values. \milres return/+! \eqref{mil_syntax_return} takes a variable
+and makes its value monadic. Notice it can only take a variable, not
+an expression.  The ``enter'' operator, \enter
+\eqref{mil_syntax_enter}, expects a closure on its left and some value
+on the right. It will enter the function pointed to by the closure,
+with the argument given, and will evaluate to the result of that
+function. !+k+!, the ``capture'' operator, creates a closure from a
+block name and a list of variables. The name given is not an arbitrary
+code pointer -- it is a location determined during compilation. The
+``goto'' expression, \texttt{b(\dots)}, jumps to the particular block
+with the arguments given. Again, this is not a computed value -- !+b+!
+represents a known location for the block. The variables mentioned in
+the !+goto+! do not have to have the same names as those given in the
+block's declaration. The constructor expression, ``C'', will create a
+data value with the given tag (``C'') and variables. Primitives, which
+are not implemented in MIL, have the form !+p*+! and are treated the
+same as ``goto'' expressions. They are not implemented in MIL,
+however.
 
 \section{Compiling \lamA to MIL}
 \label{mil_sec4}

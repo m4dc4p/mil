@@ -171,9 +171,10 @@
 
 %% Uncurrrying Chapter 
 %% A space equal to a \thinspace, but we
-%% break a line at it.
+%% can break a line at it.
 \newskip\thinskipamt \thinskipamt=.16667em 
 \protected\def\thinskip{\hskip \thinskipamt\relax}
+\protected\def\thinnerskip{\hskip .5\thinskipamt\relax}
 %% Capture a space token. Use a ``control-symbol'' (\. instead of \mksp)
 %% to keep the trailing space from getting gobbled.
 {\def\.{\global\let\sp= } \. }

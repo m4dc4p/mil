@@ -1,6 +1,7 @@
 \begin{myfig}
 \begin{tabular}{r@{}lrr}
-  \termrule block:{\ccblock k(v_1, \dots, v_n)v:\ \term tail/}:Closure-Capturing Block/& \labeleq{mil_syntax_cc}\eqref{mil_syntax_cc} \\
+  %% The kern below makes the space between "v" and ":" look better.
+  \termrule block:{\ccblock k(v_1, \dots, v_n)v\kern.07em:\ \term tail/}:Closure-Capturing Block/& \labeleq{mil_syntax_cc}\eqref{mil_syntax_cc} \\
   \termcase {\block b(v_1, \dots, v_n):\ \term body/}:Basic Block/ &  \labeleq{mil_syntax_block}\eqref{mil_syntax_block} \\
   %% This row ensures the table fills the width of the page
   \multicolumn{4}{l}{\dimen0=-12pt \advance\dimen0\linewidth \hbox to \dimen0{}}\\
