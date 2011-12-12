@@ -56,7 +56,11 @@
 \hyphenation{data-flow mo-na-dic} 
 
 %% Should unindent all haskell code set in a dispay (versus inline)
-\renewcommand{\hscodestyle}{\advance\leftskip -\mathindent}
+\makeatletter
+  \@ifundefined{hscodestyle}
+               {}
+               {\renewcommand{\hscodestyle}{\advance\leftskip -\mathindent}}
+\makeatother
 
 % Used by included files to know they
 % are NOT standalone

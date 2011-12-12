@@ -1,35 +1,34 @@
 \begin{myfig}
-\begin{tabular}{r@{}lrr}
+\begin{centering}\begin{tabular}{r@{}lrl}
   %% The kern below makes the space between "v" and ":" look better.
   \termrule block:{\ccblock k(v_1, \dots, v_n)v\kern.07em:\ \term tail/}:Closure-Capturing Block/& \labeleq{mil_syntax_cc}\eqref{mil_syntax_cc} \\
   \termcase {\block b(v_1, \dots, v_n):\ \term body/}:Basic Block/ &  \labeleq{mil_syntax_block}\eqref{mil_syntax_block} \\
-  %% This row ensures the table fills the width of the page
-  \multicolumn{4}{l}{\dimen0=-12pt \advance\dimen0\linewidth \hbox to \dimen0{}}\\
 
-  \termrule body:\rlap{\begin{minipage}[t]{2in}\disableparspacing;%%
+  \termrule body:\rlap{\begin{minipage}[t]{\widthof{\quad\term stmt_1/}}\disableparspacing;%%
       \term stmt_1/\endgraf%%
       $\dots$\endgraf%%
       \term stmt_n/\end{minipage}}:Block Body/ &  \labeleq{mil_syntax_body}\eqref{mil_syntax_body} \\\\
 
   \termrule stmt:{\binds v\ <-\ \term tail/;}:Bind/ &  \labeleq{mil_syntax_stmt}\eqref{mil_syntax_stmt} \\
-  \termcase {\begin{minipage}[t]{3in}\disableparspacing;%%
+  \termcase {\begin{minipage}[t]{\widthof{\quad\case v;}}\disableparspacing;%%
       \case v;\endgraf%%
       \quad \term alt_1/\endgraf%%
       \quad $\dots$\endgraf%%
       \quad \term alt_n/%%
   \end{minipage}}:Case Discrimination/ &  \labeleq{mil_syntax_case}\eqref{mil_syntax_case} \\
-  \termcase \term tail/:Tail Expression/ &  \labeleq{mil_syntax_done}\eqref{mil_syntax_done} \\\\
+  \termcase \term tail/:Tail Expression/ \\\\
+
+  \termrule alt:\alt C(v_1\ \dots\ v_n) -> \goto b(v_1, \dots, v_n);:Case Alternative/ &  \labeleq{mil_syntax_alt}\eqref{mil_syntax_alt} \\\\
 
   \termrule tail:{\return v;}:Return/ &  \labeleq{mil_syntax_return}\eqref{mil_syntax_return} \\
   \termcase \app v_1 * \ v_2/:Enter/ &  \labeleq{mil_syntax_enter}\eqref{mil_syntax_enter} \\
+  \termcase \invoke v/:Execute Thunk/ &  \labeleq{mil_syntax_invoke}\eqref{mil_syntax_invoke} \\
   \termcase \goto b(v_1, \dots, v_n):Goto Block/ &  \labeleq{mil_syntax_goto}\eqref{mil_syntax_goto} \\
   \termcase \prim p(v_1, \dots, v_n):Goto Primitive/ &  \labeleq{mil_syntax_prim}\eqref{mil_syntax_prim} \\
-  \termcase \invoke v/:Execute Thunk/ &  \labeleq{mil_syntax_invoke}\eqref{mil_syntax_invoke} \\
   \termcase {\mkclo[k:v_1, \dots, v_n]}:Allocate Closure/ &  \labeleq{mil_syntax_clo}\eqref{mil_syntax_clo} \\
   \termcase {\mkthunk[m:v_1, \dots, v_n]}:Allocate Monadic Thunk/ &  \labeleq{mil_syntax_thunk}\eqref{mil_syntax_thunk}\\
-  \termcase \ensurett{C\ v_1\ \dots\ v_n}:Allocate Data/ &  \labeleq{mil_syntax_cons}\eqref{mil_syntax_cons} \\\\
+  \termcase \ensurett{C\ v_1\ \dots\ v_n}:Allocate Data/ &  \labeleq{mil_syntax_cons}\eqref{mil_syntax_cons} 
 
-  \termrule alt:\alt C(v_1\ \dots\ v_n) -> \goto b(v_1, \dots, v_n);:Case Alternative/ &  \labeleq{mil_syntax_alt}\eqref{mil_syntax_alt}
   %% $alt$ := C $v_1$ \dots $v_n$ -> b(\dots) \\\\
   %% $v$ represents a variable, and only a variable. Expressions
   %% cannot be used where $v$ appears. \\ 
@@ -37,6 +36,7 @@
   %% \texttt{C $v_1$ \dots $v_n$} represents a constructor, for creating
   %% values in $tail$ expressions and inspecting values in $alt$ arms. \\
 \end{tabular}
-\caption{MIL syntax.}
+\end{centering}
+\caption{Complete syntax for MIL.}
 \label{mil_fig3}
 \end{myfig}
