@@ -19,7 +19,7 @@ import Compiler.Hoopl
 
 import Util
 
-type ProgM = Graph StmtM
+type ProgM = Graph Stmt
 type Dest = (Name, Label)
 type Env = [Name]
 
@@ -53,36 +53,36 @@ Our monadic language:
            defMN
 -}
 
-data StmtM e x where
+data Stmt e x where
   -- | Entry point to a block.
   BlockEntry :: Name -- Name of the block
     -> Label    -- Label of the entry point.
     -> [Name] -- arguments
-    -> StmtM C O
+    -> Stmt C O
 
   -- | Entry point to a closure-capturing block.
   CloEntry :: Name -- Name of the block
     -> Label    -- Label of the entry point.
     -> [Name]   -- Variables in closure
     -> Name     -- argument
-    -> StmtM C O
+    -> Stmt C O
   
   Bind :: Name      -- Name of variable that will be bound.
-    -> TailM    -- Expression that computes the value we want.
-    -> StmtM O O    -- Open/open since bind does not end an expression
+    -> Tail    -- Expression that computes the value we want.
+    -> Stmt O O    -- Open/open since bind does not end an expression
   
   CaseM :: Name      -- Variable to inspect
-    -> [Alt TailM] -- Case arms
-    -> StmtM O C
+    -> [Alt Tail] -- Case arms
+    -> Stmt O C
       
   Done :: Name -- ^ Name of this block
     -> Label -- ^ Label of this block
-    -> TailM  -- Finish a block.
-    -> StmtM O C
+    -> Tail  -- Finish a block.
+    -> Stmt O C
 
--- | TailM concludes a list of statements. Each block ends with a
--- TailM except when CaseM ends the blocks.
-data TailM = Return Name 
+-- | Tail concludes a list of statements. Each block ends with a
+-- Tail except when CaseM ends the blocks.
+data Tail = Return Name 
   | Enter -- ^ Enter a closure.
     Name  -- ^ Variable holding the closure.
     Name  -- ^ Argument to the function.
@@ -109,7 +109,7 @@ data TailM = Return Name
   deriving (Eq, Ord, Show)
 
 -- Pretty printing programs
-printStmtM :: StmtM e x -> Doc
+printStmtM :: Stmt e x -> Doc
 printStmtM (Bind n b) = text n <+> text "<-" <+> nest 2 (printTailM b)
 printStmtM (BlockEntry f l args) = text f <+> 
                                   parens (commaSep text args) <> text ":" 
@@ -120,7 +120,7 @@ printStmtM (CaseM v alts) = hang (text "case" <+> text v <+> text "of") 2 (vcat'
     printAlt (Alt cons vs tailM) = text cons <+> hsep (texts vs) <+> text "->" <+> printTailM tailM
 printStmtM (Done _ _ t) = printTailM t
 
-printTailM :: TailM -> Doc
+printTailM :: Tail -> Doc
 printTailM (Return n) = text "return" <+> text n
 printTailM (Enter f a) = text f <+> text "@" <+> text a
 printTailM (Closure dest vs) = printDest dest <+> braces (commaSep text vs)
@@ -142,21 +142,21 @@ printBlockM = p . blockToNodeList'
                        (vcat' (map printStmtM bs) $+$
                         maybeC empty printStmtM x)
 
-instance NonLocal StmtM where
+instance NonLocal Stmt where
   entryLabel (BlockEntry _ l _) = l
   entryLabel (CloEntry _ l _ _) = l
   successors = stmtSuccessors
                         
-stmtSuccessors :: StmtM e C -> [Label]
+stmtSuccessors :: Stmt e C -> [Label]
 stmtSuccessors (CaseM _ alts) = [l | (Alt _ _ (Goto (_, l) _)) <- alts]
 stmtSuccessors (Done _ _ (Goto (_, l) _)) = [l]
 stmtSuccessors _ = []
 
-tailSuccessors :: TailM -> [Dest]
+tailSuccessors :: Tail -> [Dest]
 tailSuccessors (Goto dest _) = [dest]
 tailSuccessors _ = []
 
-tailDest :: TailM -> [Dest]
+tailDest :: Tail -> [Dest]
 tailDest (Closure dest _) = [dest]
 tailDest (Thunk dest _) = [dest]
 tailDest (Goto dest _) = [dest]
@@ -166,7 +166,7 @@ tailDest _ = []
 
 -- | Get all the labels at entry points in 
 -- the program.
-entryPoints :: ProgM C C -> [(Label, StmtM C O)]
+entryPoints :: ProgM C C -> [(Label, Stmt C O)]
 entryPoints (GMany _ blocks _) = map getEntryLabel (mapElems blocks)
 
 -- | Get all entry labels in a program.
@@ -174,28 +174,28 @@ entryLabels :: ProgM C C -> [Label]
 entryLabels = map fst . entryPoints 
 
 -- | Entry label of a block, pllus the entry instruction.
-getEntryLabel :: Block StmtM C x -> (Label, StmtM C O)
+getEntryLabel :: Block Stmt C x -> (Label, Stmt C O)
 getEntryLabel block = case blockToNodeList' block of
   (JustC e@(BlockEntry _ l _), _, _) -> (l, e)
   (JustC e@(CloEntry _ l _ _), _, _) -> (l, e)
 
 -- | Find a block with a given label in the propgram
 -- and return it paired with it's label and name.
-blockOfLabel :: ProgM C C -> Label -> Maybe (Dest, Block StmtM C C)
+blockOfLabel :: ProgM C C -> Label -> Maybe (Dest, Block Stmt C C)
 blockOfLabel body l = case lookupBlock body l of
                   BodyBlock block -> Just (blockToDest block)
                   _ -> Nothing
 
-destOfEntry :: StmtM C O -> Dest
+destOfEntry :: Stmt C O -> Dest
 destOfEntry (BlockEntry n l _) = (n, l)
 destOfEntry (CloEntry n l _ _) = (n, l)
 
 -- | Constructin destination label for a given block.
-blockToDest :: Block StmtM C C -> (Dest, Block StmtM C C)
+blockToDest :: Block Stmt C C -> (Dest, Block Stmt C C)
 blockToDest block = (destOfEntry (blockEntry block), block)
 
 -- | Get the first instruction in a block.
-blockEntry :: Block StmtM C C -> StmtM C O
+blockEntry :: Block Stmt C C -> Stmt C O
 blockEntry b = case blockToNodeList' b of
                  (JustC entry, _, _) -> entry
 
@@ -206,13 +206,13 @@ labelToDest :: ProgM C C -> Label -> Maybe Dest
 labelToDest prog l = maybe Nothing (Just . fst) (blockOfLabel prog l)
 
 -- | Pair all blocks with their destination.    
-allBlocks :: ProgM C C -> [(Dest, Block StmtM C C)]
+allBlocks :: ProgM C C -> [(Dest, Block Stmt C C)]
 allBlocks (GMany _ blocks _) = map blockToDest (mapElems blocks)
 
 -- | Get the tail of a block. Will exclude
 -- the entry instruction (if C C) or the
 -- first instruction in the block (O C)
-blockTail :: Block StmtM x C -> ProgM O C
+blockTail :: Block Stmt x C -> ProgM O C
 blockTail b = case blockToNodeList' b of
                 (_, mid, JustC end) -> mkMiddles mid <*> mkLast end
 
@@ -238,15 +238,15 @@ allSuccessors prog =
       | otherwise = allSucc ds s
 
 -- | Create a Done statement if a Tail is given.
-done :: Monad m => Name -> Label -> Maybe TailM -> m (Maybe (ProgM O C))
+done :: Monad m => Name -> Label -> Maybe Tail -> m (Maybe (ProgM O C))
 done n l = return . maybe Nothing (Just . mkLast . Done n l)
 
 -- | Create a Bind statement if a Tail is given.
-bind :: FuelMonad m => Name -> Maybe TailM -> m (Maybe (ProgM O O))
+bind :: FuelMonad m => Name -> Maybe Tail -> m (Maybe (ProgM O O))
 bind v = return . maybe Nothing (Just . mkMiddle . Bind v)
 
 -- | Create a case statement if alts are given.
-_case :: FuelMonad m => Name -> (Alt TailM -> Maybe (Alt TailM)) -> [Alt TailM] -> m (Maybe (ProgM O C))
+_case :: FuelMonad m => Name -> (Alt Tail -> Maybe (Alt Tail)) -> [Alt Tail] -> m (Maybe (ProgM O C))
 _case v f alts  
   | any isJust alts' = return $ Just $ mkLast $ CaseM v (zipWith altZip alts alts')
   | otherwise = return $ Nothing
@@ -256,11 +256,11 @@ _case v f alts
     altZip a _ = a
 
 -- | Retrieve the name associated with a block (entry statemen).
-nameOfEntry :: StmtM C O -> Name
+nameOfEntry :: Stmt C O -> Name
 nameOfEntry = fst . destOfEntry
 
 -- | Retrieve all variables mentioned in a tail value.
-vars :: TailM -> [Name]
+vars :: Tail -> [Name]
 vars (Enter f x) = [f, x]
 vars (Closure _ vs) = vs
 vars (Goto _ vs) = vs
@@ -494,7 +494,7 @@ type EmptyFact = ()
 
 -- | A no-op transfer function. Used by rewriters that
 -- don't gather any new facts.
-noOpTrans :: StmtM e x -> Fact x EmptyFact -> EmptyFact
+noOpTrans :: Stmt e x -> Fact x EmptyFact -> EmptyFact
 noOpTrans _ _ = ()
 
 -- | Lattice with only one element and no changes.
@@ -518,7 +518,7 @@ mkRenamer orig new n =
 
 -- | Rename all variables in the tail value given, using
 -- the renaming function provided.
-renameTail :: (Name -> Name) -> TailM -> TailM
+renameTail :: (Name -> Name) -> Tail -> Tail
 renameTail r (Return v) = Return (r v)
 renameTail r (Enter f x) = Enter (r f) (r x)
 renameTail r (Closure dest vs) = Closure dest (map r vs)

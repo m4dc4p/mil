@@ -33,11 +33,11 @@
 > 
 > -- | Blocks we can inline will be stored in the map, by 
 > -- label/name. 
-> type ReturnPrimBlocks = Map Dest (TailM, Env)
+> type ReturnPrimBlocks = Map Dest (Tail, Env)
 > 
 > -- | Indicates what kind of instruction can be inlined
 > -- from a block. 
-> type ReturnType = Maybe (TailM, Env)
+> type ReturnType = Maybe (Tail, Env)
 > 
 > -- | Inline blocks that immediately return a
 > -- tail. Closure entry blocks are NOT inlined
@@ -57,9 +57,9 @@
 >       return body'
 >   where              
 >     labels = entryLabels body
->     initial :: BwdPass SimpleFuelMonad StmtM a -> FactBase a
+>     initial :: BwdPass SimpleFuelMonad Stmt a -> FactBase a
 >     initial bwd = mkFactBase (bp_lattice bwd) (zip labels (repeat (fact_bot (bp_lattice bwd))))
->     bwdRewrite :: ReturnPrimBlocks -> BwdPass SimpleFuelMonad StmtM EmptyFact
+>     bwdRewrite :: ReturnPrimBlocks -> BwdPass SimpleFuelMonad Stmt EmptyFact
 >     bwdRewrite returnBlocks = BwdPass { bp_lattice = rewriteLattice
 >                                       , bp_transfer = mkBTransfer noOpTrans
 >                                       , bp_rewrite = inlineReturnRewrite returnBlocks }
@@ -67,7 +67,7 @@
 >     rewriteLattice = DataflowLattice { fact_name = "Goto/Return"
 >                                      , fact_bot = ()
 >                                      , fact_join = extend}
->     bwdAnalysis :: BwdPass SimpleFuelMonad StmtM ReturnType
+>     bwdAnalysis :: BwdPass SimpleFuelMonad Stmt ReturnType
 >     bwdAnalysis = BwdPass { bp_lattice = analysisLattice
 >                           , bp_transfer = inlineReturnTransfer 
 >                           , bp_rewrite = noBwdRewrite }
@@ -77,18 +77,18 @@
 >     extend :: (Eq a) => JoinFun a
 >     extend _ (OldFact old) (NewFact new) = (changeIf (old /= new), new)   
 > 
-> inlineReturnTransfer :: BwdTransfer StmtM ReturnType
+> inlineReturnTransfer :: BwdTransfer Stmt ReturnType
 > inlineReturnTransfer = mkBTransfer bw
 >   where
->     bw :: StmtM e x -> Fact x ReturnType -> ReturnType
+>     bw :: Stmt e x -> Fact x ReturnType -> ReturnType
 >     bw (Done _ _ t) f = Just (t, [])
 >     bw block@(BlockEntry _ _ args) (Just (t, _)) = Just (t, args)
 >     bw _ _ = Nothing
 > 
-> inlineReturnRewrite :: FuelMonad m => ReturnPrimBlocks -> BwdRewrite m StmtM EmptyFact
+> inlineReturnRewrite :: FuelMonad m => ReturnPrimBlocks -> BwdRewrite m Stmt EmptyFact
 > inlineReturnRewrite blocks = iterBwdRw (mkBRewrite rewriter)
 >   where
->     rewriter :: FuelMonad m => forall e x. StmtM e x -> Fact x EmptyFact -> m (Maybe (ProgM e x))
+>     rewriter :: FuelMonad m => forall e x. Stmt e x -> Fact x EmptyFact -> m (Maybe (ProgM e x))
 >     rewriter (Bind v (Goto dest vs)) _ = 
 >       case dest `Map.lookup` blocks of
 >         Just (t, succEnv) -> return (Just (mkMiddle (Bind v (renameTail (mkRenamer vs succEnv) t))))

@@ -29,10 +29,10 @@
 > deadCode :: ProgM C C -> ProgM C C
 > deadCode = fst . usingLive deadRewriter []
 > 
-> deadCodePass :: FuelMonad m => [Name] -> BwdPass m StmtM LiveFact
+> deadCodePass :: FuelMonad m => [Name] -> BwdPass m Stmt LiveFact
 > deadCodePass = mkLivePass deadRewriter
 >
-> -- Determining liveness in StmtM
+> -- Determining liveness in Stmt
 
 %endif
 %if deadcode 
@@ -45,9 +45,9 @@ are live at any point. Our ``fact'' is then a set of variables:
 %endif
 %if False
 
-> mkLivePass :: FuelMonad m => (Set Name -> BwdRewrite m StmtM LiveFact) -- ^ Rewrite to use
+> mkLivePass :: FuelMonad m => (Set Name -> BwdRewrite m Stmt LiveFact) -- ^ Rewrite to use
 >            -> [Name] 
->            -> BwdPass m StmtM LiveFact
+>            -> BwdPass m Stmt LiveFact
 > mkLivePass rewriter tops = 
 >   BwdPass { bp_lattice = liveLattice (undefined :: Name) "live statements"
 >           , bp_transfer = liveTransfer (Set.fromList tops)
@@ -55,7 +55,7 @@ are live at any point. Our ``fact'' is then a set of variables:
 
 > -- | Used to apply different rewriters which all require 
 > -- live variable analysis.
-> usingLive :: (forall m. FuelMonad m => Set Name -> BwdRewrite m StmtM LiveFact) -- ^ Rewrite to use
+> usingLive :: (forall m. FuelMonad m => Set Name -> BwdRewrite m Stmt LiveFact) -- ^ Rewrite to use
 >           -> [Name] -- ^ Top-level variables
 >           -> ProgM C C -- ^ Program to rewrite
 >           -> (ProgM C C, FactBase LiveFact) -- Results
@@ -81,17 +81,17 @@ are live at any point. Our ``fact'' is then a set of variables:
 
 Analyzing each statement means we need to find all variables used and
 add them to our set of live variables. The signature |BwdTransfer
-StmtM LiveFact| expresses that this is a backwards analysis over our
+Stmt LiveFact| expresses that this is a backwards analysis over our
 statements, collecting liveness facts. We can also give a set of
 top-level names (|tops|), that ensures we do not see every top-level
 primitive and user-defined function as a ``live'' variable. For
 dead-code elimination this doesn't have any effect.
 \savecolumns
 
-> liveTransfer :: Set Name -> BwdTransfer StmtM LiveFact
+> liveTransfer :: Set Name -> BwdTransfer Stmt LiveFact
 > liveTransfer tops = mkBTransfer live
 >   where
->     live :: StmtM e x -> Fact x LiveFact -> LiveFact
+>     live :: Stmt e x -> Fact x LiveFact -> LiveFact
 
 
 Our analysis treats each type of statement seperately. Entry labels do
@@ -121,14 +121,14 @@ to take the union of all variables used.
 makes sure to remove any variables bound by pattern matching.
 \restorecolumns
 
->     setAlt :: FactBase LiveFact -> Alt TailM -> Set Name
+>     setAlt :: FactBase LiveFact -> Alt Tail -> Set Name
 >     setAlt f (Alt _ ns e) = Set.difference (tailVars e) (Set.fromList ns)
 
 For completeness, we show |tailVars| below. |tailVars| gathers the names used in
 each type of tail expression.
 \restorecolumns
 
->     tailVars :: TailM -> Set Name
+>     tailVars :: Tail -> Set Name
 >     tailVars (Closure _ vs) = Set.fromList vs 
 >     tailVars (Goto _ vs) = Set.fromList vs
 >     tailVars (Enter v1 v2) = Set.fromList [v1, v2]
@@ -155,10 +155,10 @@ each type of tail expression.
 > 
 > -- | Adds live variables to Goto and BlockEntry instructions. Not
 > -- filled in by the compiler - added in this pass instead.
-> addLiveRewriter :: FuelMonad m => Set Name -> BwdRewrite m StmtM LiveFact
+> addLiveRewriter :: FuelMonad m => Set Name -> BwdRewrite m Stmt LiveFact
 > addLiveRewriter tops = mkBRewrite rewrite
 >   where
->     rewrite :: FuelMonad m => forall e x. StmtM e x -> Fact x LiveFact -> m (Maybe (ProgM e x))
+>     rewrite :: FuelMonad m => forall e x. Stmt e x -> Fact x LiveFact -> m (Maybe (ProgM e x))
 >     rewrite (Done n l t) f = done n l (rewriteTail f t)
 >     rewrite (BlockEntry n l args) live 
 >       | Set.difference live tops /= Set.fromList args = blockEntry n l (sort (Set.toList live))
@@ -169,7 +169,7 @@ each type of tail expression.
 >     
 >     rewriteAlt f (Alt c ns t) = maybe Nothing (Just . Alt c ns) (rewriteTail f t)
 > 
->     rewriteTail :: FactBase LiveFact -> TailM -> Maybe TailM
+>     rewriteTail :: FactBase LiveFact -> Tail -> Maybe Tail
 >     rewriteTail f (Goto (n, l) vs) = 
 >       case l `mapLookup` f of
 >         Just vs' 
@@ -207,10 +207,10 @@ indicates it will possibly rewrite statements to graphs of the same
 shape.
 \savecolumns
 
-> deadRewriter :: FuelMonad m => Set Name -> BwdRewrite m StmtM LiveFact
+> deadRewriter :: FuelMonad m => Set Name -> BwdRewrite m Stmt LiveFact
 > deadRewriter _ = mkBRewrite rewrite
 >   where
->     rewrite :: FuelMonad m => forall e x. StmtM e x 
+>     rewrite :: FuelMonad m => forall e x. Stmt e x 
 >                -> Fact x LiveFact 
 >                -> m (Maybe (ProgM e x))
 
@@ -242,7 +242,7 @@ expression.
 %endif
 \restorecolumns
 
->     safe :: TailM -> Bool
+>     safe :: Tail -> Bool
 >     safe (Return _) = True
 >     safe (Closure _ _) = True
 >     safe (ConstrM _ _) = True

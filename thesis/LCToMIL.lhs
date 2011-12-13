@@ -27,7 +27,7 @@ The compilStmtM function implements the majority of the translation
 from LC to MIL:
 
 > compileStmt :: Expr 
->   -> (TailM -> CompM (ProgM O C))
+>   -> (Tail -> CompM (ProgM O C))
 >   -> CompM (ProgM O C)
 
 The first argument represents the LC expression to translate. The
@@ -35,7 +35,7 @@ result uses our compiler monad to create a MIL basic block. I call the
 second argument the "compilation context". The context represents
 everything translated so far, except for a hole where our current
 expression's translation should go. Therefore, compileStmt translates
-its first argument into a TailM value and passes it the context. 
+its first argument into a Tail value and passes it the context. 
 
 Notice the context itself produces a basic block. In some cases, the
 context's result is retured by compileStmt directly. In other cases,
@@ -312,7 +312,7 @@ I report an error if the situation occurs.
 >           mkDest :: Def -> CompM ()
 >           mkDest (name, _) = withNewLabel $ \label -> do
 >             modify (\s@(C { compT }) -> s { compT = Map.insert name (Just (name, label)) compT })
->           primDest :: StmtM C O -> Map Name (Maybe Dest) -> Map Name (Maybe Dest)
+>           primDest :: Stmt C O -> Map Name (Maybe Dest) -> Map Name (Maybe Dest)
 >           primDest entry topMap = 
 >             let (name, label) = destOfEntry entry
 >             in Map.insert name (Just (name, label)) topMap
@@ -459,6 +459,6 @@ I report an error if the situation occurs.
 >     f (Mutual decls) = decls
 >     f (Nonrec decl) = [decl] 
     
-> mkBind :: Name -> Label -> Name -> TailM -> TailM -> CompM (ProgM O C)
+> mkBind :: Name -> Label -> Name -> Tail -> Tail -> CompM (ProgM O C)
 > mkBind n l r f t = return (mkMiddle (Bind r t) <*> mkLast (Done n l f))
 

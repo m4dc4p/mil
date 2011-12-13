@@ -48,7 +48,7 @@ when the transfer function finds the variable's binding. If the
 binding is never found, the variable is a parameter. In that case, the
 fact reverts to |Nothing|.
 
-> type TrimFact = Maybe (Name, Maybe TailM)
+> type TrimFact = Maybe (Name, Maybe Tail)
 
 The lattice defined for our facts is simple: 
 
@@ -81,10 +81,10 @@ there was no intervening use. It's possible that |v| is bound multiple
 times in the same block; we could miss the opportunity to rewrite the
 final binding of |v| due to earlier bindings.
 
-> trimTransfer :: BwdTransfer StmtM TrimFact
+> trimTransfer :: BwdTransfer Stmt TrimFact
 > trimTransfer = mkBTransfer bw
 >   where
->     bw :: StmtM e x -> Fact x TrimFact -> TrimFact
+>     bw :: Stmt e x -> Fact x TrimFact -> TrimFact
 >     bw (Done _ _ (Return n)) f = Just (n, Nothing)
 >     bw (Bind _ _) f@(Just (_, Just _)) = f -- We've already marked our fact, pass it along.
 >     bw (Bind v t) f@(Just (v', Nothing))
@@ -100,7 +100,7 @@ final binding of |v| due to earlier bindings.
 >     bw (CloEntry _ _ _ _) f = f
 >     bw (BlockEntry _ _ _) f = f
 >     
->     uses :: TailM -> Name -> Bool
+>     uses :: Tail -> Name -> Bool
 >     uses (Enter f x) v = f == v || x == v
 >     uses (Closure _ vs) v = v `elem` vs
 >     uses (Goto _ vs) v = v `elem` vs
@@ -110,7 +110,7 @@ final binding of |v| due to earlier bindings.
 >     uses (Prim _ vs) v = v `elem` vs
 >     uses _ _ = False
 >    
->     visibleSideEffect :: TailM -> Bool
+>     visibleSideEffect :: Tail -> Bool
 >     visibleSideEffect (Run {}) = True
 >     visibleSideEffect _ = False
 
@@ -123,7 +123,7 @@ At least, that's the theory.
 > mcheck :: (FuelMonad m, CheckpointMonad m, Monad m) => m a
 > mcheck = undefined
 
-> rewriter :: forall e x. StmtM e x -> Fact x TrimFact -> InfiniteFuelMonad (State Bool) (Maybe (ProgM e x))
+> rewriter :: forall e x. Stmt e x -> Fact x TrimFact -> InfiniteFuelMonad (State Bool) (Maybe (ProgM e x))
 > rewriter (Bind v t) (Just (v', (Just t')))
 >   | v == v' && t == t' = do
 >     flag <- get
@@ -158,10 +158,10 @@ At least, that's the theory.
 >     bwd2 = BwdPass { bp_lattice = trimTailLattice 
 >                    , bp_transfer = mkBTransfer noOpTransfer
 >                    , bp_rewrite = trimRewrite }
->     trimRewrite :: BwdRewrite (InfiniteFuelMonad (State Bool)) StmtM TrimFact
+>     trimRewrite :: BwdRewrite (InfiniteFuelMonad (State Bool)) Stmt TrimFact
 >     trimRewrite = mkBRewrite rewriter
 
-> noOpTransfer :: StmtM e x -> Fact x TrimFact -> TrimFact
+> noOpTransfer :: Stmt e x -> Fact x TrimFact -> TrimFact
 > noOpTransfer (Bind _ _) f = f
 > noOpTransfer (Done _ l _) fs = fromMaybe Nothing (mapLookup l fs)
 > noOpTransfer (CaseM _ _) f = Nothing

@@ -40,7 +40,7 @@ import InlineReturn
 
 -- | Associates a binding (the key) with the
 -- value that should be substituted for it. 
-type BindFact = Map Name TailM
+type BindFact = Map Name Tail
 
 -- | Find "useless" bindings and remove them. Useless bindings 
 -- include:
@@ -58,7 +58,7 @@ bindSubst body = runSimple $ do
       (p, _, _) <- analyzeAndRewriteFwd fwd (JustC entries) body initial
       return p
   where
-    fwd :: FwdPass SimpleFuelMonad StmtM BindFact
+    fwd :: FwdPass SimpleFuelMonad Stmt BindFact
     fwd = FwdPass { fp_lattice = bindSubstLattice
                   , fp_transfer = bindSubstTransfer
                   , fp_rewrite = bindSubstRewrite }
@@ -71,10 +71,10 @@ bindSubstLattice = DataflowLattice { fact_name = "Bind/Return substitution"
     extend _ (OldFact old) (NewFact new) = (changeIf (old /= new)
                                            , new)
 
-bindSubstTransfer :: FwdTransfer StmtM BindFact
+bindSubstTransfer :: FwdTransfer Stmt BindFact
 bindSubstTransfer = mkFTransfer fw
   where
-    fw :: StmtM e x -> BindFact -> Fact x BindFact
+    fw :: Stmt e x -> BindFact -> Fact x BindFact
     fw (Bind v t@(Return {})) m = Map.insert v t m 
     fw (Bind v t@(Closure {})) m = Map.insert v t m 
     fw (Bind v t@(ConstrM {})) m = Map.insert v t m 
@@ -89,12 +89,12 @@ bindSubstTransfer = mkFTransfer fw
     fw (Done _ _ t) m = 
       mkFactBase bindSubstLattice []
 
-bindSubstRewrite :: FuelMonad m => FwdRewrite m StmtM BindFact
+bindSubstRewrite :: FuelMonad m => FwdRewrite m Stmt BindFact
 bindSubstRewrite = 
     -- deep rewriting used so all possible substitutions occur
     iterFwdRw (mkFRewrite rewrite) 
   where
-    rewrite :: FuelMonad m => forall e x. StmtM e x -> BindFact -> m (Maybe (ProgM e x))
+    rewrite :: FuelMonad m => forall e x. Stmt e x -> BindFact -> m (Maybe (ProgM e x))
     rewrite (Bind v t) f 
       | Map.member v f = bind v (rewriteTail f t)
     rewrite (CaseM v alts) f 
@@ -107,7 +107,7 @@ bindSubstRewrite =
     rewrite (Done n l t) f = done n l (rewriteTail f t)
     rewrite _ _ = return Nothing
 
-    rewriteTail :: BindFact -> TailM -> Maybe TailM
+    rewriteTail :: BindFact -> Tail -> Maybe Tail
     rewriteTail f (Return v) = substReturn f v 
     rewriteTail f (Enter v w) 
       | anyNamesIn f [v,w] = Just $ substNames f [v, w] (\ [v,w] -> Enter v w)
@@ -117,7 +117,7 @@ bindSubstRewrite =
       | anyNamesIn f ns = Just $ substNames f ns (\ns -> Goto d ns)
     rewriteTail _ _ = Nothing
 
-    substReturn :: BindFact -> Name -> Maybe TailM
+    substReturn :: BindFact -> Name -> Maybe Tail
     substReturn f v =
       case Map.lookup v f of
         (Just (Return n)) -> Just $ Return n
@@ -157,7 +157,7 @@ bindSubstRewrite =
 printBindFacts :: FactBase BindFact -> Doc
 printBindFacts = printFB printFact
   where
-    printFact :: (Label, Map Name TailM) -> Doc
+    printFact :: (Label, Map Name Tail) -> Doc
     printFact (l, ns) = text (show l) <> text ":" <+> commaSep (text . show) (Map.toList ns)
 
 -- Implementing CC-Let (figure 6) from Kennedy's paper:
@@ -220,12 +220,12 @@ inlineLattice = DataflowLattice { fact_name = "Inline blocks"
     extend _ (OldFact old) (NewFact new) = (changeIf (old /= new)
                                            , new)
 
-inlineTransfer :: BlockReferrers -> BwdTransfer StmtM InlineFact
+inlineTransfer :: BlockReferrers -> BwdTransfer Stmt InlineFact
 inlineTransfer referrers = mkBTransfer bw
   where
     -- Find blocks which are the sole referrer to another
     -- block. 
-    bw :: StmtM e x -> Fact x InlineFact -> InlineFact
+    bw :: Stmt e x -> Fact x InlineFact -> InlineFact
     bw (Bind v (Goto dest vs)) f = singlePred referrers dest f 
     bw (Bind {}) f = f
     bw (CaseM {}) _ = Just False
@@ -234,10 +234,10 @@ inlineTransfer referrers = mkBTransfer bw
     bw (CloEntry {}) f = f
     bw (BlockEntry {}) f = f
 
-inlineRewrite :: FuelMonad m => BlockReferrers -> ProgM C C -> BwdRewrite m StmtM InlineFact
+inlineRewrite :: FuelMonad m => BlockReferrers -> ProgM C C -> BwdRewrite m Stmt InlineFact
 inlineRewrite referrers prog = mkBRewrite rewriter
   where
-    rewriter :: FuelMonad m => forall e x. StmtM e x -> Fact x InlineFact -> m (Maybe (ProgM e x))
+    rewriter :: FuelMonad m => forall e x. Stmt e x -> Fact x InlineFact -> m (Maybe (ProgM e x))
     rewriter (Bind v (Goto dest vs)) (Just True) = return (inlineBind v dest vs)
     rewriter (Done _ _ (Goto dest vs)) _ = 
       case singlePred referrers dest Nothing of
@@ -257,20 +257,20 @@ inlineRewrite referrers prog = mkBRewrite rewriter
                                              (mkEnv body, emptyGraph)
           -- Create a map from formal arguements
           -- to actual arguments so we can rename.
-          mkEnv :: Block StmtM C C -> Map Name Name
+          mkEnv :: Block Stmt C C -> Map Name Name
           mkEnv body = Map.fromList (zip (entryArgs body) args)
-          entryArgs :: Block StmtM C C -> [Name]
+          entryArgs :: Block Stmt C C -> [Name]
           entryArgs body = case blockEntry body of
                              BlockEntry  _ _ args -> args
                              CloEntry _ _ clo arg -> clo ++ [arg]
-          rename :: forall e x. StmtM e x -> (Map Name Name, ProgM O O) -> (Map Name Name, ProgM O O)
+          rename :: forall e x. Stmt e x -> (Map Name Name, ProgM O O) -> (Map Name Name, ProgM O O)
           rename (Bind v tail) (env, prog) 
             | v `Map.member` env = (Map.delete v env, newProg)
             | otherwise = (env, newProg)
             where
               newProg = prog <*> mkMiddle (Bind v (changeTail env tail))
           rename (Done _ _ tail) (env, prog) = (env, prog <*> mkMiddle (Bind result (changeTail env tail)))
-          changeTail :: Map Name Name -> TailM -> TailM
+          changeTail :: Map Name Name -> Tail -> Tail
           changeTail env (Return n) = Return (changeVar env n)
           changeTail env (Enter f x) = Enter (changeVar env f) (changeVar env x)
           changeTail env (Closure dest vs) = Closure dest (map (changeVar env) vs)

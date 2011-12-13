@@ -23,7 +23,7 @@ lcm body = undefined
     ant = anticipated (used body) (killed body) body
 
 -- | Sets of Tail values.
-type Exprs = Set TailM
+type Exprs = Set Tail
 
 -- | Used expressions appear in the block but
 -- their operands are not defined there.
@@ -130,10 +130,10 @@ postLattice = DataflowLattice { fact_name = "Postponable expressions"
     extend _ (OldFact old@(PP (_, oldPp))) (NewFact new@(PP (_, newPp))) = 
       (changeIf (oldPp `Set.isProperSubsetOf` newPp), new)
 
-postTransfer :: Earliest -> Used -> FwdTransfer StmtM PostFact
+postTransfer :: Earliest -> Used -> FwdTransfer Stmt PostFact
 postTransfer early used = mkFTransfer fw
   where
-    fw :: StmtM e x -> PostFact -> Fact x PostFact
+    fw :: Stmt e x -> PostFact -> Fact x PostFact
     fw (BlockEntry n l _) pp = mkInitial (n, l) pp
     fw (CloEntry n l _ _) pp = mkInitial (n, l) pp
     fw (Bind _ t) pp@(PP (use, ea)) 
@@ -207,10 +207,10 @@ availLattice =  DataflowLattice { fact_name = "Available expressions"
     extend _ (OldFact old@(AV (_, oldAv))) (NewFact new@(AV (_, newAv))) = 
       (changeIf (oldAv `Set.isProperSubsetOf` newAv), new)
 
-availTransfer :: Anticipated -> FwdTransfer StmtM AvailFact
+availTransfer :: Anticipated -> FwdTransfer Stmt AvailFact
 availTransfer ant = mkFTransfer fw
   where
-    fw :: StmtM e x -> AvailFact -> Fact x AvailFact
+    fw :: Stmt e x -> AvailFact -> Fact x AvailFact
     fw (BlockEntry n l _) av = mkInitial (n,l) av
     fw (CloEntry n l _ _) av = mkInitial (n,l) av
     fw (Bind _ t) av = mkAvailable av t
@@ -226,7 +226,7 @@ availTransfer ant = mkFTransfer fw
       let antIn = fromMaybe Set.empty (Map.lookup (n,l) ant)
       in AV (k, Set.difference (Set.union avIn antIn) k)
 
-    mkAvailable :: AvailFact -> TailM -> AvailFact
+    mkAvailable :: AvailFact -> Tail -> AvailFact
     mkAvailable av@(AV (kill, avail)) t 
       | not (useable t) = av
       | otherwise = if t `Set.member` kill
@@ -271,10 +271,10 @@ emptyAntFact :: AntFact
 emptyAntFact = AF [] {- args passed to block -}
                   Set.empty {- anticipated exprs -}
 
-antTransfer :: Used -> Killed -> BwdTransfer StmtM AntFact
+antTransfer :: Used -> Killed -> BwdTransfer Stmt AntFact
 antTransfer uses kills = mkBTransfer anticipate
   where
-    anticipate :: StmtM e x -> Fact x AntFact -> AntFact
+    anticipate :: Stmt e x -> Fact x AntFact -> AntFact
     anticipate (BlockEntry n l args) f = mkAnticipated (n, l) f args
     anticipate (CloEntry n l args arg) f = mkAnticipated (n, l) f (args++[arg])
 
@@ -310,7 +310,7 @@ antTransfer uses kills = mkBTransfer anticipate
 -- | If the tail gives a successor (i.e., a goto),
 -- pair the destination with the value given. Otherwise,
 -- return Nothing.
-tailSucc :: TailM -> a -> Maybe (Label, a)
+tailSucc :: Tail -> a -> Maybe (Label, a)
 tailSucc t@(Goto (n, l) _) v = Just (l, v)
 tailSucc _ _ = Nothing
 
@@ -346,10 +346,10 @@ botIntersect (PElem s) s' = PElem (Set.intersection s s')
 used :: ProgM C C -> Map Dest Exprs
 used = Map.fromListWith Set.union . map destUses . allBlocks
   where
-    destUses :: (Dest, Block StmtM C C) -> (Dest, Exprs)
+    destUses :: (Dest, Block Stmt C C) -> (Dest, Exprs)
     destUses (dest, block) = (dest, foldFwdBlock uses Set.empty block)
                              
-    uses :: forall e x. Exprs -> StmtM e x -> Exprs
+    uses :: forall e x. Exprs -> Stmt e x -> Exprs
     uses u (BlockEntry {}) = u
     uses u (CloEntry {}) = u
     uses u (Bind _ t) = Set.insert t u
@@ -360,12 +360,12 @@ used = Map.fromListWith Set.union . map destUses . allBlocks
 killed :: ProgM C C -> Map Dest Exprs
 killed = Map.fromListWith Set.union . map destKills . allBlocks
   where
-    destKills :: (Dest, Block StmtM C C) -> (Dest, Exprs)
+    destKills :: (Dest, Block Stmt C C) -> (Dest, Exprs)
     destKills (dest, block) = 
       let (killed, _) = foldBwdBlock kills (Set.empty, Map.empty) block
       in (dest, killed)
 
-    kills :: forall e x. StmtM e x -> (Exprs, Map Name Exprs) -> (Exprs, Map Name Exprs)
+    kills :: forall e x. Stmt e x -> (Exprs, Map Name Exprs) -> (Exprs, Map Name Exprs)
     kills (BlockEntry {}) (k, u) = (k, u)
     kills (CloEntry {}) (k, u) = (k, u)
     kills (Bind v t) (k, u) = 

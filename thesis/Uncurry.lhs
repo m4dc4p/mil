@@ -98,7 +98,7 @@ closure or jump to the block.
 >     initial :: FactBase CollapseFact
 >     initial = mapFromList (zip labels (repeat Map.empty)) {-"\hslabel{initial}"-}
 >
->     fwd :: FwdPass SimpleFuelMonad StmtM CollapseFact
+>     fwd :: FwdPass SimpleFuelMonad Stmt CollapseFact
 >     fwd = FwdPass { fp_lattice = collapseLattice {-"\hslabel{fwd}"-}
 >                   , fp_transfer = collapseTransfer 
 >                   , fp_rewrite = collapseRewrite (destinations labels) }
@@ -107,7 +107,7 @@ closure or jump to the block.
 >     destinations = Map.fromList . catMaybes . {-"\hslabel{destinations}"-}
 >                    map (uncurry destOf) . catMaybes .  map (blockOfLabel program)
 >
->     destOf :: Dest -> Block StmtM C C -> Maybe (Label, DestOf)
+>     destOf :: Dest -> Block Stmt C C -> Maybe (Label, DestOf)
 >     destOf (_, l)  block = {-"\hslabel{destOf}"-}
 >       case blockToNodeList' block of
 >         (JustC (CloEntry _ _ args arg), _, JustC (Done _ _ (Goto d uses))) -> 
@@ -122,10 +122,10 @@ closure or jump to the block.
 %endif
 %if includeAll || includeTransfer
 
-> collapseTransfer :: FwdTransfer StmtM CollapseFact
+> collapseTransfer :: FwdTransfer Stmt CollapseFact
 > collapseTransfer = mkFTransfer t
 >   where
->     t :: StmtM e x -> CollapseFact -> Fact x CollapseFact
+>     t :: Stmt e x -> CollapseFact -> Fact x CollapseFact
 >     t (Bind v (Closure dest args)) facts = {-"\hslabel{closure}"-}
 >       Map.insert v (PElem (CloDest dest args)) 
 >                    (kill v facts)
@@ -147,7 +147,7 @@ closure or jump to the block.
 %if includeRewrite || includeAll 
 
 > collapseRewrite :: FuelMonad m => Map Label DestOf 
->                    -> FwdRewrite m StmtM CollapseFact
+>                    -> FwdRewrite m Stmt CollapseFact
 > collapseRewrite blocks = iterFwdRw (mkFRewrite rewriter) {-"\hslabel{top}"-}
 
 %endif
@@ -158,13 +158,13 @@ closure or jump to the block.
 %endif
 %if includeRewriteImpl || includeAll
 
->     rewriter :: FuelMonad m => forall e x. StmtM e x -> CollapseFact 
+>     rewriter :: FuelMonad m => forall e x. Stmt e x -> CollapseFact 
 >                 -> m (Maybe (ProgM e x))
 >     rewriter (Done n l (Enter f x)) facts = done n l (collapse facts f x) {-"\hslabel{done}"-}
 >     rewriter (Bind v (Enter f x)) facts = bind v (collapse facts f x) {-"\hslabel{bind}"-}
 >     rewriter _ _ = return Nothing {-"\hslabel{rest}"-}
 >                    
->     collapse :: CollapseFact -> Name -> Name -> Maybe TailM
+>     collapse :: CollapseFact -> Name -> Name -> Maybe Tail
 >     collapse facts f x =       
 >       case Map.lookup f facts of
 >         Just (PElem (CloDest dest@(_, l) vs)) -> {-"\hslabel{collapse_clo}"-}

@@ -1,8 +1,8 @@
 \documentclass[12pt]{report}
 \usepackage{standalone}
 %include polycode.fmt
-%format t_1 = "\ensuremath{t_1}"
-%format t_2 = "\ensuremath{t_2}"
+%include subst.fmt
+
 \input{tikz.preamble}
 \input{preamble}
 \begin{document}
@@ -774,7 +774,7 @@ invoked once the |do| block itself is invoked.
   \end{tabular}
   \caption{Part~\subref{mil_fig_kleisli_a} shows a monadic composition function 
     (also known as ``Kliesli'' composition). Part~\subref{mil_fig_kleisli_b} shows
-  a MIL program representing the same functipn.}
+  a MIL program representing the same function.}
   \label{mil_fig_kleisli}
 \end{myfig}
 
@@ -833,18 +833,109 @@ constructor expression \eqref{mil_syntax_cons} creates a data value
 with the given tag, $!+C+!$, and the variables $!+v_1, \dots, v_n+!$
 in the corresponding fields.
 
-\section{Compiling \lamA to MIL}
+\section{Evaluating MIL Programs}
+\label{mil_sec5}
+
+\section{Compiling \lamC to MIL}
 \label{mil_sec4}
 
 \input{lamCComp}
 
-\section{Evaluating MIL Programs}
-\label{mil_sec5}
-
 \section{MIL and Hoopl}
 \label{mil_sec7}
 
-\subsection{MIL Statements, Tails, \& Shapes}
+\intent{Reminder about open/closed shapes.}  As described in
+Section~\ref{hoopl_sec_cfg}, Hoopl characterizes control--flow between
+nodes in a CFG by their entry and exit shape. Hoopl uses the |O| and
+|C| types to express the shape of the entry and exit points for a
+node. A node that is open on exit can only be followed a node that is
+open on entry. A sequence of nodes can be characterized by the entry
+shape of the first node and the exit shape of the last node.
+
+\intent{Reminder about relationship between basic blocks and shape.}
+In Hoopl terms, basic blocks (described in Section~\ref{sec_back3})
+are closed on entry and closed on exit. Due to the constraints imposed
+by the shape type, none of the nodes between the first and last will
+jump or branch to other nodes. They can only execute one after
+another.
+
+\intent{Enumerate the various shape combinations and connect to basic
+  blocks.}  An |O O| (``open/open'') node has exactly one predecessor
+and one successor. An |O O| node must appear in the middle of a basic
+block --- it cannot be the target of multiple predecessors, therefore
+it cannot be the target of a jump or branch. A |C O| (``closed/open'')
+node can have multiple predecessors but only one successor. A |C O|
+node can start a basic block, but it must always be followed by at
+least one node. An |O C| (``open/closed'') node can only have one
+predecessor, but many successors. An |O C| node always ends a 
+basic block. A |C C| (``closed/closed'') node is not very useful on
+its own; however, a |C C| sequence of nodes forms a basic block.
+
+\intent{Describe the five |Stmt| constructors.}
+Figure~\ref{mil_fig_stmt_ast} shows |Stmt|, the data type defining the
+\term block/ and \term stmt/ terms from Figure~\ref{mil_fig3}. The
+|Stmt| type takes two type parameters, |e| and |x|, representing the
+entry and exit shape of the statement. |BlockEntry| and |CloEntry|
+represent the two types of blocks (basic and \cc, respectively). Their
+shape, |C O|, shows that they can only be used to begin a MIL block.
+The |Bind| statement (with shape |O O|) represents statements inside the block. The
+type ensures no block begins or ends with a |Bind|. Blocks can end with either a
+|CaseM| or |Done| statement. The |CaseM| value represents the \milres
+case/ statement. The |Done| statement is used to end a block with a
+|Tail| expression. It does not appear explicitly in
+Figure~\ref{mil_fig3}.
+
+\begin{myfig}
+  \begin{minipage}{\linewidth}
+> data Stmt e x where
+>   BlockEntry :: Name -> Label -> [Name] -> Stmt C O {-"\hslabel{block}"-}
+>   CloEntry :: Name -> Label -> [Name] -> Name -> Stmt C O {-"\hslabel{ccblock}"-}
+>   Bind :: Name -> Tail -> Stmt O O {-"\hslabel{bind}"-}
+>   CaseM :: Name -> [Alt Tail] -> Stmt O C {-"\hslabel{case}"-}
+>   Done :: Name -> Label -> Tail -> Stmt O C {-"\hslabel{done}"-}
+  \end{minipage}
+  \caption{Haskell data type representing MIL \term stmt/ terms. The |C| and |O|
+  types (from Hoopl) give the ``shape'' of each statement.}
+  \label{mil_fig_stmt_ast}
+\end{myfig}
+
+\intent{Show how the AST mirrors the expected shape of a sample MIL
+  block.}  Even without describing |Tail| values, we can show how
+|Stmt| values give the correct shape to MIL blocks. Returning to our
+example of Kleisli composition in Figure~\ref{mil_fig_kleisli}, we can
+represent the block \lab m205/ with the following AST. We
+used the Hoopl |<*>| operator to connect the |Stmt| values together, and 
+we represent |Tail| values with MIL syntax:
+
+\begin{singlespace}\correctspaceskip
+  \begin{minipage}{\widthof{|BlockEntry "m205" "m205" ["g", "f", "x"] <*>|\quad}}
+> BlockEntry "m205" "m205" ["g", "f", "x"] <*>
+>   Bind "v209" {-"\ \app g * x/"-} <*>
+>   Bind "v1" {-"\ \invoke v209/"-} <*>
+>   Bind "v208" {-"\ \app f * v1/"-} <*>
+>   Bind "v2" {-"\ \invoke v208/"-} <*>
+>   Bind "v206" {-"\ \goto return()"-} <*>
+>   Bind "v207" {-"\ \app v206 * v2/"-} <*>
+>   Done {-"\ \invoke v207/"-}
+  \end{minipage}
+\end{singlespace}
+
+
+
+\begin{myfig}
+  \begin{minipage}{\linewidth}
+> data Tail = Return Name {-"\hslabel{return}"-}
+>   | Enter Name Name {-"\hslabel{enter}"-}
+>   | Closure Dest [Name] {-"\hslabel{clo}"-}
+>   | Goto Dest [Name] {-"\hslabel{goto}"-}
+>   | ConstrM Constructor [Name] {-"\hslabel{cons}"-}
+>   | Thunk Dest [Name] {-"\hslabel{thunk}"-}
+>   | Run Name {-"\hslabel{invoke}"-}
+>   | Prim Name [Name] {-"\hslabel{prim}"-}
+  \end{minipage}
+  \caption{Haskell data type representing MIL \term tail/ expressions.}
+  \label{mil_fig_tail_ast}
+\end{myfig}
 
 \section{Summary}
 \label{mil_sec6}

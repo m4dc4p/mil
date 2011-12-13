@@ -55,10 +55,10 @@ Blocks are only added to the BlockReferrer set when they are
 referenced by another block. Therefore, any block in the
 BlockReferrers set must have at least one referrer.
 
->     addBlock :: BlockReferrers -> (Dest, Block StmtM C C) -> BlockReferrers
+>     addBlock :: BlockReferrers -> (Dest, Block Stmt C C) -> BlockReferrers
 >     addBlock refMap (dest, block) = foldFwdBlock (addReferrer dest) refMap block
 
->     addReferrer :: Dest -> (forall e x. BlockReferrers -> StmtM e x -> BlockReferrers)
+>     addReferrer :: Dest -> (forall e x. BlockReferrers -> Stmt e x -> BlockReferrers)
 >     addReferrer referrer refMap (Bind _ tail) = foldl (addRef referrer) refMap (tailDest tail)
 >     addReferrer referrer refMap (CaseM _ alts) = foldl (addRef referrer) refMap (concatMap (tailDest . altE) alts) 
 >     addReferrer referrer refMap (Done _ _ tail) = foldl (addRef referrer) refMap (tailDest tail) 
@@ -98,7 +98,7 @@ rewritten graph is returned.
 > 
 >     remove :: Set Dest
 >                  -> (ChangeFlag, ProgM C C) 
->                  -> (Dest, Block StmtM C C) 
+>                  -> (Dest, Block Stmt C C) 
 >                  -> (ChangeFlag, ProgM C C)
 >     remove live (flag, prog) (dest@(name, _), block) 
 >       | dest `Set.member` live || name `elem` tops = (flag, blockGraph block |*><*| prog)

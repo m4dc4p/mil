@@ -2,3 +2,12 @@
 %format ^ = "\char`^"
 %format == = "=="
 %format not = "\ensuremath{\mathit{not}}"
+%format t_1 = "\ensuremath{t_1}"
+%format t_2 = "\ensuremath{t_2}"
+% Hoopl spaceship
+%format <*> = "\ensuremath{\mathbin{\text{<}\mkern-1.5mu\mathord{*}\mkern-1.5mu\text{>}}}"
+% Hoopl funny operator
+%format |*><*| = "\ensuremath{\mathbin{\mathord{|}\mkern-1.5mu\mathord{*}\mkern-1.5mu\text{><}\mkern-1.5mu\mathord{*}\mkern-1.5mu\mathord{|}}}"
+
+
+

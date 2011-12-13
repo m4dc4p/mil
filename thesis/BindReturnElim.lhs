@@ -53,10 +53,10 @@ the middle statements (i.e., the |bind| statements), so we can use
 pattern-matching rather than the |last| function to get the final
 |bind| statement.
 
-> rewriteBlock :: [StmtM O O] -> StmtM O C -> ProgM O C
+> rewriteBlock :: [Stmt O O] -> Stmt O C -> ProgM O C
 > rewriteBlock = rw . reverse
 >   where
->     rw :: [StmtM O O] -> StmtM O C -> ProgM O C
+>     rw :: [Stmt O O] -> Stmt O C -> ProgM O C
 >     rw (Bind v t:bs) (Done n l (Return v')) 
 >       | v == v' = rw bs (Done n l t)
 >     rw binds done = mkMiddles (reverse binds) <*> mkLast done
@@ -69,9 +69,9 @@ blocks together to reconstruct the entire program.
 
 > bindReturn :: ProgM C C -> ProgM C C
 > bindReturn (GMany _ blocks _) = 
->   let allBlocks :: LabelMap (Block StmtM C C) -> [(MaybeC C (StmtM C O), [StmtM O O], MaybeC C (StmtM O C))]
+>   let allBlocks :: LabelMap (Block Stmt C C) -> [(MaybeC C (Stmt C O), [Stmt O O], MaybeC C (Stmt O C))]
 >       allBlocks = map blockToNodeList' . mapElems
->       rwB :: (MaybeC C (StmtM C O), [StmtM O O], MaybeC C (StmtM O C)) -> ProgM C C
+>       rwB :: (MaybeC C (Stmt C O), [Stmt O O], MaybeC C (Stmt O C)) -> ProgM C C
 >       rwB (JustC entry, binds, JustC done) = mkFirst entry <*> rewriteBlock binds done
 >   in foldr (|*><*|) emptyClosedGraph . map rwB . allBlocks $ blocks
 
