@@ -286,12 +286,10 @@
 %% argument specifies a prefix that \hslabel can
 %% use to generate line number references. If no prefix
 %% is givne, \hslabel will have no effect.
-\newtoks\prefixtoks
-\def\mkhslabel#1{\prefixtoks={#1}\let\prefix=a}
-\def\hslabel#1{\ifx\prefix\relax%%
-  \else\label{\the\prefixtoks_#1}%%
-  \fi}
-\def\unhslabel{\let\prefix=\relax}
+\newtoks\prefixtoks \newif\ifprefix
+\def\mkhslabel#1{\prefixtoks={#1}\prefixtrue}
+\def\hslabel#1{\ifprefix\label{\the\prefixtoks_#1}\fi}
+\def\unhslabel{\prefixfalse}
 \newenvironment{withHsNum}{\numberson\numbersreset}{\numbersoff}
 \newenvironment{withHsLabeled}[1]{\numberson\numbersreset\mkhslabel{#1}}{\unhslabel\numbersoff}
 

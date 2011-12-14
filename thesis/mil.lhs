@@ -1,8 +1,8 @@
 \documentclass[12pt]{report}
 \usepackage{standalone}
 %include polycode.fmt
+%include lineno.fmt
 %include subst.fmt
-
 \input{tikz.preamble}
 \input{preamble}
 \begin{document}
@@ -839,7 +839,34 @@ in the corresponding fields.
 \section{Compiling \lamC to MIL}
 \label{mil_sec4}
 
-\input{lamCComp}
+Compilers translating the \lamA to executable (or intermediate) forms
+have existed for decades, and our work did not seek to advance
+knowledge in this area. However, some nuances of our translation should be
+highlighted, especially concering \lambda-abstractions.
+
+Consider the following \lamC definition of |compose|. We take no
+syntactic shortcuts --- this definition shows the \lamC definition
+that our compiler deals with.
+
+\begin{singlespace}\correctspaceskip
+> compose = \lcabs f. \lcabs g. \lcabs x. \lcapp f * (g * x)/
+\end{singlespace}
+
+Our compiler translates each $\lambda$, except the last, to a block
+that returns a closure. The final $\lambda$ translates to a block that
+jumps to another block which implements the body of the function. The
+final result is this sequence of blocks:
+
+\begin{AVerb}
+\block compose (): \mkclo[k201:]
+\ccblock k201()f: \mkclo[k202:f]
+\ccblock k202(f)g: \mkclo[k203:(f, g)]
+\ccblock k203(f, g)x: \goto b204(f, g, x)
+\block b204(f, g, x):
+  \vbinds v205 <- \app g * x/;
+  \app f * v205/
+\end{AVerb}
+
 
 \section{MIL and Hoopl}
 \label{mil_sec7}
@@ -877,23 +904,26 @@ Figure~\ref{mil_fig_stmt_ast} shows |Stmt|, the data type defining the
 |Stmt| type takes two type parameters, |e| and |x|, representing the
 entry and exit shape of the statement. |BlockEntry| and |CloEntry|
 represent the two types of blocks (basic and \cc, respectively). Their
-shape, |C O|, shows that they can only be used to begin a MIL block.
-The |Bind| statement (with shape |O O|) represents statements inside the block. The
-type ensures no block begins or ends with a |Bind|. Blocks can end with either a
-|CaseM| or |Done| statement. The |CaseM| value represents the \milres
-case/ statement. The |Done| statement is used to end a block with a
-|Tail| expression. It does not appear explicitly in
-Figure~\ref{mil_fig3}.
+shape, |C O|, shows that they can only be used to begin a MIL
+block. The |Name| and |Label| arguments help Hoopl connect nodes
+together in the CFG.  The |Bind| statement (with shape |O O|)
+represents statements inside the block. The type ensures no block
+begins or ends with a |Bind|. Blocks can end with either a |CaseM| or
+|Done| statement. The |CaseM| value represents the \milres case/
+statement. |Done| does not appear explicitly in Figure~\ref{mil_fig3},
+but the AST uses it to end a block with a |Tail| expression. The
+|Name| and |Label| arguments to |CaseM| and |Done| make it easier to
+know the basic block being analyzed when traversing the CFG backwards.
 
 \begin{myfig}
-  \begin{minipage}{\linewidth}
+  \begin{minipage}{\linewidth}\begin{withHsLabeled}{mil_stmt_ast}
 > data Stmt e x where
 >   BlockEntry :: Name -> Label -> [Name] -> Stmt C O {-"\hslabel{block}"-}
 >   CloEntry :: Name -> Label -> [Name] -> Name -> Stmt C O {-"\hslabel{ccblock}"-}
 >   Bind :: Name -> Tail -> Stmt O O {-"\hslabel{bind}"-}
->   CaseM :: Name -> [Alt Tail] -> Stmt O C {-"\hslabel{case}"-}
+>   Case :: Name -> [Alt Tail] -> Stmt O C {-"\hslabel{case}"-}
 >   Done :: Name -> Label -> Tail -> Stmt O C {-"\hslabel{done}"-}
-  \end{minipage}
+  \end{withHsLabeled}\end{minipage}
   \caption{Haskell data type representing MIL \term stmt/ terms. The |C| and |O|
   types (from Hoopl) give the ``shape'' of each statement.}
   \label{mil_fig_stmt_ast}
@@ -903,39 +933,62 @@ Figure~\ref{mil_fig3}.
   block.}  Even without describing |Tail| values, we can show how
 |Stmt| values give the correct shape to MIL blocks. Returning to our
 example of Kleisli composition in Figure~\ref{mil_fig_kleisli}, we can
-represent the block \lab m205/ with the following AST. We
-used the Hoopl |<*>| operator to connect the |Stmt| values together, and 
-we represent |Tail| values with MIL syntax:
+represent the block \lab m205/ with the following definition:
 
 \begin{singlespace}\correctspaceskip
   \begin{minipage}{\widthof{|BlockEntry "m205" "m205" ["g", "f", "x"] <*>|\quad}}
-> BlockEntry "m205" "m205" ["g", "f", "x"] <*>
->   Bind "v209" {-"\ \app g * x/"-} <*>
->   Bind "v1" {-"\ \invoke v209/"-} <*>
->   Bind "v208" {-"\ \app f * v1/"-} <*>
->   Bind "v2" {-"\ \invoke v208/"-} <*>
->   Bind "v206" {-"\ \goto return()"-} <*>
->   Bind "v207" {-"\ \app v206 * v2/"-} <*>
->   Done {-"\ \invoke v207/"-}
+> m205 :: Label -> Graph Stmt C C
+> m205 label = mkFirst (BlockEntry "m205" label ["g", "f", "x"]) <*>
+>   mkMiddles [Bind "v209" ({-"\app g * x/"-})
+>             , Bind "v1" ({-"\invoke v209/"-})
+>             , Bind "v208" ({-"\app f * v1/"-})
+>             , Bind "v2" ({-"\invoke v208/"-})
+>             , Bind "v206" ({-"\goto return()"-})
+>             , Bind "v207" ({-"\app v206 * v2/"-})] <*>
+>   mkLast (Done "m205" label ({-"\invoke v207/"-}))
   \end{minipage}
 \end{singlespace}
 
+|m205| defines as basic block, as shown by its |C C| type. Hoopl
+provides |mkFirst|, |mkMiddles| and |mkLast| (as shown in
+Chapter~\ref{ref_chapter_hoopl}, Figure~\ref{hoopl_fig4}), for lifting
+nodes into Hoopl's monadic graph representation. The operator |<*>|
+connects pieces of the graph together. Hoopl uses the |label| argument
+to connect this definition to other basic blocks in a larger program.
 
+Figure~\ref{mil_fig_tail_ast} shows the various |Tail| values
+that implement the \term tail/ terms in Figure~\ref{mil_fig3}. Notice
+the definition does not parameterize on shape. These expressions are not
+used to construct CFGs and therefore did not need to be parameterized. 
+
+\intent{Enumerate |Tail| constructors, call out |Run| and |Constr|
+  because they have different names than in Figure~\ref{mil_fig3}.}
+The constructors to |Tail| map directly to \term tail/
+terms. |Return|, |Enter| |Goto|, |Prim|, |Closure|, and |Thunk|
+represent the corresponding \term tail/ terms. |Run| represents
+\milres invoke/ \eqref{mil_syntax_invoke} and |Constr| represents a
+constructor \eqref{mil_syntax_cons}.
 
 \begin{myfig}
-  \begin{minipage}{\linewidth}
+  \begin{minipage}{\linewidth}\begin{withHsLabeled}{mil_tail_ast}
 > data Tail = Return Name {-"\hslabel{return}"-}
 >   | Enter Name Name {-"\hslabel{enter}"-}
->   | Closure Dest [Name] {-"\hslabel{clo}"-}
->   | Goto Dest [Name] {-"\hslabel{goto}"-}
->   | ConstrM Constructor [Name] {-"\hslabel{cons}"-}
->   | Thunk Dest [Name] {-"\hslabel{thunk}"-}
 >   | Run Name {-"\hslabel{invoke}"-}
+>   | Goto Dest [Name] {-"\hslabel{goto}"-}
 >   | Prim Name [Name] {-"\hslabel{prim}"-}
-  \end{minipage}
+>   | Closure Dest [Name] {-"\hslabel{clo}"-}
+>   | Thunk Dest [Name] {-"\hslabel{thunk}"-}
+>   | Constr Constructor [Name] {-"\hslabel{cons}"-}
+  \end{withHsLabeled}\end{minipage}
   \caption{Haskell data type representing MIL \term tail/ expressions.}
   \label{mil_fig_tail_ast}
 \end{myfig}
+
+\intent{Show connection between MIL syntax and AST vis.\ arguments.}
+All MIL \term tail/ terms that take arguments only allow variables,
+not arbitrary expressions. The |Tail| constructors implement taht
+restriction by only taking |Name| arguments. Similarly, |Stmt|
+constructors do not take any argument but |Names| or |Tails|.
 
 \section{Summary}
 \label{mil_sec6}
