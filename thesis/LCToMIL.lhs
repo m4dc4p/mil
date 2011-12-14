@@ -157,7 +157,7 @@ that will compile the case expression.
 >   compileCase = withFree (const (return $ free _case)) $ \fvs -> do
 
 |compAlt| compiles creates a block for each arm and returns an |CompM Alt|
-value representing the arm. The MIL |CaseM| instruction takes a list
+value representing the arm. The MIL |Case| instruction takes a list
 of |Alt| values, each of which represents a block for a particular
 case arm. We monadically compile each arm and collect the |CompM Alt| values
 into a list.
@@ -172,11 +172,11 @@ block takes all free variables in the entire case expression
 >             (\_ _ -> 
 
 The body of block evaluates the case expression and puts the result
-in the variable represented by |v|. The block ends with the MIL |CaseM|
+in the variable represented by |v|. The block ends with the MIL |Case|
 instruction, which will select the appropriate arm based on the value 
 found in the variable represented by |v|.
 
->                compResultVar e $ \v -> return (mkLast (CaseM v altsM)))
+>                compResultVar e $ \v -> return (mkLast (Case v altsM)))
 >     return (Goto dest fvs)
 
 |compAlt| creates a block for a case arm. The block only takes free variables

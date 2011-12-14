@@ -94,7 +94,7 @@ final binding of |v| due to earlier bindings.
 >       | otherwise = f
 >     bw (Bind _ _) _ = Nothing 
 >     bw (Done _ _ _) f = Nothing
->     bw (CaseM _ _) _ = Nothing -- Not a valid tail to trim
+>     bw (Case _ _) _ = Nothing -- Not a valid tail to trim
 >     bw (CloEntry _ _ _ _) (Just (_, Nothing)) = Nothing -- Can occur if a used variable is a parameter.
 >     bw (BlockEntry _ _ _) (Just (_, Nothing)) = Nothing
 >     bw (CloEntry _ _ _ _) f = f
@@ -104,7 +104,7 @@ final binding of |v| due to earlier bindings.
 >     uses (Enter f x) v = f == v || x == v
 >     uses (Closure _ vs) v = v `elem` vs
 >     uses (Goto _ vs) v = v `elem` vs
->     uses (ConstrM _ vs) v = v `elem` vs
+>     uses (Constr _ vs) v = v `elem` vs
 >     uses (Thunk _ vs) v = v `elem` vs
 >     uses (Run f) v = f == v
 >     uses (Prim _ vs) v = v `elem` vs
@@ -140,7 +140,7 @@ At least, that's the theory.
 >       | v == v' -> done n l t
 >     _ -> return Nothing
 > rewriter (Done _ _ _) _ = return Nothing
-> rewriter (CaseM _ _) _ = return Nothing
+> rewriter (Case _ _) _ = return Nothing
 > rewriter (BlockEntry _ _ _) _ = return Nothing
 > rewriter (CloEntry _ _ _ _) _ = return Nothing
 
@@ -164,7 +164,7 @@ At least, that's the theory.
 > noOpTransfer :: Stmt e x -> Fact x TrimFact -> TrimFact
 > noOpTransfer (Bind _ _) f = f
 > noOpTransfer (Done _ l _) fs = fromMaybe Nothing (mapLookup l fs)
-> noOpTransfer (CaseM _ _) f = Nothing
+> noOpTransfer (Case _ _) f = Nothing
 > noOpTransfer (CloEntry _ _ _ _) f = f
 > noOpTransfer (BlockEntry _ _ _) f = f
 

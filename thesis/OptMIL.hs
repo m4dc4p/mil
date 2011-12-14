@@ -77,14 +77,14 @@ bindSubstTransfer = mkFTransfer fw
     fw :: Stmt e x -> BindFact -> Fact x BindFact
     fw (Bind v t@(Return {})) m = Map.insert v t m 
     fw (Bind v t@(Closure {})) m = Map.insert v t m 
-    fw (Bind v t@(ConstrM {})) m = Map.insert v t m 
+    fw (Bind v t@(Constr {})) m = Map.insert v t m 
     fw (Bind v t@(Thunk {})) m = Map.insert v t m 
     -- Why is LitM treated special here?
     fw (Bind v (LitM {})) m = Map.delete v m
     fw (Bind v _) m = m
     fw (BlockEntry _ _ _) m = m
     fw (CloEntry _ _ _ _) m = m
-    fw (CaseM _ alts) m = 
+    fw (Case _ alts) m = 
       mkFactBase bindSubstLattice []
     fw (Done _ _ t) m = 
       mkFactBase bindSubstLattice []
@@ -97,7 +97,7 @@ bindSubstRewrite =
     rewrite :: FuelMonad m => forall e x. Stmt e x -> BindFact -> m (Maybe (ProgM e x))
     rewrite (Bind v t) f 
       | Map.member v f = bind v (rewriteTail f t)
-    rewrite (CaseM v alts) f 
+    rewrite (Case v alts) f 
         | maybe False isNameBind (Map.lookup v f) = _case (substName f v) Just alts
         | otherwise = _case v (replaceAlt f) alts
         where
@@ -124,7 +124,7 @@ bindSubstRewrite =
         (Just (Enter fn x)) -> Just $ substNames f [fn, x] (\ [fn, x] -> Enter fn x)
         (Just (Closure d ns)) -> Just $ substNames f ns (\ns -> Closure d ns)
         (Just (Goto d ns)) -> Just $ substNames f ns (\ns -> Goto d ns)
-        (Just (ConstrM c ns)) -> Just $ substNames f ns (\vs -> ConstrM c ns)
+        (Just (Constr c ns)) -> Just $ substNames f ns (\vs -> Constr c ns)
         (Just (Thunk d ns)) -> Just $ substNames f ns (\ns -> Thunk d ns)
         -- (Just (BindRun n)) -> Just $ substNames f [n] (\ [n] -> Run n)
         (Just (Prim p vs)) -> Just $ substNames f vs (\vs -> Prim p vs)
@@ -228,7 +228,7 @@ inlineTransfer referrers = mkBTransfer bw
     bw :: Stmt e x -> Fact x InlineFact -> InlineFact
     bw (Bind v (Goto dest vs)) f = singlePred referrers dest f 
     bw (Bind {}) f = f
-    bw (CaseM {}) _ = Just False
+    bw (Case {}) _ = Just False
     bw (Done _ _ (Goto dest _)) f = Nothing -- singlePred preds dest Nothing
     bw (Done {}) _ = Nothing
     bw (CloEntry {}) f = f
@@ -275,7 +275,7 @@ inlineRewrite referrers prog = mkBRewrite rewriter
           changeTail env (Enter f x) = Enter (changeVar env f) (changeVar env x)
           changeTail env (Closure dest vs) = Closure dest (map (changeVar env) vs)
           changeTail env (Goto dest vs) = Goto dest (map (changeVar env) vs)
-          changeTail env (ConstrM c ns) = ConstrM c (map (changeVar env) ns)
+          changeTail env (Constr c ns) = Constr c (map (changeVar env) ns)
           changeTail env (LitM i) = LitM i
           changeTail env (Thunk dest vs) = Thunk dest (map (changeVar env) vs)
           changeTail env (Run v) = Run (changeVar env v)

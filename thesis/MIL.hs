@@ -71,7 +71,7 @@ data Stmt e x where
     -> Tail    -- Expression that computes the value we want.
     -> Stmt O O    -- Open/open since bind does not end an expression
   
-  CaseM :: Name      -- Variable to inspect
+  Case :: Name      -- Variable to inspect
     -> [Alt Tail] -- Case arms
     -> Stmt O C
       
@@ -81,7 +81,7 @@ data Stmt e x where
     -> Stmt O C
 
 -- | Tail concludes a list of statements. Each block ends with a
--- Tail except when CaseM ends the blocks.
+-- Tail except when Case ends the blocks.
 data Tail = Return Name 
   | Enter -- ^ Enter a closure.
     Name  -- ^ Variable holding the closure.
@@ -92,7 +92,7 @@ data Tail = Return Name
   | Goto   -- ^ Jump to a block.
     Dest   -- ^ Address of the block
     [Name] -- ^ Arguments/live variables used in the block.
-  | ConstrM     -- ^ Create a data value.
+  | Constr     -- ^ Create a data value.
     Constructor -- ^ Constructor name.
     [Name]      -- ^ Only variables allowed as arguments to
                 -- constructor.
@@ -115,7 +115,7 @@ printStmtM (BlockEntry f l args) = text f <+>
                                   parens (commaSep text args) <> text ":" 
 printStmtM (CloEntry f l clos arg) = text f <+> braces (commaSep text clos) 
                                      <+> text arg <> text ":" 
-printStmtM (CaseM v alts) = hang (text "case" <+> text v <+> text "of") 2 (vcat' $ map printAlt alts)
+printStmtM (Case v alts) = hang (text "case" <+> text v <+> text "of") 2 (vcat' $ map printAlt alts)
   where
     printAlt (Alt cons vs tailM) = text cons <+> hsep (texts vs) <+> text "->" <+> printTailM tailM
 printStmtM (Done _ _ t) = printTailM t
@@ -125,7 +125,7 @@ printTailM (Return n) = text "return" <+> text n
 printTailM (Enter f a) = text f <+> text "@" <+> text a
 printTailM (Closure dest vs) = printDest dest <+> braces (commaSep text vs)
 printTailM (Goto dest vs) = printDest dest <> parens (commaSep text vs)
-printTailM (ConstrM cons vs) = text cons <> text "*" <+> (hsep $ texts vs)
+printTailM (Constr cons vs) = text cons <> text "*" <+> (hsep $ texts vs)
 printTailM (Thunk dest vs) = printDest dest <+> brackets (commaSep text vs)
 printTailM (Run v) = text "invoke" <+> text v
 printTailM (Prim p vs) = text p <> text "*" <> parens (commaSep text vs)
@@ -148,7 +148,7 @@ instance NonLocal Stmt where
   successors = stmtSuccessors
                         
 stmtSuccessors :: Stmt e C -> [Label]
-stmtSuccessors (CaseM _ alts) = [l | (Alt _ _ (Goto (_, l) _)) <- alts]
+stmtSuccessors (Case _ alts) = [l | (Alt _ _ (Goto (_, l) _)) <- alts]
 stmtSuccessors (Done _ _ (Goto (_, l) _)) = [l]
 stmtSuccessors _ = []
 
@@ -248,7 +248,7 @@ bind v = return . maybe Nothing (Just . mkMiddle . Bind v)
 -- | Create a case statement if alts are given.
 _case :: FuelMonad m => Name -> (Alt Tail -> Maybe (Alt Tail)) -> [Alt Tail] -> m (Maybe (ProgM O C))
 _case v f alts  
-  | any isJust alts' = return $ Just $ mkLast $ CaseM v (zipWith altZip alts alts')
+  | any isJust alts' = return $ Just $ mkLast $ Case v (zipWith altZip alts alts')
   | otherwise = return $ Nothing
   where
     alts' = map f alts
@@ -264,7 +264,7 @@ vars :: Tail -> [Name]
 vars (Enter f x) = [f, x]
 vars (Closure _ vs) = vs
 vars (Goto _ vs) = vs
-vars (ConstrM _ vs) = vs
+vars (Constr _ vs) = vs
 vars (Thunk _ vs) = vs
 vars (Run v) = [v]
 vars (Prim _ vs) = vs
@@ -371,7 +371,7 @@ mkDataPrim tag numArgs = do
       mkLam bName 0 vs = do
         bLabel <- freshLabel
         let bloConstr = mkFirst (BlockEntry bName bLabel vs) <*>
-              mkLast (Done bName bLabel (ConstrM tag vs))
+              mkLast (Done bName bLabel (Constr tag vs))
         return (bLabel, bloConstr)
       mkLam cName n vs = do
         cLabel <- freshLabel
@@ -523,7 +523,7 @@ renameTail r (Return v) = Return (r v)
 renameTail r (Enter f x) = Enter (r f) (r x)
 renameTail r (Closure dest vs) = Closure dest (map r vs)
 renameTail r (Goto dest vs) = Goto dest (map r vs)
-renameTail r (ConstrM c vs) = ConstrM c (map r vs)
+renameTail r (Constr c vs) = Constr c (map r vs)
 renameTail r (Thunk dest vs) = Thunk dest (map r vs)
 renameTail r (Run v) = Run (r v)
 renameTail r (Prim p vs) = Prim p (map r vs)

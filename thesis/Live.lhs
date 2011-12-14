@@ -109,12 +109,12 @@ proceeds backwards. You cannot use a variable before it has been declared!
 
 >     live (Bind v t) f = Set.delete v f  `Set.union` tailVars t 
 
-|CaseM| and |Done| add variables based on the tails found. |Done| only
-needs to consider its tail expression. For |CaseM|, we need
+|Case| and |Done| add variables based on the tails found. |Done| only
+needs to consider its tail expression. For |Case|, we need
 to take the union of all variables used. 
 \restorecolumns
 
->     live (CaseM v alts) f = Set.insert v (Set.unions (map (setAlt f) alts))
+>     live (Case v alts) f = Set.insert v (Set.unions (map (setAlt f) alts))
 >     live (Done _ _ t) f = tailVars t
 
 |setAlt| gathers the variables used in each case alternative, and
@@ -132,7 +132,7 @@ each type of tail expression.
 >     tailVars (Closure _ vs) = Set.fromList vs 
 >     tailVars (Goto _ vs) = Set.fromList vs
 >     tailVars (Enter v1 v2) = Set.fromList [v1, v2]
->     tailVars (ConstrM _ vs) = Set.fromList vs
+>     tailVars (Constr _ vs) = Set.fromList vs
 >     tailVars (Return n) = Set.singleton n
 >     tailVars (Thunk _ vs) = Set.fromList vs
 >     tailVars (Run n) = Set.singleton n
@@ -162,7 +162,7 @@ each type of tail expression.
 >     rewrite (Done n l t) f = done n l (rewriteTail f t)
 >     rewrite (BlockEntry n l args) live 
 >       | Set.difference live tops /= Set.fromList args = blockEntry n l (sort (Set.toList live))
->     rewrite (CaseM n alts) f = _case n (rewriteAlt f) alts
+>     rewrite (Case n alts) f = _case n (rewriteAlt f) alts
 >     -- Why do I not need to worry about Bind here? What shows I can't have a 
 >     -- Goto in the tail?
 >     rewrite _ _ = return Nothing
@@ -245,7 +245,7 @@ expression.
 >     safe :: Tail -> Bool
 >     safe (Return _) = True
 >     safe (Closure _ _) = True
->     safe (ConstrM _ _) = True
+>     safe (Constr _ _) = True
 >     safe (Prim _ _) = True 
 >     safe (Enter _ _) = True
 >     safe (Thunk _ _) = True 

@@ -130,7 +130,7 @@ closure or jump to the block.
 >       Map.insert v (PElem (CloDest dest args)) 
 >                    (kill v facts)
 >     t (Bind v _) facts = Map.insert v Top (kill v facts) {-"\hslabel{rest}"-}
->     t (CaseM _ _) facts = mkFactBase collapseLattice []
+>     t (Case _ _) facts = mkFactBase collapseLattice []
 >     t (Done _ _ _) facts = mkFactBase collapseLattice []
 >     t (BlockEntry _ _ _) facts = facts
 >     t (CloEntry _ _ _ _) facts = facts

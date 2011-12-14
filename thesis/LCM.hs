@@ -139,7 +139,7 @@ postTransfer early used = mkFTransfer fw
     fw (Bind _ t) pp@(PP (use, ea)) 
        | useable t && not (t `Set.member` use) = PP (use, Set.insert t ea)
        | otherwise = pp
-    fw (CaseM _ alts) (PP (use, post)) = 
+    fw (Case _ alts) (PP (use, post)) = 
       let altT (Alt _ _ t) = tailSucc t post
           (labels, posts) = unzip . catMaybes $ map altT alts
           fact = PP (Set.empty, intersections posts)
@@ -214,7 +214,7 @@ availTransfer ant = mkFTransfer fw
     fw (BlockEntry n l _) av = mkInitial (n,l) av
     fw (CloEntry n l _ _) av = mkInitial (n,l) av
     fw (Bind _ t) av = mkAvailable av t
-    fw (CaseM _ alts) (AV (kill, avail)) = 
+    fw (Case _ alts) (AV (kill, avail)) = 
       let altT (Alt _ _ t) = tailSucc t avail
           (labels, avails) = unzip . catMaybes $ map altT alts
           fact = AV (kill, intersections avails)
@@ -234,7 +234,7 @@ availTransfer ant = mkFTransfer fw
                     else AV (kill, Set.insert t avail)
 
 -- | Anticipated expressions will always be some sort of tail: Enter,
--- Closure, ConstrM, Thunk, Prim or LitM.  
+-- Closure, Constr, Thunk, Prim or LitM.  
 --
 -- We index by the arguments used so we can tell when to remove
 -- an expression. At the entry point to a block, the anticipated
@@ -280,7 +280,7 @@ antTransfer uses kills = mkBTransfer anticipate
 
     anticipate (Bind _ _) f = f
 
-    anticipate (CaseM _ alts) f = 
+    anticipate (Case _ alts) f = 
       let tails = [(l, args) | (Alt _ _ (Goto (_, l) args)) <- alts]
       in AF [] (Set.unions . map (fromSucc f) $ tails)
     anticipate (Done _ _ (Goto (_, l) args)) f = AF [] (fromSucc f (l, args))
@@ -328,7 +328,7 @@ showAnt (AF env ant) = "(" ++ show env ++ ", " ++
 -- | This defines the expressions we consider for LCM.
 useable (Enter {}) = True
 useable (Closure {}) = True
-useable (ConstrM {}) = True
+useable (Constr {}) = True
 useable (Thunk {}) = True
 useable (Prim {}) = True
 useable (LitM {}) = True
@@ -353,7 +353,7 @@ used = Map.fromListWith Set.union . map destUses . allBlocks
     uses u (BlockEntry {}) = u
     uses u (CloEntry {}) = u
     uses u (Bind _ t) = Set.insert t u
-    uses u (CaseM {}) = u
+    uses u (Case {}) = u
     uses u (Done n l t) = Set.insert t u 
 
 -- | Compute expressions killed in each block.
@@ -372,7 +372,7 @@ killed = Map.fromListWith Set.union . map destKills . allBlocks
       let updatedUses = Map.delete v u
       in (k `Set.union` Map.findWithDefault Set.empty v u
          , newUses t updatedUses)
-    kills (CaseM {}) (k, u) = (k, u)
+    kills (Case {}) (k, u) = (k, u)
     kills (Done n l t) (k, u) = (k, newUses t u)
 
     newUses t old = 

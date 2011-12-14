@@ -39,6 +39,16 @@ progM prelude@(prims, _) progs = do
       printDef :: Def -> Doc
       printDef def = text (show (ppr def))
 
+m205 :: Graph Stmt C C
+m205 = mkFirst (BlockEntry undefined undefined ["g", "f", "x"]) <*>
+       mkMiddles [Bind "v209" undefined {-"\ \app g * x/"-}
+                , Bind "v1" undefined {-"\ \invoke v209/"-}
+                , Bind "v208" undefined {-"\ \app f * v1/"-} 
+                , Bind "v2" undefined {-"\ \invoke v208/"-}
+                , Bind "v206" undefined {-"\ \goto return()"-} 
+                , Bind "v207" undefined {-"\ \app v206 * v2/"-}] <*>
+       mkLast (Done undefined undefined undefined {-"\ \invoke v207/"-})
+
 -- Optimize a hand-writen MIL program.
 milTest :: SimpleUniqueMonad (ProgM C C) -> IO ()
 milTest prog = do
@@ -676,7 +686,7 @@ testBindReturn6 = do
            mkMiddle (Bind "b" (Return "a")) <*>
            mkMiddle (Bind "c" (Return "b")) <*>
            mkMiddle (Bind "x" (Closure ("block1", l1) [])) <*>
-           mkMiddle (Bind "z" (ConstrM "C" [])) <*>
+           mkMiddle (Bind "z" (Constr "C" [])) <*>
            mkLast (Done "block1" l1 (Return "c"))
 
 {-- 

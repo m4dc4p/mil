@@ -60,7 +60,7 @@ BlockReferrers set must have at least one referrer.
 
 >     addReferrer :: Dest -> (forall e x. BlockReferrers -> Stmt e x -> BlockReferrers)
 >     addReferrer referrer refMap (Bind _ tail) = foldl (addRef referrer) refMap (tailDest tail)
->     addReferrer referrer refMap (CaseM _ alts) = foldl (addRef referrer) refMap (concatMap (tailDest . altE) alts) 
+>     addReferrer referrer refMap (Case _ alts) = foldl (addRef referrer) refMap (concatMap (tailDest . altE) alts) 
 >     addReferrer referrer refMap (Done _ _ tail) = foldl (addRef referrer) refMap (tailDest tail) 
 >     addReferrer referrer refMap (BlockEntry _ _ _) = refMap
 >     addReferrer referrer refMap (CloEntry _ _ _ _) = refMap
