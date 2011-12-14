@@ -842,7 +842,7 @@ in the corresponding fields.
 Compilers translating the \lamA to executable (or intermediate) forms
 have existed for decades, and our work did not seek to advance
 knowledge in this area. However, some nuances of our translation should be
-highlighted, especially concering \lambda-abstractions.
+highlighted, especially concering $\lambda$-abstractions.
 
 Consider the following \lamC definition of |compose|. We take no
 syntactic shortcuts --- this definition shows the \lamC definition
