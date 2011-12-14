@@ -4,12 +4,14 @@
 \input{preamble}
 \setboolean{standaloneFlag}{false}
 \begin{document}
-\input{document.preamble}
 
-$<*>$
 
-\ensuremath{\mathbin{\text{<}\mkern-1.5mu\mathord{*}\mkern-1.5mu\text{>}}}
+\LCToMIL{\lcabs x. \lcabs y. \lcname e/}{\mkclo[abs2:v1, \dots, v_n, x]}
 
-\ensuremath{\mathbin{\mathord{|}\mkern-1.5mu\mathord{*}\mkern-1.5mu\text{><}\mkern-1.5mu\mathord{*}\mkern-1.5mu\mathord{|}}}
+  \begin{AVerb}[gobble=4]
+    \ccblock abs1(v_1, \dots, v_n)x: \compMILE{\lcabs y.\lcname e/}
+  \end{AVerb}
+
+
 
 \end{document}

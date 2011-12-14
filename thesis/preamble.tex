@@ -55,11 +55,10 @@
 
 \hyphenation{data-flow mo-na-dic} 
 
-%% Should unindent all haskell code set in a dispay (versus inline)
+%% Should unindent all haskell code set in a display (versus inline)
 \makeatletter
-  \@ifundefined{hscodestyle}
-               {}
-               {\renewcommand{\hscodestyle}{\advance\leftskip -\mathindent}}
+\@ifundefined{hscodestyle}{}
+  {\renewcommand{\hscodestyle}{\advance\leftskip -\mathindent}}
 \makeatother
 
 % Used by included files to know they
@@ -103,7 +102,7 @@
 \let\lamAppP=\lamAPp
 %% LC definition
 \newtoks\toksA
-\protected\def\lcname#1/{\ensuremath{\mathit{#1}}}
+\protected\def\lcname#1/{\ensuremath{\mathit{\removespaces #1}}}
 \protected\def\lcdef#1(#2)=#3;{\def\arg{#2}%%
   \def\lcargs##1,##2/{\def\arg{##2}%%
     \ifx\empty\arg%%
@@ -162,6 +161,20 @@
 \protected\def\syntaxrule#1/{\hfil\text{\emph{#1}}}
 \protected\long\def\termrule#1:#2:#3/{\term #1/ &\hbox{$:=$}\ensuremath{\ #2} & \syntaxrule #3/}
 \protected\def\termcase#1:#2/{&\hbox to \termalign{$|$\hss}\ensuremath{\ #1} & \syntaxrule #2/}
+
+%% Produce a ``meaning'' equation
+%% where
+%%  
+%%  [| #1 |] => <following group>
+%%
+%% LCToMIL should have one argument and be followed by a group. The group
+%% should be translation of the expression.
+\newtoks\meaningtoks \newbox\meaningbox
+\protect\def\LCToMIL#1{%%
+  \gdef\LCToMILa{\meaningtoks={\setbox\meaningbox=\vbox\bgroup\aftergroup\LCToMILb}
+    \the\meaningtoks}%%
+  \gdef\LCToMILb{\vtop{\compMILE{#1}} = \ensuremath{\vtop{\hbox{\box\meaningbox}}}}%%
+    \afterassignment\LCToMILa\let\next= }
 
 
 %% End MIL chapter
