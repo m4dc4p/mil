@@ -815,57 +815,116 @@ in the corresponding fields.
 \section{Compiling \lamC to MIL}
 \label{mil_sec4}
 
+\intent{Explain why we don't show the whole compiler.}
 Compilers translating the \lamA to executable (or intermediate) forms
 have existed for decades, and our work did not seek to advance
 knowledge in this area. However, some nuances of our translation should be
 highlighted, especially concering $\lambda$-abstractions.
 
-Consider again the definition of |compose| in Figure~\ref{mil_fig1_a} on
-Page~\pageref{mil_fig1}. Our compiler translates each $\lambda$,
+\intent{Show how $\lambda$-abstractions are translated.}
+Consider again the definition of |compose| in Figure~\ref{mil_fig1_a}
+on Page~\pageref{mil_fig1}. Our compiler translates each $\lambda$,
 except the last, to a block that returns a closure. The final
-$\lambda$ translates to a block that jumps to another block which
-implements the body of the function. This gives the sequence
-of blocks shown in Figure~\ref{mil_fig2} (excepting \lab main/, of
-course). 
+$\lambda$ translates to a block that immediately jumps to the the
+implementation of the function. This gives the sequence of blocks
+shown in Figure~\ref{mil_fig2} (excepting \lab main/, of course).
 
-\newtoks\meaningtoks \newbox\meaningbox
-\def\LCToMIL#1{%%
-  \gdef\LCToMILa{\meaningtoks={\setbox\meaningbox=\hbox\bgroup\aftergroup\LCToMILb}
-    \the\meaningtoks}
-  \gdef\LCToMILb{\ensuremath{\compMILE{#1} = \unhbox\meaningbox}}
-    \afterassignment\LCToMILa\let\next= }
+%% \newtoks\meaningtoks \newbox\meaningbox
+%% \def\LCToMIL#1{%%
+%%   \gdef\LCToMILa{\meaningtoks={\setbox\meaningbox=\hbox\bgroup\aftergroup\LCToMILb}
+%%     \the\meaningtoks}
+%%   \gdef\LCToMILb{\ensuremath{\compMILE{#1} = \unhbox\meaningbox}}
+%%     \afterassignment\LCToMILa\let\next= }
+%% \begin{myfig}
+%%   \begin{minipage}
+%%     \begin{math}
+%%       \begin{array}
+%%         \LCToMIL{|x -> y -> e|}{
+%%           \begin{AVerb}[gobble=12]
+%%             \mkclo[abs2:v1, \dots, v_n, x]
+
+%%             \ccblock abs1(v_1, \dots, v_n)x: \compMILE{|y -> e|}
+%%           \end{AVerb}
+%%         }
+%%       \end{array}
+%%     \end{math}
+%%   \end{minipage}
+%%   \caption{Excerpts from a \lamC to MIL translator. This figure shows
+%%     rules for compiling $\lambda$-abstractions and monadic expressions.}
+%% \end{myfig}
+
+\intent{Point out how we rely on uncurrying to make this code performant.}
+This strategy produces code that does a lot of repetitive work. When
+fully applied, a function of $n$ arguments will create $n - 1$
+closures, perform $n - 1$ jumps between blocks, and copy arguments
+between closures numerous times. Our uncurrying optimization
+(Chapter~\ref{ref_chapter_uncurrying}) can collapse this work to 1
+closure, 1 jump and no argument copying in many cases. Therefore,
+generating simple (and easy to analyze code) seems reasonable.
+
+\intent{Explain how we know when to create a thunk versus executing
+  monadic code.}  Monadic code presents other challenges. \lamC
+requires that all definitions be entirely pure or entirely
+monadic. The compiler treats a given \lamC definition as monadic when
+the definition starts with a statement like |x <- e|. We write such
+definitions using |do| notation for convenience, but |do| does not
+actually exist in \lamC's syntax.
+
+Monaic expressions do not directly produce a value; they produce a
+thunk that can be later evaluated. Therefore, when the compiler first
+encounters a monadic definition, it generates a block that returns a
+thunk. The block pointed to by the thunk executes the monadic program.
+
+The code shown for |kleisli| in Figure~\ref{mil_fig_kleisli_b}
+illustrates this strategy. Blocks \lab kleisli/, \lab k201/, \lab
+k202/, and \lab k203/ collect the arguments |a|, |b|, and |c| for
+|kleisli|. Block \lab m205/ executes the body of |kleisli|; block \lab
+b204/ returns a thunk that, when invoked, will execute \lab m205/.
+
 \begin{myfig}
-  \begin{minipage}
-    \begin{math}
-      \begin{array}
-        \LCToMIL{|x -> y -> e|}{
-          \begin{AVerb}[gobble=12]
-            \mkclo[abs2:v1, \dots, v_n, x]
-
-            \ccblock abs1(v_1, \dots, v_n)x: \compMILE{|y -> e|}
-          \end{AVerb}
-        }
-      \end{array}
-    \end{math}
+  \begin{minipage}{\hsize}
+> twice f x = kleisli f f x 
   \end{minipage}
-  \caption{Excerpts from a \lamC to MIL translator. This figure shows
-    rules for compiling $\lambda$-abstractions and monadic expressions.}
+  \caption{Definition of |twice|, which applies a given 
+    function twice using kleisli composition.}
+  \label{mil_fig_twice}
 \end{myfig}
 
-The final result is this sequence
-of blocks:
+Consider a definition that uses |kleisli|, such as |twice| in
+Figure~\ref{mil_fig_twice}. If \lab b204/ jumped directly to \lab
+m205/, then any application of |twice| would immediately execute the
+body of |kleisli|, subsequent evalution of the result would produce
+nothing.\footnote{Technically, the unit value (|()|), would be
+  produced.} 
 
-\begin{singlespace}\correctspaceskip
-  \begin{AVerb}[gobble=4]
-    \block compose(): \mkclo[k201:]
-    \ccblock k201()f: \mkclo[k202:f]
-    \ccblock k202(f)g: \mkclo[k203:(f, g)]
-    \ccblock k203(f, g)x: \goto b204(f, g, x)
-    \block b204(f, g, x):
-      \vbinds v205 <- \app g * x/;
-      \app f * v205/
-  \end{AVerb}
-\end{singlespace}
+For example, if we defined |greet| as follows:
+
+>  greet = twice (\f -> do { print ("Hello, " ++ f); return f;}) "world!"
+
+\noindent then the following program would only print |"Hello, world!"| twice,
+when we would expect it to print four times:
+
+> _ <- greet
+> _ <- greet
+
+The compiler always generates code to return a thunk when it first
+encounters a monadic definition, but it does not use the same strategy
+when translating the body of the definition. As seen in
+Figure~\ref{mil_fig_kleisli_b}, the block \lab m205/ does not continue
+to create thunks. If every bind generated a block returning a thunk,
+the program would never get any work done. 
+
+Instead, the compiler assumes a monadic definition will consist of a
+sequence of ``monadic-valued'' statements. In |x <- e|, |e| clearly is
+monadic-valued. Any other expression (such as |f g| or |case e of
+{-"\dots"}|) must evaluate to a monadic value. All expression 
+results are assigned to a variable; if the expression is a monadic
+bind, the existing \lhs is used. A compiler generated temporary
+is used in all other cases. 
+
+For example, consider again |twice| from Figure~\ref{mil_fig_twice}. 
+
+
 
 \section{MIL and Hoopl}
 \label{mil_sec7}

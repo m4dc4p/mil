@@ -1064,7 +1064,19 @@ mil_print = [("hello", bindE "_" (mPrint `app` lit 0) $ \_ -> ret mkUnit)
             ,("main", 
                     bindE "_" (var "hello") $ \_ -> 
                     bindE "_" (var "hello") $ \_ -> ret mkUnit)]
-                     
+
+mil_twice = [("twice", 
+                     lam "f" $ \f ->
+                     lam "x" $ \x -> 
+                       _let "m" (var "kleisli" `app` f `app` f `app` x) $ \m ->
+                         m)] ++ kleisli
+
+
+mil_bind = [("bind", lam "f" $ \f ->
+               lam "x" $ \x -> 
+                 bindE "y" (f `app` x) $ \y ->
+                   (lam "z" $ \z -> z `app` y) `app` y)]
+
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
 
