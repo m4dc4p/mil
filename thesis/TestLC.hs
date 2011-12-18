@@ -189,8 +189,7 @@ kleisli = [("kleisli",
             lam "f" $ \f ->
             lam "g" $ \g ->
             lam "x" $ \x ->
-              bindE "v1" (g `app` x) $ \v1 ->
-              bindE "v2" (f `app` v1) ret)]
+              bindE "v1" (g `app` x) $ \v1 -> f `app` v1)]
 
 {-
 

@@ -201,7 +201,7 @@
 \newtoks\foo
 %% Removes spaces, implicit, active and explicit.
 \protected\def\removespaces{\asp\afterassignment\removesp\let\next= }
-\def\removesp{\foo={\next}\ifcat\noexpand\next\sp\foo={\removespace}%%
+\def\removesp{\foo={\next}\ifcat\noexpand\next\sp\foo={\removespaces}%%
  \else\ifx\next\spa\foo={\removespaces}\fi%%
  \fi\the\foo}
 %% MIL reserved word

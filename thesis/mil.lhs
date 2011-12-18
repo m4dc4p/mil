@@ -712,14 +712,6 @@ shows the corresponding MIL code. The blocks \lab k201/, \lab k202/, and \lab k2
 progressively capture the arguments to |kleisli|. \lab b204/ constructs
 the thunk for |kleisli|, but only after all arguments have been captured. 
 
-\intent{Illustrate that bind statements all run when a thunk is
-  invoked.}  The value returned by \lab b204/ in
-Figure~\ref{mil_fig_kleisli_b} must be invoked before \lab m205/ will
-execute. However, \lab m205/ does not suspend the computations
-represented by \app g * x/ or \app f * v/, even though they are also
-monadic. In general, all bind statements in a given |do| block will be
-invoked once the |do| block itself is invoked.
-
 \begin{myfig}
   \begin{tabular}{c}
     \begin{minipage}{\widthof{|kleisli f g x = do|}}
@@ -730,20 +722,17 @@ invoked once the |do| block itself is invoked.
     \scap{mil_fig_kleisli_a} \\
     \begin{minipage}{\widthof{\ \ \block b204 (g, x, f): \mkthunk[m205:g, x, f]}}
       \begin{AVerb}[gobble=8,numbers=left]
-        \block kleisli (): \mkclo[k201:]
+        \block kleisli(): \mkclo[k201:]
         \ccblock k201()f: \mkclo[k202:f]
         \ccblock k202(f)g: \mkclo[k203:g, f]
         \ccblock k203(g, f)x: \goto b204(g, x, f)
-        \block b204 (g, x, f): \mkthunk[m205:g, x, f]
+        \block b204(g, x, f): \mkthunk[m205:g, x, f]
 
-        \block m205 (g, x, f):
-          \vbinds v209 <- \app g * x/;
-          \vbinds v1 <- \invoke v209/;
-          \vbinds v208 <- \app f * v1/;
-          \vbinds v2 <- \invoke v208/;
-          \vbinds v206 <- \goto return();
-          \vbinds v207 <- \app v206 * v2/;
-          \invoke v207/
+        \block m205(g, x, f):
+          \vbinds v207 <- \app g * x/;
+          \vbinds v1 <- \invoke v207/;
+          \vbinds v206 <- \app f * v1/; \label{mil_fig_kleisli_f_app}
+          \invoke v206/ \label{mil_fig_kleisli_result}
       \end{AVerb}
     \end{minipage} \\\\
     \scap{mil_fig_kleisli_b} \\
@@ -821,37 +810,14 @@ have existed for decades, and our work did not seek to advance
 knowledge in this area. However, some nuances of our translation should be
 highlighted, especially concering $\lambda$-abstractions.
 
-\intent{Show how $\lambda$-abstractions are translated.}
-Consider again the definition of |compose| in Figure~\ref{mil_fig1_a}
-on Page~\pageref{mil_fig1}. Our compiler translates each $\lambda$,
+\intent{Show how $\lambda$-abstractions are translated.}  Consider
+again the definition of |compose| in Figure~\ref{mil_fig1a} on
+Page~\pageref{mil_fig1}. Our compiler translates each $\lambda$,
 except the last, to a block that returns a closure. The final
 $\lambda$ translates to a block that immediately jumps to the the
 implementation of the function. This gives the sequence of blocks
-shown in Figure~\ref{mil_fig2} (excepting \lab main/, of course).
-
-%% \newtoks\meaningtoks \newbox\meaningbox
-%% \def\LCToMIL#1{%%
-%%   \gdef\LCToMILa{\meaningtoks={\setbox\meaningbox=\hbox\bgroup\aftergroup\LCToMILb}
-%%     \the\meaningtoks}
-%%   \gdef\LCToMILb{\ensuremath{\compMILE{#1} = \unhbox\meaningbox}}
-%%     \afterassignment\LCToMILa\let\next= }
-%% \begin{myfig}
-%%   \begin{minipage}
-%%     \begin{math}
-%%       \begin{array}
-%%         \LCToMIL{|x -> y -> e|}{
-%%           \begin{AVerb}[gobble=12]
-%%             \mkclo[abs2:v1, \dots, v_n, x]
-
-%%             \ccblock abs1(v_1, \dots, v_n)x: \compMILE{|y -> e|}
-%%           \end{AVerb}
-%%         }
-%%       \end{array}
-%%     \end{math}
-%%   \end{minipage}
-%%   \caption{Excerpts from a \lamC to MIL translator. This figure shows
-%%     rules for compiling $\lambda$-abstractions and monadic expressions.}
-%% \end{myfig}
+shown in Figure~\ref{mil_fig2} on Page~\pageref{mil_fig2} (excepting
+\lab main/, of course).
 
 \intent{Point out how we rely on uncurrying to make this code performant.}
 This strategy produces code that does a lot of repetitive work. When
@@ -863,68 +829,47 @@ closure, 1 jump and no argument copying in many cases. Therefore,
 generating simple (and easy to analyze code) seems reasonable.
 
 \intent{Explain how we know when to create a thunk versus executing
-  monadic code.}  Monadic code presents other challenges. \lamC
-requires that all definitions be entirely pure or entirely
-monadic. The compiler treats a given \lamC definition as monadic when
-the definition starts with a statement like |x <- e|. We write such
-definitions using |do| notation for convenience, but |do| does not
-actually exist in \lamC's syntax.
+  monadic code.}  Monadic code presents other challenges. Monadic
+expressions do not directly produce a value; they produce a thunk to
+be evaluated later. Therefore, when the compiler first encounters a
+monadic expression, it generates a block that returns a thunk. The
+block pointed to by the thunk executes the monadic expression. 
 
-Monaic expressions do not directly produce a value; they produce a
-thunk that can be later evaluated. Therefore, when the compiler first
-encounters a monadic definition, it generates a block that returns a
-thunk. The block pointed to by the thunk executes the monadic program.
+\intent{Show where a thunk is created in |kleisli|.}  The code shown
+for |kleisli| in Figure~\ref{mil_fig_kleisli_b} on
+Page~\pageref{mil_fig_kleisli} illustrates this strategy. Block \lab
+m205/ executes the body of |kleisli|. However, nothing calls \lab
+m205/ directly. Instead, block \lab b204/ returns a thunk that points
+to \lab m205/. \lab b204/ only executes after all arguments for
+|kleisli| are collected; \lab m205/ can only execute by invoking the
+thunk returned by \lab b204/.
 
-The code shown for |kleisli| in Figure~\ref{mil_fig_kleisli_b}
-illustrates this strategy. Blocks \lab kleisli/, \lab k201/, \lab
-k202/, and \lab k203/ collect the arguments |a|, |b|, and |c| for
-|kleisli|. Block \lab m205/ executes the body of |kleisli|; block \lab
-b204/ returns a thunk that, when invoked, will execute \lab m205/.
+\intent{Explain how compiler changes strategy when translating a
+  monadic expression.}  While the compiler follows the strategy above
+when it first encountes a monadic expresssion, it changes strategy
+when compiling the body of that expression. The compiler assumes a
+monadic expression consists of a sequence of ``monadic-valued''
+statements.  In |x <- e|, |e| produces a monadic value. Any other
+expression (such as ``|f g|'' or ``|case e of {-"\dots"-}|'') should
+also evaluate to a monadic value.
 
-\begin{myfig}
-  \begin{minipage}{\hsize}
-> twice f x = kleisli f f x 
-  \end{minipage}
-  \caption{Definition of |twice|, which applies a given 
-    function twice using kleisli composition.}
-  \label{mil_fig_twice}
-\end{myfig}
+\intent{Show how the compiler translates a non-bind expression using
+  |f v| in |kleisli|.}  The translation of |kleisli| in
+Figure~\ref{mil_fig_kleisli_b} illustrates this principle. |kleisli|
+ends with |f v|, an application that must produce a monadic result. We also
+expect that result to be evaluated.\footnote{Imagine if |f| were
+  |print| -- then ``|print x|'' should print!} The statements on
+Lines~\ref{mil_fig_kleisli_f_app} and \ref{mil_fig_kleisli_result}
+evaluate the application, assign the thunk returned to \var v206/, and
+then execute that thunk. In essence, the compiler translates |kleisli|
+as if it ended with a bind followed by a |return|:
 
-Consider a definition that uses |kleisli|, such as |twice| in
-Figure~\ref{mil_fig_twice}. If \lab b204/ jumped directly to \lab
-m205/, then any application of |twice| would immediately execute the
-body of |kleisli|, subsequent evalution of the result would produce
-nothing.\footnote{Technically, the unit value (|()|), would be
-  produced.} 
-
-For example, if we defined |greet| as follows:
-
->  greet = twice (\f -> do { print ("Hello, " ++ f); return f;}) "world!"
-
-\noindent then the following program would only print |"Hello, world!"| twice,
-when we would expect it to print four times:
-
-> _ <- greet
-> _ <- greet
-
-The compiler always generates code to return a thunk when it first
-encounters a monadic definition, but it does not use the same strategy
-when translating the body of the definition. As seen in
-Figure~\ref{mil_fig_kleisli_b}, the block \lab m205/ does not continue
-to create thunks. If every bind generated a block returning a thunk,
-the program would never get any work done. 
-
-Instead, the compiler assumes a monadic definition will consist of a
-sequence of ``monadic-valued'' statements. In |x <- e|, |e| clearly is
-monadic-valued. Any other expression (such as |f g| or |case e of
-{-"\dots"}|) must evaluate to a monadic value. All expression 
-results are assigned to a variable; if the expression is a monadic
-bind, the existing \lhs is used. A compiler generated temporary
-is used in all other cases. 
-
-For example, consider again |twice| from Figure~\ref{mil_fig_twice}. 
-
-
+\begin{singlespace}
+> kleisli f g x = do
+>   y <- g x
+>   t <- f y
+>   return t
+\end{singlespace}
 
 \section{MIL and Hoopl}
 \label{mil_sec7}
@@ -990,29 +935,27 @@ know the basic block being analyzed when traversing the CFG backwards.
 \intent{Show how the AST mirrors the expected shape of a sample MIL
   block.}  Even without describing |Tail| values, we can show how
 |Stmt| values give the correct shape to MIL blocks. Returning to our
-example of Kleisli composition in Figure~\ref{mil_fig_kleisli}, we can
+example of Kleisli composition in Figure~\ref{mil_fig_kleisli} on Page~\pageref{mil_fig_kleisli}, we can
 represent the block \lab m205/ with the following definition:
 
 \begin{singlespace}\correctspaceskip
   \begin{minipage}{\widthof{|BlockEntry "m205" "m205" ["g", "f", "x"] <*>|\quad}}
 > m205 :: Label -> Graph Stmt C C
 > m205 label = mkFirst (BlockEntry "m205" label ["g", "f", "x"]) <*>
->   mkMiddles [Bind "v209" ({-"\app g * x/"-})
+>   mkMiddles [Bind "v207" ({-"\app g * x/"-})
 >             , Bind "v1" ({-"\invoke v209/"-})
->             , Bind "v208" ({-"\app f * v1/"-})
->             , Bind "v2" ({-"\invoke v208/"-})
->             , Bind "v206" ({-"\goto return()"-})
->             , Bind "v207" ({-"\app v206 * v2/"-})] <*>
->   mkLast (Done "m205" label ({-"\invoke v207/"-}))
+>             , Bind "v206" ({-"\app f * v1/"-})] <*>
+>   mkLast (Done "m205" label ({-"\invoke v206/"-}))
   \end{minipage}
 \end{singlespace}
 
 |m205| defines as basic block, as shown by its |C C| type. Hoopl
-provides |mkFirst|, |mkMiddles| and |mkLast| (as shown in
-Chapter~\ref{ref_chapter_hoopl}, Figure~\ref{hoopl_fig4}), for lifting
-nodes into Hoopl's monadic graph representation. The operator |<*>|
-connects pieces of the graph together. Hoopl uses the |label| argument
-to connect this definition to other basic blocks in a larger program.
+provides |mkFirst|, |mkMiddles| and |mkLast|
+(Chapter~\ref{ref_chapter_hoopl}, Figure~\ref{hoopl_fig4}), for
+lifting nodes into Hoopl's monadic graph representation. The operator
+|<*>| connects pieces of the graph together. Hoopl uses the |label|
+argument to connect this definition to other basic blocks in a larger
+program.
 
 Figure~\ref{mil_fig_tail_ast} shows the various |Tail| values
 that implement the \term tail/ terms in Figure~\ref{mil_fig3}. Notice
@@ -1027,7 +970,7 @@ represent the corresponding \term tail/ terms. |Run| represents
 \milres invoke/ \eqref{mil_syntax_invoke} and |Constr| represents a
 constructor \eqref{mil_syntax_cons}.
 
-\begin{myfig}
+\begin{myfig}[tb]
   \begin{minipage}{\linewidth}\begin{withHsLabeled}{mil_tail_ast}
 > data Tail = Return Name {-"\hslabel{return}"-}
 >   | Enter Name Name {-"\hslabel{enter}"-}
@@ -1056,10 +999,9 @@ MIL resembles three-address code in several ways: infinitely many
 registers can be named, nested expressions are not allowed, and
 implementation details are made explicit. The MIL's unique features
 include separate representations for \emph{closure-capturing} and
-basic blocks, and the use of monadic \emph{tail} expressions. We 
-presented a simple scheme for compiling the \lamA given in
-Chapter \ref{ref_chapter_languages} to our MIL. Later will be devoted
-to optimizing those MIL programs using dataflow techniques.
+basic blocks, and the use of monadic \emph{tail} expressions. Later
+chapters will be devoted to optimizing MIL programs using
+dataflow techniques.
 
 \standaloneBib
 
