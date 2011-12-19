@@ -414,7 +414,14 @@ mkPrim name numArgs
 
 mkMonadicPrim :: UniqueMonad m => Name -> Int -> m (Dest, ProgM C C)
 mkMonadicPrim name numArgs 
-  | numArgs == 0 = final []
+  | numArgs == 0 = do
+      dest1@(n1, l1) <- newDest name
+      dest2@(n2, l2) <- newDest (name ++ "body")
+      return (dest1
+             , (mkFirst (BlockEntry n1 l1 []) <*>
+                mkLast (Done n1 l1 (Thunk dest2 []))) |*><*|
+              (mkFirst (BlockEntry n2 l2 []) <*>
+               mkLast (Done n2 l2 (Prim name []))))
   | otherwise = do
     (next, rest) <- mkIntermediate final name (numArgs - 1) ["a"] 
     dest@(n, l) <- newDest name

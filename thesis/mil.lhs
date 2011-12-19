@@ -68,32 +68,21 @@ particular, \lamC uses Haskell's notation for monadic bind (|<-|) and
 languages for the Habit programming language \citep{Habit2010}.
 
 Our work focused on MIL, rather than \lamC, so we do not describe it
-in detail here. A privately available ``Compilation Strategy''
-\citep{HabitCompiler2010} gives full details on \lamC.\footnote{For
-  simplicity's sake, we ignore two features of \lamC in this work:
-  patterns and guards. Details on those elements can be found in the
-  aforementioned report.}
+in detail here. The Habit ``Compilation Strategy''
+\citep{HabitCompiler2010} report gives full details on
+\lamC.\footnote{For simplicity's sake, we ignore two features of \lamC
+  in this work: patterns and guards. Details on those elements can be
+  found in the aforementioned report.} The report describes several
+variations on MPEG: the language we describe corresponds to
+``Normalized'' MPEG.
 
 Figure~\ref{mil_fig_lam_syntax} gives the full syntax of \lamC. In the
-figure, \term a/, \term b/, $\ldots$, \term v_1/, represent variables,
-not arbitrary terms; however, \term t/, \term t_1/, etc. do represent
-arbitrary terms. While most terms should be recognizable from Haskell
-or the \lamA, the monadic bind \eqref{lam_syntax_bind}, primitive
-\eqref{lam_syntax_prim} and let \eqref{lam_syntax_let} terms bear
-further explanation.
-
-A monadic bind expression, |v <- t_1; t_2| implies that the result od
-the monadic computation, |t_1|, will be bound to |v|; |t_2| will then
-be evaluated with |v| in scope. In this case, |v| can only be a
-variable; \lamC does not support pattern-matching on the \lhs of a
-bind. As we describe later in Section~\ref{mil_subsec_monad}, the
-monadic context in which \term t_1/ is evaluated depends on the type
-of the expression in Habit.
-
-The expression |let v = t_1 in t_2| binds the value represented by \term t_1/
-to \term v/; \term v/ is then in scope over the expression \term t_2/. Due to
-Habit's evaluation strategy, \term v/ cannot appear in \term t_1/ unless \term t_1/
-begins with an abstraction. 
+figure, \term a/, \term b/, $\ldots$, \term v_1/, etc.\ represent simple
+variables, not terms; however, \term t/, \term t_1/, etc.\ do represent
+arbitrary terms. While most elements should be recognizable from
+Haskell or the \lamA, the \emph{monadic bind} \eqref{lam_syntax_bind},
+\emph{let} \eqref{lam_syntax_let} and \emph{primitive}
+\eqref{lam_syntax_prim} terms bear further explanation.
 
 \begin{myfig}
   \begin{tabular}{r@@{}lrl}
@@ -109,258 +98,38 @@ begins with an abstraction.
       \end{minipage}}:Case Discimination/ & \labeleq{lam_syntax_case}\eqref{lam_syntax_case} \\
     \termcase |v <- t_1; t_2|:Monadic Bind/ & \labeleq{lam_syntax_bind}\eqref{lam_syntax_bind} \\
     \termcase {\begin{minipage}[t]{\widthof{|let f_1 v_1 {-"\ldots"-} v_n = t_1|}}
-        $\mathbf{let}\ f_1\ v_1\ \ldots\ v_n = t_1$\endgraf%%
+        $\mathbf{let} \term def_1/$\endgraf%%
         $\phantom{\mathbf{let}}\ \ldots$\endgraf%%
-        $\phantom{\mathbf{let}}\ f_n\ v_1\ \ldots\ v_n = t_n$\endgraf
+        $\phantom{\mathbf{let}} \term def_n/$\endgraf
         $\mathbf{in}\ t$
     \end{minipage}}:Let/ & \labeleq{lam_syntax_let}\eqref{lam_syntax_let} \\
     \termcase \lcprim p*:Primitive/ & \labeleq{lam_syntax_prim}\eqref{lam_syntax_prim} \\
     \termcase \lccons C(v_1 \ldots v_n):Allocate Data/ & \labeleq{lam_syntax_cons}\eqref{lam_syntax_cons} \\\\
     \termrule alt:{|C v_1 {-"\ldots"-} v_n -> t|}:Alternative/& \labeleq{lam_syntax_alt}\eqref{lam_syntax_alt} 
-
-    %%   \mathit{term} &= a, b, \ldots & \hfill\text{\emph{(Variables)}} \\
-    %%   &= \lamAbs{x}{t} & \hfill\text{\emph{(Abstraction)}} \\ 
-    %%   &= \lamApp{t_1}{t_2} & \hfill\text{\emph{(Application)}}
-    %% term &= \mathit{C}\ t_1\ t_2\ \ldots\ t_n, n \ge 0 & \hfil\text{\emph{(ADTs)}} \\ \\
-    %%   &= |case|\ t\ |of| & \hfil\text{\emph{(Case Discrimination)}} \\
-    %%   & \qquad\mathit{C}_1\ a_1\ a_2\ \ldots\ a_n \rightarrow t_1, n \ge 0 \\
-    %%   & \qquad\mathit{C}_2\ b_1\ b_2\ \ldots\ b_n \rightarrow t_2, n \ge 0 
   \end{tabular}
-    \caption{The syntax of \lamC, which extends \lamA from
-    Figure~\ref{lang_fig3} with \emph{algebraic data types} (ADTs) and
-    \emph{case discrimination}. $t$ again represents an arbitrary
-    term. $C$ stands for a constructor name. $a$ and $b$ represent
-    variables, not terms.}
+  \caption{The syntax of \lamC.}
   \label{mil_fig_lam_syntax}
 \end{myfig}
 
+A monadic bind expression, |v <- t_1; t_2|, states that the result of
+the monadic computation, |t_1|, will be bound to |v|; |t_2| will then
+be evaluated with |v| in scope. In this case, |v| can only be a
+variable; \lamC does not support pattern-matching on the \lhs of a
+bind. As we describe later in Section~\ref{mil_subsec_monad}, the
+monadic context in which \term t_1/ is evaluated depends on the type
+of the expression in Habit.
 
-%% \intent{Introduce \lamC as extension to \lamA. Motivate \lamC as used by Habit; 
-%% something to write a compiler for.}
+The |let {-"\term def_1/, $\ldots$, \term def_n/"-} in t| term brings
+the definitions given into the scope of \term t/. The definitions can
+be values or functions\footnote{Technically, values are functions with
+  zero arguments.}, and they can be recursive. However, Habit only
+allows functions to be mutually-recursive.
 
-%% \intent{Brief tour of \lamC's features except bind: constructors, case, primitives and let.}
-
-%% \intent{Description of \lamC's bind feature.}
-
-%% \intent{Present syntax of \lamC.}
-
-%% Section~\ref{lang_sec1} should make it clear that the \lamA is capable
-%% of general-purpose programming, but also quite cumbersome. In
-%% particular, representing conditional statements and values in purely
-%% ``functional'' form is extremely verbose. Therefore we extend the
-%% \lamA in our work by adding two new terms: \emph{algebraic data
-%%   types}\ and \emph{case discrimination}.
-
-%% \emph{Algebraic data types} (ADTs) are a new type of value, alongside
-%% $\lambda$-abstractions.  They consist of a \emph{constructor} tag and
-%% zero or more fields. For example, we can create boolean values by
-%% defining two constructors:
-
-%% > Boolean = True | False
-
-%% Here, |Boolean| is the name of the data we will create, while |True| and
-%% |False| represent the different possible values for |Boolean| data. Our syntax
-%% does not actually support naming data types like |Boolean|; we only are able
-%% to name the constructors |True| and |False|. For presentation, however, this
-%% shorthand is convenient and will be used as needed.
-
-%% Constructors can take also take arguments. This allows us to build
-%% composite data values from simpler pieces. For example, lists
-%% typically have one constructor taking no arguments that represents the
-%% empty list, and another taking two arguments, one of which holds an
-%% element of the list and other which holds the ``rest'' of the list:
-
-%% > List = Nil | Cons x xs
-
-%% Here, |Nil| represents the empty list. |Cons| holds an element of the
-%% list (|x|) and the rest of the list (|xs|). While the |x| argument can
-%% hold any value, the |xs| argument must be another |Cons| or |Nil|
-%% value. If |xs| is some other value, we do not have a valid list. For
-%% example, the list |[True, False, True]| translates to the following
-%% sequence of |List| constructors:
-
-%% > Cons True (Cons False (Cons True Nil))) 
-
-%% However, for convenience, we will write lists using brackets. The
-%% empty list, |Nil|, is written as empty brackets: |[]|.
-
-%% Natural numbers can be represented as successors to zero, otherwise
-%% known as \emph{Peano} numbers. We define two constructors, |Z| for
-%% zero and |S| for successor:
-
-%% > Natural = Z | S n
-
-%% The |n| argument to |S| will be either another |S| or a
-%% |Z|.\footnote{At least, if we want our program to execute properly.} We
-%% then represent each natural as some number of |S| constructors,
-%% terminated by a |Z|:
-
-%% > 0 = Z
-%% > 1 = S Z
-%% > 2 = S (S Z)
-%% > 3 = S (S (S Z))
-%% > {-"\ldots"-}
-
-%% Constructors are just like functions, except for one crucial
-%% difference: we do not write their ``body.'' Instead, the body of the
-%% constructor creates new data, in some way that we cannot explicitly express
-%% in \lamC. 
-
-%% We use ADTs to construct values; we take them apart using \emph{case
-%%   expressions} (or \emph{case discrimination}). Case expressions are a
-%% generalized form of the \emph{if} or \emph{switch} statements found in
-%% languages such as C, Java, and JavaScript. The case expression
-%% inspects a value (the \emph{discriminant}) and selects one of many
-%% \emph{case alternatives} (or \emph{arms}) based on the value
-%% found. The value of the alternative becomes the value of the case
-%% expression.
-
-%% For example, we can implement \emph{if} over booleans using \emph{case}:
-
-%% > case b of
-%% >   True -> {-"\ldots"-}
-%% >   False -> {-"\ldots"-}
-
-%% Each alternative specifies a constructor to the left of the arrow. The
-%% right-hand side gives the body that will be evaluated if the
-%% discriminant matches the constructor. 
-
-%% When the constructor used in the case alternatives takes arguments,
-%% then those values become available in the arm associated with the
-%% alternative.  Looking at lists, we can write \emph{takeOne}, which
-%% will take 1 element from a list and return a list. If the list
-%% given has no elements, an empty list is returned:
-
-%% > takeOne = {-"\lamAbs{l}{}"-} case l of
-%% >               Cons a as -> Cons a Nil
-%% >               Nil -> Nil   
-
-%% We use |a| and |as| to emphasize that these bindings are new and based on
-%% the value of |l|.
-
-%% It is possible to write a case expression with undefined behavior, if
-%% the discriminant contains a value that does not match one of the arms. For
-%% example, this expression would have undefined behavior:
-
-%% > case (Cons True Nil) of
-%% >   Nil -> Nil
-
-%% Figure~\ref{lang_fig5} shows the syntax for ADTs and case
-%% discrimination. An ADT consists of a constructor name, |C|, and zero
-%% or more arguments ($t_1$, $t_2$, \ldots). Each argument can be a
-%% term. The ADT term itself can only appear where our syntax allows
-%% terms. Specifically, they cannot be used as the parameter variable in
-%% an abstraction. That is, we do not support ``pattern-matching,'' as
-%% found in many functional languages. Case discrimination consists of
-%% the determinant term, $t$, and one or more alternatives (or
-%% ``arms''). Each arm consists of a constructor ($C_1$, $C_2$, \ldots)
-%% and a ``binding'' for each argument that the constructor was defined
-%% with ($a_1$, $b_1$, \ldots). The number of bindings must exactly match
-%% the number of arguments defined for the constructor. Each binding is
-%% also a \emph{variable} -- we do \emph{not} allow terms. Each arm
-%% defines a body ($t_1$, $t_2$, \ldots). Both the new bindings from the
-%% arm \emph{and} the discriminant are in scope in the arm.\footnote{Any
-%%   other variables bound by enclosing $\lambda$'s are in scope as well,
-%%   of course.}  Bindings in the arm will ``shadow'' any bindings with
-%% the same name that are already in scope.
-
-
-%% Figure~\ref{lang_fig6} shows how we evaluate our new terms. In {\sc
-%%   Case1}, the discriminant must evaluate to a constructor. Otherwise,
-%% the behavior is undefined. If we allowed evaluation to an arbitrary
-%% value, that would imply a $\lambda$ could appear as a discriminant,
-%% which does not make sense. {\sc Case2} shows two important
-%% actions. First, the discriminate value is matched to an alternative
-%% with the same constructor \emph{and} number of arguments.\footnote{The
-%%   behavior is undefined if a single match is not found.}  Second, the
-%% alternative's body will be evaluated with new bindings, where $v_1$
-%% maps to $a_1$, $v_2$ maps to $a_2$, etc. The {\sc Value} rule shows
-%% that constructors will evaluate all of their arguments to
-%% values.\footnote{Note that order of evaluation for arguments is
-%%   \emph{not} specified.}
-
-%% \begin{myfig}[tbh]
-%%   \begin{minipage}{5in}
-%%     \centering
-%%     \begin{math}
-%%       \begin{array}{lclr}
-%%         \begin{minipage}{1in}
-%%           \begin{math}
-%%             \begin{array}{l}
-%%               |case|\ t\ |of| \\
-%%               \;\ldots \\
-%%             \end{array}
-%%           \end{math}
-%%         \end{minipage} & %%
-%%         \rightarrow & %%
-%%         \begin{minipage}{1in}
-%%           \begin{math}
-%%             \begin{array}{l}
-%%               |case|\ |C|\ v_1\ \ldots\ v_n\ |of| \\
-%%               \;\ldots
-%%             \end{array}
-%%           \end{math}
-%%         \end{minipage} & \text{({\sc Case1})} \\ \\
-
-%%         \begin{minipage}{2in}
-%%           \begin{math}
-%%             \begin{array}{l}
-%%               |case|\ |C|\ v_1\ \ldots\ v_n\ |of| \\
-%%               \;\ldots \\
-%%               \; |C|\ a_1\ \ldots\ a_n \rightarrow\ t \\
-%%               \;\ldots
-%%             \end{array}
-%%           \end{math}
-%%         \end{minipage} & %% 
-%%         \rightarrow & [v_1 \mapsto a_1, \ldots, v_n \mapsto a_n]\ t & \text{({\sc Case2})} \\ \\
-
-%%         \;|C|\ t_1\ \ldots\ t_n& %%
-%%         \rightarrow & |C|\ v_1 \ldots\ v_n & \text{({\sc Value})}
-
-%%       \end{array}
-%%     \end{math}
-%%   \end{minipage}
-%%   \caption{Evaluation rules for the new elements in \lamC. Constructors
-%%     require that their arguments be values. Case discrimination evaluates
-%%     its argument, but does \emph{not} evaluate every arm -- only the one
-%%     which matches.}
-%%   \label{lang_fig6}
-%% \end{myfig}
-
-%% With our new terms, we can more easily define functions from
-%% Section~\ref{lang_sec1}. Rather than the Church numerals,
-%% we can define \emph{plus} in terms of Peano numbers:
-
-%% > plus = {-"\lamAbs{m}{\lamAbs{n}{}}"-} case m of
-%% >   S m' -> S (plus m' n)
-%% >   Z -> n
-
-%% Multiplication can be defined in terms of |plus|:
-
-%% > mult = {-"\lamAbs{m}{\lamAbs{n}{}}"-} case m of
-%% >   S m' -> plus n (mult m' n)
-%% >   Z -> Z
-
-%% This allows us to define our |multiplier| and |mag| function from
-%% Section~\ref{lang_sec2}:\footnote{We use ``2'' here to represent the
-%%   Peano number |S (S Z)|.}
-
-%% > multiplier = {-"\lamAbs{multiple}{\lamAbs{a}{}}"-} mult multiple a
-%% > mag = multiplier 2
-
-%% Figure~\ref{lang_fig7} collects the syntax and evaluation rules for
-%% \lamC into one place. Part~\subref{lang_fig7_syntax} gives the full
-%% syntax for \lamC, and Part~\subref{lang_fig7_eval} gives our
-%% evaluation rules. We extend the syntax for convenience in two ways. We
-%% have added the ability to define top-level definitions, so that a
-%% program is formed of multiple definitions, each of which is available
-%% to all top-level functions. We have also allowed arguments to be
-%% written to the left of the equals when defining a function.  We also
-%% updated the abstraction notation from ``$\lamAbs{x}{t}$'' to ``|\x ->
-%% t|.''
-
-%% \afterpage{\clearpage\input{lang_fig7}\clearpage}
-
+The primitive expression \lcprim p* treats \term p/ as if it were a
+function. When the term appears alone, \lcprim p* acts as a function
+with no arguments. Primitives can be pure or impure, but our syntax
+does not distinguish them --- we rely on the Habit compiler to sort
+out the difference.
 
 %% \section{Closures}
 %% \label{mil_sec1}
@@ -546,10 +315,11 @@ Pure operations include inspecting data values (i.e., with the |case|
 statement) or jumping to another location in the program (using
 application). 
 
-We designed MIL to support the Habit programming language; in particular, we rely on Habit to give meaning to
-the monadic context for each MIL operation. We further assume that the
-interpreter (or compiler) for MIL will implement underlying monadic
-primitives (e.g., allocation, arithmetic, etc.).  
+We designed MIL to support the Habit programming language; in
+particular, we rely on Habit to give meaning to the monadic context
+for each MIL operation. We further assume that the interpreter (or
+compiler) for MIL will implement underlying monadic primitives (e.g.,
+allocation, arithmetic, etc.).
 
 \subsection{MIL Example: \lcname compose/}
 
@@ -585,8 +355,8 @@ the \lab compose/ block returns the value of
 
 %% Closures
 
-Using the evaluation rules from Figure~\ref{lang_fig6}, we can compute
-the value of the expression \lcapp compose * a * b * c/:
+Using Habit's call-by-value evaluation strategy, we can compute the
+value of the expression \lcapp compose * a * b * c/:
 
 \begin{singlespace}\noindent
   \begin{math}\begin{array}{rlr}
