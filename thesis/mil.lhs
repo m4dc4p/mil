@@ -58,6 +58,83 @@ Hoopl influenced the implementation the MIL language from Chapter
 \section{Our Source Language}
 \label{mil_src}
 
+\intent{Introduce \lamC; where it came from, references, etc.}  We
+call our source language ``MPEG'' and write its name as
+\lamC. ``MPEG'' derives from ``Matches, Patterns, Expressions and
+Guards,'' all features of \lamC. \lamC derives from the \lamA, with
+syntactic (and semantic) elements borrowed from Haskell. In
+particular, \lamC uses Haskell's notation for monadic bind (|<-|) and
+|case| expressions. \lamC is itself one of the proposed intermediate
+languages for the Habit programming language \citep{Habit2010}.
+
+Our work focused on MIL, rather than \lamC, so we do not describe it
+in detail here. A privately available ``Compilation Strategy''
+\citep{HabitCompiler2010} gives full details on \lamC.\footnote{For
+  simplicity's sake, we ignore two features of \lamC in this work:
+  patterns and guards. Details on those elements can be found in the
+  aforementioned report.}
+
+Figure~\ref{mil_fig_lam_syntax} gives the full syntax of \lamC. In the
+figure, \term a/, \term b/, $\ldots$, \term v_1/, represent variables,
+not arbitrary terms; however, \term t/, \term t_1/, etc. do represent
+arbitrary terms. While most terms should be recognizable from Haskell
+or the \lamA, the monadic bind \eqref{lam_syntax_bind}, primitive
+\eqref{lam_syntax_prim} and let \eqref{lam_syntax_let} terms bear
+further explanation.
+
+A monadic bind expression, |v <- t_1; t_2| implies that the result od
+the monadic computation, |t_1|, will be bound to |v|; |t_2| will then
+be evaluated with |v| in scope. In this case, |v| can only be a
+variable; \lamC does not support pattern-matching on the \lhs of a
+bind. As we describe later in Section~\ref{mil_subsec_monad}, the
+monadic context in which \term t_1/ is evaluated depends on the type
+of the expression in Habit.
+
+The expression |let v = t_1 in t_2| binds the value represented by \term t_1/
+to \term v/; \term v/ is then in scope over the expression \term t_2/. Due to
+Habit's evaluation strategy, \term v/ cannot appear in \term t_1/ unless \term t_1/
+begins with an abstraction. 
+
+\begin{myfig}
+  \begin{tabular}{r@@{}lrl}
+    \termrule def:|f v_1 {-"\dots"-} v_n = {-"\term term/"-}|:Definition/& \labeleq{lam_syntax_def}\eqref{lam_syntax_def} \\\\
+    \termrule term:a, b, \ldots:Variables/ & \labeleq{lam_syntax_var}\eqref{lam_syntax_var} \\
+    \termcase \lcabs x. \term t_1/:Abstraction/ & \labeleq{lam_syntax_abs}\eqref{lam_syntax_abs} \\
+    \termcase \lcapp t_1 * t_2/:Application/ & \labeleq{lam_syntax_app}\eqref{lam_syntax_app} \\
+    \termcase {\begin{minipage}[t]{\widthof{|case t_1 of x|}}
+      |case t_1 of|\endgraf%%
+      \quad \term alt_1/\endgraf%%
+      \quad $\ldots$\endgraf%%
+      \quad \term alt_n/%%
+      \end{minipage}}:Case Discimination/ & \labeleq{lam_syntax_case}\eqref{lam_syntax_case} \\
+    \termcase |v <- t_1; t_2|:Monadic Bind/ & \labeleq{lam_syntax_bind}\eqref{lam_syntax_bind} \\
+    \termcase {\begin{minipage}[t]{\widthof{|let f_1 v_1 {-"\ldots"-} v_n = t_1|}}
+        $\mathbf{let}\ f_1\ v_1\ \ldots\ v_n = t_1$\endgraf%%
+        $\phantom{\mathbf{let}}\ \ldots$\endgraf%%
+        $\phantom{\mathbf{let}}\ f_n\ v_1\ \ldots\ v_n = t_n$\endgraf
+        $\mathbf{in}\ t$
+    \end{minipage}}:Let/ & \labeleq{lam_syntax_let}\eqref{lam_syntax_let} \\
+    \termcase \lcprim p*:Primitive/ & \labeleq{lam_syntax_prim}\eqref{lam_syntax_prim} \\
+    \termcase \lccons C(v_1 \ldots v_n):Allocate Data/ & \labeleq{lam_syntax_cons}\eqref{lam_syntax_cons} \\\\
+    \termrule alt:{|C v_1 {-"\ldots"-} v_n -> t|}:Alternative/& \labeleq{lam_syntax_alt}\eqref{lam_syntax_alt} 
+
+    %%   \mathit{term} &= a, b, \ldots & \hfill\text{\emph{(Variables)}} \\
+    %%   &= \lamAbs{x}{t} & \hfill\text{\emph{(Abstraction)}} \\ 
+    %%   &= \lamApp{t_1}{t_2} & \hfill\text{\emph{(Application)}}
+    %% term &= \mathit{C}\ t_1\ t_2\ \ldots\ t_n, n \ge 0 & \hfil\text{\emph{(ADTs)}} \\ \\
+    %%   &= |case|\ t\ |of| & \hfil\text{\emph{(Case Discrimination)}} \\
+    %%   & \qquad\mathit{C}_1\ a_1\ a_2\ \ldots\ a_n \rightarrow t_1, n \ge 0 \\
+    %%   & \qquad\mathit{C}_2\ b_1\ b_2\ \ldots\ b_n \rightarrow t_2, n \ge 0 
+  \end{tabular}
+    \caption{The syntax of \lamC, which extends \lamA from
+    Figure~\ref{lang_fig3} with \emph{algebraic data types} (ADTs) and
+    \emph{case discrimination}. $t$ again represents an arbitrary
+    term. $C$ stands for a constructor name. $a$ and $b$ represent
+    variables, not terms.}
+  \label{mil_fig_lam_syntax}
+\end{myfig}
+
+
 %% \intent{Introduce \lamC as extension to \lamA. Motivate \lamC as used by Habit; 
 %% something to write a compiler for.}
 
@@ -187,22 +264,6 @@ Hoopl influenced the implementation the MIL language from Chapter
 %%   of course.}  Bindings in the arm will ``shadow'' any bindings with
 %% the same name that are already in scope.
 
-%% \begin{myfig}[tbh]
-%%   \begin{minipage}{3in}
-%%   \begin{align*}
-%%     term &= \mathit{C}\ t_1\ t_2\ \ldots\ t_n, n \ge 0 & \hfil\text{\emph{(ADTs)}} \\ \\
-%%       &= |case|\ t\ |of| & \hfil\text{\emph{(Case Discrimination)}} \\
-%%       & \qquad\mathit{C}_1\ a_1\ a_2\ \ldots\ a_n \rightarrow t_1, n \ge 0 \\
-%%       & \qquad\mathit{C}_2\ b_1\ b_2\ \ldots\ b_n \rightarrow t_2, n \ge 0 
-%%   \end{align*}
-%%   \end{minipage}
-%%   \caption{The syntax of \lamC, which extends \lamA from
-%%     Figure~\ref{lang_fig3} with \emph{algebraic data types} (ADTs) and
-%%     \emph{case discrimination}. $t$ again represents an arbitrary
-%%     term. $C$ stands for a constructor name. $a$ and $b$ represent
-%%     variables, not terms.}
-%%   \label{lang_fig5}
-%% \end{myfig}
 
 %% Figure~\ref{lang_fig6} shows how we evaluate our new terms. In {\sc
 %%   Case1}, the discriminant must evaluate to a constructor. Otherwise,
@@ -454,7 +515,7 @@ three-address code, however, our language supports features unique to
 functional languages: the ability to treat functions as first-class
 values, and the representation of stateful computations in a monad.
 
-\subsection*{Monads \& Functional Programming}
+\subsection{Monads \& Functional Programming}
 We can divide functions into two types: \emph{pure} and
 \emph{impure}. A \emph{pure} function has no side-effects: it will not
 print to the screen, throw an exception, write to disk, or in any
@@ -471,7 +532,8 @@ from a monadic function are not directly accessible --- they are
 ``wrapped'' in the monad. The only way to ``unwrap'' a monadic value
 is to execute the computation --- inside the monad!
 
-\subsection*{The Monad in MIL}
+\subsection{The Monad in MIL}
+\label{mil_subsec_monad}
 
 All MIL programs execute in a monadic context. For example, we
 consider allocation impure, because it affects the machine's
@@ -484,13 +546,12 @@ Pure operations include inspecting data values (i.e., with the |case|
 statement) or jumping to another location in the program (using
 application). 
 
-We designed MIL to support the Habit programming language
-\citep{Habit2010}; in particular, we rely on Habit to give meaning to
+We designed MIL to support the Habit programming language; in particular, we rely on Habit to give meaning to
 the monadic context for each MIL operation. We further assume that the
 interpreter (or compiler) for MIL will implement underlying monadic
 primitives (e.g., allocation, arithmetic, etc.).  
 
-\subsection*{MIL Example: \lcname compose/}
+\subsection{MIL Example: \lcname compose/}
 
 To give a sense of MIL, consider the definition of \lcname compose/
 given in Figure~\ref{mil_fig1a}. Figure~\ref{mil_fig1b} shows a
@@ -619,7 +680,7 @@ k3/) with the final argument, \var c/. \lab k3/ will directly execute
 by \lab compose/. On the last line of \lab main/ we return the value
 computed, \var t3/.
 
-\subsection*{Monadic Programs}
+\subsection{Monadic Programs}
 
 \intent{Contrast pure and monadic values.}  Consider the \lamC
 functions in Figure~\ref{mil_fig_monadic}.\footnote{Some syntactic

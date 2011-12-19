@@ -2,12 +2,10 @@
 \begin{centering}\begin{tabular}{r@{}lrl}
   %% The kern below makes the space between "v" and ":" look better.
   \termrule block:{\ccblock k(v_1, \dots, v_n)v\kern.07em:\ \term tail/}:Closure-Capturing Block/& \labeleq{mil_syntax_cc}\eqref{mil_syntax_cc} \\
-  \termcase {\block b(v_1, \dots, v_n):\ \term body/}:Basic Block/ &  \labeleq{mil_syntax_block}\eqref{mil_syntax_block} \\
-
-  \termrule body:\rlap{\begin{minipage}[t]{\widthof{\quad\term stmt_1/}}\disableparspacing;%%
+  \termcase {\block b(v_1, \dots, v_n):\ \rlap{\begin{minipage}[t]{\widthof{\quad\term stmt_1/}}\disableparspacing;%%
       \term stmt_1/\endgraf%%
       $\dots$\endgraf%%
-      \term stmt_n/\end{minipage}}:Block Body/ &  \labeleq{mil_syntax_body}\eqref{mil_syntax_body} \\\\
+      \term stmt_n/\end{minipage}}}:Basic Block/ &  \labeleq{mil_syntax_block}\eqref{mil_syntax_block} \\
 
   \termrule stmt:{\binds v\ <-\ \term tail/;}:Bind/ &  \labeleq{mil_syntax_stmt}\eqref{mil_syntax_stmt} \\
   \termcase {\begin{minipage}[t]{\widthof{\quad\case v;}}\disableparspacing;%%
@@ -16,7 +14,7 @@
       \quad $\dots$\endgraf%%
       \quad \term alt_n/%%
   \end{minipage}}:Case Discrimination/ &  \labeleq{mil_syntax_case}\eqref{mil_syntax_case} \\
-  \termcase \term tail/:Tail Expression/ \\\\
+  \termcase \term tail/:/ \\\\
 
   \termrule alt:\alt C(v_1\ \dots\ v_n) -> \goto b(v_1, \dots, v_n);:Case Alternative/ &  \labeleq{mil_syntax_alt}\eqref{mil_syntax_alt} \\\\
 

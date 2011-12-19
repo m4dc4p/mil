@@ -122,10 +122,14 @@
       \lcname##1/\ \lcappB##2/%%
       \fi}}%%
   %% Adding a star here makes
-  %% sure our applicaitn always ends with an asterisks, ensuring
+  %% sure our application always ends with an asterisks, ensuring
   %% #2 will be \empty at some point.
   \lcappB#1*/}
 \protected\def\lcabs#1.{\ensuremath{\lambda#1.\ }}
+%% LC primitve function.
+\protected\def\lcprim#1*{\ensuremath{#1^*}}
+%% LC constructor
+\protected\def\lccons#1(#2){\ensuremath{\mfun{#1}\ \ignorespaces #2}}
 
 \newcommand{\lamId}{\lamAbs{x}{x}}
 \newcommand{\lamCompose}{\lamAbs{f}{\lamAbs{g}{\lamAbs{x}{\lamApp{f}{(\lamApp{g}{x})}}}}}
