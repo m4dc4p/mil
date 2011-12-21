@@ -42,20 +42,20 @@ specifies evaluation order and separates stateful computation using a
 monadic programming style. MIL's syntax enforces basic-block structure
 on programs, making them ideal for dataflow analysis.
 
-We first describe our source language, \lamC, in
-Section~\ref{mil_src}.  Section~\ref{mil_sec1} describes closures, a
-fundamental data structure used to implement functional languages. We
-then describe ``three-address code,'' the intermediate form from which
-MIL partly derives, in Section~\ref{mil_sec2}.  MIL syntax and
-examples follow in Section~\ref{mil_sec3}. Section~\ref{mil_sec4}
-shows our compiler for translating \lamC to MIL. We sketch how MIL
-programs can be evaluated in Section~\ref{mil_sec5}, using the same
-structural operational semantics (SOS) style as in
-Chapter~\ref{ref_chapter_languages}. Section \ref{mil_sec7} shows how
-Hoopl influenced the implementation the MIL language from Chapter
-\ref{ref_chapter_mil} and discusses the design choices we made.
+\intent{Signposts.}
+% We first describe our source language, \lamC, in
+% Section~\ref{mil_src}.  MIL syntax and
+% examples follow in Section~\ref{mil_sec3}.  We
+% then describe ``three-address code,'' the intermediate form from which
+% MIL partly derives, in Section~\ref{mil_sec2}. Section~\ref{mil_sec4}
+% shows our compiler for translating \lamC to MIL. We sketch how MIL
+% programs can be evaluated in Section~\ref{mil_sec5}, using the same
+% structural operational semantics (SOS) style as in
+% Chapter~\ref{ref_chapter_languages}. Section \ref{mil_sec7} shows how
+% Hoopl influenced the implementation the MIL language from Chapter
+% \ref{ref_chapter_mil} and discusses the design choices we made.
 
-\section{Our Source Language}
+\section{Source Language}
 \label{mil_src}
 
 \intent{Introduce \lamC; where it came from, references, etc.}  We
@@ -225,19 +225,27 @@ out the difference.
 %% within the closure to find the values of free variables when that
 %% code executes.
 
-\section{Three-address Code}
-\label{mil_sec2}
+\section{Monadic Intermediate Language}
+\label{mil_sec3}
 
-Three-address code represents programs in a form similar to assembly
-language, where named registers represent storage locations. Each
-instruction in the translated program has two operand registers and
-one destination register, thus the name ``three-address.'' Infinitely
-many registers are available, making them more like memory locations
-than registers in real hardware.
+An intermediate language always seeks to highlight some specific
+implementation detail while hiding others in order to support certain
+analysis, transformations or other goals such as portability or code
+verification. We designed MIL such that intermediate values specific to
+functional languages would be explicitly represented. We also designed MIL to
+hide details about memory locations, stack management, and register
+allocation. Exposing intermediate values gives us the chance to analyze and
+eliminate them. Hiding implementation details makes the job of writing those
+analysis and transformation programs simpler.
 
-Three-address code makes all intermediate expression values explicit, 
-by reducing complicated expressions to a series of assignments. 
-For example, the expression:
+\subsection{Three-Address Code}
+
+MIL's syntax and design borrow heavily from three-address code, an
+intermediate form normally associated with imperative languages. Three-address
+code represents programs such that all operations specify two operands and a
+destination. Three-address code also hides details of memory management by
+assuming infinitely many storage locations can be named and updated. For
+example, the expression:
 
 \begin{singlespace}\correctspaceskip
   \begin{equation}
@@ -248,10 +256,10 @@ For example, the expression:
 \noindent would be expressed in three-address code as:
 
 \begin{singlespace}\correctspaceskip
-  \begin{AVerb}[gobble=2]
-    s = b * c;
-    t = s + d;
-    a = t / 2;
+  \begin{AVerb}[gobble=4]
+    \vbinds s <- mul b c;
+    \vbinds t <- add s d;
+    \vbinds a <- div t 2;
   \end{AVerb}
 \end{singlespace}
 
@@ -260,31 +268,71 @@ compiler. This representation makes it easier for the compiler to
 re-order expressions, unravel complex control-flow, and manipulate
 intermediate values.
 
-Three-address code intends to simplify the analysis of programs while
-not revealing all details of the underlying hardware. Three-address
-code accomplishes these goals by reducing all expressions to a
-uniform representation, exposing the intermediate values (and thus,
-memory operations) created while expressions are evaluated. It hides
-some details by deferring decisions about the actual location of
-values to some later stage of compilation. Finally, three-address code
-programs are easy to represent as basic blocks, which makes
-control-flow analysis much simpler.
+Three-address code emphasizes assignments and low-level operations, features
+important to imperative languages. MIL emphasizes closures and side-effecting
+computations, features important to functional languages.\footnote{Most
+importantly, features import to a pure language like Habit.} Though the
+operations supported by MIL differ from traditional three-address code, the
+intentation remains the same. For example, the previously given
+example can be implemented in MIL as:
 
-\section{Monadic Intermediate Language}
-\label{mil_sec3}
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4, linenumbers=left]
+    \vbinds t1 <- \mkclo[mul:b] \label{mil_arith_mul1}
+    \vbinds t2 <- \app t1 * c/; \label{mil_arith_mul2}
+    \vbinds t3 <- \mkclo[add:t2]
+    \vbinds t4 <- \app t3 * d/;
+    \vbinds t5 <- \mkclo[div:t5]
+    \app t5 * 2/
+  \end{AVerb}
+\end{singlespace}
 
-Our intermediate language, MIL, serves the same purpose as any
-intermediate language: it simplifies the analysis of programs (for
-certain characteristics), while hiding details of the underlying
-hardware. MIL shares some of the same goals as three-address code, and
-accomplishes them in similar ways: programs are organized into basic
-blocks; all intermediate values are named; precise details of
-registers and memory locations used are deferred. In contrast to
-three-address code, however, our language supports features unique to
-functional languages: the ability to treat functions as first-class
-values, and the representation of stateful computations in a monad.
+\noindent The expression on Line~\ref{mil_arith_mul1}, \mkclo[mul:b],
+allocates a closure pointing to the code implementing multiplication, holding
+the value of the varaiable \var b/. On Line~\ref{mil_arith_mul2}, we call (or
+``enter''), the multiplication code with argument \var c/, putting the result
+in \var t2/. 
 
-\subsection{Monads \& Functional Programming}
+
+\subsect{MIL Example: \lcname kleisli/
+Figure~\ref{mil_fig_kleisli_a} shows the monadic composition function (also
+known as ``Kleisili compose''). 
+
+
+
+
+
+To give a sense of MIL, consider the definition of \lcname compose/
+given in Figure~\ref{mil_fig1a}. Figure~\ref{mil_fig1b} shows a
+fragment of this expression in MIL. The \emph{block declaration} on
+Line~\ref{mil_block_decl_fig1b} gives the name of the block (\lab
+ compose/) and arguments that will be passed in (\var f/, \var g/, and
+\var x/). Line~\ref{mil_gofx_fig1b} applies \var g/ to \var x/ and
+assigns the result to \var t1/. The ``enter'' operator (\enter),
+represents function application.
+\footnote{So called because in the expression \app g * x/, we
+  ``enter'' function \var g/ with the argument \var x/.}  We assume
+\var g/ refers to a function (or, more precisely, a
+\emph{closure}). The ``bind'' operator (\bind) assigns the result of
+the operation on its right-hand side to the location on the left. In
+turn, Line~\ref{mil_fofx_fig1b} applies \var f/ to \var t1/ and
+assigns the result to \var t2/. The last line returns \var t2/. Thus,
+the \lab compose/ block returns the value of
+\lcapp f * (g * x)/, just as in our original \lamC expression.
+
+\begin{myfig}[t]
+  \begin{tabular}{c@@{\hspace{2em}}c}
+    \lcdef compose()=\lcapp \lcabs f. \lcabs g. \lcabs x. f * (g * x)/; & 
+    \input{lst_mil1} \\\\
+    \scap{mil_fig1a} & \scap{mil_fig1b}
+  \end{tabular} 
+  \caption{Part~\subref{mil_fig1a} gives a \lamC definition of the composition
+    function; \subref{mil_fig1b} shows a fragment of the MIL program
+    for |compose|.}
+  \label{mil_fig1}
+\end{myfig}
+
+\subsection{Monads}
 We can divide functions into two types: \emph{pure} and
 \emph{impure}. A \emph{pure} function has no side-effects: it will not
 print to the screen, throw an exception, write to disk, or in any
@@ -321,38 +369,62 @@ for each MIL operation. We further assume that the interpreter (or
 compiler) for MIL will implement underlying monadic primitives (e.g.,
 allocation, arithmetic, etc.).
 
-\subsection{MIL Example: \lcname compose/}
+%% Syntax of MIL
+\section{MIL Syntax}
 
-To give a sense of MIL, consider the definition of \lcname compose/
-given in Figure~\ref{mil_fig1a}. Figure~\ref{mil_fig1b} shows a
-fragment of this expression in MIL. The \emph{block declaration} on
-Line~\ref{mil_block_decl_fig1b} gives the name of the block (\lab
- compose/) and arguments that will be passed in (\var f/, \var g/, and
-\var x/). Line~\ref{mil_gofx_fig1b} applies \var g/ to \var x/ and
-assigns the result to \var t1/. The ``enter'' operator (\enter),
-represents function application.
-\footnote{So called because in the expression \app g * x/, we
-  ``enter'' function \var g/ with the argument \var x/.}  We assume
-\var g/ refers to a function (or, more precisely, a
-\emph{closure}). The ``bind'' operator (\bind) assigns the result of
-the operation on its right-hand side to the location on the left. In
-turn, Line~\ref{mil_fofx_fig1b} applies \var f/ to \var t1/ and
-assigns the result to \var t2/. The last line returns \var t2/. Thus,
-the \lab compose/ block returns the value of
-\lcapp f * (g * x)/, just as in our original \lamC expression.
+Figure \ref{mil_fig3} gives the syntax for MIL.  A MIL program
+consists of a number of \emph{blocks}. Blocks come in two types:
+\emph{\cc} blocks \eqref{mil_syntax_cc} and basic blocks
+\eqref{mil_syntax_block}. Though the syntax for closure blocks allows
+any \term tail/, in practice they either return a closure
+(\mkclo[k:v_1, \dots, v_n]) or jump to a block (\goto b(v_1, \dots,
+v_n)). 
 
-\begin{myfig}[t]
-  \begin{tabular}{c@@{\hspace{2em}}c}
-    \lcdef compose()=\lcapp \lcabs f. \lcabs g. \lcabs x. f * (g * x)/; & 
-    \input{lst_mil1} \\\\
-    \scap{mil_fig1a} & \scap{mil_fig1b}
-  \end{tabular} 
-  \caption{Part~\subref{mil_fig1a} gives a \lamC definition of the composition
-    function; \subref{mil_fig1b} shows a fragment of the MIL program
-    for |compose|.}
-  \label{mil_fig1}
-\end{myfig}
+\input{mil_syntax}
 
+Basic block bodies \eqref{mil_syntax_body} consist of a sequence of
+statements that execute in order without any intra-block jumps or
+conditional branches. Each basic block ends by evaluating a \term
+tail/ or a conditional branch. A block body cannot end with a 
+bind statement.
+
+The bind statement \eqref{mil_syntax_body} can appear multiple
+times in a block. Each binding assigns the result of the \emph{tail}
+on the \rhs to a variable on the left. If a variable is
+bound more than once, later bindings will shadow previous
+bindings.
+
+The \milres case/ statement \eqref{mil_syntax_case} examines a
+discriminant and selects one alternative based on the value found. The
+discriminant is always a simple variable, not an expresssion. Each
+alternative \eqref{mil_syntax_alt} specifies a \emph{constructor} and
+variables for each value held by the constructor. Alternatives always
+jump immediately to a block --- they do not allow any other statement.
+
+\emph{Tail} expressions represent effects -- they create monadic
+values. \milres return/ \eqref{mil_syntax_return} takes a variable
+(\emph{not} an expression) and makes its value monadic. The ``enter''
+operator \eqref{mil_syntax_enter}, \enter, implements function
+application, ``entering'' the closure represented by its \lhs with the
+argument on its \rhs. The invoke operator \eqref{mil_syntax_invoke}
+executes the thunk referred to by its argument.
+
+The goto block \eqref{mil_syntax_goto} and goto primitive
+\eqref{mil_syntax_prim} expressions implement labeled jumps with
+arguments. In the first case, \lab b/ represents a labeled block
+elsewhere in the program.  In the second, \lab p/\suptt* refers to
+code that is implemented outside of MIL. Otherwise, primitives are
+treated like blocks.
+
+Closures and thunks are allocated similarly. Closure allocation
+\eqref{mil_syntax_clo} creates a closure pointing the block labelled
+\lab k/, capturing the variables $!+v_1, \dots, v_n+!$. Thunk
+allocation \eqref{mil_syntax_thunk} behaves analogously.  The
+constructor expression \eqref{mil_syntax_cons} creates a data value
+with the given tag, $!+C+!$, and the variables $!+v_1, \dots, v_n+!$
+in the corresponding fields.
+
+\subsection{MIL \& Closures}
 %% Closures
 
 Using Habit's call-by-value evaluation strategy, we can compute the
@@ -573,61 +645,6 @@ the thunk for |kleisli|, but only after all arguments have been captured.
   a MIL program representing the same function.}
   \label{mil_fig_kleisli}
 \end{myfig}
-
-%% Syntax of MIL
-\section{MIL Syntax}
-
-Figure \ref{mil_fig3} gives the syntax for MIL.  A MIL program
-consists of a number of \emph{blocks}. Blocks come in two types:
-\emph{\cc} blocks \eqref{mil_syntax_cc} and basic blocks
-\eqref{mil_syntax_block}. Though the syntax for closure blocks allows
-any \term tail/, in practice they either return a closure
-(\mkclo[k:v_1, \dots, v_n]) or jump to a block (\goto b(v_1, \dots,
-v_n)). 
-
-\input{mil_syntax}
-
-Basic block bodies \eqref{mil_syntax_body} consist of a sequence of
-statements that execute in order without any intra-block jumps or
-conditional branches. Each basic block ends by evaluating a \term
-tail/ or a conditional branch. A block body cannot end with a 
-bind statement.
-
-The bind statement \eqref{mil_syntax_body} can appear multiple
-times in a block. Each binding assigns the result of the \emph{tail}
-on the \rhs to a variable on the left. If a variable is
-bound more than once, later bindings will shadow previous
-bindings.
-
-The \milres case/ statement \eqref{mil_syntax_case} examines a
-discriminant and selects one alternative based on the value found. The
-discriminant is always a simple variable, not an expresssion. Each
-alternative \eqref{mil_syntax_alt} specifies a \emph{constructor} and
-variables for each value held by the constructor. Alternatives always
-jump immediately to a block --- they do not allow any other statement.
-
-\emph{Tail} expressions represent effects -- they create monadic
-values. \milres return/ \eqref{mil_syntax_return} takes a variable
-(\emph{not} an expression) and makes its value monadic. The ``enter''
-operator \eqref{mil_syntax_enter}, \enter, implements function
-application, ``entering'' the closure represented by its \lhs with the
-argument on its \rhs. The invoke operator \eqref{mil_syntax_invoke}
-executes the thunk referred to by its argument.
-
-The goto block \eqref{mil_syntax_goto} and goto primitive
-\eqref{mil_syntax_prim} expressions implement labeled jumps with
-arguments. In the first case, \lab b/ represents a labeled block
-elsewhere in the program.  In the second, \lab p/\suptt* refers to
-code that is implemented outside of MIL. Otherwise, primitives are
-treated like blocks.
-
-Closures and thunks are allocated similarly. Closure allocation
-\eqref{mil_syntax_clo} creates a closure pointing the block labelled
-\lab k/, capturing the variables $!+v_1, \dots, v_n+!$. Thunk
-allocation \eqref{mil_syntax_thunk} behaves analogously.  The
-constructor expression \eqref{mil_syntax_cons} creates a data value
-with the given tag, $!+C+!$, and the variables $!+v_1, \dots, v_n+!$
-in the corresponding fields.
 
 \section{Evaluating MIL Programs}
 \label{mil_sec5}
