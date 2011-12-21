@@ -8,7 +8,7 @@
 \begin{document}
 \input{document.preamble}
 
-\chapter{Compiling to a Monadic Intermediate Language}
+\chapter{A Monadic Intermediate Language}
 \label{ref_chapter_mil}
 
 Most compilers do not generate executable machine code directly from a
@@ -67,6 +67,7 @@ particular, \lamC uses Haskell's notation for monadic bind (|<-|) and
 |case| expressions. \lamC is itself one of the proposed intermediate
 languages for the Habit programming language \citep{Habit2010}.
 
+\intent{Excuse why we don't give semantics, etc. for \lamC.}
 Our work focused on MIL, rather than \lamC, so we do not describe it
 in detail here. The Habit ``Compilation Strategy''
 \citep{HabitCompiler2010} report gives full details on
@@ -111,6 +112,7 @@ Haskell or the \lamA, the \emph{monadic bind} \eqref{lam_syntax_bind},
   \label{mil_fig_lam_syntax}
 \end{myfig}
 
+\intent{Describe bind.}
 A monadic bind expression, |v <- t_1; t_2|, states that the result of
 the monadic computation, |t_1|, will be bound to |v|; |t_2| will then
 be evaluated with |v| in scope. In this case, |v| can only be a
@@ -119,113 +121,21 @@ bind. As we describe later in Section~\ref{mil_subsec_monad}, the
 monadic context in which \term t_1/ is evaluated depends on the type
 of the expression in Habit.
 
+\intent{Describe let.}
 The |let {-"\term def_1/, $\ldots$, \term def_n/"-} in t| term brings
 the definitions given into the scope of \term t/. The definitions can
 be values or functions\footnote{Technically, values are functions with
   zero arguments.}, and they can be recursive. However, Habit only
 allows functions to be mutually-recursive.
 
+\intent{Describe primitives.}
 The primitive expression \lcprim p* treats \term p/ as if it were a
 function. When the term appears alone, \lcprim p* acts as a function
 with no arguments. Primitives can be pure or impure, but our syntax
 does not distinguish them --- we rely on the Habit compiler to sort
 out the difference.
 
-%% \section{Closures}
-%% \label{mil_sec1}
-
-%% Closures are the fundamental data structures used to implement
-%% functional languages. A closure always results when a function value
-%% is created. They may not have the exact form described here but they
-%% always have the same purpose: they pair a location with a list of
-%% values. The location tells where to find the code implementing the
-%% body of the function. The list of values defines the environment in
-%% which the code will execute.\footnote{The values are not necessarily
-%%   stored in the immediate environment. For example, static links
-%%   (described by \citet[pg.~125]{Appel2003}) might be used to implement
-%%   a chain of environments. In any case the environment is always used
-%%   to find values for arguments, so we say they ``can be located'' in
-%%   the environment.}
-
-%% For example, consider the value created when we apply the |compose|
-%% function to two arguments:
-
-%% \begin{singlespace}\correctspaceskip
-%%   \begin{equation}
-%%     \begin{split}
-%%       t_1 &= \lamApp{compose}{\lamApp{a}{b}} \\
-%%       &= \lamAPp{\lamCompose}{\lamApp{a}{b}} \\
-%%       & \dots \\
-%%       t_1 &= \lamAbs{x}{\lamApP{\lamSubst{a}{f}}{\lamApp{\lamSubst{b}{g}}{x}}}.
-%%     \end{split}\label{mil_eq1}
-%%   \end{equation}
-%% \end{singlespace}
-
-%% The result of Expression~\eqref{mil_eq1}, $t_1$, is itself a
-%% function. We say $x$ is \emph{bound},
-%% because it is given as an argument, and that $f$ and $g$ are
-%% \emph{free} because they are not arguments (i.e., no
-%% $\lambda$-abstraction mentions them). The notation \lamSubst{a}{f} in
-%% $t_1$ means we substitute the value $a$ for the argument $f$. This
-%% lets us keep track of the original name of the argument as well as the
-%% value given for it.
-
-%% \begin{myfig}
-%%   \begin{tabular}{m{1in}m{4in}}
-%%     \scap{mil_fig4a} & \begin{minipage}{4in}\vbox to .75in {\vss\hbox to \textwidth{\hss
-%%       \begin{tikzpicture}[remember picture, overlay]
-%%         \newbox\clobox
-%%         \tikzstyle{clo}=[draw]
-%%         \begin{pgfinterruptpicture}
-%%           \global\setbox\clobox=\hbox{\normalfont\sc CompL}
-%%         \end{pgfinterruptpicture}
-
-%%         \node[clo,minimum height=3\ht\clobox] (compclo_l) {\sc CompL}; 
-%%         \node[clo,minimum height=3\ht\clobox, right=0.2in of compclo_l] (compclo_f) {$a$}; 
-%%         \node[clo,minimum height=3\ht\clobox, right=0.0in of compclo_f] (compclo_g) {$b$};
-%%         \draw (compclo_l.east) -- (compclo_f.west);
-
-%%       \end{tikzpicture}\hss}\vss}
-%%     \end{minipage} \\
-%%       \scap{mil_fig4b} & \tikz[remember picture,overlay]{\node[invis] (comp_l) {}; \draw[->] (compclo_l.west) -|| (comp_l.north) ;}\text{\sc CompL}:\ %%
-%%       \lamAbs{f}{\lamAbs{g}{\lamAbs{x}{%%
-%%             \lamApp{\tikz[remember picture,overlay]{\node[invis] (comp_f) {\phantom{\fbox{f}}}; \draw[->] (comp_f.north) -- (compclo_f.south);}\fbox{f}}%%
-%%                    {(\lamApp{\tikz[remember picture,overlay]{\node[invis] (comp_g) {\phantom{\fbox{g}}}; \draw[->] (comp_g.north) -- (compclo_g.south);}\fbox{g}}%%
-%%                      {x})}}}}.
-%%   \end{tabular}
-%%   \caption{Part~\subref{mil_fig4a}
-%%     shows the closure representing function value
-%%     \lamAbs{x}{\lamApP{\lamSubst{a}{f}}{\lamApp{\lamSubst{b}{g}}{x}}}. The
-%%     definition of |compose| is given in \subref{mil_fig4b}. Arrows
-%%     from variables to their position in the closure show how argument
-%%     values are accessed when the function is evaluated.}
-%%   \label{mil_fig4}
-%% \end{myfig}
-
-%% The value referred to by $t_1$ will be a
-%% closure. Figure~\ref{mil_fig4} shows this closure and the original
-%% definition of |compose|. Figure~\ref{mil_fig4b} attaches the label
-%% \textsc{CompL} to the body of |compose|, suggesting that |compose|
-%% appears at fixed location in our program. The closure refers to the
-%% body of the |compose| function using \textsc{CompL}. The closure also
-%% holds values for the free variables $f$ and $g$. The arrows from $f$
-%% and $g$ show how the body of the function refers to fixed locations in
-%% the closure. In this case, the $x$ argument does not have an arrow
-%% since only $f$ and $g$ are free in $t_1$. When $t_1$ is applied to an
-%% argument, the implementation of |compose| will be able to refer to
-%% fixed locations within the closure to find the arguments originally
-%% supplied (i.e., $a$ and $b$).
-
-%% Closures are the ``value'' created by $\lambda$-abstractions. That is,
-%% when a function evaluates to a $\lambda$, a closure results. The
-%% closure refers to the location of the body of the $\lambda$ using a
-%% label, address or symbolic name. The closure also holds the current
-%% values for all free variables in the body of the $\lambda$. The code
-%% implementing the body of the $\lambda$ refers to fixed locations
-%% within the closure to find the values of free variables when that
-%% code executes.
-
-\section{Monadic Intermediate Language}
+\section{MIL's Purpose}
 \label{mil_sec3}
 
 An intermediate language always seeks to highlight some specific
@@ -238,8 +148,6 @@ allocation. Exposing intermediate values gives us the chance to analyze and
 eliminate them. Hiding implementation details makes the job of writing those
 analysis and transformation programs simpler.
 
-\subsection{Three-Address Code}
-
 MIL's syntax and design borrow heavily from three-address code, an
 intermediate form normally associated with imperative languages. Three-address
 code represents programs such that all operations specify two operands and a
@@ -249,7 +157,7 @@ example, the expression:
 
 \begin{singlespace}\correctspaceskip
   \begin{equation}
-    a = \frac{(b * c + d)}{2},
+    \frac{(b * c + d)}{2},
   \end{equation}
 \end{singlespace}
 
@@ -257,117 +165,47 @@ example, the expression:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
-    \vbinds s <- mul b c;
-    \vbinds t <- add s d;
-    \vbinds a <- div t 2;
+    \vbinds t_1 <- mul b c;
+    \vbinds t_2 <- add t_1 d;
+    \vbinds t_3 <- div t_2 2;
   \end{AVerb}
 \end{singlespace}
 
-\noindent where \var s/ and \var t/ are new temporaries created by the
-compiler. This representation makes it easier for the compiler to
-re-order expressions, unravel complex control-flow, and manipulate
-intermediate values.
+\noindent where \var t_1/, \var t_2/ and \var t_3/ are new temporary storage
+locations. 
 
 Three-address code emphasizes assignments and low-level operations, features
 important to imperative languages. MIL emphasizes closures and side-effecting
 computations, features important to functional languages.\footnote{Most
-importantly, features import to a pure language like Habit.} Though the
-operations supported by MIL differ from traditional three-address code, the
-intentation remains the same. For example, the previously given
-example can be implemented in MIL as:
+importantly, features important to a pure functional language like Habit.}
+Though the operations supported by MIL differ from traditional three-address
+code, the intention remains the same. For example, the previously given
+expression can be written in Habit as:
+
+\begin{singlespace}\correctspaceskip
+> div (plus (mul b c) d) 2
+\end{singlespace}
+
+which can be implemented in MIL as:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4, linenumbers=left]
-    \vbinds t1 <- \mkclo[mul:b] \label{mil_arith_mul1}
-    \vbinds t2 <- \app t1 * c/; \label{mil_arith_mul2}
-    \vbinds t3 <- \mkclo[add:t2]
-    \vbinds t4 <- \app t3 * d/;
-    \vbinds t5 <- \mkclo[div:t5]
-    \app t5 * 2/
+    \vbinds t_1 <- \mkclo[mul:b] \label{mil_arith_mul1}
+    \vbinds t_2 <- \app t_1 * c/; \label{mil_arith_mul2}
+    \vbinds t_3 <- \mkclo[add:t2]
+    \vbinds t_4 <- \app t_3 * d/;
+    \vbinds t_5 <- \mkclo[div:t5]
+    \vbinds t_6 <- \app t_5 * 2/
   \end{AVerb}
 \end{singlespace}
 
-\noindent The expression on Line~\ref{mil_arith_mul1}, \mkclo[mul:b],
-allocates a closure pointing to the code implementing multiplication, holding
-the value of the varaiable \var b/. On Line~\ref{mil_arith_mul2}, we call (or
-``enter''), the multiplication code with argument \var c/, putting the result
-in \var t2/. 
-
-
-\subsect{MIL Example: \lcname kleisli/
-Figure~\ref{mil_fig_kleisli_a} shows the monadic composition function (also
-known as ``Kleisili compose''). 
-
-
-
-
-
-To give a sense of MIL, consider the definition of \lcname compose/
-given in Figure~\ref{mil_fig1a}. Figure~\ref{mil_fig1b} shows a
-fragment of this expression in MIL. The \emph{block declaration} on
-Line~\ref{mil_block_decl_fig1b} gives the name of the block (\lab
- compose/) and arguments that will be passed in (\var f/, \var g/, and
-\var x/). Line~\ref{mil_gofx_fig1b} applies \var g/ to \var x/ and
-assigns the result to \var t1/. The ``enter'' operator (\enter),
-represents function application.
-\footnote{So called because in the expression \app g * x/, we
-  ``enter'' function \var g/ with the argument \var x/.}  We assume
-\var g/ refers to a function (or, more precisely, a
-\emph{closure}). The ``bind'' operator (\bind) assigns the result of
-the operation on its right-hand side to the location on the left. In
-turn, Line~\ref{mil_fofx_fig1b} applies \var f/ to \var t1/ and
-assigns the result to \var t2/. The last line returns \var t2/. Thus,
-the \lab compose/ block returns the value of
-\lcapp f * (g * x)/, just as in our original \lamC expression.
-
-\begin{myfig}[t]
-  \begin{tabular}{c@@{\hspace{2em}}c}
-    \lcdef compose()=\lcapp \lcabs f. \lcabs g. \lcabs x. f * (g * x)/; & 
-    \input{lst_mil1} \\\\
-    \scap{mil_fig1a} & \scap{mil_fig1b}
-  \end{tabular} 
-  \caption{Part~\subref{mil_fig1a} gives a \lamC definition of the composition
-    function; \subref{mil_fig1b} shows a fragment of the MIL program
-    for |compose|.}
-  \label{mil_fig1}
-\end{myfig}
-
-\subsection{Monads}
-We can divide functions into two types: \emph{pure} and
-\emph{impure}. A \emph{pure} function has no side-effects: it will not
-print to the screen, throw an exception, write to disk, or in any
-other way change the observable state of the
-machine.\footnote{We mean ``observable'' from the program's standpoint. Even a pure
-  computation will generate heat, if nothing else.} An
-\emph{impure} function may change the machine's state in an observable
-way.
-
-As described by Wadler \citeyearpar{Wadler1990}, \emph{monads} can be
-used distinguish \emph{pure} and \emph{impure} functions. Impure (or
-``monadic'') functions execute ``inside'' the monad. Values returned
-from a monadic function are not directly accessible --- they are
-``wrapped'' in the monad. The only way to ``unwrap'' a monadic value
-is to execute the computation --- inside the monad!
-
-\subsection{The Monad in MIL}
-\label{mil_subsec_monad}
-
-All MIL programs execute in a monadic context. For example, we
-consider allocation impure, because it affects the machine's
-memory. Some runtime primitives have observable effects (like printing
-to the screen), making them impure. Dividing by zero typically causes
-a program to abort or throw an exception, making division an impure
-operation. Even addition can cause exceptions, due to overflow. 
-
-Pure operations include inspecting data values (i.e., with the |case|
-statement) or jumping to another location in the program (using
-application). 
-
-We designed MIL to support the Habit programming language; in
-particular, we rely on Habit to give meaning to the monadic context
-for each MIL operation. We further assume that the interpreter (or
-compiler) for MIL will implement underlying monadic primitives (e.g.,
-allocation, arithmetic, etc.).
+\noindent On Line~\ref{mil_arith_mul1}, \mkclo[mul:b] allocates a closure
+pointing to \lab mul/ and capturing the value of the variable \var b/. On
+Line~\ref{mil_arith_mul2}, we ``enter'' the closure represented by \var t1/
+with  argument \var c/. This executes the multiplication and returns a result,
+which we store  in \var t2/. These two lines show how MIL makes closure
+allocation explicit. The monadic syntax (\bind) also hints at MIL treatments
+of allocation as side-effect.
 
 %% Syntax of MIL
 \section{MIL Syntax}
@@ -424,11 +262,78 @@ constructor expression \eqref{mil_syntax_cons} creates a data value
 with the given tag, $!+C+!$, and the variables $!+v_1, \dots, v_n+!$
 in the corresponding fields.
 
-\subsection{MIL \& Closures}
+\subsection{MIL Example: \lcname compose/}
+To give a sense of MIL, consider the definition of \lcname compose/
+given in Figure~\ref{mil_fig1a}. Figure~\ref{mil_fig1b} shows a
+fragment of this expression in MIL. The \emph{block declaration} on
+Line~\ref{mil_block_decl_fig1b} gives the name of the block (\lab
+ compose/) and arguments that will be passed in (\var f/, \var g/, and
+\var x/). Line~\ref{mil_gofx_fig1b} applies \var g/ to \var x/ and
+assigns the result to \var t1/. The ``enter'' operator (\enter),
+represents function application.
+\footnote{So called because in the expression \app g * x/, we
+  ``enter'' function \var g/ with the argument \var x/.}  We assume
+\var g/ refers to a function (or, more precisely, a
+\emph{closure}). The ``bind'' operator (\bind) assigns the result of
+the operation on its right-hand side to the location on the left. In
+turn, Line~\ref{mil_fofx_fig1b} applies \var f/ to \var t1/ and
+assigns the result to \var t2/. The last line returns \var t2/. Thus,
+the \lab compose/ block returns the value of
+\lcapp f * (g * x)/, just as in our original \lamC expression.
+
+\begin{myfig}[t]
+  \begin{tabular}{c@@{\hspace{2em}}c}
+    \lcdef compose()=\lcapp \lcabs f. \lcabs g. \lcabs x. f * (g * x)/; & 
+    \input{lst_mil1} \\\\
+    \scap{mil_fig1a} & \scap{mil_fig1b}
+  \end{tabular} 
+  \caption{Part~\subref{mil_fig1a} gives a \lamC definition of the composition
+    function; \subref{mil_fig1b} shows a fragment of the MIL program
+    for |compose|.}
+  \label{mil_fig1}
+\end{myfig}
+
+\section{Monads \& MIL} 
+
+\intent{Briefly describe what we mean by ``monad'' or ``monadic.'' Introduce
+the idea of monadic values as computation.} As described by Wadler
+\citeyearpar{Wadler1990}, \emph{monads} can be used distinguish \emph{pure}
+and \emph{impure} functions. A \emph{pure} function has no side-effects: it
+will not print to the screen, throw an exception, write to disk, or in any
+other way change the observable state of the machine.\footnote{We mean
+``observable'' from the program's standpoint. Even a pure  computation will
+generate heat, if nothing else.} An \emph{impure} function may change the
+machine's state in an observable way. In another sense, also described in the
+same paper, a monadic value represents a \emph{computation}. Where a pure
+function evaluates to a ``pure'' value that is immediately availabe, a monadic
+function gives back a suspended computation that we need to execute before we
+can get to the value ``inside'' the computation.
+
+
+% All MIL programs execute in a monadic context. For example, we
+% consider allocation impure, because it affects the machine's
+% memory. Some runtime primitives have observable effects (like printing
+% to the screen), making them impure. Dividing by zero typically causes
+% a program to abort or throw an exception, making division an impure
+% operation. Even addition can cause exceptions, due to overflow. 
+
+% Pure operations include inspecting data values (i.e., with the |case|
+% statement) or jumping to another location in the program (using
+% application). 
+
+% We designed MIL to support the Habit programming language; in
+% particular, we rely on Habit to give meaning to the monadic context
+% for each MIL operation. We further assume that the interpreter (or
+% compiler) for MIL will implement underlying monadic primitives (e.g.,
+% allocation, arithmetic, etc.).
+
+%% \subsection{MIL \& Closures}
 %% Closures
 
-Using Habit's call-by-value evaluation strategy, we can compute the
-value of the expression \lcapp compose * a * b * c/:
+\intent{Illustrate allocation as a monadic effect in MIL. Contrast with
+allocation as in invisible effect in \lamA.} Using Habit's call-by-value
+evaluation strategy, we can compute the value of the expression \lcapp compose
+* a * b * c/:
 
 \begin{singlespace}\noindent
   \begin{math}\begin{array}{rlr}
