@@ -138,22 +138,21 @@ out the difference.
 \section{MIL's Purpose}
 \label{mil_sec3}
 
-\intent{Remark on intermediate languages and MIL's focus.} An intermediate
-language always seeks to highlight some specific implementation detail while
-hiding others in order to support certain analysis, transformations or other
-goals such as portability or code verification. We designed MIL such that
-intermediate values specific to functional languages would be explicitly
-represented. We also designed MIL to hide details about memory locations,
-stack management, and register allocation. Exposing intermediate values gives
-us the chance to analyze and eliminate them. Hiding implementation details
-makes the job of writing those analysis and transformation programs simpler.
+\intent{Remark on intermediate languages and MIL's focus.} An
+intermediate language always seeks to highlight some specific
+implementation detail while hiding others in order to support certain
+analysis and transformation goals. Exposing intermediate values gives
+us the chance to analyze and eliminate them. Hiding implementation
+details makes the job of writing those analyses and transformations
+simpler.
 
-\intent{Relate MIL to three-address code.} MIL's syntax and design borrow
-heavily from three-address code, an intermediate form normally associated with
-imperative languages. Three-address code represents programs such that all
-operations specify two operands and a destination. Three-address code also
-hides details of memory management by assuming infinitely many storage
-locations can be named and updated. For example, the expression:
+\intent{Relate MIL to three-address code.} MIL's syntax and design
+borrow heavily from three-address code, an intermediate form normally
+associated with imperative languages. Three-address code represents
+programs such that all operations specify two operands and a
+destination. Three-address code also hides details of memory
+management by assuming that infinitely many storage locations can be
+named and updated. For example, the expression:
 
 \begin{singlespace}\correctspaceskip
   \begin{equation}
@@ -174,20 +173,23 @@ locations can be named and updated. For example, the expression:
 \noindent where \var t_1/, \var t_2/ and \var t_3/ are new temporary storage
 locations. 
 
-\intent{Highlight focus of MIL (closure allocation).} Three-address code
-emphasizes assignments and low-level operations, features important to
-imperative languages. MIL emphasizes closures and side-effecting computations,
-features important to functional languages.\footnote{Most importantly,
-features important to a pure functional language like Habit.} Though the
-operations supported by MIL differ from traditional three-address code, the
-intention remains the same. For example, the previously given expression can
-be written in Habit as:
+\intent{Highlight focus of MIL (closure allocation).} Three-address
+code emphasizes assignments and low-level operations, features
+important to imperative languages. MIL emphasizes allocation and
+side-effecting computations, features important to functional
+languages.\footnote{Most importantly, features important to a pure
+  functional language like Habit.} Though the operations supported by
+MIL differ from traditional three-address code, the intention remains
+the same: hide some details while exposing those we care about.
 
-\begin{singlespace}\correctspaceskip
+For example, the previously given expression can be written in Habit
+as:
+
+\begin{singlespace}
 > div (plus (mul b c) d) 2
 \end{singlespace}
 
-which can be implemented in MIL as:
+\noindent and implemented in MIL as:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4, numbers=left]
@@ -201,73 +203,91 @@ which can be implemented in MIL as:
 \end{singlespace}
 
 \intent{Explain example, pointing out treatment of allocation.}
-\noindent On Line~\ref{mil_arith_mul1}, \mkclo[mul:b] allocates a closure
-pointing to \lab mul/ and capturing the value of the variable \var b/. On
-Line~\ref{mil_arith_mul2}, we ``enter'' the closure represented by \var t1/
-with  argument \var c/. This executes the multiplication and returns a result,
-which we store  in \var t2/. These two lines show how MIL makes closure
-allocation explicit. The monadic syntax (\bind) also hints at MIL treatments
-of allocation as side-effect.
+\noindent Line~\ref{mil_arith_mul1} shows MIL's emphasis on
+allocation. \mkclo[mul:b] allocates a closure pointing to \lab mul/
+and capturing the value of the variable \var b/. We make allocation of
+closures a monadic, side-effecting operation by placing \mkclo[mul:b]
+on the \rhs of the monadic binding operator (\bind). However, we do
+not need to mention the actual address of the locaton \var t_1/, \var
+b/ or even \lab mul/ --- those details are hidden. On
+Line~\ref{mil_arith_mul2}, we represent function application with the
+``enter'' operator, \enter. Line~\ref{mil_arith_mul2} executes the
+multiplication and returns a result, which we store in \var
+t_2/. Though MIL represents function application explicitly, we hide
+implementation details such as stack operations or register spilling. The
+rest of the program executes similarly.
 
 %% Syntax of MIL
 \section{MIL Syntax}
 
-\intent{Introduce MIL syntax.}
-Figure \ref{mil_fig3} gives the syntax for MIL.  A MIL program
-consists of a number of \emph{blocks}. Blocks come in two types:
-\emph{\cc} blocks \eqref{mil_syntax_cc} and basic blocks
-\eqref{mil_syntax_block}. Though the syntax for closure blocks allows
-any \term tail/, in practice they either return a closure
-(\mkclo[k:v_1, \dots, v_n]) or jump to a block (\goto b(v_1, \dots,
-v_n)). 
+\intent{Introduce MIL syntax.}  Figure \ref{mil_fig3} gives the syntax
+for MIL.  A MIL program consists of a number of \emph{blocks}. Blocks
+come in two types: \emph{\cc} and basic blocks.
 
 \input{mil_syntax}
 
-\intent{Describe blocks.}
-Basic block bodies \eqref{mil_syntax_body} consist of a sequence of
+\intent{Describe closure-capturing blocks} \Cc blocks specify two
+``arguments:'' an environment $\left\{\parstrut\ensurett{v_1, \dots,
+  v_n}\right\}$ and a new argument, \var v/. Though the syntax for
+closure blocks allows any \term tail/, in practice they either return
+a closure (\mkclo[k:v_1, \dots, v_n]) or jump to a block (\goto b(v_1,
+\dots, v_n)). The name of the block, \lab k/, is global to the program
+and can be captured in a closure. 
+
+\Cc blocks only execute when initiated by an ``enter''
+(or function application) expression like \app f * x/. In order for
+the \cc block \ccblock k (v_1, \dots, v_n) v: to execute, \var f/ must
+hold a closure referring to \lab k/ with $n$ captured variables. The
+new argument, \var v/, becomes \var x/ from the expression \app f * x/.
+
+\intent{Describe basic blocks.} Basic blocks consist of a sequence of
 statements that execute in order without any intra-block jumps or
 conditional branches. Each basic block ends by evaluating a \term
-tail/ or a conditional branch. A block body cannot end with a 
-bind statement.
+tail/ or a conditional branch. A block body cannot end with a bind
+statement. The arguments \ensuremath{\ensurett{(v_1, \dots, v_n)}} are
+the only variables in scope while the block executes. The name of the
+block (\lab b/) is global to the program but it cannot be captured in a
+closure (as closures must always refer to \cc blocks). Basic blocks always
+execute as the result of the goto tail expression, \goto b(v_1, \dots, v_n).
 
 \intent{Describe bind.}
-The bind statement \eqref{mil_syntax_body} can appear multiple
+The bind statement can appear multiple
 times in a block. Each binding assigns the result of the \emph{tail}
 on the \rhs to a variable on the left. If a variable is
 bound more than once, later bindings will shadow previous
 bindings.
 
 \intent{Describe \milres case/.}
-The \milres case/ statement \eqref{mil_syntax_case} examines a
+The \milres case/ statement examines a
 discriminant and selects one alternative based on the value found. The
-discriminant is always a simple variable, not an expresssion. Each
-alternative \eqref{mil_syntax_alt} specifies a \emph{constructor} and
+discriminant is always a simple variable, not an expression. Each
+alternative specifies a \emph{constructor} and
 variables for each value held by the constructor. Alternatives always
 jump immediately to a block --- they do not allow any other statement.
 
-\intent{Introduce tail expressions.} \emph{Tail} expressions represent effects
--- they create monadic values. \milres return/ \eqref{mil_syntax_return} takes
-a variable (\emph{not} an expression) and makes its value monadic. The
-``enter'' operator \eqref{mil_syntax_enter}, \enter, implements function
-application, ``entering'' the closure represented by its \lhs with the
-argument on its \rhs. The invoke operator \eqref{mil_syntax_invoke} executes
-the thunk referred to by its argument.
+\intent{Introduce tail expressions.} \emph{Tail} expressions represent
+effects --- they create monadic values. \milres return/ takes a
+variable (\emph{not} an expression) and makes its value monadic. The
+``enter'' operator, \enter, implements function application,
+``entering'' the closure represented by its \lhs with the argument on
+its \rhs. The invoke operator executes the thunk referred to by its
+argument (thunks are described in Section~\ref{mil_monadic_programs}).
 
 \intent{Describe goto for blocks and primitives.}
-The goto block \eqref{mil_syntax_goto} and goto primitive
-\eqref{mil_syntax_prim} expressions implement labeled jumps with
+The goto block and goto primitive
+expressions implement labeled jumps with
 arguments. In the first case, \lab b/ represents a labeled block
 elsewhere in the program.  In the second, \lab p/\suptt* refers to
 code that is implemented outside of MIL. Otherwise, primitives are
 treated like blocks.
 
-\intent{Describe closure and thunk allocation.} Closures and thunks are
-allocated similarly. Closure allocation \eqref{mil_syntax_clo} creates a
-closure pointing the block labelled \lab k/, capturing the variables $!+v_1,
-\dots, v_n+!$. A thunk, details for which can be found in
-Section~\ref{mil_monadic_programs} behave analogously. The constructor
-expression \eqref{mil_syntax_cons} creates a data value with the given tag,
-$!+C+!$, and the variables $!+v_1, \dots, v_n+!$ in the corresponding fields.
+\intent{Describe closure and thunk allocation.} Closure allocation
+creates a closure pointing the block labelled \lab k/, capturing the
+variables $!+v_1, \dots, v_n+!$. A thunk, details for which can be
+found in Section~\ref{mil_monadic_programs}, is allocated
+similarly. The constructor expression creates a data value with the
+given tag, $!+C+!$, and the variables $!+v_1, \dots, v_n+!$ in the
+corresponding fields.
 
 \subsection{MIL Example: \lcname compose/}
 \intent{Show an LC program and its translation in MIL.}
@@ -281,13 +301,18 @@ assigns the result to \var t1/. The ``enter'' operator (\enter),
 represents function application.
 \footnote{So called because in the expression \app g * x/, we
   ``enter'' function \var g/ with the argument \var x/.}  We assume
-\var g/ refers to a function (or, more precisely, a
-\emph{closure}). The ``bind'' operator (\bind) assigns the result of
-the operation on its right-hand side to the location on the left. In
-turn, Line~\ref{mil_fofx_fig1b} applies \var f/ to \var t1/ and
-assigns the result to \var t2/. The last line returns \var t2/. Thus,
-the \lab compose/ block returns the value of
-\lcapp f * (g * x)/, just as in our original \lamC expression.
+\var g/ refers to a closure. 
+
+The ``bind'' operator (\bind) assigns the result of
+the operation on its right-hand side to the location on the left. All
+expressions that could have a side-effect appear on the \rhs of a bind
+operator in MIL; in this case, \app g * x/ may allocate memory when
+evaluated. 
+
+Line~\ref{mil_fofx_fig1b} applies \var f/ to \var
+t1/ and assigns the result to \var t2/. The last line returns \var
+t2/. Thus, the \lab compose/ block returns the value of \lcapp f * (g
+* x)/, just as in our original \lamC expression.
 
 \begin{myfig}[t]
   \begin{tabular}{c@@{\hspace{2em}}c}
@@ -301,55 +326,104 @@ the \lab compose/ block returns the value of
   \label{mil_fig1}
 \end{myfig}
 
-\section{Monads \& MIL} 
-
-\intent{Briefly describe what we mean by ``monad'' or ``monadic.'' Introduce
-the idea of monadic values as computation.} As described by Wadler
-\citeyearpar{Wadler1990}, \emph{monads} can be used distinguish \emph{pure}
-and \emph{impure} functions. A \emph{pure} function has no side-effects: it
-will not print to the screen, throw an exception, write to disk, or in any
-other way change the observable state of the machine.\footnote{We mean
-``observable'' from the program's standpoint. Even a pure  computation will
-generate heat, if nothing else.} An \emph{impure} function may change the
-machine's state in an observable way. 
+\section{Allocation as a Side-Effect} 
 
 \intent{Motivate why we consider allocation impure.}
 Functional languages normally treat data allocation as a pure operation, in
 that the program cannot directly observe any effect from an allocation. Of
-course, when implementing such operations, allocation is definitley impure:
+course, when implementing such operations, allocation is definitely impure:
 the heap may be updated and a garbage collection might be triggered.
 
-\intent{Illustrate allocation as a monadic effect in MIL. Contrast with
-allocation as in invisible effect in \lamA.} For example, consider the
-operations that occur when evaluating |compose a b c| using call-
-by-value:
+\intent{Illustrate allocation as in invisible effect in \lamA.} For
+example, consider the operations that occur when calculating |compose
+a b c| using call- by-value evaluation:
 
 \begin{singlespace}\noindent
-  \begin{math}\begin{array}{rll}
-      \lcname main/ &= \lcapp compose * a * b * c/ \\
-      &= \rlap{\lcapp (\lcabs f. \lcabs g. \lcabs x. f * (g * x)) * a * b * c/}\phantom{\lcapp t_1 * b * c/} \\
-      &= \lcapp t_1 * b * c/ & \text{where\ } t_1 = \lcapp \lcabs g. \lcabs x. a * (g * x)/ \\
-      &= \lcapp t_2 * c/ & \text{where\ } t_2 = \lcapp \lcabs x. a * (b * x)/ \\
-      &= t_3 & \text{where\ } t_3 = \lcapp a * (b * c)/ \\[-\baselineskip]
-      \multicolumn{3}{l}{\hbox to .95\hsize{}}
+  \begin{math}\begin{array}{rl}
+      \lcapp compose * a * b * c/ &= \lcapp (\lcabs f. \lcabs g. \lcabs x. {\lcapp f * (g * x)/}) * a * b * c/ \\
+      &= \lcapp (\lcabs g. \lcabs x. {\lcapp a * (g * x)/}) * b * c/ \\
+      &= \lcapp (\lcabs x. {\lcapp a * (b * x)/}) * c/ \\
+      &= \lcapp a * (b * c)/ \\
     \end{array}\end{math}
 \end{singlespace}
 
-\noindent Each evaluation step consumes one argument. \lcname t_1/ and \lcname t_2/
-represent \emph{closures}. A closure holds a pointer to a body of code and any
-free variables. In this case, \lcname t_1/ holds \lcname a/ and points to code
-that executes \lcapp \lcabs g. \lcabs x. a * (g * x)/. In turn, \lcname t_2/
-holds \lcname a/ and \lcname b/, and it points to code that executes \lcapp
-\lcabs x. a * (b * x)/. Normally, such
-substitutions are written inline but we have defined $t_1$ and $t_2$ to
-explicitly capture those intermediate values. 
+\intent{Introduce notation to make the environment and intermediate functions
+explicit.}
+This representation hides an important detail: each
+application creates a closure representing a function and its
+environment (or \emph{free variables}). We can make these values more
+obvious by writing each $\lambda$-expression as a new function,
+annotated with its free variables in braces:
 
-\intent{Emphasize that MIL treats allocation as impure.}
-In \lamC, these intermediate closures are not explicitly represented --- they
-are really a consequence of implementing function application. But these
-operations affect the machine --- they allocate memory. While this detail is
-hidden from most high-level languages (with good reason), MIL treats
-allocation as  an \emph{impure} operation.
+\begin{singlespace}\noindent
+  \begin{math}\begin{array}{rl}
+      k_1 \left\{\strut \right\} f &= \lcabs g. \lcabs x. \lcapp f * (g * x)/ \\
+      k_2 \left\{\strut f\right\} g & = \lcabs x. \lcapp f * (g * x)/ \\
+      k_3 \left\{\strut f, g\right\} x &= \lcapp f * (g * x)/ \\
+    \end{array}\end{math}
+\end{singlespace}
+
+\intent{Explain why the notation above is not sufficient to show
+  allocation as an effect.}  This notation, however, is not quite
+enough. Each time we return a $\lambda$ value in \lamC, we allocate a
+closure to represent the result. \lcname k_1/ does not
+return the result of executing \lcabs g. \lcabs x. \lcapp f * (g *
+x)/; rather, \lcname k_1/ returns a closure that indirectly represents
+the execution of \lcabs g. \lcabs x. \lcapp f * (g * x)/. These allocations
+are not pure --- they affect the state of the machine and can
+trigger observable effects. 
+
+As described by Wadler \citeyearpar{Wadler1990}, \emph{monads}
+can be used distinguish \emph{pure} and \emph{impure} functions. A
+\emph{pure} function has no side-effects: it will not print to the
+screen, throw an exception, write to disk, or in any other way change
+the observable state of the machine.\footnote{We mean ``observable''
+  from the program's standpoint. Even a pure computation will generate
+  heat, if nothing else.} An \emph{impure} function may change the
+machine's state in an observable way.
+
+\intent{Explain our $k$ and \hsdo notation together.}  Therefore, we
+rewrite the \rhs of \lcname k_1/ as $\hsdo\left\{\lcapp k_2 *
+\left\{\parstrut f\right\}/;\right\}$, denoting two concepts. First,
+\lcapp k_2 * \left\{\parstrut f\right\}/ indicates that we create a
+closure pointing to \lcname k_2/ and holding an environment
+containing \lcname f/. Second, because allocation has an observable
+effect, we use $\mathbf{do}$ notation to show that \lcname k_1/ does
+not represent a pure value --- it evaluates to a computation that must
+be executed. We do the same for \lcname k_2/; \lcname k_3/ remains
+unchanged as it does not evaluate to a $\lambda$ and therefore does
+not directly have an observable effect:
+
+\begin{singlespace}\noindent
+  \begin{math}\begin{array}{rl}
+      k_1 \left\{\strut \right\} f &= \hsdo \left\{\lcapp k_2 * \left\{\strut f\right\}/;\right\} \\
+      k_2 \left\{\strut f\right\} g & = \hsdo \left\{\lcapp k_3 * \left\{\strut f, g\right\}/;\right\} \\
+      k_3 \left\{\strut f, g\right\} x &= \lcapp f * (g * x)/ \\
+    \end{array}\end{math}
+\end{singlespace}
+
+\intent{Show example with new notation and explain why it is important.}
+With these definitions, we can rewrite the evaluation of \lcapp compose * a * b * c/
+as a sequence of side-effecting monadic allocations:
+
+\begin{singlespace}\noindent
+  \begin{math}\begin{array}{rl}
+      \lcapp compose * a * b * c/ &= \lcapp (\lcabs f. \lcabs g. \lcabs x. {\lcapp f * (g * x)/}) * a * b * c/\\
+      &= \lcapp {\lcapp (k_1 \left\{\strut\right\} * a)/} * b * c/ \\
+      &= \lcapp ({(\hsdo \left\{\lcapp k_2 * \left\{\strut a\right\}/;\right\})} * b) * c/ \\
+      &= \lcapp {\lcapp (k_2 \left\{\strut a\right\} * b)/} * c/ \\
+      &= \lcapp {(\hsdo \left\{\lcapp k_3 * \left\{\strut a, b\right\}/;\right\})} * c/ \\
+      &= \lcapp k_3 \left\{\strut a, b\right\} * c/ \\
+      &= \lcapp a * (b * c)/ \\
+      \multicolumn{2}{l}{\vrule width.95\hsize height0pt depth0pt}
+    \end{array}\end{math}
+\end{singlespace}
+
+\noindent In \lamC, the values created by \lcname k_1/ and \lcname
+k_2/ are not explicitly represented. In the above, each \hsdo line
+indicates that an allocation will occur. While this detail is hidden
+from most high-level languages, MIL treats allocation as an impure
+operation. Allocation affects the machine and MIL makes it explicit.
 
 \begin{myfig}[t]
   \input{lst_mil2}
@@ -359,43 +433,40 @@ allocation as  an \emph{impure} operation.
   \label{mil_fig2}
 \end{myfig}
 
-\intent{Describe MIL program for |main = compose a b c|.}
-Figure \ref{mil_fig2} shows the complete MIL program for \lcdef
-main()= \lcapp compose * a * b * c/;. We call the blocks labeled \lab
-k1/, \lab k2/ and \lab k3/ (lines \ref{mil_k1_fig2} --
-\ref{mil_k3_fig2}) \emph{closure-capturing} blocks.\footnote{So called
-  because they \emph{capture} arguments in a closure.}  As opposed to
-\lab main/, these blocks create new closures. In the definition
-\ccblock k1()f: \mkclo[k2:f], the braces on the left-hand side
-represent variables expected in the closure given to this function. In
-this case, \lab k1/ does not expect to find any variables. \var f/
-names the argument given to \lab k1/. The right-hand side,
-\mkclo[k2:f], shows the creation of a new closure. The closure points
-to block \lab k2/ and captures the value of \var f/.  Evaluating \lab
-k1/ returns a closure which can be used to execute \lab k2/. \lab k2/
-expects an argument, \var g/, and a closure with one value (\var
-f/). \lab k2/ returns a closure that points to \lab k3/ and contains
-the variables \var f/ and \var g/: \clo[k3:f, g]. \lab k3/, however,
-does something new. Instead of returning a closure, it executes the
-\lab compose/ block (defined in Figure \ref{mil_fig1b}) with three
-arguments: \var f/, \var g/, and \var x/. The value returned by \lab
-k3/ will be the value computed by \lab compose/ with the arguments
-given.
+\intent{Describe MIL program for |main = compose a b c|.}  Figure
+\ref{mil_fig2} shows the complete MIL program for \lcdef main()=
+\lcapp compose * a * b * c/;. The closure-capturing blocks \lab k1/,
+\lab k2/ and \lab k3/ correspond to the \lcname k_1/, \lcname k_2,/
+and \lcname k_3/ definitions above. The free variables annotated on each
+definition correspond to the variables in braces next to \lab k1/, \lab k2/
+and \lab k3/. \lab main/ corresponds to our
+top-level expression |compose a b c|. 
+
+Evaluating \lab k1/ returns a closure that stores the argument \var f/
+and points to \lab k2/; \lab k2/ returns a closure that captures the
+variable \var f/ from its environment and the new argument \var
+g/. The closure returned by \lab k2/ points to \lab k3/. \lab k3/,
+however, does not return a closure (directly). Instead, it executes
+the \lab compose/ block (defined in Figure \ref{mil_fig1b}) with the
+two variables in its environment, \var f/ and \var g/, and the
+argument given, \var x/.
 
 \intent{Point out where intermediate values are created and captured.}
 Returning to the \lab main/ block in Figure \ref{mil_fig2}, we can now
 see how MIL makes explicit the intermediate closures created while
-evaluating \lcapp compose * a * b * c/. On line \ref{mil_t1_fig2}, we
-enter \lab k1/ with the first argument, \var a/ (remember, \app \lab
-k1/ * a/ represents function application). The result on the \lhs of
-the \bind, \var t1/, holds the closure returned. On the next line, we
-enter \var t1/ (which will point to \lab k2/) with the second
-argument, \var b/. \var t2/ then holds the closure returned. Finally,
-on line \ref{mil_t3_fig2}, we enter \var t2/ (which will point to \lab
-k3/) with the final argument, \var c/. \lab k3/ will directly execute
-\lab compose/ with our arguments. \var t3/ holds the result returned
-by \lab compose/. On the last line of \lab main/ we return the value
-computed, \var t3/.
+evaluating \lcapp compose * a * b * c/. Line~\ref{mil_t0_fig2}
+executes the block \lab k0/, allocating a closure pointing to \lab
+k1/. On line \ref{mil_t1_fig2}, we apply \var t0/ to \var a/. That
+executes \lab k1/, creating a closure holding one value in its
+environment (\var f/) and pointing to \lab k2/. We assign the result
+to \var t1/. On Line~\ref{mil_t2_fig2} we apply \var t1/ to the second
+argument, \var b/. This executes \lab k2/, which expects to find one
+argument in its environment, just as we stored in \var t1/. \lab k2/
+creates another closure, which we assign to \var t2/. Finally, on line
+\ref{mil_t3_fig2}, we enter \var t2/ (which will point to \lab k3/)
+with the final argument, \var c/. \lab k3/ will directly execute \lab
+compose/ with our arguments. \var t3/ holds the result returned by
+\lab compose/, which we return on the last line of \lab main/.
 
 % All MIL programs execute in a monadic context. For example, we
 % consider allocation impure, because it affects the machine's
@@ -442,7 +513,7 @@ Part~\subref{mil_fig_monadic_comp}.
 \begin{myfig}
   \begin{tabular}{cc}
     |f = 1| & 
-    \begin{minipage}{\widthof{|do {print "hello";}|}}
+    \begin{minipage}[t]{\widthof{|do {print "hello";}|}}
 > m = do 
 >   print 0
 >   return 1
@@ -456,7 +527,7 @@ Part~\subref{mil_fig_monadic_comp}.
 \intent{Introduce monadic thunks.}  Intuitively, |f| returns an
 integer, but |m| returns a \emph{computation}. We call this
 computation a \emph{monadic thunk}, as coined in the Habit Compiler
-Report \citep{HabitComp2010}. Traditionally, thunks have represented
+Report \citep{HabitComp2010}. Traditionally, thunks represent
 \emph{suspended} computation. We use it in the same sense here, in
 that |m| evaluates to a program that we can invoke; moreover,
 evaluating |m| alone will \emph{not} invoke the computation --- |m|

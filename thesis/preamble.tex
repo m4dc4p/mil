@@ -180,7 +180,14 @@
   \gdef\LCToMILb{\vtop{\compMILE{#1}} = \ensuremath{\vtop{\hbox{\box\meaningbox}}}}%%
     \afterassignment\LCToMILa\let\next= }
 
-
+%% A "strut" the height of a parantheses; \strut
+%% produces a bar that is too tall in double-spaced
+%% paragraphs at time.
+\def\parstrut{\vphantom{(}}
+%% Typeset the ``do'' keyword
+\def\hsdo{\ensuremath{\mathbf{do\;}}}
+\def\hslet{\ensuremath{\mathbf{let\;}}}
+\def\hsreturn{\ensuremath{\mathbf{return\;}}}
 %% End MIL chapter
 
 %% Dataflow Chapter
@@ -360,3 +367,4 @@
 
 %% Place an input file on the next page
 \def\onnextpage#1{\afterpage{\clearpage\input{#1}\clearpage}}
+

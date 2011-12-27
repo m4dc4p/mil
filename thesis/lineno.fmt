@@ -55,7 +55,7 @@
 \newcommand{\numberson}{\global\let\printline\printlineyes}
 \newcommand{\numbersoff}{\global\let\printline\empty}
 \newcommand{\numbersreset}{\setcounter{linenum}{0}}
-\numberson
+\numberson\numbersoff
 %
 %endif
 %endif
