@@ -25,36 +25,36 @@
 
 \input{uncurrying}
 
-\input{deadcode}
+%% \input{deadcode}
 
-\chapter{Monadic Optimizations}
-\label{ref_chapter_monadic}
+%% \chapter{Monadic Optimizations}
+%% \label{ref_chapter_monadic}
 
-\emph{Describes optimizations based on the monad laws: bind/return collapse and
-  monadic fuzzbang (inlining)}
+%% \emph{Describes optimizations based on the monad laws: bind/return collapse and
+%%   monadic fuzzbang (inlining)}
 
-\section{Copy-propagation}
-\emph{Collapsing ``|x <- return y; p|'' to ``|[y/x] p|''.}
-\subsection{Example of Desired Optimization}
-\subsection{Implementation}
-\subsection{Reflection}
+%% \section{Copy-propagation}
+%% \emph{Collapsing ``|x <- return y; p|'' to ``|[y/x] p|''.}
+%% \subsection{Example of Desired Optimization}
+%% \subsection{Implementation}
+%% \subsection{Reflection}
 
-\section{Inlining}
-\emph{Monadic inlining using the associativity law. That is:}
+%% \section{Inlining}
+%% \emph{Monadic inlining using the associativity law. That is:}
 
-> y <- (z <- x; p1)
-> p2
+%% > y <- (z <- x; p1)
+%% > p2
 
-\noindent
-\emph{becomes:}
+%% \noindent
+%% \emph{becomes:}
 
-> z <- x
-> y <- p1
-> p2
+%% > z <- x
+%% > y <- p1
+%% > p2
 
-\subsection{Example of Desired Optimization}
-\subsection{Implementation}
-\subsection{Reflection}
+%% \subsection{Example of Desired Optimization}
+%% \subsection{Implementation}
+%% \subsection{Reflection}
 
 \chapter{Conclusion \& Future Work}
 

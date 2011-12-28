@@ -42,18 +42,17 @@ specifies evaluation order and separates stateful computation using a
 monadic programming style. MIL's syntax enforces basic-block structure
 on programs, making them ideal for dataflow analysis.
 
-\intent{Signposts.}
-% We first describe our source language, \lamC, in
-% Section~\ref{mil_src}.  MIL syntax and
-% examples follow in Section~\ref{mil_sec3}.  We
-% then describe ``three-address code,'' the intermediate form from which
-% MIL partly derives, in Section~\ref{mil_sec2}. Section~\ref{mil_sec4}
-% shows our compiler for translating \lamC to MIL. We sketch how MIL
-% programs can be evaluated in Section~\ref{mil_sec5}, using the same
-% structural operational semantics (SOS) style as in
-% Chapter~\ref{ref_chapter_languages}. Section \ref{mil_sec7} shows how
-% Hoopl influenced the implementation the MIL language from Chapter
-% \ref{ref_chapter_mil} and discusses the design choices we made.
+\intent{Signposts.}  We first describe our source language, \lamC, in
+Section~\ref{mil_src}.  The motivation and roots of MIL are given in
+Section~\ref{mil_sec3}. MIL's complete syntax follows in
+Section~\ref{mil_syntax}.  Section~\ref{mil_monad} discusses MIL's
+treatment of allocation as a side-effect.  Section~\ref{mil_thunks}
+shows how MIL treats monadic programs as suspended
+computations. Section~\ref{mil_sec4} highlights some of the subtler
+points in our translation strategy from \lamC to MIL. We sketch how
+MIL programs can be evaluated in Section~\ref{mil_sec5}. Section
+\ref{mil_sec7} shows how Hoopl influenced the AST we used to
+rerpresent MIL programs. We conclude in Section~\ref{mil_sec6}.
 
 \section{Source Language: \lamC}
 \label{mil_src}
@@ -155,9 +154,9 @@ management by assuming that infinitely many storage locations can be
 named and updated. For example, the expression:
 
 \begin{singlespace}\correctspaceskip
-  \begin{equation}
+  \begin{equation*}
     \frac{(b * c + d)}{2},
-  \end{equation}
+  \end{equation*}
 \end{singlespace}
 
 \noindent would be expressed in three-address code as:
@@ -186,7 +185,9 @@ For example, the previously given expression can be written in Habit
 as:
 
 \begin{singlespace}
-> div (plus (mul b c) d) 2
+\begin{center}
+> div (plus (mul b c) d) 2,
+\end{center}
 \end{singlespace}
 
 \noindent and implemented in MIL as:
@@ -219,6 +220,7 @@ rest of the program executes similarly.
 
 %% Syntax of MIL
 \section{MIL Syntax}
+\label{mil_syntax}
 
 \intent{Introduce MIL syntax.}  Figure \ref{mil_fig3} gives the syntax
 for MIL. Where the term \var v_1/, etc. appears, only simple variables
@@ -274,7 +276,7 @@ expression) and makes its value monadic. The ``enter'' operator,
 \enter, implements function application, ``entering'' the closure
 represented by its \lhs with the argument on its \rhs. The \milres invoke/
 operator executes the thunk referred to by its argument (thunks are
-described in Section~\ref{mil_monadic_programs}).
+described in Section~\ref{mil_thunks}).
 
 \intent{Describe goto for blocks and primitives.}  The goto block and
 goto primitive expressions implement labeled jumps with arguments. In
@@ -287,7 +289,7 @@ primitives are treated like blocks.
 \intent{Describe closure and thunk allocation.} Closure allocation
 creates a closure pointing the block labelled \lab k/, capturing the
 variables $!+v_1, \dots, v_n+!$. A thunk, details for which can be
-found in Section~\ref{mil_monadic_programs}, is allocated
+found in Section~\ref{mil_thunks}, is allocated
 similarly. The constructor expression creates a data value with the
 given tag, $!+C+!$, and the variables $!+v_1, \dots, v_n+!$ in the
 corresponding fields.
@@ -345,6 +347,7 @@ t2/. Thus, the \lab compose/ block returns the value of \lcapp f * (g
 \end{myfig}
 
 \section{Allocation as a Side-Effect} 
+\label{mil_monad}
 
 \intent{Motivate why we consider allocation impure.}
 Functional languages normally treat data allocation as a pure operation, in
@@ -479,7 +482,7 @@ and immediately jumps to \lab compose/ with our arguments. The result,
 assigned to \var t3/, is returned on the last line of \lab main/.
 
 \section{Monadic Thunks}
-\label{mil_monadic_programs}
+\label{mil_thunks}
 
 \intent{Introduce idea of monads as suspended computation.}
 In another sense, also described in Wadler's \citeyear{Wadler1990} paper, a
@@ -576,13 +579,13 @@ an effect each time.
 unlike closures they are not progressively ``built up'' across
 multiple blocks. Figure~\ref{mil_fig_kleisli} illustrates this
 concept. Part~\subref{mil_fig_kleisli_a} shows the monadic, or
-``Kleisli,'' \citep{KleisliXX} composition
-function. Part~\subref{mil_fig_kleisli_b} shows the corresponding MIL
-code. The blocks \lab k201/, \lab k202/, and \lab k203/ progressively
-capture the arguments to |kleisli|. \lab b204/ constructs the thunk
-for |kleisli|, but only after all arguments have been captured. The
-block \lab m205/ implements the body of |kleisli| and is shown in 
-Figure~\ref{mil_fig_kleisli_body} rather than here.
+``Kleisli,'' composition function. Part~\subref{mil_fig_kleisli_b}
+shows the corresponding MIL code. The blocks \lab k201/, \lab k202/,
+and \lab k203/ progressively capture the arguments to |kleisli|. \lab
+b204/ constructs the thunk for |kleisli|, but only after all arguments
+have been captured. The block \lab m205/ implements the body of
+|kleisli| and is shown in Figure~\ref{mil_fig_kleisli_body} rather
+than here.
 
 \begin{myfig}
   \begin{tabular}{cc}
@@ -700,11 +703,53 @@ as if it ended with a bind followed by a |return|:
 
 \section{Executing MIL Programs}
 \label{mil_sec5}
-\intent{MIL programs execute like assembly programs.}
-\intent{Only variables mentioned in environments and arguments are in scope; however, definitions are global.}
-\intent{Goto's are more like function calls than jumps.}
 
-\section{MIL and Hoopl}
+\intent{Introduce MIl execution model.}  MIL derives its syntax and
+intention from three-address code, an intermediate form normally
+associated with imperitave, procedural programming languages such as
+C. Three-address code, like other register-transfer languages, closely
+resembles assembly language code. The execution model for MIL draws on
+its three-address code inspiration and executes like an
+assembly-language for a simple register-based computer: execution
+begins at a special designated point in the program and proceeds
+sequentially. When the first block executed in the program
+``returns,'' the program terminates.
+
+\intent{Describe blocks as functions; argument scope; blocks always
+  ``return.''}  Unlike assembly-language, MIL blocks also act like
+functions. Each block declares arguments (\cc blocks have arguments in
+their environment) and those names are only in scope over the
+block. The value of the last statement in a given block is returned to
+the block's caller. If that statement is a goto, enter (\enter),
+\invoke/, or \milres case/ statement, then the return value of the
+called block will become the return value of the current block.
+
+\intent{Describe variable scope; storage locations are local.}  Within
+each block, any number of storage locations may be named on the \lhs
+of a bind (\bind) statement. Those names are not global storage
+locations: variables with the same name in differents blocks do not
+affect each other. Values can only be passed from one block to another
+as arguments, in a closure, or in a monadic thunk.
+
+\intent{Describe control-flow on the \rhs of a bind.}  When an \enter,
+\invoke/, or goto expression appears on the \rhs of a bind
+statement, control-flow transfers to the appropriate block. For \enter
+and \invoke/, the label stored in the closure or thunk determines the
+block to execute. For goto, the block (or primitive) is named
+directly. When the block returns a value, it will be assigned to the
+storage location on the \lhs of the bind. The value returned must be
+monadic, and in a type-correct program it always will be.
+
+\intent{Describe our (lack of) error handling.}
+MIL's syntax does not mention error handling or exceptions at
+all. However, errors can arise in a number of areas. For example, when
+no case aleternatives match the inspected value, or if a block is
+called with the wrong number of arguments. In these cases, and others,
+an error would be generated by the MIL runtime or interpreter and the
+program would terminate. We rely on the Habit compiler to avoid most
+of these errors; the rest we ignore in the interest of simplicity.
+
+\section{A Hoopl-friendly AST For MIL}
 \label{mil_sec7}
 
 \intent{Reminder about open/closed shapes.}  As described in

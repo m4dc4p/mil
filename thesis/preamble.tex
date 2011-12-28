@@ -266,7 +266,9 @@
 %% Case alternative
 \protected\def\alt#1(#2)#3->#4;{\ensuremath{\ensurett{#1\ \ignorespaces#2\ \texttt{->}\ \ignorespaces #4}}}
 %% Invoke
-\protected\def\invoke#1/{\milres invoke/\ensurett{\ \removespaces #1}}
+\protected\def\invoke#1/{\edef\arg{#1}%%
+  \milres invoke/\ifx\arg\empty%%
+  \else\ensurett{\ \removespaces #1}\fi}
 \def\rhs{right--hand side\xspace}
 \def\lhs{left--hand side\xspace}
 \def\enter{\texttt{@}\xspace}
