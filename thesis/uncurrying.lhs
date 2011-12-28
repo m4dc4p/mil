@@ -533,7 +533,7 @@ that applies the optimization to a given program.
         \vbinds v0 <- \mkclo[k0:];
         \vbinds v1 <- \app v0 * n/;
         \vbinds v2 <- \app v1 * n/;
-        \return v2;
+        \return v2/
 
       \ccblock k0()a: \mkclo[k1:a]
       \ccblock k1(a)b: \goto add(a, b)
@@ -695,7 +695,7 @@ to the set returned by |kill| and return the result.
     \binds v0 <- \mkclo[k0:]; & $\top$ & $\cdot$ & $\cdot$ & $\cdot$ \\
     \binds v1 <- \app v0 * n/; & $\cdot$ & \clo[k0:] & $\cdot$ & $\cdot$ \\
     \binds v2 <- \app v1 * n/; & $\cdot$ & $\cdot$ & $\top$ & $\cdot$ \\
-    \return v2; & $\cdot$ & $\cdot$ & $\cdot$ & $\top$ \\
+    \return v2/ & $\cdot$ & $\cdot$ & $\cdot$ & $\top$ \\
   \end{tabular}
   \caption{Facts about each variable in the \lab main/ block of
     our example program from Figure~\ref{uncurry_fig_eg}.}
@@ -761,7 +761,7 @@ pointing to \lab k1/.
         \vbinds v0 <- \mkclo[k0:];
         \vbinds v1 <- \app v0 * n/;
         \vbinds v2 <- \app v1 * n/;
-        \return v2; 
+        \return v2/ 
       \end{AVerb} 
     \end{minipage} & \begin{minipage}[t]{\widthof{\ \phantom{\{}(\var v2/, \goto add(n,n))\}\ }}\raggedright
       (\var n/, $\top$),\break
@@ -780,7 +780,7 @@ pointing to \lab k1/.
         \vbinds v0 <- \mkclo[k0:];
         \llap{\ensuremath{\rightarrow} }\vbinds v1 <- \mkclo[k1:n]; \ensuremath{\leftarrow}
         \vbinds v2 <- \app v1 * n/;
-        \return v2;
+        \return v2/
       \end{AVerb} 
     \end{minipage} & \begin{minipage}[t]{\widthof{\ \phantom{\{}(\var v2/, \goto add(n,n))\}\ }}\raggedright
       (\var n/, $\top$),\break
@@ -794,7 +794,7 @@ pointing to \lab k1/.
         \vbinds v0 <- \mkclo[k0:];
         \vbinds v1 <- \mkclo[k1:n];
         \llap{\ensuremath{\rightarrow} }\vbinds v2 <- \goto add(n, n); \ensuremath{\leftarrow}
-        \return v2;
+        \return v2/
       \end{AVerb}
     \end{minipage} & \begin{minipage}[t]{\widthof{\ \phantom{\{}(\var v2/, \goto add(n,n))\}\ }}\raggedright
       (\var n/, $\top$),\break
@@ -824,10 +824,10 @@ implement our uncurrying optimization.\footnote{Note that these
   definition are local to |collapseRewrite|, so the |blocks| argument remains
   in scope.} Line
 \ref{uncurry_fig_rewrite_impl_done} of |rewriter| rewrites \app f * x/
-expressions when they occur in a \return;
+expressions when they occur in a \return/
 statement. Line~\ref{uncurry_fig_rewrite_impl_bind} rewrites when \app
 f * x/ appears on the \rhs of a \bind statement.  In
-the first case, |done n l (collapse facts f x)| produces \return |e|;
+the first case, |done n l (collapse facts f x)| produces \return |e|/
 when |collapse| returns |Just e| (i.e., a rewritten
 expression). In the second case, |bind v (collapse facts f x)|
 behaves similarly, producing \binds v <- |e|; when |collapse| returns

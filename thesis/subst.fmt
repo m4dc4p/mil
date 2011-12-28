@@ -6,6 +6,8 @@
 %format t_2 = "\ensuremath{t_2}"
 %format v_1 = "\ensuremath{v_1}"
 %format v_n = "\ensuremath{v_n}"
+%format x_1 = "\ensuremath{x_1}"
+%format x_n = "\ensuremath{x_n}"
 % Hoopl spaceship
 %format <*> = "\ensuremath{\mathbin{\text{<}\mkern-1.5mu\mathord{*}\mkern-1.5mu\text{>}}}"
 % Hoopl funny operator
