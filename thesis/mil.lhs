@@ -502,14 +502,16 @@ Part~\subref{mil_fig_monadic_comp}.
 \begin{myfig}
   \begin{tabular}{cc}
     |f = 1| & 
-    \begin{minipage}[t]{\widthof{|m = do 0|}}
+    \begin{minipage}[t]{1in}
 > m = do 
 >   print 0
 >   return 1
     \end{minipage} \\
     \scap{mil_fig_monadic_pure} & \scap{mil_fig_monadic_comp}
   \end{tabular}
-  \caption{}
+  \caption{Part~\ref{mil_fig_monadic_pure} shows a \emph{pure}
+    function with no side effects. Part~\ref{mil_fig_monadic_comp}
+    shows an \emph{impure} function.}
   \label{mil_fig_monadic}
 \end{myfig}
 
@@ -600,7 +602,7 @@ Figure~\ref{mil_fig_kleisli_body} rather than here.
     \scap{mil_fig_kleisli_a} & \scap{mil_fig_kleisli_b} \\
   \end{tabular}
   \caption{Part~\subref{mil_fig_kleisli_a} shows a monadic composition function 
-    (also known as ``Kliesli'' composition). Part~\subref{mil_fig_kleisli_b} shows
+    (also known as ``Kleisli'' composition). Part~\subref{mil_fig_kleisli_b} shows
   a MIL program representing the same function.}
   \label{mil_fig_kleisli}
 \end{myfig}
@@ -672,9 +674,9 @@ also evaluate to a monadic value.
     \end{minipage}
   \end{tabular}
   \caption{The MIL implemention of the |kleisli| function from
-    Figure~\ref{mil_fig_kliesli_a}. Here, we only show the main body
+    Figure~\ref{mil_fig_kleisli_a}. Here, we only show the main body
     of the function; the other blocks are shown in
-    Figure~\ref{mil_fig_kliesli_b}.}
+    Figure~\ref{mil_fig_kleisli_b}.}
   \label{mil_fig_kleisli_body}
 \end{myfig}
 
@@ -750,7 +752,7 @@ but the AST uses it to end a block with a |Tail| expression. The
 know the basic block being analyzed when traversing the CFG backwards.
 
 \begin{myfig}
-  \begin{minipage}{\linewidth}\begin{withHsLabeled}{mil_stmt_ast}
+  \begin{minipage}{\linewidth}\begin{withHsLabeled}{mil_stmt_ast}\numbersoff
 > data Stmt e x where
 >   BlockEntry :: Name -> Label -> [Name] -> Stmt C O {-"\hslabel{block}"-}
 >   CloEntry :: Name -> Label -> [Name] -> Name -> Stmt C O {-"\hslabel{ccblock}"-}
@@ -769,15 +771,13 @@ know the basic block being analyzed when traversing the CFG backwards.
 example of Kleisli composition in Figure~\ref{mil_fig_kleisli_body} on Page~\pageref{mil_fig_kleisli_body}, we can
 represent the block \lab m205/ with the following definition:
 
-\begin{singlespace}\correctspaceskip
-  \begin{minipage}{\widthof{|BlockEntry "m205" "m205" ["g", "f", "x"] <*>|\quad}}
+\begin{singlespace}
 > m205 :: Label -> Graph Stmt C C
 > m205 label = mkFirst (BlockEntry "m205" label ["g", "f", "x"]) <*>
 >   mkMiddles [Bind "v207" ({-"\app g * x/"-})
 >             , Bind "v1" ({-"\invoke v209/"-})
 >             , Bind "v206" ({-"\app f * v1/"-})] <*>
 >   mkLast (Done "m205" label ({-"\invoke v206/"-}))
-  \end{minipage}
 \end{singlespace}
 
 |m205| defines a basic block, as shown by its |C C| type. Hoopl
@@ -802,7 +802,7 @@ represent the corresponding \term tail/ terms. |Run| represents
 constructor.
 
 \begin{myfig}[tb]
-  \begin{minipage}{\linewidth}\begin{withHsLabeled}{mil_tail_ast}
+  \begin{minipage}{\linewidth}\begin{withHsLabeled}{mil_tail_ast}\numbersoff
 > data Tail = Return Name {-"\hslabel{return}"-}
 >   | Enter Name Name {-"\hslabel{enter}"-}
 >   | Run Name {-"\hslabel{invoke}"-}
