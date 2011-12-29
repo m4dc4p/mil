@@ -136,8 +136,8 @@ Hoopl defines CFGs in terms of basic blocks, parameterized by
 \emph{content} and \emph{shape}. Content means statements or
 expressions from the client's AST. Shape applies to both the entry and
 exit point of a block and specifies how control-flow enters and leaves
-that block. An ``open'' block allows control-flow to ``fall-through''
-implicitly from its predecessor or to ``fall-through'' to its
+that block. An ``open'' block allows control-flow to fall-through
+implicitly from its predecessor or to fall-through to its
 successor. A ``closed'' block requires that control-flow explicitly
 transfer to or from the block. Shape constrains the CFG such that only
 blocks with compatible shapes can be connected: successors of a
@@ -170,7 +170,7 @@ different block shapes.
       \draw [->] (curr) to (succ);
     \end{tikzpicture}}
 \begin{myfig}[tb]
-  \begin{tabular}{cccm{\wd\graphbox}m{\widthof{Statment\quad}}}
+  \begin{tabular}{cccm{\wd\graphbox}m{\widthof{Statement}}}
     Shape & Predecessors & Successors & \hfil Example Graph\hfil & Example Statement \\\midrule
     \begin{minipage}{\widthof{(``open/open'')}}\centering
       |O O|\\
@@ -260,13 +260,23 @@ successors and predecessors of closed blocks.
 \label{hoopl_fig3}
 \end{myfig}
 
-For example, the |Return| constructor creates a value with the type
-|CStmt O C| --- an ``open/closed'' statement. A statement with a
-``closed'' exit type does not allow control-flow to fall through,
-which reflects the behavior of the !+return+! statement. The |Assign|
-constructor's type, |CStmt O O|, indicates that control-flow
-\emph{can} fall through, again reflecting the behavior of the
-assignment statement.
+\intent{Explain each |CStmt| constructor, except |Call|.}
+The |Entry| value represents a function entry point; we give it type
+|C O| because control-flow does not implicitly enter a function but
+only through an explicit function call. The |Return| constructor
+creates a value with the type |O C|, meaning control-flow will not
+pass through the statement but rather explicitly transfers to another
+block (i.e., the caller of the function). The |Assign| constructor's
+type, |CStmt O O|, indicates that control-flow \emph{can} fall
+through, reflecting the behavior of the assignment statement. 
+
+\intent{Excuse why |Call| has a funny type.}  The |Call| statement's
+type could be |O C| to reflect that control-flow implicitly enters the
+statement from its predecessor and then transfers explicitly to
+another block. However, we can think of this as an "external call" to
+a block defined outside the program. Then |Call| then acts like an
+assignment --- control-flow implicitly passes through the function
+call to the next statement. Therefore, we give |Call| the type |O O|.
 
 \begin{myfig}
   \begin{tabular}{cc}
@@ -293,39 +303,19 @@ Part~\subref{hoopl_fig2_a} do not appear explicitly in our program
 text, but they must be represented in the CFG. Our AST makes entry and
 exit points explicit using the |Entry| and |Return| constructors.
 
-\intent{Show how types constrain control flow.}
-Each block in Figure~\ref{hoopl_fig2_b} shows the type
-associated with its value. The type for
-Block~\refNode{hoopl_lst4_assignc}, |CStmt O O|, shows that
-control-flow falls through the statement. However, the type on
-\refNode{hoopl_lst4_start}, |CStmt C O|, shows that the function's
-entry point allows many predecessors --- that is, the function can be
-called from multiple locations. The type |CStmt O C| on
-\refNode{hoopl_lst4_return} (i.e., the exit point
-for the function) shows the opposite --- the function can have many
-successors (i.e., since it can be called from many locations, it can
-return to those same locations) but control-flow exits the function
-from only one location -- namely, that preceding the implicit return.
-
-\intent{Introduce types and classes Hoopl uses to build graphs; use of
-  O and C types in graphs.}  
-Hoopl builds CFGs like that in
-Figure~\ref{hoopl_fig2_b} using the |Block| and |Graph'|
-types. |Graph'| is parameterized by block type; however, Hoopl also
-provides an alias, |Graph|, which suffices for our
-needs:\footnote{|Block| and |Graph'| define a number of constructors
-  but they do not relate to our presentation and so we elide them.}
-
-\begin{singlespace}
-> data Block n e x = {-"\dots"-}
-> data Graph' block n e x = {-"\dots"-}
-> type Graph = Graph' Block
-\end{singlespace}
+\intent{Show how types constrain control flow.}  Each block in
+Figure~\ref{hoopl_fig2_b} shows the type associated with its
+value. For exampe, the type of Block~\refNode{hoopl_lst4_assignc},
+|CStmt O O|, shows that control-flow falls through the
+statement. However, the type of \refNode{hoopl_lst4_start}, |CStmt C
+O|, shows that control-flow must explicitly transfer to the block (in
+this case, through a function call). The type |CStmt O C| on
+\refNode{hoopl_lst4_return} shows the opposite --- control-flow does
+implicitly exit the block; instead, control-flow explicitly returns to
+the caller of the function. 
 
 The parameters |e| and |x| (``entry'' and ``exit'') describe the shape
-of the block (or graph) and must be |O| or |C|. The |n| (``node'')
-parameter specifies the contents of each block (or graph) and will be
-the type of the AST used by the client program.
+of the block (or graph) and must be |O| or |C|. 
 
 \intent{Describe how to build CFGs with Hoopl}
 Client programs construct graphs using methods specified by the
@@ -340,34 +330,37 @@ the more general class definitions.\footnote{These instances show why
 
 \begin{myfig}
 \begin{minipage}{\hsize}
-> instance GraphRep Graph where
->   mkFirst  :: n C O -> Graph n C O
->   mkMiddle :: n O O -> Graph n O O
->   mkLast   :: n O C -> Graph n O C
->   (<*>)    :: NonLocal n => Graph n e O -> Graph n O x -> Graph n e x
->   (|*><*|) :: NonLocal n => Graph n e C -> Graph n C x -> Graph n e x
->   {-"\dots"-}
+> mkFirst  :: n C O -> Graph n C O
+> mkMiddle :: n O O -> Graph n O O
+> mkLast   :: n O C -> Graph n O C
+> (<*>)    :: Graph n e O -> Graph n O x -> Graph n e x
+> (|*><*|) :: Graph n e C -> Graph n C x -> Graph n e x
 \end{minipage}
 \caption{Hoopl's definition of the |Graph| instance for the |GraphRep| class.}
 \label{hoopl_fig4}
 \end{myfig}
 
-\intent{Show how to build single-node graphs and how to compose them into 
-basic blocks. Continue illustrating use of |O| and |C| types.}
-|mkFirst|, |mkMiddle| and |mkLast| all turn a single block
-(represented by the type parameter |n|) into a graph of one block with
-the same shape. The |(<*>)| operator, said ``concat,'' concatenates
-compatible graphs. By compatible, we mean the shapes of each argument
-must fit together. Ignoring the |NonLocal| constraint for the time
-being, the |(<*>)| operator's signature specifies that the first
-argument must be open on exit (i.e., |n e O|) and the second must be
-open on entry (i.e., |n O x|). The resulting graph's shape combines
-the exit shape of the predecessor with the entry shape of the
-successor (i.e., |n e x|). For example, arguments with type |CStmt C
-O| and |CStmt O O| will have a result with type |CStmt C O|. The types
-|CStmt O O| and |CStmt O C| will result in |CStmt O C|. Necessarily,
-in the resulting graph the first argument will be a predecessor to the
-second. In other words, |(<*>)| creates basic blocks.
+\intent{Introduce Hoopl functions for building graphs.}
+Figure~\ref{hoopl_fig4} shows the five primitive functions that Hoopl
+provides so client programs can construct CFGs. The |n| type parameter
+represents the AST defined by the client program (|CStmt| in our
+example). Hoopl defines the |Graph| type. 
+
+The |mkFirst|, |mkMiddle| and |mkLast| functions turn a single block
+into a graph of one block with the same shape. 
+
+The |(<*>)| operator, said ``concat,'' concatenates
+compatible graphs (that is, where the shapes of each argument fit
+together). The |(<*>)| operator's signature specifies that the first
+argument must be open on exit (|e O|) and the second must be open on
+entry (|O x|). The resulting graph's shape combines the exit shape of
+the predecessor with the entry shape of the successor (i.e., |e x|).
+
+For example, arguments with type |CStmt C O| and |CStmt O O| will have
+a result with type |CStmt C O|. The types |CStmt O O| and |CStmt O C|
+will result in |CStmt O C|. Necessarily, in the resulting graph the
+first argument will be a predecessor to the second. In other words,
+|(<*>)| creates basic blocks.
 
 \begin{myfig}
 \begin{minipage}{\hsize}

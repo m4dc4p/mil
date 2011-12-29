@@ -1,31 +1,33 @@
-\begin{minipage}{2in}
-  \begin{tikzpicture}[>=stealth, node distance=.5in]
-    \withmd{\node[entex] (entry) {\entryN};
+\begin{tikzpicture}[>=stealth, node distance=.55in]
+  \withmd{\node[entex] (lst3_entry) {\entryN};
 
-    \node[stmt,
-      below of=entry] (assignc) {!+c = 4+!\labelNode{hoopl_lst3_assignc}};
-    \node[labelfor=assignc] () {\refNode{hoopl_lst3_assignc}};
+  \node[stmt,
+    below of=lst3_entry,
+    anchor=center] (lst3_assignc) {!+c = 4+!\labelNode{hoopl_lst3_assignc}};
+  \node[labelfor=lst3_assignc] () {\refNode{hoopl_lst3_assignc}};
 
-    \node[stmt,
-      below of=assignc] (assigna1) {!+a = c + 1+!\labelNode{hoopl_lst3_assigna1}};
-    \node[labelfor=assigna1] () {\refNode{hoopl_lst3_assigna1}};
+  \node[stmt,
+    below of=lst3_assignc,
+    anchor=center] (lst3_assigna1) {!+a = c + 1+!\labelNode{hoopl_lst3_assigna1}};
+  \node[labelfor=lst3_assigna1] () {\refNode{hoopl_lst3_assigna1}};
 
-    \node[stmt,
-      below of=assigna1] (print) {!+printf("\%d",c)+!\labelNode{hoopl_lst3_print}};
-    \node[labelfor=print] () {\refNode{hoopl_lst3_print}};
+  \node[stmt,
+    below of=lst3_assigna1,
+    anchor=center] (lst3_print) {!+printf("\%d",c)+!\labelNode{hoopl_lst3_print}};
+  \node[labelfor=lst3_print] () {\refNode{hoopl_lst3_print}};
 
-    \node[stmt,
-      below of=print] (assigna2) {!+a = c + 2+!\labelNode{hoopl_lst3_assigna2}};
-    \node[labelfor=assigna2] () {\refNode{hoopl_lst3_assigna2}};
+  \node[stmt,
+    below of=lst3_print,
+    anchor=center] (lst3_assigna2) {!+a = c + 2+!\labelNode{hoopl_lst3_assigna2}};
+  \node[labelfor=lst3_assigna2] () {\refNode{hoopl_lst3_assigna2}};
 
-    \node[entex,
-      below of=assigna2] (exit) {\exitN};
+  \node[entex,
+    below of=lst3_assigna2,
+    anchor=center] (lst3_return) {\exitN};
 
-    \draw [->>] (entry) to (assignc);
-    \draw [->] (assignc) to (assigna1);
-    \draw [->] (assigna1) to (print);
-    \draw [->] (print) to (assigna2);
-    \draw [->] (assigna2) to (exit);}
-  \end{tikzpicture}
-\end{minipage}
-
+  \draw [->>] (lst3_entry) to (lst3_assignc);
+  \draw [->] (lst3_assignc) to (lst3_assigna1);
+  \draw [->] (lst3_assigna1) to (lst3_print);
+  \draw [->] (lst3_print) to (lst3_assigna2);
+  \draw [->] (lst3_assigna2) to (lst3_return);}
+\end{tikzpicture}
