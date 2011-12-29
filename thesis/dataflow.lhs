@@ -366,7 +366,7 @@ set in Figure~\ref{fig_back11} is derived:
   \shortintertext{\hbox to 1\textwidth{\hfil\textit{Definition of \lub from Figure~\ref{tbl_back4}.}}}
   &= \{\factC{i}{\top}\} \\
   \shortintertext{\hbox to 1\textwidth{\hfil\textit{Definition of \inB{lst_back17_test}.}}}
-  \{\factC{i}{\top}\} &= \{\factC{i}{\top}\}.
+  &= \{\factC{i}{\top}\}.
 \end{align*}
 \end{singlespace}
 
@@ -527,7 +527,7 @@ set:
     &= \outB{lst_back15_assign}^0 \bigwedge \outB{lst_back15_incr}^0 \\
     &= \left\{\dots, \factC{i}{\bot}, \dots\right\} \wedge \left\{\dots, \factC{i}{\bot}, \dots\right\} \\
     &= \left\{\dots, \factC{i}{\bot \lub \bot}, \dots\right\} \\
-        \left\{\dots, \factC{i}{\bot}, \dots\right\} &= \left\{\dots, \factC{i}{\bot}, \dots\right\}.
+    &= \left\{\dots, \factC{i}{\bot}, \dots\right\}.
   \end{align*}
 \end{singlespace}
 
@@ -544,7 +544,7 @@ each set, emphasizing its origin:
     \inB{lst_back15_test}^2 &= \outB{lst_back15_assign}^1 \bigwedge \outB{lst_back15_incr}^1 \\
     &= \left\{\dots, \factC{i}{0}, \dots\right\} \wedge \left\{\dots, \factC{i}{\top}, \dots\right\} \\
     &= \left\{\dots, \factC{i}{0 \lub \top}, \dots\right\} \\
-    \left\{\dots, \factC{i}{\top}, \dots\right\} &= \left\{\dots, \factC{i}{\top}, \dots\right\}.
+    &= \left\{\dots, \factC{i}{\top}, \dots\right\}.
   \end{align*}
 \end{singlespace}
 

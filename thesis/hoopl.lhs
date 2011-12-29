@@ -9,6 +9,7 @@
 \input{document.preamble}
 \chapter{The Hoopl Library}
 \label{ref_chapter_hoopl}
+\emergencystretch=3em
 
 \section{Introduction}
 \label{hoopl_sec4}
@@ -80,21 +81,22 @@ Figure~\ref{hoopl_fig1_b}.
 
 This chapter provides enough background to understand the use of Hoopl
 in later chapters. It assumes the reader has a fair knowledge of the
-Haskell programming language, as well as recent extensions available
-in the GHC compiler, such as GADTs. This chapter's structure mirrors
-that covering dataflow analysis
-(Chapter~\ref{ref_chapter_background}), presenting parallel concepts
-in terms of Hoopl structures. Section~\ref{hoopl_sec1} gives an
-overview of the types, data structures, and functions provided by
+Haskell programming language. We also assume familiarity with language
+extensions, such as GADTs \citep{Schrijvers2009}, as implemented by
+GHC 7.2 \citep{GHC-7.2.1}. This chapter's structure mirrors that
+covering dataflow analysis (Chapter~\ref{ref_chapter_background}),
+presenting parallel concepts in terms of Hoopl
+structures. Section~\ref{hoopl_sec1} gives an overview of the types,
+data structures, and functions provided by
 Hoopl. Sections~\ref{hoopl_sec_cfg} through \ref{hoopl_sec6} give
-detailed information about each item. Section~\ref{hoopl_sec8} gives a 
-brief overview of other Hoopl elements that do not directly pertain to 
-our introduction here. Throughout, we develop our
-client program to implement dead-code elimination. We conclude with a
-summary and brief discussion of our experience with Hoopl in
+detailed information about each item. Section~\ref{hoopl_sec8} gives a
+brief overview of other Hoopl elements that do not directly pertain to
+our introduction here. Throughout, we develop our client program to
+implement dead-code elimination. We conclude with a summary and brief
+discussion of our experience with Hoopl in
 Section~\ref{hoopl_sec3}. Section~\ref{hoopl_sec7} shows all the code
-for our dead-code optimization in one place, as well as output demonstrating
-the optimization shown in Figure~\ref{hoopl_fig1_b}.
+for our dead-code optimization in one place, as well as output
+demonstrating the optimization shown in Figure~\ref{hoopl_fig1_b}.
 
 \section{Hoopl's API}
 \label{hoopl_sec1}
@@ -129,55 +131,124 @@ them for their specific AST and optimization.
 \section{Control-Flow Graphs}
 \label{hoopl_sec_cfg}
 
-\intent{Introduce parameterization of blocks by AST and shape.}
-
+\intent{Introduce parameterization of blocks by AST and shape. }
 Hoopl defines CFGs in terms of basic blocks, parameterized by
 \emph{content} and \emph{shape}. Content means statements or
-expressions from the client's AST. Shape can be either \emph{open} or
-\emph{closed} and applies to both the entry and exit of the block.
-Roughly, ``open'' allows control-flow to fall through the block;
-``closed'' means control-flow branches.
+expressions from the client's AST. Shape applies to both the entry and
+exit point of a block and specifies how control-flow enters and leaves
+that block. An ``open'' block allows control-flow to ``fall-through''
+implicitly from its predecessor or to ``fall-through'' to its
+successor. A ``closed'' block requires that control-flow explicitly
+transfer to or from the block. Shape constrains the CFG such that only
+blocks with compatible shapes can be connected: successors of a
+closed block must be closed; the predecessor of an open block must be
+open.
 
-\intent{Introduce meaning and definition of O and C types.}
+\intent{Introduce meaning and definition of O and C types.}  Hoopl
+provides types named |O| (for open) and |C| (for closed) to describe
+the entry and exit shape of a given block. We write |O O|
+(``open/open''), |O C| (``open/closed''), etc., where the first type
+describes the block's entry shape and the latter its exit shape. An |O
+C| block requires a unique predecessor. Control-flow will fall-through
+from the predecessor to the |O C| block, but it will explicitly pass
+control to another block on exit. An |O O| block requires a unique
+predecessor and a unique successor. The block allows control-flow to
+fall-through from its predecessor and similarly allows contrl-flow to
+implicitly pass to its successor. A |C O| block must be labeled and
+requires that control-flow pass explicitly from its predecessors to
+the block. However, control-flow falls-through from the block to its
+successor. A |C C| block must begin with a label and end with a
+branch. Figure~\ref{hoopl_tbl1} summarizes the meaning of the
+different block shapes.
 
-Hoopl provides types named |O| and |C|, representing open and closed,
-which Hoopl uses to constrain the edges between blocks in the CFG. As
-open and closed describe both the entry and exit point of the block,
-we write them as |O O| (``open/open''), |O C| (``open/closed''), etc.,
-where the first describes the block's entry shape and the latter its
-exit shape. An |O C| block allows one predecessor block but many
-successors (i.e., control-flow can branch to one of many locations on
-exit). An |O O| block permits exactly one predecessor and one
-successor (i.e., control-flow falls through on
-exit). Figure~\ref{hoopl_tbl1} summarizes the meaning of the different
-block shapes.
-
+\newbox\graphbox
+\setbox\graphbox=\hbox{\begin{tikzpicture}[>=stealth, node distance=.5in, on grid]
+      \node[stmt] (pred) at (-1,0) {$e\ O$};
+      \node[stmt] (curr) [right=of pred] {$O\ O$};
+      \node[stmt] (succ) [right=of curr] {$O\ x$};
+      \draw [->] (pred) to (curr);
+      \draw [->] (curr) to (succ);
+    \end{tikzpicture}}
 \begin{myfig}[tb]
-  \begin{tabular}{cccr}
-    Shape & Predecessors & Successors & Example Statement \\\midrule
-    |O C| & One & Many & Conditionals, jumps. \\
-    |C O| & Many & One & Function entry points, branch labels. \\
-    |O O| & One & One & Assignments, statements. \\
-    |C C| & Many & Many & Function bodies. \\
+  \begin{tabular}{cccm{\wd\graphbox}m{\widthof{Statment\quad}}}
+    Shape & Predecessors & Successors & \hfil Example Graph\hfil & Example Statement \\\midrule
+    \begin{minipage}{\widthof{(``open/open'')}}\centering
+      |O O|\\
+      (``open/open'')
+    \end{minipage}
+    & One & One & \unhbox\graphbox & Assignments. \\
+    \begin{minipage}[c]{\widthof{(``open/closed'')}}\centering
+      |O C|\\
+      (``open/closed'')
+    \end{minipage}
+    & One & Many & 
+    \begin{tikzpicture}[>=stealth, node distance=.5in, on grid]
+      \node[stmt] (succ1) at (1, 1) {$C\ x$};
+      \node[stmt] (succ2) at (1, 0) {$C\ x$};
+      \node[stmt] (succ3) at (1, -1) {$C\ x$};
+      \node[stmt] (curr) [left=of succ2] {$O\ C$};
+      \node[stmt] (pred) [left=of curr] {$e\ O$};
+      \draw [->] (pred) to (curr);
+      \draw [->] (curr) to (succ1);
+      \draw [->] (curr) to (succ2);
+      \draw [->] (curr) to (succ3);
+    \end{tikzpicture} & Conditionals, jumps. \\
+    \begin{minipage}{\widthof{(``closed/open'')}}\centering
+      |C O|\\
+      (``closed/open'')
+    \end{minipage}
+    & Many & One &
+    \begin{tikzpicture}[>=stealth, on grid, node distance=.5in]
+      \node[stmt] (pred1) at (-1,1) {$e\ C$};
+      \node[stmt] (pred2) at (-1,0) {$e\ C$};
+      \node[stmt] (pred3) at (-1,-1) {$e\ C$};
+      \node[stmt] (curr) [right=of pred2] {$C\ O$};
+      \node[stmt] (succ) [right=of curr] {$O\ x$};
+      \draw [->] (pred1) to (curr);
+      \draw [->] (pred2) to (curr);
+      \draw [->] (pred3) to (curr);
+      \draw [->] (curr) to (succ);
+    \end{tikzpicture} & Function entry points, alternatives. \\
+    \begin{minipage}{\widthof{(``closed/closed'')}}\centering
+      |C C|\\
+      (``closed/closed'')
+    \end{minipage}
+    & Many & Many & 
+    \begin{tikzpicture}[>=stealth, node distance=.5in, on grid]
+      \node[stmt] (pred1) at (-1,1) {$e\ C$};
+      \node[stmt] (pred2) at (-1,0) {$e\ C$};
+      \node[stmt] (pred3) at (-1,-1) {$e\ C$};
+      \node[stmt] (curr) [right=of pred2] {$C\ C$};
+      \node[stmt] (succ1) [right=1in of pred1] {$C\ x$};
+      \node[stmt] (succ2) [right=1in of pred2] {$C\ x$};
+      \node[stmt] (succ3) [right=1in of pred3] {$C\ x$};
+      
+      \draw [->] (pred1) to (curr);
+      \draw [->] (pred2) to (curr);
+      \draw [->] (pred3) to (curr);
+      \draw [->] (curr) to (succ1);
+      \draw [->] (curr) to (succ2);
+      \draw [->] (curr) to (succ3);
+    \end{tikzpicture} & Function bodies. 
   \end{tabular}
   \caption{This table shows the four entry and exit shapes that Hoopl
     defines for blocks. It also shows the number of predecessors and
-    successors allowed by each shape, as well as example
-    statements.}
+    successors allowed by each shape, example statements, and a sample
+    graph showing how the block can be connected to other blocks.}
   \label{hoopl_tbl1}
 \end{myfig}
 
 \intent{Show example with O and C types applied.}
 
 Figure~\ref{hoopl_fig3} gives Haskell declarations that can represent
-the AST for !+example+!. We use the GHC Haskell compiler's GADT syntax
-\citep{GHC-7.2.1} to succinctly specify the actual type of the |e|
-(``entry'') and |x| (``exit'') type parameters for each
-constructor. The entry and exit type (i.e., either |O| or |C|) given
-for each constructor reflects the control-flow of the represented
-statement. The |CExpr| and |Var| types do not affect control flow in
-our subset, so we do not annotate them like |CStmt|. Hoopl defines the
-|Label| type and uses it to connect basic blocks together.
+the AST for !+example+!. We use GHC's GADT syntax
+\citep[Section~7.4.7]{GHCManual} to specify the value of the |e| and
+|x| (``entry'' and ``exit'') types for each constructor. The entry and
+exit types given for each constructor reflect the control-flow of the
+represented statement. The |CExpr| and |Var| types do not affect
+control flow in our subset, so we do not annotate them like
+|CStmt|. Hoopl defines the |Label| type; we use it to define the
+successors and predecessors of closed blocks.
 
 \begin{myfig}
   \begin{minipage}{\hsize}
@@ -199,8 +270,8 @@ assignment statement.
 
 \begin{myfig}
   \begin{tabular}{cc}
-    \input{hoopl_lst3} &  \input{hoopl_lst4} \\
-    \scap{hoopl_fig2_a} & \scap{hoopl_fig2_b}
+    \input{hoopl_lst3} &  \input{hoopl_lst4} \\\\
+    \scap{hoopl_fig2_a} & \scap{hoopl_fig2_b} 
   \end{tabular}
   \caption{Our example function as a control-flow
     graph. Part~\ref{hoopl_fig1_a} uses C syntax for each
@@ -210,20 +281,20 @@ assignment statement.
 \end{myfig}
 
 \intent{Make connection between CFG using program text and CFG using
-  AST.}  Figure~\ref{hoopl_fig2} shows !+example+! as a
-CFG. Part~\subref{hoopl_fig2_a} shows the program with C
+  AST.}  Figure~\ref{hoopl_fig2} shows a CFG for
+!+example+!. Part~\subref{hoopl_fig2_a} shows the program with C
 syntax. Part~\subref{hoopl_fig2_b} uses the AST just given.  Each
-block in Part~\subref{hoopl_fig2_a} corresponds with the adjacent
+block in Part~\subref{hoopl_fig2_a} corresponds to the adjacent
 block in Part~\subref{hoopl_fig2_b}. For example,
-Block~\refNode{hoopl_lst3_assignc} (``\verb_c = 4_'') corresponds with
+Block~\refNode{hoopl_lst3_assignc} (``!+c = 4+!'') corresponds to
 Block~\refNode{hoopl_lst4_assignc} (``|Assign "c" (Const 4)|''). Also
 notice that the entry and exit points ($E$ and $X$, respectively) in
-Part~\subref{hoopl_fig2_a} do not explicitly appear in our program
+Part~\subref{hoopl_fig2_a} do not appear explicitly in our program
 text, but they must be represented in the CFG. Our AST makes entry and
 exit points explicit using the |Entry| and |Return| constructors.
 
-\intent{Show how types mirror control flow.}
-Each block in Figure~\subref{hoopl_fig2_b} shows the type
+\intent{Show how types constrain control flow.}
+Each block in Figure~\ref{hoopl_fig2_b} shows the type
 associated with its value. The type for
 Block~\refNode{hoopl_lst4_assignc}, |CStmt O O|, shows that
 control-flow falls through the statement. However, the type on
@@ -896,7 +967,15 @@ program.
 %let includeAll = False
 \end{singlespace}
 
+\noindent\begin{minipage}{\hsize}
+%% Some interaction with standalone makes the thesis break unless this
+%% is wrapped in a minipage. The error is:
+%%
+%%   "You can't use `\\unskip' in vertical mode.\\sa@atenddocument
+%%   ->\\unskip".
+%%
 \noindent Executing ``main'' produces output showing our optimized function:
+\begin{singlespace}\correctspaceskip
 \begin{AVerb}
 Original Program
 ----------------
@@ -914,7 +993,9 @@ void example() \{
   printf("%d",c);
 \}  
 \end{AVerb}
-%% DO NOT REMOVE THIS COMMENT OR THESIS BREAKS! "cannot \unskip in vertical mode"
-\standaloneBib %%
+\end{singlespace}
+\end{minipage}
+
+\standaloneBib 
 \end{document}
 

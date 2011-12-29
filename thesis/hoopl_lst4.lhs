@@ -6,23 +6,23 @@
     \node[labelfor=start] () {\refNode{hoopl_lst4_start}};
 
     \node[stmt,
-      below of=start] (assignc) {|Assign "c" (Const 4) :: CStmt O O|\labelNode{hoopl_lst4_assignc}};
+      below of=start] (assignc) {|Assign "c" (Const 4)|\labelNode{hoopl_lst4_assignc}}; %%  :: CStmt O O
     \node[labelfor=assignc] () {\refNode{hoopl_lst4_assignc}};
 
     \node[stmt,
-      below of=assignc] (assigna1) {|Assign "a" (Add (Var "c") (Const 1)) :: CStmt O O|\labelNode{hoopl_lst4_assigna1}};
+      below of=assignc] (assigna1) {|Assign "a" (Add (Var "c") (Const 1))|\labelNode{hoopl_lst4_assigna1}}; %%  :: CStmt O O|
     \node[labelfor=assigna1] () {\refNode{hoopl_lst4_assigna1}};
 
     \node[stmt,
-      below of=assigna1] (print) {|Call "printf" [String "%d", Var "c"] :: CStmt O O|\labelNode{hoopl_lst4_print}};
+      below of=assigna1] (print) {|Call "printf" [String "%d", Var "c"]|\labelNode{hoopl_lst4_print}}; %%  :: CStmt O O
     \node[labelfor=print] () {\refNode{hoopl_lst4_print}};
 
     \node[stmt,
-      below of=print] (assigna2) {|Assign "a" (Add (Var "c") (Const 2)) :: CStmt O O|\labelNode{hoopl_lst4_assigna2}};
+      below of=print] (assigna2) {|Assign "a" (Add (Var "c") (Const 2))|\labelNode{hoopl_lst4_assigna2}}; %%  :: CStmt O O
     \node[labelfor=assigna2] () {\refNode{hoopl_lst4_assigna2}};
 
     \node[stmt,
-      below of=assigna2] (return) {|Return :: CStmt O C|\labelNode{hoopl_lst4_return}};
+      below of=assigna2] (return) {|Return|\labelNode{hoopl_lst4_return}}; %%  :: CStmt O C
     \node[labelfor=return] () {\refNode{hoopl_lst4_return}};
 
     \draw [->>] (start) to (assignc);
