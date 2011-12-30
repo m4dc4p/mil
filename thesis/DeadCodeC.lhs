@@ -21,7 +21,8 @@
 >   Call :: Var -> [CExpr] -> CStmt O O
 >   Return :: CStmt O C
 >
-> data CExpr = Const Int 
+> data CExpr = 
+>     Const Int 
 >   | Add CExpr CExpr 
 >   | Var Var 
 >   | String String

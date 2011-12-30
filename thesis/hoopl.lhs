@@ -330,11 +330,11 @@ the more general class definitions.\footnote{These instances show why
 
 \begin{myfig}
 \begin{minipage}{\hsize}
-> mkFirst  :: n C O -> Graph n C O
-> mkMiddle :: n O O -> Graph n O O
-> mkLast   :: n O C -> Graph n O C
-> (<*>)    :: Graph n e O -> Graph n O x -> Graph n e x
-> (|*><*|) :: Graph n e C -> Graph n C x -> Graph n e x
+> mkFirst   :: n C O -> Graph n C O
+> mkMiddle  :: n O O -> Graph n O O
+> mkLast    :: n O C -> Graph n O C
+> (<*>)     :: Graph n e O -> Graph n O x -> Graph n e x
+> (|*><*|)  :: Graph n e C -> Graph n C x -> Graph n e x
 \end{minipage}
 \caption{Hoopl's definition of the |Graph| instance for the |GraphRep| class.}
 \label{hoopl_fig4}
@@ -342,13 +342,15 @@ the more general class definitions.\footnote{These instances show why
 
 \intent{Introduce Hoopl functions for building graphs.}
 Figure~\ref{hoopl_fig4} shows the five primitive functions that Hoopl
-provides so client programs can construct CFGs. The |n| type parameter
+provides for client programs to use when constructing CFGs. The |n| type parameter
 represents the AST defined by the client program (|CStmt| in our
 example). Hoopl defines the |Graph| type. 
 
+\intent{Introduce |mkFirst|, |mkMiddle|, and |mkLast|.}
 The |mkFirst|, |mkMiddle| and |mkLast| functions turn a single block
 into a graph of one block with the same shape. 
 
+\intent{Introduce |(<*>)|.}
 The |(<*>)| operator, said ``concat,'' concatenates
 compatible graphs (that is, where the shapes of each argument fit
 together). The |(<*>)| operator's signature specifies that the first
@@ -356,11 +358,10 @@ argument must be open on exit (|e O|) and the second must be open on
 entry (|O x|). The resulting graph's shape combines the exit shape of
 the predecessor with the entry shape of the successor (i.e., |e x|).
 
-For example, arguments with type |CStmt C O| and |CStmt O O| will have
-a result with type |CStmt C O|. The types |CStmt O O| and |CStmt O C|
-will result in |CStmt O C|. Necessarily, in the resulting graph the
-first argument will be a predecessor to the second. In other words,
-|(<*>)| creates basic blocks.
+\intent{Example showing how |(<*>)| creates graphs.}
+For example, if |n1| has type |CStmt C O| and |n2| has type |CStmt O
+O|, then |n1 <*> n2| would have type |CStmt C O|. In the resulting
+graph, |n1| will be the unique predecessor to |n2|.  
 
 \begin{myfig}
 \begin{minipage}{\hsize}
@@ -375,13 +376,13 @@ from Figure~\ref{hoopl_fig3}.}
 \end{myfig}
 
 \intent{Illustrate use of |(<*>)|.}  Returning to our example, we can
-construct the CFG from Figure~\ref{hoopl_fig2_b} using code in
+construct the CFG from Figure~\ref{hoopl_fig2_b} using the code in
 Figure~\ref{hoopl_fig5}.  The |l| parameter (with type |Label|)
-defines the entry point for this block and will be supplied
-externally. Each individual statement turns into a graph through
-|mkFirst|, |mkMiddle| and |mkLast|. |(<*>)| concatenates those graphs
-together, forming one large graph with type |CStmt C C|. This
-construction exactly represents the CFG in Figure~\ref{hoopl_fig2_b}.
+defines the entry point for this block. Each statement in the block is
+mapped to a graph by applying |mkFirst|, |mkMiddle| or |mkLast| as
+appropriate. We concatenate the graphs using the |(<*>)| operator,
+forming one large graph with type |CStmt C C|. This construction
+exactly represents the CFG in Figure~\ref{hoopl_fig2_b}.
 
 \intent{Show how Hoopl manages control-flow between blocks.}
 Hoopl connects basic blocks into larger graphs
