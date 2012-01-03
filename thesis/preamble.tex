@@ -61,6 +61,9 @@
   {\renewcommand{\hscodestyle}{\advance\leftskip -\mathindent}}
 \makeatother
 
+%% Recommended stretch for CM 10pt roman.
+\emergencystretch=3em
+
 % Used by included files to know they
 % are NOT standalone
 \newboolean{standaloneFlag}
@@ -269,11 +272,11 @@
 \protected\def\invoke#1/{\edef\arg{#1}%%
   \milres invoke/\ifx\arg\empty%%
   \else\ensurett{\ \removespaces #1}\fi}
-\def\rhs{right--hand side\xspace}
-\def\lhs{left--hand side\xspace}
+\def\rhs{right-hand side\xspace}
+\def\lhs{left-hand side\xspace}
 \def\enter{\texttt{@}\xspace}
-\def\cc{closure--capturing\xspace}
-\def\Cc{Closure--capturing\xspace}
+\def\cc{closure-capturing\xspace}
+\def\Cc{Closure-capturing\xspace}
 %%
 
 \newenvironment{myfig}[1][tbh]{\begin{figure}[#1]%%

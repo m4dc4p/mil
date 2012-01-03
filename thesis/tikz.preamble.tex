@@ -15,15 +15,10 @@
   node distance=.5in,
   stmt/.style={rectangle,
     draw=black, thick,        
-    minimum height=2em,
-    %% inner sep=2pt,
-    %% text centered,
-    %% node distance=.5in,
+    minimum height=2em
   },
   entex/.style={
-    minimum height=2em,
-    %% inner sep=2pt,
-    %% text centered,
+    minimum height=2em
   },
   labelfor/.style={circle, 
     draw=black, thin,
@@ -37,7 +32,11 @@
   %% Invisible node
   invis/.style={inner sep=0pt, 
     minimum height=0em}, 
-  table/.style={circle, fill=white,height=2mm}
+  table/.style={circle, fill=white,height=2mm},
+  optional/.style={rectangle,
+    draw=black, dashed,        
+    minimum height=2em},
+  invisstmt/.style={minimum height=2em}  
 }
 
 %% Dataflow chapter commands

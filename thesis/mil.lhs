@@ -753,7 +753,7 @@ of these errors; the rest we ignore in the interest of simplicity.
 \label{mil_sec7}
 
 \intent{Reminder about open/closed shapes.}  As described in
-Section~\ref{hoopl_sec_cfg}, Hoopl characterizes control--flow between
+Section~\ref{hoopl_sec_cfg}, Hoopl characterizes control-flow between
 nodes in a CFG by their entry and exit shape. Hoopl uses the |O| and
 |C| types to express the shape of the entry and exit points for a
 node. A node that is open on exit can only be followed a node that is

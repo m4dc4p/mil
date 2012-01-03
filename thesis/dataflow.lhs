@@ -36,7 +36,7 @@ backwards.
 
 This chapter describes Kildall's algorithm, now known as \emph{the
   dataflow algorithm} or the technique of \emph{dataflow analysis}. In
-Section~\ref{sec_back1} we define \emph{control--flow graphs} (CFGs),
+Section~\ref{sec_back1} we define \emph{control-flow graphs} (CFGs),
 which the directed graphs representing the program are now called.
 Section~\ref{sec_back3} introduces ``basic blocks,'' not something
 originally defined by Kildall but now a fundamental way of
@@ -128,7 +128,7 @@ Part~\subref{fig_back4_a}: a long, straight sequence of nodes, one
 after another. Part~\subref{fig_back4_c} represents the assignment statements on
 lines~\ref{lst_back3_start} -- \ref{lst_back3_end} as a \emph{basic
   block}: a sequence of statements with one entry, one exit, and no
-branches in--between. Execution cannot start in the ``middle'' of the
+branches in-between. Execution cannot start in the ``middle'' of the
 block, nor can it branch anywhere but at the end of the block. In fact,
 Part~\ref{fig_back4_b} also shows four basic blocks --- they just happen
 to consist of one statement each.
@@ -308,7 +308,7 @@ follows that intuition and tells us that \inB{fig_back15_b3} should be
 
 \begin{myfig}
   \input{lst_back19}
-  \caption{A control--flow graph illustrating the behavior of \lub with
+  \caption{A control-flow graph illustrating the behavior of \lub with
     $\bot$ (i.e., undefined) values.}
   \label{fig_back15}
 \end{myfig}
@@ -405,8 +405,8 @@ the transfer function also considers known facts (i.e., \inE facts for
 forwards, \out for backwards) as well as the statements in the node.
 
 For our example analysis, we only consider two kinds of statements:
-constant and non--constant updates. A constant update is one of the
-form $a !+=+! C$, where $C$ is a known integer value. A non--constant
+constant and non-constant updates. A constant update is one of the
+form $a !+=+! C$, where $C$ is a known integer value. A non-constant
 update is any other type of assignment; in our example, something like
 $i!++++!$.
 
@@ -440,7 +440,7 @@ than one fact per variable exists in our fact set.
 The definition in Equation~\eqref{eqn_back4} matches our intuition for
 constant propagation. When we know a variable is assigned a constant,
 we add that fact to our knowledge. When we know it is changed in a
-non--constant way, we update our knowledge to show we no longer know
+non-constant way, we update our knowledge to show we no longer know
 the value of the variable.
 
 Figure~\ref{fig_back9}, Part \subref{fig_back9_initial}, shows our

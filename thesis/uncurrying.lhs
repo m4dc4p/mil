@@ -26,7 +26,7 @@ application can be very convenient for programmers, but it can also be
 very inefficient. Conceptually, an uncurried function does real work
 with each application --- that is, each application executes the body
 of the function. A curried function does not do any real work until 
-given all its arguments; each in--between application essentially creates
+given all its arguments; each in-between application essentially creates
 a new function. 
 
 \intent{Introduce uncurrying optimization.} This chapter describes our
@@ -344,7 +344,7 @@ optimization as currently implemented.
 We implement uncurrying with a forwards dataflow analysis that
 determines if a given statement allocates a closure. The analysis
 creates a map of bound variables to closures. If a variable is
-re--bound in the block, the analysis updates its map by removing any
+re-bound in the block, the analysis updates its map by removing any
 facts that referred to that variable and adding a new fact associating
 the variable with the new value.
 
@@ -493,7 +493,7 @@ label in the closure returned by \goto compose().
 \label{uncurry_sec_impl}
 
 \intent{Provide a bridge to the four subsections below.}  Originally,
-we called this transformation ``closure--collapse,'' because it
+we called this transformation ``closure-collapse,'' because it
 ``collapsed'' the construction of multiple closures into the
 construction of a single closure. Later, we learned this optimization
 is known as ``uncurrying,'' but at the point the code had already been
@@ -661,7 +661,7 @@ unchanged.\footnote{Note these will always be empty maps, because our
   analysis does not extend across blocks and |fact_bot| in our lattice
   is |Map.empty|.} Because we do not propagate facts between blocks,
 the |CaseM| and |Done| cases pass an empty map to each successor,
-using the Hoopl--provided |mkFactBase| function to create a |FactBase|
+using the Hoopl-provided |mkFactBase| function to create a |FactBase|
 from empty facts.
 
 \begin{myfig}
@@ -853,7 +853,7 @@ k/. Lines~\ref{uncurry_fig_rewrite_impl_collapse_jump} and
 \ref{uncurry_fig_rewrite_impl_collapse_capt} test if \lab k/
 returns a closure or jumps immediately to
 another block. In the first case, |collapse| returns a new
-closure--creating expression (\mkclo[|dest|:\dots]). In the
+closure-creating expression (\mkclo[|dest|:\dots]). In the
 second case, |collapse| returns a new goto expression (\goto |dest|(\dots)).
 
 If the destination immediately jumps to another block

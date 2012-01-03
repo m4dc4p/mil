@@ -9,7 +9,6 @@
 \input{document.preamble}
 \chapter{The Hoopl Library}
 \label{ref_chapter_hoopl}
-\emergencystretch=3em
 
 \section{Introduction}
 \label{hoopl_sec4}
@@ -151,15 +150,15 @@ the entry and exit shape of a given block. We write |O O|
 describes the block's entry shape and the latter its exit shape. An |O
 C| block requires a unique predecessor. Control-flow will fall-through
 from the predecessor to the |O C| block, but it will explicitly pass
-control to another block on exit. An |O O| block requires a unique
+control a successor block on exit. An |O O| block requires a unique
 predecessor and a unique successor. The block allows control-flow to
-fall-through from its predecessor and similarly allows contrl-flow to
+fall-through from its predecessor and similarly allows control-flow to
 implicitly pass to its successor. A |C O| block must be labeled and
 requires that control-flow pass explicitly from its predecessors to
 the block. However, control-flow falls-through from the block to its
 successor. A |C C| block must begin with a label and end with a
-branch. Figure~\ref{hoopl_tbl1} summarizes the meaning of the
-different block shapes.
+branch. Figure~\ref{hoopl_tbl1} summarizes the four possible block
+shapes.
 
 \newbox\graphbox
 \setbox\graphbox=\hbox{\begin{tikzpicture}[>=stealth, node distance=.5in, on grid]
@@ -170,71 +169,67 @@ different block shapes.
       \draw [->] (curr) to (succ);
     \end{tikzpicture}}
 \begin{myfig}[tb]
-  \begin{tabular}{cccm{\wd\graphbox}m{\widthof{Statement}}}
-    Shape & Predecessors & Successors & \hfil Example Graph\hfil & Example Statement \\\midrule
+  \begin{tabular}{cm{\wd\graphbox}m{\widthof{Example Statements}}}
+    Shape & \hfil Example Graph\hfil & Example Statement \\\midrule
     \begin{minipage}{\widthof{(``open/open'')}}\centering
       |O O|\\
       (``open/open'')
     \end{minipage}
-    & One & One & \unhbox\graphbox & Assignments. \\
+    & \unhbox\graphbox & Assignments. \\
     \begin{minipage}[c]{\widthof{(``open/closed'')}}\centering
       |O C|\\
       (``open/closed'')
     \end{minipage}
-    & One & Many & 
+    & 
     \begin{tikzpicture}[>=stealth, node distance=.5in, on grid]
-      \node[stmt] (succ1) at (1, 1) {$C\ x$};
-      \node[stmt] (succ2) at (1, 0) {$C\ x$};
-      \node[stmt] (succ3) at (1, -1) {$C\ x$};
+      \node[optional] (succ1) at (1, 1) {$C\ x$};
+      \node[invis] (succ2) at (1, 0) {$\strut\vdots$};
+      \node[optional] (succ3) at (1, -1) {$C\ x$};
       \node[stmt] (curr) [left=of succ2] {$O\ C$};
       \node[stmt] (pred) [left=of curr] {$e\ O$};
       \draw [->] (pred) to (curr);
       \draw [->] (curr) to (succ1);
-      \draw [->] (curr) to (succ2);
       \draw [->] (curr) to (succ3);
     \end{tikzpicture} & Conditionals, jumps. \\
     \begin{minipage}{\widthof{(``closed/open'')}}\centering
       |C O|\\
       (``closed/open'')
     \end{minipage}
-    & Many & One &
+    &
     \begin{tikzpicture}[>=stealth, on grid, node distance=.5in]
-      \node[stmt] (pred1) at (-1,1) {$e\ C$};
-      \node[stmt] (pred2) at (-1,0) {$e\ C$};
-      \node[stmt] (pred3) at (-1,-1) {$e\ C$};
+      \node[optional] (pred1) at (-1,1) {$e\ C$};
+      \node[invis] (pred2) at (-1,0) {$\strut\vdots$};
+      \node[optional] (pred3) at (-1,-1) {$e\ C$};
       \node[stmt] (curr) [right=of pred2] {$C\ O$};
       \node[stmt] (succ) [right=of curr] {$O\ x$};
       \draw [->] (pred1) to (curr);
-      \draw [->] (pred2) to (curr);
       \draw [->] (pred3) to (curr);
       \draw [->] (curr) to (succ);
-    \end{tikzpicture} & Function entry points, alternatives. \\
+    \end{tikzpicture} & \emergencystretch=0pt Function entry points, alternatives. \\ %% prevents a badly stretched paragraph 
     \begin{minipage}{\widthof{(``closed/closed'')}}\centering
       |C C|\\
       (``closed/closed'')
     \end{minipage}
-    & Many & Many & 
+    & 
     \begin{tikzpicture}[>=stealth, node distance=.5in, on grid]
-      \node[stmt] (pred1) at (-1,1) {$e\ C$};
-      \node[stmt] (pred2) at (-1,0) {$e\ C$};
-      \node[stmt] (pred3) at (-1,-1) {$e\ C$};
+      \node[optional] (pred1) at (-1,1) {$e\ C$};
+      \node[invis] (pred2) at (-1,0) {$\strut\vdots$};
+      \node[optional] (pred3) at (-1,-1) {$e\ C$};
       \node[stmt] (curr) [right=of pred2] {$C\ C$};
-      \node[stmt] (succ1) [right=1in of pred1] {$C\ x$};
-      \node[stmt] (succ2) [right=1in of pred2] {$C\ x$};
-      \node[stmt] (succ3) [right=1in of pred3] {$C\ x$};
+      \node[optional] (succ1) [right=1in of pred1] {$C\ x$};
+      \node[invis] (succ2) [right=1in of pred2] {$\strut\vdots$};
+      \node[optional] (succ3) [right=1in of pred3] {$C\ x$};
       
       \draw [->] (pred1) to (curr);
-      \draw [->] (pred2) to (curr);
       \draw [->] (pred3) to (curr);
       \draw [->] (curr) to (succ1);
-      \draw [->] (curr) to (succ2);
       \draw [->] (curr) to (succ3);
     \end{tikzpicture} & Function bodies. 
   \end{tabular}
-  \caption{This table shows the four entry and exit shapes that Hoopl
-    defines for blocks. It also shows the number of predecessors and
-    successors allowed by each shape, example statements, and a sample
-    graph showing how the block can be connected to other blocks.}
+  \caption{This table shows the four possible block shapes. Each row
+    gives example statements and a representative CFG using a block of
+    the given shape. Dashed lines indicate optional blocks. Solid
+    lines show required blocks. }
   \label{hoopl_tbl1}
 \end{myfig}
 
@@ -244,7 +239,7 @@ Figure~\ref{hoopl_fig3} gives Haskell declarations that can represent
 the AST for !+example+!. We use GHC's GADT syntax
 \citep[Section~7.4.7]{GHCManual} to specify the value of the |e| and
 |x| (``entry'' and ``exit'') types for each constructor. The entry and
-exit types given for each constructor reflect the control-flow of the
+exit types given for each reflect the control-flow of the
 represented statement. The |CExpr| and |Var| types do not affect
 control flow in our subset, so we do not annotate them like
 |CStmt|. Hoopl defines the |Label| type; we use it to define the
@@ -260,15 +255,15 @@ successors and predecessors of closed blocks.
 \label{hoopl_fig3}
 \end{myfig}
 
-\intent{Explain each |CStmt| constructor, except |Call|.}
-The |Entry| value represents a function entry point; we give it type
-|C O| because control-flow does not implicitly enter a function but
-only through an explicit function call. The |Return| constructor
-creates a value with the type |O C|, meaning control-flow will not
-pass through the statement but rather explicitly transfers to another
-block (i.e., the caller of the function). The |Assign| constructor's
-type, |CStmt O O|, indicates that control-flow \emph{can} fall
-through, reflecting the behavior of the assignment statement. 
+\intent{Explain each |CStmt| constructor, except |Call|.}  The |Entry|
+value represents a function entry point; we give it type |C O| because
+control-flow can only explicitly enter a function through a call. The
+|Return| constructor creates a value with the type |O C|, meaning
+control-flow will not implicitly pass from the statement but rather
+explicitly transfers to another block (i.e., the caller of the
+function). The |Assign| constructor's type, |CStmt O O|, indicates
+that control-flow \emph{can} fall-through, reflecting the behavior of
+the assignment statement.
 
 \intent{Excuse why |Call| has a funny type.}  The |Call| statement's
 type could be |O C| to reflect that control-flow implicitly enters the
@@ -300,33 +295,18 @@ Block~\refNode{hoopl_lst3_assignc} (``!+c = 4+!'') corresponds to
 Block~\refNode{hoopl_lst4_assignc} (``|Assign "c" (Const 4)|''). Also
 notice that the entry and exit points ($E$ and $X$, respectively) in
 Part~\subref{hoopl_fig2_a} do not appear explicitly in our program
-text, but they must be represented in the CFG. Our AST makes entry and
-exit points explicit using the |Entry| and |Return| constructors.
+text, but they must be represented in the CFG. 
 
 \intent{Show how types constrain control flow.}  Each block in
 Figure~\ref{hoopl_fig2_b} shows the type associated with its
-value. For exampe, the type of Block~\refNode{hoopl_lst4_assignc},
-|CStmt O O|, shows that control-flow falls through the
+value. For example, the type of Block~\refNode{hoopl_lst4_assignc},
+|CStmt O O|, shows that control-flow falls-through the
 statement. However, the type of \refNode{hoopl_lst4_start}, |CStmt C
 O|, shows that control-flow must explicitly transfer to the block (in
 this case, through a function call). The type |CStmt O C| on
 \refNode{hoopl_lst4_return} shows the opposite --- control-flow does
 implicitly exit the block; instead, control-flow explicitly returns to
 the caller of the function. 
-
-The parameters |e| and |x| (``entry'' and ``exit'') describe the shape
-of the block (or graph) and must be |O| or |C|. 
-
-\intent{Describe how to build CFGs with Hoopl}
-Client programs construct graphs using methods specified by the
-|GraphRep| class. |GraphRep| allows the client to implement their own
-graph representation, but we do not use that here. Instead,
-Figure~\ref{hoopl_fig4} shows Hoopl's instances for |Graph| instead of
-the more general class definitions.\footnote{These instances show why
-  we let Hoopl create |Block| and |Graph'| values. The |Graph| alias
-  expands to |Graph' Block|; Hoopl provides a |GraphRep| instance for
-  the |Graph| type that constructs the actual |Graph'| and |Block|
-  values.}
 
 \begin{myfig}
 \begin{minipage}{\hsize}
@@ -350,18 +330,14 @@ example). Hoopl defines the |Graph| type.
 The |mkFirst|, |mkMiddle| and |mkLast| functions turn a single block
 into a graph of one block with the same shape. 
 
-\intent{Introduce |(<*>)|.}
-The |(<*>)| operator, said ``concat,'' concatenates
-compatible graphs (that is, where the shapes of each argument fit
-together). The |(<*>)| operator's signature specifies that the first
-argument must be open on exit (|e O|) and the second must be open on
-entry (|O x|). The resulting graph's shape combines the exit shape of
-the predecessor with the entry shape of the successor (i.e., |e x|).
-
-\intent{Example showing how |(<*>)| creates graphs.}
-For example, if |n1| has type |CStmt C O| and |n2| has type |CStmt O
-O|, then |n1 <*> n2| would have type |CStmt C O|. In the resulting
-graph, |n1| will be the unique predecessor to |n2|.  
+\intent{Introduce |(<*>)|.}  The |(<*>)| operator, pronounced
+``concat,'' concatenates an ``open on entry'' graph (|O x|) to one
+``open on exit'' (|e O|). The first argument becomes the predecessor
+to the second in the concatenated graph. The resulting graph's shape,
+|e x|, combines the entry shape of the first argument and the exit
+shape of the second. For example, if |n1| has type |CStmt C O| and
+|n2| has type |CStmt O O|, then |n1 <*> n2| would have type |CStmt C
+O| and |n1| will be the unique predecessor to |n2| in |n1 <*> n2|.
 
 \begin{myfig}
 \begin{minipage}{\hsize}
@@ -384,29 +360,30 @@ appropriate. We concatenate the graphs using the |(<*>)| operator,
 forming one large graph with type |CStmt C C|. This construction
 exactly represents the CFG in Figure~\ref{hoopl_fig2_b}.
 
-\intent{Show how Hoopl manages control-flow between blocks.}
-Hoopl connects basic blocks into larger graphs
-using the |(||*><*||)| operator.\footnote{Sorry, I don't know how to
-  pronounce this one. Call it ``funny.''} This operator does not imply any 
-control-flow between its arguments, unlike |(<*>)|. Instead, the |NonLocal|
-class defines control-flow between blocks with its two members, |entryLabel| and
-|successors|:
+\intent{Show how Hoopl manages control-flow between blocks.}  Hoopl
+combines smaller graphs into larger graphs using the |(||*><*||)|
+operator (pronounced ``append''). Unlike |(<*>)|, this operator does
+not imply any control-flow between its arguments. 
+
+Hoopl defines control-flow between blocks using the |NonLocal| class'
+two members, |entryLabel| and |successors|:\footnote{The |(||*><*||)|
+  and |(<*>)| operators in Figure~\ref{hoopl_fig4} specify a
+  |NonLocal| constraint on |n|, which we hid to simplify the
+  presentation.}
 
 \begin{singlespace}
 > class NonLocal n where 
->   entryLabel :: n C x -> Label 
->   successors :: n e C -> [Label]
+>   entryLabel  :: n C x -> Label 
+>   successors  :: n e C -> [Label]
 \end{singlespace}
 
-The |entryLabel| method returns the entry point (as a |Label|) for a
-given node, block or graph. The |C| type on the first argument (i.e.,
-|n C x|) ensures only ``closed on entry'' graphs can be given to
-|entryLabel|. |successors| gives the |Labels| that a given node, block
-or graph may branch to. Again, the |C| type on the first argument
-(i.e., |n e C|) ensures only ``closed on exit'' graphs can be given to
-|successors|. Hoopl uses these methods to determine how basic blocks
-connect. The |NonLocal| constraint on |(<*>)| and |(||*><*||)| ensures
-Hoopl can traverse the CFG built by the client program.
+Hoopl defines the |Label| type. |Labels| uniquely name blocks in the
+graph. The |entryLabel| method returns the entry point for a given
+block. A |C x| block can only be the target of an explicit
+control-flow transfer; therefore, |entryLabel| only applies to
+``closed on entry'' blocks. Similarly, |successors| returns a list of
+successors for a given block, therefore it only applies to |e C|
+blocks.
 
 \intent{Illustrate use of |NonLocal| in our example.}
 Now we can give the |NonLocal| instance for |CStmt|:
@@ -415,26 +392,25 @@ Now we can give the |NonLocal| instance for |CStmt|:
 %include DeadCodeC.lhs
 %let nonLocalInst = False
 \end{singlespace}
-We only define |entryLabel| for the |Entry| constructor, because only
-it is ``open on entry'' (i.e., due to its type |C O|).  We do not
-define any cases for |successors| even though |Return| is ``closed on
-exit'' (i.e., due to its type |O C|), because our AST does not
-represent the destination of a return (implicit or explicit). If our
-AST supported branching (such as !+if+! statements), then
-|successors| would be more interesting.
 
-\intent{Summarize CFGs in Hoopl} 
+\noindent We only define |entryLabel| for the |Entry| constructor, because only
+it is ``closed on entry.''  We only need define one case for
+|successors| as |Return| is the only ``closed on exit'' |CStmt|
+value. However, we do not specify the destination of a |Return|
+so |successors| always returns an empty list.
 
-Hoopl ensures that client programs build correct CFGs using the |O|
-and |C| types. The library controls graph creation through the
-|GraphRep| class --- and that class ensures graphs are built from
-basic blocks, connected by |Labels|. Hoopl recovers control-flow
-information using the |NonLocal| class, through its |entryLabel| and
-|successors| methods. This section introduced our example function,
-!+example+!, in Figure~\ref{hoopl_fig1}, defined an AST in
-Figure~\ref{hoopl_fig2} that represents the subset of the C
-language used by !+example+!, and showed how to build a representation of
-!+example+! in Figure~\ref{hoopl_fig5}.
+%% \subsection*{Summary} \intent{Summarize CFGs in Hoopl} Hoopl
+%% ensures that client programs build well-formed CFGs using the |O|
+%% and |C| types. The library defines five primitives and one class
+%% for creating graphs controls graph creation through the |GraphRep|
+%% class --- and that class ensures graphs are built from basic
+%% blocks, connected by |Labels|. Hoopl recovers control-flow
+%% information using the |NonLocal| class, through its |entryLabel|
+%% and |successors| methods. This section introduced our example
+%% function, !+example+!, in Figure~\ref{hoopl_fig1}, defined an AST
+%% in Figure~\ref{hoopl_fig2} that represents the subset of the C
+%% language used by !+example+!, and showed how to build a
+%% representation of !+example+! in Figure~\ref{hoopl_fig5}.
 
 \section{Facts, Meet Operators and Lattices}
 \intent{Reminder about what facts and lattices are; How Hoopl
@@ -451,24 +427,41 @@ analysis).\footnote{The Hoopl documentation refers to a \emph{join}
   operator, which is essentially the opposite of \emph{meet}, but we
   use \emph{meet} for consistency with the rest of this thesis. Hoopl
   allows the operator to be defined either way, as long as it is
-  consistent.}  The analysis will always terminate if the meet
-operator defines a finite-height lattice. A \emph{forwards}
-dataflow-analysis computes the set \outBa, for a block $B$ in the CFG,
-using \inBa and the transfer function; \inBa then equals the meet of
-all \outBa from predecessor blocks. A backwards analysis does the
-opposite: \inBa is computed using the transfer function and \outBa, and \outBa 
-equals the meet of all \inBa from successor blocks.
+  consistent.}  
 
 \intent{Introduce |DataflowLattice| type and show connection to facts and 
 the meet operator.}
 
-Hoopl provides the type |DataflowLattice| (shown with several
-associated definitions in Figure~\ref{hoopl_fig7}) so clients can
-define the facts and meet operator for their specific analysis. The
-field |fact_name| exists only for documentation. Hoopl uses the value
-in the |fact_bot| field to create initial facts for each block in
-the CFG when analysis starts. The |fact_join| field will hold the
-client's implementation of their meet operator.
+Hoopl provides the type |DataflowLattice| (shown in
+Figure~\ref{hoopl_fig7}) so clients programs can specify the facts and
+meet operator for their analysis. |DataflowLattice| defines he
+following fields:
+
+\begin{description}
+  \item |fact_name| --- Used for documentation only.
+  \item |fact_bot| --- Specifies the initial facts for each \inBa (for
+    a forwards analysis) or \outBa (for a backwards analysis) set in
+    the CFG when analysis starts.
+  \item |fact_join| --- Specifies the client's implementation of the analysis'
+    meet operator.
+\end{description}
+
+\begin{myfig}
+  \begin{minipage}{\hsize}
+> data DataflowLattice a = DataflowLattice { 
+>   fact_name  :: String,
+>   fact_bot   :: a,
+>   fact_join  :: Label -> OldFact a -> NewFact a -> (ChangeFlag, a) }
+>
+> newtype OldFact a = OldFact a 
+> newtype NewFact a = NewFact a 
+>
+> data ChangeFlag = NoChange | SomeChange 
+  \end{minipage}
+  \caption{|DataflowLattice| and associated types defined by Hoopl for
+    representing and combining facts.}
+  \label{hoopl_fig7}
+\end{myfig}
 
 The meet operator, |fact_join|, takes two arguments and returns a pair
 consisting of a value and a |ChangeFlag|. The arguments, of type
@@ -479,30 +472,6 @@ and returns |SomeChange|, plus the new facts, if so. Otherwise, the
 |NewFact| values are equal. Hoopl choose this implementation for
 efficiency: the client can determine if facts change during each join,
 rather than the library comparing all facts on every iteration.
-
-Unlike the meet operator defined in Chapter~\ref{ref_chapter_background},
-Section~\ref{back_subsec_facts}, |fact_join| is \emph{not} used to
-combine \inE or \out facts during analysis. The transfer function, to
-be discussed in Section~\ref{hoopl_sec5}, manages that. |fact_join| is only used
-when determining if analysis is at a fixed-point.
-
-\begin{myfig}
-  \begin{minipage}{\hsize}
-> data DataflowLattice a = DataflowLattice { fact_name :: String,
->   fact_bot :: a,
->   fact_join :: Label -> OldFact a -> NewFact a 
->                -> (ChangeFlag, a) }
->
-> newtype OldFact a = {-"\dots"-}
-> newtype NewFact a = {-"\dots"-}
->
-> data ChangeFlag = NoChange | SomeChange 
->
-  \end{minipage}
-  \caption{|DataflowLattice| and associated types defined by Hoopl for
-    representing and combining facts.}
-  \label{hoopl_fig7}
-\end{myfig}
 
 \intent{Remind reader how liveness is computed for dead-code
   elimination} As stated in Section~\ref{hoopl_sec4}, dead-code
@@ -859,7 +828,7 @@ forwards analysis is exactly analogous.
 The |BwdPass| type packages the lattice definition, transfer function, and
 rewrite function into one structure. The |analyzeAndRewriteBwd|
 function takes a number of interesting arguments and must be run
-inside a Hoopl--specified monad. We address those arguments in turn.
+inside a Hoopl-specified monad. We address those arguments in turn.
 
 \itempar{(|CheckpointMonad m|, |NonLocal n|, |LabelsPtr entries|)} These constraints reflect
 several Hoopl requirements:
