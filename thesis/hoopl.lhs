@@ -331,13 +331,13 @@ The |mkFirst|, |mkMiddle| and |mkLast| functions turn a single block
 into a graph of one block with the same shape. 
 
 \intent{Introduce |(<*>)|.}  The |(<*>)| operator, pronounced
-``concat,'' concatenates an ``open on entry'' graph (|O x|) to one
-``open on exit'' (|e O|). The first argument becomes the predecessor
-to the second in the concatenated graph. The resulting graph's shape,
-|e x|, combines the entry shape of the first argument and the exit
-shape of the second. For example, if |n1| has type |CStmt C O| and
-|n2| has type |CStmt O O|, then |n1 <*> n2| would have type |CStmt C
-O| and |n1| will be the unique predecessor to |n2| in |n1 <*> n2|.
+``concat,'' connects an ``open on exit'' (|e O|) graph to one ``open
+on entry'' (|O x|). The first argument becomes the predecessor to the
+second in the concatenated graph. The resulting graph's shape, |e x|,
+combines the entry shape of the first argument and the exit shape of
+the second. For example, if |n1| has type |CStmt C O| and |n2| has
+type |CStmt O O|, then |n1 <*> n2| would have type |CStmt C O| and
+|n1| will be the unique predecessor to |n2| in |n1 <*> n2|.
 
 \begin{myfig}
 \begin{minipage}{\hsize}
@@ -393,11 +393,11 @@ Now we can give the |NonLocal| instance for |CStmt|:
 %let nonLocalInst = False
 \end{singlespace}
 
-\noindent We only define |entryLabel| for the |Entry| constructor, because only
-it is ``closed on entry.''  We only need define one case for
-|successors| as |Return| is the only ``closed on exit'' |CStmt|
-value. However, we do not specify the destination of a |Return|
-so |successors| always returns an empty list.
+\noindent We only define |entryLabel| for the |Entry| constructor,
+because only it is ``closed on entry.''  We only need define one case
+for |successors| as |Return| is the only ``closed on exit'' |CStmt|
+value. However, we do not specify the destination of a |Return| so
+|successors| always returns an empty list.
 
 %% \subsection*{Summary} \intent{Summarize CFGs in Hoopl} Hoopl
 %% ensures that client programs build well-formed CFGs using the |O|
@@ -413,37 +413,33 @@ so |successors| always returns an empty list.
 %% representation of !+example+! in Figure~\ref{hoopl_fig5}.
 
 \section{Facts, Meet Operators and Lattices}
-\intent{Reminder about what facts and lattices are; How Hoopl
-  represents them.  Emphasize facts are defined by the client; meet
-  operator defined by the client; Hoopl manages combining facts and
-  determining when a fixed point has been reached.}  
+\intent{Reminder about the role that facts and the meet operator
+  play.}
 
-Recall that dataflow analysis computes \emph{facts} on each edge for
-each block $B$ in the CFG. We call the set of facts computed on the
-inbound edges of a block $B$ \inBa and the set of facts on outbound
-edges \outBa. A \emph{meet operator} combines facts when multiple
-edges enter or leave the block (depending on the direction of the
-analysis).\footnote{The Hoopl documentation refers to a \emph{join}
-  operator, which is essentially the opposite of \emph{meet}, but we
-  use \emph{meet} for consistency with the rest of this thesis. Hoopl
-  allows the operator to be defined either way, as long as it is
-  consistent.}  
+The dataflow algorithm, as given for the forwards case in
+Figure~\ref{fig_back14} on Page~\pageref{fig_back14}, iteratively
+computes output \emph{facts} for each block in the CFG, until reaching
+a fixed point. Input facts correspond to the \inBa set for each block;
+output facts correspond to the \outBa set for the block.\footnote{In a
+  backwards analysis, the correspondance is reversed}. The first
+iteration uses some initial value for each \inBa and \outBa set. Each
+subsequent iteration uses a \emph{meet operator} to combine \outBa
+sets from the predecessors of each block into an \inBa set for that
+block. The set of values representing facts and the meet operator
+together form a \emph{lattice}.
 
 \intent{Introduce |DataflowLattice| type and show connection to facts and 
 the meet operator.}
 
 Hoopl provides the type |DataflowLattice| (shown in
-Figure~\ref{hoopl_fig7}) so clients programs can specify the facts and
-meet operator for their analysis. |DataflowLattice| defines he
-following fields:
+Figure~\ref{hoopl_fig7}) so clients programs can specify the initial
+facts and meet operator for their analysis. |DataflowLattice| defines
+the following fields:
 
 \begin{description}
   \item |fact_name| --- Used for documentation only.
-  \item |fact_bot| --- Specifies the initial facts for each \inBa (for
-    a forwards analysis) or \outBa (for a backwards analysis) set in
-    the CFG when analysis starts.
-  \item |fact_join| --- Specifies the client's implementation of the analysis'
-    meet operator.
+  \item |fact_bot| --- Specifies initial facts.
+  \item |fact_join| --- Implementation of the analysis' meet operator.
 \end{description}
 
 \begin{myfig}
@@ -464,24 +460,21 @@ following fields:
 \end{myfig}
 
 The meet operator, |fact_join|, takes two arguments and returns a pair
-consisting of a value and a |ChangeFlag|. The arguments, of type
-|OldFact| and |NewFact|, represent sets of facts for the same block
-from different iterations. |fact_join| determines if the facts differ
-and returns |SomeChange|, plus the new facts, if so. Otherwise, the
-|fact_join| returns |NoChange|, indicating the the |OldFact| and
-|NewFact| values are equal. Hoopl choose this implementation for
-efficiency: the client can determine if facts change during each join,
-rather than the library comparing all facts on every iteration.
+consisting of a value and a |ChangeFlag|. The arguments represent
+possibly differing output facts; the result represents the meet of
+those facts. Hoopl determines that a fixed point has been reached when
+|fact_join| returns |NoChange| for all blocks in the CFG. Hoopl choose
+this implementation for efficiency: if the client does not specify
+when facts change, Hoopl would need to do many comparisons on each
+iteration to determine if a fixed point has been reached. The client
+program must ensure that the meet implementation defines a
+finite-height lattice; otherwise, the analysis may not terminate.
 
 \intent{Remind reader how liveness is computed for dead-code
   elimination} As stated in Section~\ref{hoopl_sec4}, dead-code
 elimination uses \emph{liveness} analysis to find dead code. A
 variable is live if it is used after declaration; otherwise, it is
-dead.
-
-\intent{Introduce fact definition for liveness.} 
-
-We define the set \setL{Live} as the set of all declared variables
+dead. We define the set \setL{Live} as the set of all declared variables
 in the program. Recall that dataflow analysis computes two sets for
 each block in the CFG, named \inBa and \outBa. For liveness analysis,
 \inBa and \outBa are subsets of \setL{Live}. 
