@@ -428,13 +428,11 @@ sets from the predecessors of each block into an \inBa set for that
 block. The set of values representing facts and the meet operator
 together form a \emph{lattice}.
 
-\intent{Introduce |DataflowLattice| type and show connection to facts and 
-the meet operator.}
-
-Hoopl provides the type |DataflowLattice| (shown in
-Figure~\ref{hoopl_fig7}) so clients programs can specify the initial
-facts and meet operator for their analysis. |DataflowLattice| defines
-the following fields:
+\intent{Introduce |DataflowLattice| type and show connection to facts
+  and the meet operator.}  Hoopl provides the type |DataflowLattice|
+(shown in Figure~\ref{hoopl_fig7}) so clients programs can specify the
+initial facts and meet operator for their analysis. |DataflowLattice|
+defines the following fields:
 
 \begin{description}
   \item |fact_name| --- Used for documentation only.
@@ -463,75 +461,46 @@ The meet operator, |fact_join|, takes two arguments and returns a pair
 consisting of a value and a |ChangeFlag|. The arguments represent
 possibly differing output facts; the result represents the meet of
 those facts. Hoopl determines that a fixed point has been reached when
-|fact_join| returns |NoChange| for all blocks in the CFG. Hoopl choose
-this implementation for efficiency: if the client does not specify
-when facts change, Hoopl would need to do many comparisons on each
-iteration to determine if a fixed point has been reached. The client
-program must ensure that the meet implementation defines a
+|fact_join| returns |NoChange| for all blocks in the
+CFG.\footnote{Hoopl uses this strategy for efficiency: if the client
+  does not specify when facts change, Hoopl would need to do many
+  comparisons on each iteration to determine if a fixed point had been
+  reached.} The client program must ensure that the meet defines a
 finite-height lattice; otherwise, the analysis may not terminate.
 
-\intent{Remind reader how liveness is computed for dead-code
-  elimination} As stated in Section~\ref{hoopl_sec4}, dead-code
-elimination uses \emph{liveness} analysis to find dead code. A
-variable is live if it is used after declaration; otherwise, it is
-dead. We define the set \setL{Live} as the set of all declared variables
-in the program. Recall that dataflow analysis computes two sets for
-each block in the CFG, named \inBa and \outBa. For liveness analysis,
-\inBa and \outBa are subsets of \setL{Live}. 
+\intent{Introduce meet for liveness} As stated in
+Section~\ref{hoopl_sec4}, dead-code elimination uses \emph{liveness}
+analysis to find dead code. A live variable is one used after
+assignment or declaration; otherwise the variable is dead.\footnote{In
+  our AST, declaration is not explicitly represented. Instead, we only
+  represent assignment. In C, of course, variables can be declared and
+  not initialized, but for simplicity we ignore the distinction.} We
+traverse the CFG backwards to determine liveness. In a backwards
+analysis, \outBa is the set of input facts to block $B$; \inBa is the
+set of output facts. All live variables from $B$'s
+successors may be live in $B$; therefore, we implement our meet
+operator as \emph{set union}: to compute \outBa for block $B$, we take
+the union of all the \inE sets of $B$'s successors.
 
-\intent{Introduce meet for liveness}
-
-Our transfer function, given in Section~\ref{hoopl_sec5}, will show
-that we traverse the CFG backward. To compute the \outBa set for block
-$B$, we take the union of all the \inE sets of $B$'s successors. That
-is, the meet operator for liveness is set union.
-
-\intent{Illustrate liveness using a better example than our sample
-  program.}  
-
-Consider Figure~\ref{hoopl_fig8}, which shows a fragment of C code and
-its associated CFG. In Block~\refNode{hoopl_lst6_assignx2} only !+x+!
-is live due to ``!+x = 0+!.'' Therefore, $\inB{hoopl_lst6_assignx2} =
-\{\facts{x}\} \subseteq \setL{Live}$.  However, in
-Block~\refNode{hoopl_lst6_assignx1} both !+x+! and !+y+!  are live due
-to ``!+x = 1 + y+!'' (and thus, $\inB{hoopl_lst6_assignx1} =
-\{\facts{x,y}\} \subseteq \setL{Live}$). Because both
-Block~\refNode{hoopl_lst6_assignx1} and
-Block~\refNode{hoopl_lst6_assignx2} are successors to
-Block~\refNode{hoopl_lst6_test}, \outB{hoopl_lst6_test} must be the
-union of \inB{hoopl_lst6_assignx2} and \inB{hoopl_lst6_assignx1}; that
-is, we compute that $\outB{hoopl_lst6_test} = \{\facts{x,y}\} \subseteq
-\setL{Live}$.
-
-\begin{myfig}
-  \begin{tabular}{cc}
-    \input{hoopl_lst5} & \input{hoopl_lst6} \\
-    \scap{hoopl_fig8_a} & \scap{hoopl_fig8_b}
-  \end{tabular}
-  \caption{A fragment of C code and its associated CFG.}
-  \label{hoopl_fig8}
-\end{myfig}
+\intent{Introduce facts used during liveness analysis.} We define the
+set \setL{Vars} as the set of all declared variables in the
+program. For each block $B$, our analysis computes the set of
+variables live at the beginning of each block, \inBa, using the
+transfer function (defined in Section~\ref{hoopl_sec5}) and the
+block's input set, \outBa. Both \inBa and \outBa are subsets of
+\setL{Vars}. We set \inBa and \outBa to the empty set when analysis
+begins.
 
 \intent{Show fact and meet operator for example as Haskell code and as
-  dataflow equations.}  
-
-Figure~\ref{hoopl_fig9} shows definitions for our liveness facts and
-meet operator. Part~\subref{hoopl_fig9_a} shows dataflow equations
-(using the notation of Chapter~\ref{ref_chapter_background}) and
-Part~\subref{hoopl_fig9_b} shows Haskell
-code. Equation~\ref{hoopl_eqn_facts} in Part~\subref{hoopl_fig9_a}
-defines \setL{Live} as the set of variables in the CFG; in
-Part~\subref{hoopl_fig9_b}, we define an analogous synonym, |Live|, as
-a |Set Var| (using Haskell's standard |Set|
-type). Equation~\ref{hoopl_eqn_meet} defines our meet operator as set
-union. The |meet| function in Part~\subref{hoopl_fig9_b} implements
-the operator. |meet| takes two sets, |(OldFact old)| and |(NewFact
-new)|. If |old| does not equal |new| we return |SomeChange| and the
-union of the two sets. Hoopl provides the |changeIf| function that
-maps |Bools| to |ChangeFlag| values.\footnote{If the sets are equal,
-  the second value of the pair will be ignored and lazy evaluation
-  saves us from computing a union we never use.}
-
+  dataflow equations.} Figure~\ref{hoopl_fig9} shows Haskell code
+implementing the definitions of meet operator and facts just
+given. The type |Vars| corresponds to \setL{Vars}. The definition of
+|meet| corresponds to set union. If |old| does not equal |new| we
+return |SomeChange| and the union of the two sets.\footnote{Hoopl
+  provides the |changeIf| function to map |Bools| to |ChangeFlags|
+  values.} The |lattice| definition puts all the pieces together into
+a |DataflowLattice| value. Notice we set |fact_bot| to |Set.empty|,
+the initial value for all \inBa and \outBa sets.
 
 \begin{myfig}
   \begin{tabular}{cc}
@@ -550,22 +519,19 @@ maps |Bools| to |ChangeFlag| values.\footnote{If the sets are equal,
   \label{hoopl_fig9}
 \end{myfig}
 
-The |lattice| function in Part~\subref{hoopl_fig9_b} creates a
-|DataflowLattice| value for our analysis. Its type, |DataflowLattice Live|, reflects
-the facts computed. The bottom element for the lattice is also
-|Set.empty|, an empty set, meaning we have no knowledge about liveness
-when analysis begins.
-
-%% \intent{Aside: |WithTop|/|WithBottom| types.}
-%% \lipsum
-
-\intent{Conclude \& Summarize}
-\dots To be written \dots
-
 \section{Direction \& Transfer Functions}
 \label{hoopl_sec5}
 \intent{Reminder about what transfer functions do \& that they can go forwards or
 backwards.}
+
+Liveness analysis is a backwards dataflow analysis. A Our transfer
+function computes the set of variables used (but not assigned) in each
+block . 
+Note
+that an assignment like !+c = c + 1;+! makes !+c+! live prior to the
+assignment but dead after the assignment if !+c+! is not used again. As
+liveness is property of variables, our facts c
+
 
 The \emph{transfer function}, as defined by dataflow analysis,
 computes either \inBa or \outBa for a some block $B$ in the CFG. A
