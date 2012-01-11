@@ -52,17 +52,14 @@
 
 > type Vars = Set Var
 >
-> meet :: Label -> OldFact Vars 
->         -> NewFact Vars 
->         -> (ChangeFlag, Vars)
-> meet _ (OldFact old) (NewFact new) = 
->   (changeIf (old /= new), old `union` new)
+> meet :: Label -> OldFact Vars -> NewFact Vars -> (ChangeFlag, Vars)
+> meet _ (OldFact old) (NewFact new) = (changeIf (old /= new), old `union` new)
 >
 > lattice :: DataflowLattice Vars
 > lattice = DataflowLattice { 
->       fact_name = "Liveness"
->     , fact_bot = Set.empty
->     , fact_join = meet }
+>       fact_name  = "Liveness"
+>     , fact_bot   = Set.empty
+>     , fact_join  = meet }
 
 %endif
 %if includeLiveness || includeAll

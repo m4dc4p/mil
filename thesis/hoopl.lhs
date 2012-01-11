@@ -418,7 +418,7 @@ value. However, we do not specify the destination of a |Return| so
 
 The dataflow algorithm, as given for the forwards case in
 Figure~\ref{fig_back14} on Page~\pageref{fig_back14}, iteratively
-computes output \emph{facts} for each block in the CFG, until reaching
+computes output \emph{facts} for each block in the CFG until reaching
 a fixed point. Input facts correspond to the \inBa set for each block;
 output facts correspond to the \outBa set for the block.\footnote{In a
   backwards analysis, the correspondance is reversed}. The first
@@ -429,16 +429,11 @@ block. The set of values representing facts and the meet operator
 together form a \emph{lattice}.
 
 \intent{Introduce |DataflowLattice| type and show connection to facts
-  and the meet operator.}  Hoopl provides the type |DataflowLattice|
-(shown in Figure~\ref{hoopl_fig7}) so clients programs can specify the
-initial facts and meet operator for their analysis. |DataflowLattice|
-defines the following fields:
-
-\begin{description}
-  \item |fact_name| --- Used for documentation only.
-  \item |fact_bot| --- Specifies initial facts.
-  \item |fact_join| --- Implementation of the analysis' meet operator.
-\end{description}
+  and the meet operator.}  Hoopl provides the |DataflowLattice|
+type (shown in Figure~\ref{hoopl_fig7}). |DataflowLattice| defines the
+following fields: |fact_name|, used for documentation; |fact_bot|,
+for specifying initial facts; and |fact_join|, for the implementation
+of the analysis' meet operator.
 
 \begin{myfig}
   \begin{minipage}{\hsize}
@@ -447,8 +442,8 @@ defines the following fields:
 >   fact_bot   :: a,
 >   fact_join  :: Label -> OldFact a -> NewFact a -> (ChangeFlag, a) }
 >
-> newtype OldFact a = OldFact a 
-> newtype NewFact a = NewFact a 
+> newtype OldFact a  = OldFact a 
+> newtype NewFact a  = NewFact a 
 >
 > data ChangeFlag = NoChange | SomeChange 
   \end{minipage}
@@ -471,13 +466,12 @@ finite-height lattice; otherwise, the analysis may not terminate.
 \intent{Introduce meet for liveness} As stated in
 Section~\ref{hoopl_sec4}, dead-code elimination uses \emph{liveness}
 analysis to find dead code. A live variable is one used after
-assignment or declaration; otherwise the variable is dead.\footnote{In
-  our AST, declaration is not explicitly represented. Instead, we only
-  represent assignment. In C, of course, variables can be declared and
-  not initialized, but for simplicity we ignore the distinction.} We
-traverse the CFG backwards to determine liveness. In a backwards
-analysis, \outBa is the set of input facts to block $B$; \inBa is the
-set of output facts. All live variables from $B$'s
+assignment or declaration; otherwise the variable is
+dead.\footnote{For simplicity, our AST does not explicitly represent
+  declarations. Instead, we only represent assignment.} Liveness
+analysis is implemented as a backwards dataflow analysis. In a
+backwards analysis, \outBa is the set of input facts to block $B$;
+\inBa is the set of output facts. All live variables from $B$'s
 successors may be live in $B$; therefore, we implement our meet
 operator as \emph{set union}: to compute \outBa for block $B$, we take
 the union of all the \inE sets of $B$'s successors.
@@ -497,51 +491,39 @@ implementing the definitions of meet operator and facts just
 given. The type |Vars| corresponds to \setL{Vars}. The definition of
 |meet| corresponds to set union. If |old| does not equal |new| we
 return |SomeChange| and the union of the two sets.\footnote{Hoopl
-  provides the |changeIf| function to map |Bools| to |ChangeFlags|
+  provides the |changeIf| function to map |Bool| values to |ChangeFlag|
   values.} The |lattice| definition puts all the pieces together into
 a |DataflowLattice| value. Notice we set |fact_bot| to |Set.empty|,
 the initial value for all \inBa and \outBa sets.
 
 \begin{myfig}
-  \begin{tabular}{cc}
-    \begin{minipage}{3in}
-      \input{hoopl_fact_def}
-    \end{minipage} & \begin{minipage}{3.5in}
+  \begin{tabular}{c}
+    \begin{minipage}{\hsize}
 %let latticeDef = True
 %include DeadCodeC.lhs
 %let latticeDef = False
-    \end{minipage} \\
-    \scap{hoopl_fig9_a} & \scap{hoopl_fig9_b}
+    \end{minipage} 
   \end{tabular}
-  \caption{Fact and meet definitions for liveness
-    analysis. Part~\subref{hoopl_fig9_a} shows dataflow equations;
-    Part~\subref{hoopl_fig9_b} shows Haskell code.}
+  \caption{Haskell definitions implementing fact and meet
+    definitions for our liveness analysis.}
   \label{hoopl_fig9}
 \end{myfig}
 
 \section{Direction \& Transfer Functions}
 \label{hoopl_sec5}
-\intent{Reminder about what transfer functions do \& that they can go forwards or
-backwards.}
-
-Liveness analysis is a backwards dataflow analysis. A Our transfer
-function computes the set of variables used (but not assigned) in each
-block . 
-Note
-that an assignment like !+c = c + 1;+! makes !+c+! live prior to the
-assignment but dead after the assignment if !+c+! is not used again. As
-liveness is property of variables, our facts c
-
-
-The \emph{transfer function}, as defined by dataflow analysis,
-computes either \inBa or \outBa for a some block $B$ in the CFG. A
-\emph{forwards} analysis calculates \outBa, based on the contents of
-$B$ and \inBa. A \emph{backwards} analysis does the reverse: computing
-\inBa from the block's contents and its \outBa.
+\intent{Reminder about what transfer functions do \& that they can go
+  forwards or backwards.}  The dataflow algorithm specifies two sets
+of facts for every block in the CFG: \inBa and \outBa.  \inBa
+represents facts known when control-flow enters the block; \outBa
+those facts known when control-flow leaves the block. The
+\emph{transfer function} computes output facts for each block in the
+CFG, using the contents of the block and its input facts. A forwards
+analysis uses \inBa as the input facts and computes \outBa; A
+backwards analysis does the opposite, computing \inBa from \outBa and
+the contents of the block.
 
 \intent{Introduce |FwdTransfer| and |BwdTransfer| types; Show how
   |mkFTransfer| and |mkBTransfer| construct transfer functions.} 
-
 Hoopl defines the |FwdTransfer| and |BwdTransfer| types, shown in
 Figure~\ref{hoopl_fig10}, to represent forwards and backwards transfer
 functions. The |n| parameter represents the block's contents (i.e., the
@@ -564,22 +546,21 @@ Figure~\ref{hoopl_fig10}.
   \label{hoopl_fig10}
 \end{myfig}
 
-The signatures for |mkFTransfer| and |mkBTransfer| use
-\emph{existential} types. Hoopl requires that we parameterize our AST
-(i.e., the |n| type) using the |O| and |C| types from
-Section~\ref{hoopl_sec_cfg}.  A standard Haskell function cannot
-pattern match on values with different types (e.g., |Assign| has type
-|CStmt O O|, but |Entry| has type |CStmt C O|).  Therefore, to
-pattern-match on all constructors, the transfer function must be
-defined with an \emph{existential} type. The notation |(forall e x. n
-e x -> {-"\dots"-})| indicates that the |e| and |x| types will not be
+Hoopl requires that we parameterize our AST (i.e., the |n| type) using
+the |O| and |C| types from Section~\ref{hoopl_sec_cfg}.  A standard
+Haskell function cannot pattern match on values with different types
+(e.g., |Assign| has type |CStmt O O|, but |Entry| has type |CStmt C
+O|).  Therefore, to pattern-match on all constructors, the transfer
+function must be defined with a \emph{higher-rank}
+type\citep[Section~7.8.5]{GHCManual}. The notation |(forall e x. n e x
+-> {-"\dots"-})| indicates that the |e| and |x| types will not be
 visible outside the function definition. This allows us to write one
 transfer function that can match on all constructors in the
-AST.\footnote{Hoopl also exports |mkFTransfer3| and |mkBTransfer3|
-  which take separate arguments for each |C O|, |O O| and |O C| type,
-  in case the node type is not known and an existential transfer
-  function cannot be defined.}
+AST.
 
+
+The signatures for |mkFTransfer| and |mkBTransfer| use
+\emph{higher-rank} types\citep[Section~7.8.5]{GHCManual}. 
 \intent{Types families and |Fact C| vs. |Fact O|} 
 
 The |mkFTransfer| and |mkBTransfer| functions look almost identical
