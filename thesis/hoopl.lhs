@@ -523,15 +523,15 @@ backwards analysis does the opposite, computing \inBa from \outBa and
 the contents of the block.
 
 \intent{Introduce |FwdTransfer| and |BwdTransfer| types; Show how
-  |mkFTransfer| and |mkBTransfer| construct transfer functions.} 
+  |mkFTransfer| and |mkBTransfer| construct transfer functions.}
 Hoopl defines the |FwdTransfer| and |BwdTransfer| types, shown in
 Figure~\ref{hoopl_fig10}, to represent forwards and backwards transfer
-functions. The |n| parameter represents the block's contents (i.e., the
-AST of the language analyzed). The |f| parameter represents the facts
-computed. Hoopl does not export the constructors for |FwdTransfer| or
-|BwdTransfer|; instead, clients use the |mkFTransfer| and
-|mkBTransfer| functions, whose signatures are also shown in
-Figure~\ref{hoopl_fig10}. 
+functions. The |n| parameter represents the block's contents (i.e.,
+the AST of the language analyzed). The |f| parameter represents the
+facts computed. Hoopl does not export the constructors for
+|FwdTransfer| or |BwdTransfer|; instead, clients use the |mkFTransfer|
+and |mkBTransfer| functions, whose signatures are also shown in
+Figure~\ref{hoopl_fig10}.
 
 \begin{myfig}
     \begin{minipage}{\hsize}
@@ -546,81 +546,67 @@ Figure~\ref{hoopl_fig10}.
   \label{hoopl_fig10}
 \end{myfig}
 
-Hoopl requires that we parameterize our AST (i.e., the |n| type) using
-the |O| and |C| types from Section~\ref{hoopl_sec_cfg}.  A standard
-Haskell function cannot pattern match on values with different types
-(e.g., |Assign| has type |CStmt O O|, but |Entry| has type |CStmt C
-O|).  Therefore, to pattern-match on all constructors, the transfer
-function must be defined with a \emph{higher-rank}
-type\citep[Section~7.8.5]{GHCManual}. The notation |(forall e x. n e x
--> {-"\dots"-})| indicates that the |e| and |x| types will not be
-visible outside the function definition. This allows us to write one
-transfer function that can match on all constructors in the
+\intent{Explain why |mkFTransfer| and |mkBTransfer| require
+  higher-rank types.}  Hoopl requires that we parameterize our AST
+(i.e., the |n| type) using the |O| and |C| types from
+Section~\ref{hoopl_sec_cfg}.  A standard Haskell function cannot
+pattern match on values with different types (e.g., |Assign| has type
+|CStmt O O|, but |Entry| has type |CStmt C O|).  Therefore, to
+pattern-match on all constructors, the transfer function must be
+defined with a \emph{higher-rank}
+type\citep[Section~7.8.5]{GHCManual}. This allows client programs to
+write one transfer function that can match on all constructors in the
 AST.
 
+\intent{Types families and |Fact C| vs. |Fact O|} Notice that
+|mkFTransfer| takes a transfer function that produces a |Fact x f|
+value. Hoopl defines |Fact x f| as an \emph{indexed type family}
+\citep[Section~7.2.2]{GHCManual}, where the meaning of |Fact x f|
+depends on the type of |x|.  When |x| is |C|, then |Fact x f| is a
+synonym for |FactBase f| (another Hoopl type), which is a dictionary
+of facts indexed by |Labels|. When |x| is |O|, |Fact x f| is just a
+synonym for |f|. Hoopl extends the forwards dataflow algorithm
+slightly by allowing the transfer function to produce different facts
+for each successor node. The definition of |Fact x f| is a consequence
+of their extension.
 
-The signatures for |mkFTransfer| and |mkBTransfer| use
-\emph{higher-rank} types\citep[Section~7.8.5]{GHCManual}. 
-\intent{Types families and |Fact C| vs. |Fact O|} 
-
-The |mkFTransfer| and |mkBTransfer| functions look almost identical
-but for their |Fact x f| argument. |Fact x f| defines a type family
-(another GHC extension) such that the \emph{actual} type of |Fact x f|
-depends on the type of |x|. When |x| is |C|, then |Fact x f| is a
-|FactBase f| type. A |FactBase| maps |Labels| to |f| values. When |x|
-is |O|, |Fact x f| is only |f|.
-
-Recall that a |C| type on exit means the block may branch to one of
-many successors. In a forwards analysis, the transfer function
-distributes facts to all successors. In a backwards analysis,
-  the transfer function gathers facts from all successors.
-
-A forwards transfer function produces a |Fact| type. The
-parameterization of |FactBase| by |C| allows the transfer function to
-distribute facts to any (or all) of the block's successors, as
-required by the particular analysis. That is, it produces a map of
-|Labels| to |Facts|. A backwards transfer function receives a |Fact|
-argument. If the block has type |n e C|, then the transfer function
-receives a map of |Labels| to |Facts| for all its successor blocks. 
-
-\intent{Explain how |Fact e C| does not conflict with the meet operator --- or does it?}
-%% The |FactBase| argument given to the backwards transfer function might
-%% seem to conflict with the meet operator defined for the analysis. In
-%% fact, the |FactBase| is provided for informational purposes only ---
-%% the transfer function is free to use it in any way. \margin{Because
-%%   Hoopl interleaves rewriting and analysis (as discussed in
-%%   Section~\ref{hoopl_sec_iter}), the facts in the |FactBase|
-%%   associated with each successor label will evolve. converge until the
-%%   analysis reaches a fixed point.}{Better verify this!}
+In the case of a backwards analysis, |mkBTransfer| specifies that the
+transfer function \emph{receive} an argument of type |Fact x f|, and
+that it always produce a single fact value. When a node is closed on
+exit, the transfer function receives a dictionary of all facts
+(indexed by label) from the successors of the node. It is up to the
+client program to take the meet of these facts.
 
 \intent{Give definition for example's transfer function.}
+Figure~\ref{hoopl_fig11} shows the implementation of the transfer
+function for our example. The subsidiary definition, |transfer|,
+computes facts for each constructor in |CStmt|:
 
-Figure~\ref{hoopl_fig11} shows the transfer function, |liveness|, for
-our example. The |uses| function takes an expression and returns the
-set of all variables used in the expression. The |transfer| function
-computes the facts for each constructor in |CStmt|:
+\begingroup\everypar={\hangindent=\parindent\hangafter=1}
+\narrower
 
-\noindent\hangindent=\parindent\hangafter=1 |transfer (Entry _)
-f|\quad This statement represents the entry point of the function. If we
-represented global variables we would pass them along as our result. However,
-because we do not, no variables will be live after this statement and our result
-is the empty set.
+\noindent|transfer (Entry _) f|\quad This statement represents the
+entry point of the function. If we represented global variables we
+would pass them along as our result. However, because we do not, no
+variables will be live after this statement and our result is the
+empty set.
 
-\noindent\hangindent=\parindent\hangafter=1 |transfer (Assign var expr)
-f|\quad In this case, |f| represents the set of live variables found
-so far. We first remove |var| from |f|.\footnote{This statement
-  represents the declaration of |var|; because our analysis goes
-  backwards, |var| cannot be live \emph{prior} to declaration.}  Any
-variables in |expr| are live, so we add them to |f|. 
+\noindent|transfer (Assign var expr) f|\quad In this case, |f|
+represents the set of live variables found so far. We first remove
+|var| from |f|, as assignments always eliminate live
+variables.\footnote{If this statement represents the declaration of
+  |var|, then |var| will not be live again. However, if |var| is used
+  again we will add it back to the live set.}  Any variables used by
+the expression |expr| are live, so we add them to |f|.
 
-\noindent\hangindent=\parindent\hangafter=1 |transfer (Call _ exprs)
-f|\quad This case resembles |Assign|, except we do not remove any
-variables from |f|. We just add all variables found in all the
-elements of |exprs|.
+\noindent|transfer (Call _ exprs) f|\quad This case resembles
+|Assign|, except we do not remove any variables from |f|. We add all
+variables used in any of the |exprs| to the live set.
 
-\noindent\hangindent=\parindent\hangafter=1 |transfer Return f|\quad
-We do not add any variables here, since our |Return| does not take an
-argument.
+\noindent|transfer Return f|\quad We do not add any variables here,
+since our |Return| does not take an argument.
+
+\endgroup
 
 \begin{myfig}
   \begin{minipage}{\hsize}
@@ -633,9 +619,6 @@ argument.
   \caption{The transfer function implementing liveness analysis.}
   \label{hoopl_fig11}
 \end{myfig}
-
-\intent{Conclude \& Summarize transfer functions and our example.}
-\dots To be written \dots
 
 \section{Iteration \& Fixed Points}
 \intent{Describe how Hoopl iterates on facts; how Hoopl determines when
