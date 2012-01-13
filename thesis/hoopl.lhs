@@ -17,26 +17,26 @@
 \section{Introduction}
 \label{hoopl_sec4}
 
-\intent{Introduction}
-The Hoopl library \citep{Hoopl-3.8.7.0}, written in Haskell, provides
-a framework for implementing program analyses and transformations,
-which we call ``optimizations,'' using dataflow analysis. The library
-does not target a particular language or provide any built-in
-optimizations; rather, Hoopl enables the user to implement their own
-optimizations for their own language. A thorough description of the
-library's implementation can be found in the authors' paper
-\citep{Ramsey2010}; here, we discuss the abstractions they provide and
-how to use them.
+\intent{Introduction} The dataflow algorithm describes a generic
+method for analyzing programs based on the computation of facts
+between nodes in the program's control-flow graph. The Hoopl library
+\citep{Hoopl-3.8.7.0}, written in Haskell, provides a framework using
+the dataflow algorithm. The library does not target a particular
+programming language or provide concrete analyses; rather, Hoopl
+enables the user to implement their own analyses for their own
+language. A thorough description of the library's implementation can
+be found in the authors' paper \citep{Ramsey2010}; here, we discuss
+the abstractions they provide and how to use them.
 
-\intent{Broad description of how Hoopl abstracts dataflow optimization}
+\intent{Broad description of how Hoopl abstracts the dataflow
+  algorithm.} Hoopl implements the generic portions of the dataflow
+algorithm: iterative computation, traversing the control-flow graph
+(CFG), and combining facts. The \emph{client program}, a term Hoopl
+uses to mean the program using the library for some optimization,
+provides data structures and functions specific to that optimization:
+the representation of facts, a transfer function, and a meet operator.
 
-Hoopl implements the generic portions of dataflow analysis:
-iterative computation, traversing the control-flow graph (CFG), and
-combining facts. The \emph{client program}, a term Hoopl uses to mean
-the program using the library for some optimization, provides data
-structures and functions specific to that optimization: the
-representation of facts, a transfer function, a meet operator, and a
-rewriting function that transforms the CFG.
+%% \intent{Discuss rewrite aspect of Hoopl} 
 
 %% Discuss Hoopl's implementation of the iterative analyze/rewrite
 %% technique discussed in Lerner's paper.
@@ -622,49 +622,68 @@ since our |Return| does not take an argument.
 \end{myfig}
 
 \section{Iteration \& Fixed Points}
-\intent{Describe how Hoopl iterates on facts; how Hoopl determines when
-a fixed point has been reached.}
-Dataflow analysis iterates over the CFG until facts reach a fixed point. Hoopl
-implements this portion of the algorithm using the lattice and transfer
-function implementations given by the client program.
+\intent{Describe how Hoopl iterates on facts; how Hoopl determines
+  when a fixed point has been reached.}  The dataflow algorithm
+iterates over a program's CFG until the facts for each block reach a
+fixed point. Hoopl uses the meet operator (the |fact_join| field of
+the |DataflowLattice| type) given by the client to determine when
+the analysis should terminate.
 
-Hoopl uses the meet operator (the |fact_join| field of the
-|DataflowLattice| type) given by the client to 
-determine when facts stop changing. In a forwards analysis, the
-transfer function produces a |FactBase| at each block's exit point. In a
-backwards analysis, a |Fact| is produced at each block's entry point. In both
-cases, facts are associated with |Labels|.
+Hoopl associates each block in the CFG with a |Label|. On each
+iteration, at each label, Hoopl computes the meet of facts from the
+prior iteration with facts from the current iteration. Recall that
+|fact_join| returns a |ChangeFlag|, as well as new facts. Therefore,
+if any application of |fact_join| results in |SomeChange|, Hoopl
+continues to iterate. Otherwise, the analysis terminates.
 
-Conceptually, Hoopl tracks the facts associated with each |Label|. On
-each iteration, the previous facts for a label are combined with new
-facts using the meet operator. Recall that |fact_join| returns a
-|ChangeFlag| as well as new facts. Therefore, if any application of
-|fact_join| results in |SomeChange|, Hoopl continues to iterate the
-analysis. Otherwise, the analysis terminates. 
+\section{Interleaved Analysis \& Rewriting}
+\intent{Introduce rewriting in Hoopl.} Kildall's formulation of the
+dataflow algorithm \citep{Kildall1973} does not give a general method
+for transforming CFGs based on the results of the analysis
+performed. He assumed that the CFG would be transformed after each
+analysis; he did not address the issue of determining when an analysis
+should be performed again (possibly leading to further
+rewrites). Further, he did not address the question of composing
+multiple analyses; instead, each analysis is assumed to be applied one
+at a time, in no particular order.
 
-\section{Rewriting}
-\intent{Briefly describe rewriting as transformation.}  Dataflow
-anlysis does not strictly address how to transform (or rewrite) the
-CFG --- it just defines how to analyze properties of the
-CFG. Even so, rewriting is usually the goal of analysis, and is therefore
-generally grouped with dataflow analysis under the term
-``optimization.''
+Lerner and colleagues \citep{Lerner2002} developed a variation of the
+dataflow algorithm that addresses both of these concerns. Where
+Kildall's dataflow algorithm only computes facts, their algorithm
+transforms the CFG \emph{during} analysis. Lerner and colleagues'
+algorithm recursively analyses the transformed CFG, potentially
+producing better facts. The replacement graph can be thrown away and
+the new facts used to produce a better rewrite, or the replacement
+graph can remain.
+
+Rather than analyzing the CFG, followed by rewriting, followed by more
+analysis, until no rewrites occur, this method allows the CFG to be
+rewritten in portions until the facts computed reach the best
+possible approximation. Additionally, by recursively analyzing the CFG
+after each rewrite, their method enables simple composition of
+multiple dataflow analyses, using the program graph as means of
+communication between the individual implementations. While their
+method does not produce better results, in the sense of
+Section~\ref{back_sec_quality}, than analyzing and rewriting the CFG
+sequentially, but as Lerner, etc. describe in their paper, this method
+makes the implementation of several common optimizations much
+simpler. Hoopl implements a version of the interleaved analysis and
+rewriting algorithm just described.
 
 \intent{Introduce |FwdRewrite| and |BwdRewrite| types; show how to
-  construct them with |mkFRewrite| and |mkBRewrite|.} 
+  construct them with |mkFRewrite| and |mkBRewrite|.}  Hoopl provides
+two types to represent rewriting, shown in Figure~\ref{hoopl_fig15}. A
+rewrite uses |FwdRewrite|; backwards optimization uses
+|BwdRewrite|. Hoopl does not export the constructors for either
+type. Instead, client programs use the |mkBRewrite| and |mkFRewrite|
+functions. Hoopl defines exactly analogous functions for forward and
+backward rewrites, so we will only discuss the backwards case from
+here.
 
-Hoopl provides two types to represent rewriting, shown in
-Figure~\ref{hoopl_fig15}. A forwards optimization uses |FwdRewrite|;
-backwards optimization uses |BwdRewrite|. Hoopl does not export the
-constructors for either type. Instead, client programs use the
-|mkBRewrite| and |mkFRewrite| functions. Hoopl defines exactly
-analogous functions for forward and backward rewrites, so we will only
-discuss the backwards case from here.
-
-The |mkBRewrite| function takes an argument with an existential type,
+The |mkBRewrite| function takes an argument with an higher-rank type,
 similar to |mkBTransfer| in Figure~\ref{hoopl_fig10}. This argument
 implements the rewriting that the given analysis will perform. The
-existential type |(forall e x. n e x)| allows one function to
+ type |(forall e x. n e x)| allows one function to
 pattern-match on all definitions in the AST. The |Fact x f| argument
 gives facts computed by the transfer function to the rewriter. The |n|
 and |f| parameters are the same as always: facts and the AST. However,
@@ -724,7 +743,7 @@ a dangling |O x| or |e O| block, respectively.
   \label{hoopl_fig12}
 \end{myfig}
 
-\intent{Give definition of examples transfer function.}
+\intent{Give definition of examples rewrite function.}
 Figure~\ref{hoopl_fig12} shows |eliminate|, the rewrite function for
 our example optimization. We define the local function |rewrite| with
 cases for each constructor in |CStmt|, but only the |Assign| case 
