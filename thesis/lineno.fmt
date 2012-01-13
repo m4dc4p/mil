@@ -56,6 +56,8 @@
 \newcommand{\numbersoff}{\global\let\printline\empty}
 \newcommand{\numbersreset}{\setcounter{linenum}{0}}
 \numberson\numbersoff
+\makeatother
+\EndFmtInput
 %
 %endif
 %endif

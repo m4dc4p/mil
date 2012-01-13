@@ -1,8 +1,14 @@
-\documentclass[12pt]{report}
-%include polycode.fmt
+%&preamble
+\input{nodocclass}
+\ifnodocclass
+  \documentclass[12pt]{report}
+  \usepackage{standalone}
+  \input{preamble}
+\else\fi
+
 %include lineno.fmt
 %include subst.fmt
-\input{preamble}
+
 \begin{document}
 \numbersoff
 \input{document.preamble}
@@ -440,7 +446,7 @@ It returns a \setL{Fact} set containing new facts based on the
 statement given. We define $t$ by cases for each type of MIL statement.
 
 Equation~\eqref{uncurry_df_transfer_closure} applies when the \rhs of
-a \bind statement creates a closure, as in \binds v <- \mkclo[l: v_1,
+a \mbind statement creates a closure, as in \binds v <- \mkclo[l: v_1,
   \dots, v_n];. Because \var v/ has been redefined, we must invalidate
 any facts that refer to \var v/, as they do not refer to the new value
 of \var v/. The \mfun{uses} function in
@@ -454,7 +460,7 @@ set shows that \var v/ now refers to the closure \clo[l:v_1, \dots,
 v/.
 
 Equation~\eqref{uncurry_df_transfer_other} applies when the \rhs of a
-\bind statement does not allocate a closure. We create a new fact
+\mbind statement does not allocate a closure. We create a new fact
 associating \var v/ with $\top$, indicating we know \var v/ does not
 refer to a closure. We also remove any existing uses of \var v/ from
 $F$. Our new fact and new set are combined to form our result.
@@ -480,7 +486,7 @@ entered it.
 \intent{Point out we don't inline closures from |Goto| expressions.}
 The example we discussed in Section~\ref{uncurry_sec_mil} does not
 match with the optimization just discussed on one crucial point:
-replacing calls to normal blocks on the \rhs of a \bind with
+replacing calls to normal blocks on the \rhs of a \mbind with
 their closure result. Our implementation relies on another, more
 general, optimization that inlines simple blocks into their
 predecessor. We describe the optimization in detail in
@@ -705,9 +711,9 @@ to the set returned by |kill| and return the result.
 Figure~\ref{uncurry_fig_impl_transfer} shows the facts gathered for
 each variable in the \lab main/ block of our sample program. The
 variables \var n/, \var v1/, and \var v2/ are assigned $\top$ because
-the \rhs of the \bind statement for each does not directly create a
+the \rhs of the \mbind statement for each does not directly create a
 closure. Only \var v0/ is assigned a |CloDest| value (\clo[k0:])
-because the \rhs of its \bind statement is in the right form. We will
+because the \rhs of its \mbind statement is in the right form. We will
 see in the next section how these facts evolve as the program is
 rewritten.
 
@@ -826,7 +832,7 @@ implement our uncurrying optimization.\footnote{Note that these
 \ref{uncurry_fig_rewrite_impl_done} of |rewriter| rewrites \app f * x/
 expressions when they occur in a \return/
 statement. Line~\ref{uncurry_fig_rewrite_impl_bind} rewrites when \app
-f * x/ appears on the \rhs of a \bind statement.  In
+f * x/ appears on the \rhs of a \mbind statement.  In
 the first case, |done n l (collapse facts f x)| produces \return |e|/
 when |collapse| returns |Just e| (i.e., a rewritten
 expression). In the second case, |bind v (collapse facts f x)|

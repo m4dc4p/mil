@@ -1,9 +1,13 @@
-\documentclass[12pt]{report}
+%&preamble
+\input{nodocclass}
+\ifnodocclass
+  \documentclass[12pt]{report}
+  \usepackage{standalone}
+  \input{tikz.preamble}
+  \input{preamble}
+\else\fi
 %include polycode.fmt
-\input{tikz.preamble}
-\input{preamble}
 \begin{document}
-
 
 \input{document.preamble}
 \renewcommand{\textfraction}{0.1}

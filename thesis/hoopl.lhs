@@ -1,9 +1,13 @@
-\documentclass[12pt]{report}
-%include polycode.fmt
+%&preamble
+\input{nodocclass}
+\ifnodocclass
+  \documentclass[12pt]{report}
+  \usepackage{standalone}
+  \input{tikz.preamble}
+  \input{preamble}
+\else\fi
 %include lineno.fmt
 %include subst.fmt
-\input{tikz.preamble}
-\input{preamble}
 \begin{document}
 \numbersoff
 \input{document.preamble}
@@ -101,7 +105,6 @@ demonstrating the optimization shown in Figure~\ref{hoopl_fig1_b}.
 \label{hoopl_sec1}
 
 \intent{Introduce Hoopl-managed structures}
-
 In order to implement dataflow analysis generically, Hoopl defines
 several core data structures which client programs must use. These
 include the representation of CFGs, the type of transfer and rewrite
@@ -113,7 +116,6 @@ rewrites). Finally, Hoopl specifies the meet operator (but not its
 implementation) so that the library can recognize fixpoints.
 
 \intent{Introduce client-managed structures}
-
 Hoopl requires that client programs specify those items related to
 their specific optimization: the abstract syntax tree (AST) of the
 language analyzed, the representation of facts, and the implementation
@@ -234,7 +236,6 @@ shapes.
 \end{myfig}
 
 \intent{Show example with O and C types applied.}
-
 Figure~\ref{hoopl_fig3} gives Haskell declarations that can represent
 the AST for !+example+!. We use GHC's GADT syntax
 \citep[Section~7.4.7]{GHCManual} to specify the value of the |e| and

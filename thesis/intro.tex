@@ -1,6 +1,11 @@
-\documentclass[12pt]{report}
+%&preamble
+\input{nodocclass}
+\ifnodocclass
+  \documentclass[12pt]{report}
+  \usepackage{standalone}
+  \input{preamble}
+\fi
 %include polycode.fmt
-\input{preamble}
 \begin{document}
 \input{document.preamble}
 

@@ -1,9 +1,15 @@
-\documentclass[12pt]{report}
-\usepackage{standalone}
-%include polycode.fmt
+%&preamble
+\input{nodocclass}
+\ifnodocclass
+  \documentclass[12pt]{report}
+  \usepackage{standalone}
+  \input{tikz.preamble}
+  \input{preamble}
+\fi
+
 %include lineno.fmt
-\input{tikz.preamble}
-\input{preamble}
+%include subst.fmt
+
 % Used by included files to know they
 % are NOT standalone
 \setboolean{standaloneFlag}{false}

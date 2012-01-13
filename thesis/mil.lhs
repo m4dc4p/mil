@@ -1,10 +1,13 @@
-\documentclass[12pt]{report}
-\usepackage{standalone}
-%include polycode.fmt
+%&preamble
+\input{nodocclass}
+\ifnodocclass
+  \documentclass[12pt]{report}
+  \usepackage{standalone}
+  \input{tikz.preamble}
+  \input{preamble}
+\else\fi
 %include lineno.fmt
 %include subst.fmt
-\input{tikz.preamble}
-\input{preamble}
 \begin{document}
 \input{document.preamble}
 
@@ -208,7 +211,7 @@ as:
 allocation. \mkclo[mul:b] allocates a closure pointing to \lab mul/
 and capturing the value of the variable \var b/. We make allocation of
 closures a monadic, side-effecting operation by placing \mkclo[mul:b]
-on the \rhs of the monadic binding operator (\bind). However, we do
+on the \rhs of the monadic binding operator (\mbind). However, we do
 not need to mention the actual address of the locaton \var t_1/, \var
 b/ or even \lab mul/ --- those details are hidden. On
 Line~\ref{mil_arith_mul2}, we represent function application with the
@@ -270,7 +273,7 @@ variables for each value held by the constructor. Alternatives always
 jump immediately to a block --- they do not allow any other statement.
 
 \intent{Introduce tail expressions.} \emph{Tail} expressions represent
-effects and always appear on the \rhs of a \bind statement or at the
+effects and always appear on the \rhs of a \mbind statement or at the
 end of a basic block. \milres return/ takes a variable (\emph{not} an
 expression) and makes its value monadic. The ``enter'' operator,
 \enter, implements function application, ``entering'' the closure
@@ -312,7 +315,7 @@ operator (\enter), implements function application.
 \footnote{So called because in the expression \app g * x/, we
   ``enter'' function \var g/ with the argument \var x/.}
 
-The ``bind'' operator (\bind) assigns the result of
+The ``bind'' operator (\mbind) assigns the result of
 the operation on its right-hand side to the location on the left. All
 expressions that could have a side-effect appear on the \rhs of a bind
 operator in MIL; in this case, \app g * x/ may allocate memory when
@@ -726,7 +729,7 @@ called block will become the return value of the current block.
 
 \intent{Describe variable scope; storage locations are local.}  Within
 each block, any number of storage locations may be named on the \lhs
-of a bind (\bind) statement. Those names are not global storage
+of a bind (\mbind) statement. Those names are not global storage
 locations: variables with the same name in differents blocks do not
 affect each other. Values can only be passed from one block to another
 as arguments, in a closure, or in a monadic thunk.

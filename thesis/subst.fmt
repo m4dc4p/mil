@@ -15,5 +15,5 @@
 %format |*><*| = "\ensuremath{\mathbin{\mathord{|}\mkern-1.5mu\mathord{*}\mkern-1.5mu\text{><}\mkern-1.5mu\mathord{*}\mkern-1.5mu\mathord{|}}}"
 % PPrint concat
 %format <+> = "\ensuremath{\mathbin{\text{<}\mkern-1.5mu\mathord{+}\mkern-1.5mu\text{>}}}"
-
+%format undefined = "undefined"
 

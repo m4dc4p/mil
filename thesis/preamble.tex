@@ -1,3 +1,13 @@
+%&PDFLATEX
+%% Courtesy of the TeXBook, answer to exercise 7.7
+%% \def\ifundefined#1{\expandafter\ifx\csname#1\endcsname\relax}
+\makeatletter
+\@ifclassloaded{report}{}
+  {\documentclass[12pt]{report}
+    \usepackage{standalone}
+    \input{tikz.preamble}}
+\makeatother
+
 \usepackage[T1]{fontenc}
 \usepackage{calc}
 \usepackage{palatino}
@@ -259,7 +269,7 @@
 \protected\def\goto#1(#2){\lab #1/\thinspace\ensuremath{(\ensurett{#2})}}
 %% An enter expression
 \protected\def\app#1*#2/{\ensurett{\removespaces #1\ifmmode\ \fi{\text{\tt @}}\ifmmode\ \fi#2}}
-\protected\def\bind{\texttt{<-}\xspace}
+\protected\def\mbind{\texttt{<-}\xspace}
 %% Primitive expression
 \protected\def\prim#1(#2){\lab #1/\suptt*\ensuremath{(\ensurett{#2})}}
 %% Program variable
@@ -373,3 +383,5 @@
 %% Place an input file on the next page
 \def\onnextpage#1{\afterpage{\clearpage\input{#1}\clearpage}}
 
+%% Indicates the preamble has been loadd.
+\def\preambleloaded{}

@@ -3,7 +3,12 @@
     void example() \{
       int a, c;
       c = 4; \label{hoopl_lst1_assign_c}
-      a = c + 1;  \label{hoopl_lst1_assign_a}
+
+      if(c) 
+        a = c + 1; \label{hoopl_lst1_assign_a}
+      else
+        a = c + 2; \label{hoopl_lst1_assign_a2}
+
       printf("\%d",c); \label{hoopl_lst1_print}
       a = c + 2; \label{hoopl_lst1_add}
     \}

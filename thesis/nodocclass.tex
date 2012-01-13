@@ -1,0 +1,13 @@
+%% Looking at LaTeX sources reveals \usepackage and
+%% \RequirePackage are made equivalent when \documentclass
+%% executes, so we can test if \documentclass has
+%% been executed by comparing those two control sequences.
+\def\ifnodocclass{\def\loaded{\iffalse}%
+  \def\notloaded{\iftrue}%%
+  \let\which=\loaded%%
+  \ifx\usepackage\undefined\let\which=\notloaded%%
+  \else%%
+    \ifx\usepackage\RequirePackage%%
+    \else\let\which=\notloaded%%
+    \fi%%
+  \fi\which}

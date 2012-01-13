@@ -1,5 +1,4 @@
 \documentclass[12pt]{report}
-%include polycode.fmt
 %include lineno.fmt
 \input{preamble}
 \begin{document}

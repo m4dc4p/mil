@@ -1,4 +1,4 @@
-]%if False
+%if False
 
 > {-# LANGUAGE GADTs, RankNTypes #-}
 
@@ -89,7 +89,8 @@
 >     transfer (Dest _) f = f {-"\label{hoopl_eg_transfer_dest}"-}
 >     transfer (Assign var expr) facts = (var `delete` facts) `union` (uses expr) {-"\label{hoopl_eg_transfer_assign}"-}
 >     transfer (Call _ exprs) facts = facts `union` unions (map uses exprs) {-"\label{hoopl_eg_transfer_call}"-}
->     transfer s@(If testExpr _ _) facts = uses testExpr `union` joinFacts lattice undefined (successorFacts s facts)
+>     transfer s@(If testExpr _ _) facts = uses testExpr `union` 
+>       joinFacts lattice undefined (successorFacts s facts)
 >     transfer s@(Goto _) facts = joinFacts lattice undefined (successorFacts s facts)
 >     transfer Return _ = Set.empty {-"\label{hoopl_eg_transfer_return}"-}
 >     
