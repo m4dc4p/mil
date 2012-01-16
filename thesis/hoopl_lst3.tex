@@ -13,21 +13,6 @@
 
   \node[stmt,
     below of=lst3_assigna1,
-    anchor=center] (lst3_test) {!+if(c)+!\labelNode{hoopl_lst3_test}};
-  \node[labelfor=lst3_test] () {\refNode{hoopl_lst3_test}};
-
-  \node[stmt,
-    below left=.5in and .5in of lst3_test,
-    anchor=center] (lst3_true) {!+a = c + 1+!\labelNode{hoopl_lst3_true}};
-  \node[labelfor=lst3_true] () {\refNode{hoopl_lst3_true}};
-
-  \node[stmt,
-    below right=.5in and .5in of lst3_test,
-    anchor=center] (lst3_false) {!+a = c + 2+!\labelNode{hoopl_lst3_false}};
-  \node[labelfor=lst3_false] () {\refNode{hoopl_lst3_false}};
-
-  \node[stmt,
-    below=1.25in of lst3_test,
     anchor=center] (lst3_print) {!+printf("\%d",c)+!\labelNode{hoopl_lst3_print}};
   \node[labelfor=lst3_print] () {\refNode{hoopl_lst3_print}};
 
@@ -42,14 +27,7 @@
 
   \draw [->>] (lst3_entry) to (lst3_assignc);
   \draw [->] (lst3_assignc) to (lst3_assigna1);
-  \draw [->] (lst3_assigna1) to (lst3_test);
-
-  \draw [->] (lst3_test) to (lst3_true);
-  \draw [->] (lst3_test) to (lst3_false);
-
-  \draw [->] (lst3_true) to (lst3_print);
-  \draw [->] (lst3_false) to (lst3_print);
-
+  \draw [->] (lst3_assigna1) to (lst3_print);
   \draw [->] (lst3_print) to (lst3_assigna2);
   \draw [->] (lst3_assigna2) to (lst3_return);}
 \end{tikzpicture}
