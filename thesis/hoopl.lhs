@@ -553,11 +553,11 @@ Figure~\ref{hoopl_fig10}.
 Section~\ref{hoopl_sec_cfg}.  A standard Haskell function cannot
 pattern match on values with different types (e.g., |Assign| has type
 |CStmt O O|, but |Entry| has type |CStmt C O|).  Therefore, to
-pattern-match on all constructors, the transfer function must be
-defined with a \emph{higher-rank}
-type\citep[Section~7.8.5]{GHCManual}. This allows client programs to
-write one transfer function that can match on all constructors in the
-AST.
+pattern-match on all constructors, |mkFTransfer| and |mkBTransfer|
+require that the transfer function given be defined with a
+\emph{higher-rank} type \citep[Section~7.8.5]{GHCManual}. This allows
+client programs to write one transfer function that can match on all
+constructors in the AST.
 
 \intent{Types families and |Fact C| vs. |Fact O|} Notice that
 |mkFTransfer| takes a transfer function that produces a |Fact x f|
@@ -583,31 +583,28 @@ Figure~\ref{hoopl_fig11} shows the implementation of the transfer
 function for our example. The subsidiary definition, |transfer|,
 computes facts for each constructor in |CStmt|:
 
-\begingroup\everypar={\hangindent=\parindent\hangafter=1}
-\narrower
+{\everypar={\hangindent=\parindent\hangafter=1}\narrower
 
 \noindent|transfer (Entry _) f|\quad This statement represents the
-entry point of the function. If we represented global variables we
-would pass them along as our result. However, because we do not, no
-variables will be live after this statement and our result is the
-empty set.
+entry point of the function. No variables are live before the
+procedures executes, so |transfer| returns the empty set.
 
 \noindent|transfer (Assign var expr) f|\quad In this case, |f|
 represents the set of live variables found so far. We first remove
 |var| from |f|, as assignments always eliminate live
 variables.\footnote{If this statement represents the declaration of
   |var|, then |var| will not be live again. However, if |var| is used
-  again we will add it back to the live set.}  Any variables used by
-the expression |expr| are live, so we add them to |f|.
+  again we will add it back to the live set.}  The auxilary function |uses|
+computes the live variables in |expr|; we add those variables to 
+our updated |f| and return the result. 
 
 \noindent|transfer (Call _ exprs) f|\quad This case resembles
-|Assign|, except we do not remove any variables from |f|. We add all
-variables used in any of the |exprs| to the live set.
+|Assign|, except that we do not remove any variables from |f|. We add all
+variables used in any of the |exprs| given to the live set.
 
-\noindent|transfer Return f|\quad We do not add any variables here,
-since our |Return| does not take an argument.
-
-\endgroup
+\noindent|transfer Return f|\quad No variables (in our AST) will be
+live after the procedure returns. Therefore, nothing is live at this
+point, and we return the empty set.\par}
 
 \begin{myfig}
   \begin{minipage}{\hsize}
@@ -657,37 +654,58 @@ the new facts used to produce a better rewrite, or the replacement
 graph can remain.
 
 Rather than analyzing the CFG, followed by rewriting, followed by more
-analysis, until no rewrites occur, this method allows the CFG to be
-rewritten in portions until the facts computed reach the best
-possible approximation. Additionally, by recursively analyzing the CFG
-after each rewrite, their method enables simple composition of
-multiple dataflow analyses, using the program graph as means of
-communication between the individual implementations. While their
-method does not produce better results, in the sense of
-Section~\ref{back_sec_quality}, than analyzing and rewriting the CFG
-sequentially, but as Lerner, etc. describe in their paper, this method
-makes the implementation of several common optimizations much
-simpler. Hoopl implements a version of the interleaved analysis and
-rewriting algorithm just described.
+analysis, until no rewrites occur, Lerner and colleagues' method
+allows the CFG to be rewritten in portions until the facts computed
+reach the best possible approximation. Their method enables simple
+composition of multiple dataflow analyses, using the program graph as
+means of communication between the individual implementations. This
+method does not produce better results, in the sense given by
+Section~\ref{back_sec_quality} (Page \pageref{back_sec_quality}), than
+analyzing and rewriting the CFG sequentially. However, as they
+describe, this technique removes the need to manually combine multiple
+dataflow analyses' into one ``super-analysis.'' Instead, each dataflow
+analysis can be implemented separately and Lerner and colleagues'
+technique composes those separate pieces automatically. Hoopl
+implements a version of the interleaved analysis and rewriting
+algorithm just described.
 
-\intent{Introduce |FwdRewrite| and |BwdRewrite| types; show how to
-  construct them with |mkFRewrite| and |mkBRewrite|.}  Hoopl provides
-two types to represent rewriting, shown in Figure~\ref{hoopl_fig15}. A
-rewrite uses |FwdRewrite|; backwards optimization uses
-|BwdRewrite|. Hoopl does not export the constructors for either
-type. Instead, client programs use the |mkBRewrite| and |mkFRewrite|
-functions. Hoopl defines exactly analogous functions for forward and
-backward rewrites, so we will only discuss the backwards case from
-here.
+\intent{Introduce |FwdRewrite| and |BwdRewrite| type.}
+Figure~\ref{hoopl_fig15} shows the two types Hoopl provides for
+rewriting, |FwdRewrite| and |BwdRewrite|. These types correspond to
+the |FwdTransfer| and |BwdTransfer| types; Hoopl requires that a
+|FwdTransfer| be paired with a |FwdRewrite|, and a |BwdTransfer| with
+a |BwdRewrite|.
 
-The |mkBRewrite| function takes an argument with an higher-rank type,
-similar to |mkBTransfer| in Figure~\ref{hoopl_fig10}. This argument
-implements the rewriting that the given analysis will perform. The
- type |(forall e x. n e x)| allows one function to
-pattern-match on all definitions in the AST. The |Fact x f| argument
-gives facts computed by the transfer function to the rewriter. The |n|
-and |f| parameters are the same as always: facts and the AST. However,
-the |m| parameter and its |FuelMonad| constraint are new.
+\intent{Introduce |mkFRewrite| and |mkBRewrite|.}  Client programs
+use the |mkFRewrite| and |mkBRewrite| functions to create
+|FwdRewrite| and |BwdRewrite| values. Like |mkFTransfer| and
+|mkBTransfer|, |mkBRewrite| and |mkFRewrite| take an argument that
+becomes the rewriting function for the analysis. So client programs
+can implement one rewrite function for all nodes in the AST, the
+rewrite function must be defined with a higher-rank type.
+
+\intent{Explain arguments to rewrite functions.}
+Rewrite functions receive the node to rewrite as their first
+argument. The facts computed for that node are given in the second
+argument. A backwards rewriter can receive a dictionary of facts,
+indexed by labels, if the node is closed on exit (analagous to the
+backwards transfer function); otherwise, the rewriter receives a
+single fact. Of course, a forwards rewriter always receives a single
+fact.
+
+\intent{Describe result of rewrite function.}  The rewrite function
+returns a monadic |Maybe (Graph n e x)| value. The monadic portion
+relates to |FuelMonad|, to be described shortly. The |Maybe| portion
+indicates if the rewriter wants to change the node given in any
+way. |Nothing| means no change to the node. A |Just| value causes
+Hoopl to replace the current block with a |Graph n e x| value. This
+allows the rewriter to replace a single statement with many
+statements. Notice that the shape of the resulting graph must be the
+same as the original node. Finally, if the node has shape |O O|, a
+rewriter can return |Just emptyGraph| to delete the node. Only an |O
+O| block can be deleted. A |C O| and |O C| block cannot be deleted
+during rewrite as that would leave a dangling |O x| or |e O| block,
+respectively.
 
 \begin{myfig}
   \begin{minipage}{\hsize}
@@ -708,28 +726,14 @@ the |m| parameter and its |FuelMonad| constraint are new.
 \end{myfig}
 
 \intent{Describe optimization fuel and purpose of |FuelMonad|
-  constraint.}  
-
-Hoopl implements a concept known as ``optimization
-fuel'' to aid in debugging optimizations. Each rewrite costs 1 ``unit''
-of fuel. If fuel runs out, Hoopl stops iterating. This allows the
-programmer to debug faulty optimizations by decreasing the fuel supply
-in a classic divide-and-conquer approach. The |FuelMonad| constraint
-ensures Hoopl can manage fuel during rewriting. Normally, the client
-program does not worry about fuel. 
-
-\intent{Describe result of rewrite function.}  
-
-The rewrite function returns a monadic |Maybe (Graph n e x)| value. The
-monadic portion relates to |FuelMonad|. The |Maybe| portion
-indicates if any rewriting took place. |Nothing| means no
-changes occurred. A |Just| value causes Hoopl to replace
-the current block with the \emph{graph} given. This allows rewriters
-to replace a single statement with many statements. A rewriter can
-also return |Just emptyGraph|, which deletes the current block. Notice
-that only an |O O| block can be deleted. A |C O| and |O C| block
-cannot be deleted during rewrite as that would leave
-a dangling |O x| or |e O| block, respectively.
+  constraint.}  Hoopl implements ``optimization fuel,'' originally
+described by Whalley \citeyearpar{Whalley1994}, as an aid in debugging
+optimizations. Each rewrite costs one ``unit'' of fuel. If fuel runs
+out, Hoopl stops iterating. This allows the programmer to debug faulty
+optimizations by decreasing the fuel supply in a classic
+divide-and-conquer approach. The |FuelMonad| constraint ensures Hoopl
+can manage fuel during rewriting. Normally, the client program does
+not worry about fuel.
 
 \begin{myfig}
   \begin{minipage}{\hsize}
@@ -743,7 +747,7 @@ a dangling |O x| or |e O| block, respectively.
   \label{hoopl_fig12}
 \end{myfig}
 
-\intent{Give definition of examples rewrite function.}
+\intent{Give definition of example's rewrite function.}
 Figure~\ref{hoopl_fig12} shows |eliminate|, the rewrite function for
 our example optimization. We define the local function |rewrite| with
 cases for each constructor in |CStmt|, but only the |Assign| case 
