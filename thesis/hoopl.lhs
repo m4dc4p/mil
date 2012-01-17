@@ -171,7 +171,7 @@ shapes.
       \draw [->] (curr) to (succ);
     \end{tikzpicture}}
 \begin{myfig}[tb]
-  \begin{tabular}{cm{\wd\graphbox}m{\widthof{Example Statements}}}
+  \begin{tabular}{c>{\hfuzz=100pt}m{\wd\graphbox}>{\hfuzz=5pt\emergencystretch=0pt}m{\widthof{Example Statements}}}
     Shape & \hfil Example Graph\hfil & Example Statement \\\midrule
     \begin{minipage}{\widthof{(``open/open'')}}\centering
       |O O|\\
@@ -207,7 +207,7 @@ shapes.
       \draw [->] (pred1) to (curr);
       \draw [->] (pred3) to (curr);
       \draw [->] (curr) to (succ);
-    \end{tikzpicture} & \emergencystretch=0pt Function entry points, alternatives. \\ %% prevents a badly stretched paragraph 
+    \end{tikzpicture} & Function entry points, alternatives. \\ %% prevents a badly stretched paragraph 
     \begin{minipage}{\widthof{(``closed/closed'')}}\centering
       |C C|\\
       (``closed/closed'')
@@ -234,6 +234,7 @@ shapes.
     lines show required blocks. }
   \label{hoopl_tbl1}
 \end{myfig}
+\showthe\emergencystretch
 
 \intent{Show example with O and C types applied.}
 Figure~\ref{hoopl_fig3} gives Haskell declarations that can represent
@@ -497,9 +498,9 @@ return |SomeChange| and the union of the two sets.\footnote{Hoopl
 a |DataflowLattice| value. Notice we set |fact_bot| to |Set.empty|,
 the initial value for all \inBa and \outBa sets.
 
-\begin{myfig}
+\begin{myfig}\disableoverfull
   \begin{tabular}{c}
-    \begin{minipage}{\hsize}
+    \begin{minipage}{\hsize}\disableoverfull
 %let latticeDef = True
 %include DeadCodeC.lhs
 %let latticeDef = False
@@ -608,11 +609,9 @@ point, and we return the empty set.\par}
 
 \begin{myfig}
   \begin{minipage}{\hsize}
-    \begin{withHsNum}
 %let includeLiveness = True
 %include DeadCodeC.lhs
 %let includeLiveness = False
-    \end{withHsNum}
   \end{minipage}
   \caption{The transfer function implementing liveness analysis.}
   \label{hoopl_fig11}
@@ -669,6 +668,7 @@ technique composes those separate pieces automatically. Hoopl
 implements a version of the interleaved analysis and rewriting
 algorithm just described.
 
+\section{Rewriting with Hoopl}
 \intent{Introduce |FwdRewrite| and |BwdRewrite| type.}
 Figure~\ref{hoopl_fig15} shows the two types Hoopl provides for
 rewriting, |FwdRewrite| and |BwdRewrite|. These types correspond to
@@ -695,17 +695,17 @@ fact.
 
 \intent{Describe result of rewrite function.}  The rewrite function
 returns a monadic |Maybe (Graph n e x)| value. The monadic portion
-relates to |FuelMonad|, to be described shortly. The |Maybe| portion
-indicates if the rewriter wants to change the node given in any
-way. |Nothing| means no change to the node. A |Just| value causes
-Hoopl to replace the current block with a |Graph n e x| value. This
-allows the rewriter to replace a single statement with many
-statements. Notice that the shape of the resulting graph must be the
-same as the original node. Finally, if the node has shape |O O|, a
-rewriter can return |Just emptyGraph| to delete the node. Only an |O
-O| block can be deleted. A |C O| and |O C| block cannot be deleted
-during rewrite as that would leave a dangling |O x| or |e O| block,
-respectively.
+relates to |FuelMonad|, which deals with ``optimization fuel'' and is
+described in Section~\ref{hoopl_sec8}. The |Maybe| portion indicates
+if the rewriter wants to change the node given in any way. |Nothing|
+means no change to the node. A |Just| value causes Hoopl to replace
+the current block with a |Graph n e x| value. This allows the rewriter
+to replace a single statement with many statements. Notice that the
+shape of the resulting graph must be the same as the original
+node. Finally, if the node has shape |O O|, a rewriter can return
+|Just emptyGraph| to delete the node. Only an |O O| block can be
+deleted. A |C O| and |O C| block cannot be deleted during rewrite as
+that would leave a dangling |O x| or |e O| block, respectively.
 
 \begin{myfig}
   \begin{minipage}{\hsize}
@@ -724,16 +724,6 @@ respectively.
     |mkFRewrite|.}
   \label{hoopl_fig15}
 \end{myfig}
-
-\intent{Describe optimization fuel and purpose of |FuelMonad|
-  constraint.}  Hoopl implements ``optimization fuel,'' originally
-described by Whalley \citeyearpar{Whalley1994}, as an aid in debugging
-optimizations. Each rewrite costs one ``unit'' of fuel. If fuel runs
-out, Hoopl stops iterating. This allows the programmer to debug faulty
-optimizations by decreasing the fuel supply in a classic
-divide-and-conquer approach. The |FuelMonad| constraint ensures Hoopl
-can manage fuel during rewriting. Normally, the client program does
-not worry about fuel.
 
 \begin{myfig}
   \begin{minipage}{\hsize}
@@ -755,7 +745,6 @@ affects the CFG. If the variable assigned to is
 dead (i.e., |not (var `member` live)|), |rewrite| returns |Just
 emptyGraph|, deleting the statement from the CFG. In all other cases
 |rewrite| return |Nothing|, leaving the CFG unchanged.
-
 
 \section{Executing an Optimization}
 \label{hoopl_sec6}
@@ -841,8 +830,8 @@ this graph with a type signature, |SimpleFuelMonad (Graph CStmt C C)|,
 that selects a Hoopl provided fuel and checkpoint monad
 implementation.
 
-\begin{myfig}
-  \begin{minipage}{\hsize}
+\begin{myfig}\disableoverfull
+  \begin{minipage}{\hsize}\disableoverfull
 %let includeDeadCode = True
 %include DeadCodeC.lhs
 %let includeDeadCode = False
@@ -854,11 +843,20 @@ implementation.
 
 \section{The Rest of Hoopl}
 \label{hoopl_sec8}
-\intent{Interleaved Analysis \& Rewriting}
 
 \intent{Items that don't fit in elsewhere: combinators for rewriting,
   the |CheckPoint| monad, optimization fuel, |liftFuel|,
   |runInfinite|, |runChecked|, etc. }
+
+\intent{Describe optimization fuel and purpose of |FuelMonad|
+  constraint.}  Hoopl implements ``optimization fuel,'' originally
+described by Whalley \citeyearpar{Whalley1994}, as an aid in debugging
+optimizations. Each rewrite costs one ``unit'' of fuel. If fuel runs
+out, Hoopl stops iterating. This allows the programmer to debug faulty
+optimizations by decreasing the fuel supply in a classic
+divide-and-conquer approach. The |FuelMonad| constraint ensures Hoopl
+can manage fuel during rewriting. Normally, the client program does
+not worry about fuel.
 
 \section{Summary}
 \label{hoopl_sec3}
@@ -871,13 +869,13 @@ shown so far appears, as well as code for printing before and after
 results and |main|, which runs the optimization over our sample
 program. 
 
-\begin{singlespace}
+\begin{singlespace}\disableoverfull
 %let includeAll = True
 %include DeadCodeC.lhs
 %let includeAll = False
 \end{singlespace}
 
-\noindent\begin{minipage}{\hsize}
+\noindent\begin{minipage}{\hsize}\disableoverfull
 %% Some interaction with standalone makes the thesis break unless this
 %% is wrapped in a minipage. The error is:
 %%

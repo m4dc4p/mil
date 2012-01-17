@@ -67,13 +67,13 @@
 > liveness :: BwdTransfer CStmt Vars
 > liveness = mkBTransfer transfer
 >   where 
->     transfer :: forall e x. CStmt e x -> Fact x Vars -> Vars {-"\label{hoopl_eg_transfer}"-}
->     transfer (Entry _) _ = Set.empty {-"\label{hoopl_eg_transfer_entry}"-}
->     transfer (Assign var expr) facts = (var `delete` facts) `union` (uses expr) {-"\label{hoopl_eg_transfer_assign}"-}
->     transfer (Call _ exprs) facts = facts `union` unions (map uses exprs) {-"\label{hoopl_eg_transfer_call}"-}
->     transfer Return _ = Set.empty {-"\label{hoopl_eg_transfer_return}"-}
+>     transfer :: forall e x. CStmt e x -> Fact x Vars -> Vars 
+>     transfer (Entry _) _ = Set.empty 
+>     transfer (Assign var expr) facts = (var `delete` facts) `union` (uses expr) 
+>     transfer (Call _ exprs) facts = facts `union` unions (map uses exprs) 
+>     transfer Return _ = Set.empty 
 >     
->     uses :: CExpr -> Set Var {-"\label{hoopl_eg_transfer_uses}"-}
+>     uses :: CExpr -> Set Var 
 >     uses (Add e1 e2) = uses e1 `union` uses e2
 >     uses (Var v) = singleton v
 >     uses _ = Set.empty

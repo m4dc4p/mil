@@ -1,6 +1,6 @@
 %include polycode.fmt
-\begin{myfig}
-  \begin{minipage}{\hsize}
+\begin{myfig}\disableoverfull
+  \begin{minipage}{\hsize}\disableoverfull
 > data FwdPass m n f = FwdPass	{
 >     fp_lattice :: DataflowLattice f
 >   , fp_transfer :: FwdTransfer n f
