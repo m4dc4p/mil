@@ -33,8 +33,8 @@ by Lerner, Grove and Chambers \citeyearpar{Lerner2002}. In brief,
 Lerner and colleagues' dataflow algorithm interleaves analysis and
 transformation. While this technique does not provide any better
 quality solutions than Kildall's original formulation
-\citep{Kildall1973}, it arguably simplifies the implemenation of individual
-analysis. We discuss their work further in Section~\ref{hoopl_sec9}.
+\citep{Kildall1973}, it arguably simplifies the implementation of individual
+analysis. We return to Lerner and colleagues' work in Section~\ref{hoopl_sec9}.
 
 \intent{Broad description of how Hoopl abstracts the dataflow
   algorithm.} Hoopl implements the generic portions of the dataflow
@@ -91,10 +91,10 @@ data structures, and functions provided by
 Hoopl. Sections~\ref{hoopl_sec_cfg} through \ref{hoopl_sec6} give
 detailed information about each item. Throughout, we develop our
 client program to implement dead-code elimination. We conclude with a
-summary and brief discussion of our experience with Hoopl in
-Section~\ref{hoopl_sec3}. Section~\ref{hoopl_sec7} shows all the code
-for our dead-code optimization in one place, as well as output
-demonstrating the optimization shown in Figure~\ref{hoopl_fig1_b}.
+summary of Hoopl in Section~\ref{hoopl_sec3}. Section~\ref{hoopl_sec7}
+shows all the code for our dead-code optimization in one place, as
+well as output demonstrating the optimization shown in
+Figure~\ref{hoopl_fig1_b}.
 
 \section{Hoopl's API}
 \label{hoopl_sec1}
@@ -103,12 +103,12 @@ demonstrating the optimization shown in Figure~\ref{hoopl_fig1_b}.
 dataflow analysis generically, Hoopl defines several core data
 structures which client programs must use. These include the
 representation of CFGs, the type of transfer and rewrite functions,
-and the represention of the meet operator. Hoopl controls the CFG
+and the representation of the meet operator. Hoopl controls the CFG
 representation so it can traverse, propagate facts around, and rewrite
 the CFG. Hoopl specifies the type of the transfer and rewrite function
-such that they produce useable information (and rewrites). Finally,
+such that they produce usable information (and rewrites). Finally,
 Hoopl specifies the meet operator (but not its implementation) so that
-the library can recognize fixpoints.
+the library can recognize fixed points.
 
 \intent{Introduce client-managed structures} Hoopl requires that
 client programs specify those items related to their specific
@@ -118,7 +118,7 @@ and rewrite functions. Each node in the CFG typically contains an
 expression or statement from the AST of the language which the client
 program analyzes. While Hoopl controls the edges between nodes in the
 CFG, it does not specify the contents of those nodes. Similarly, while
-Hoopl determines when the analysis reaches a fixpoint, it requires
+Hoopl determines when the analysis reaches a fixed point, it requires
 that the client specify when one set of facts equals another. Finally,
 Hoopl applies the transfer and rewrite functions to the CFG but
 requires that the client program implement them for their specific AST
@@ -236,7 +236,7 @@ Figure~\ref{hoopl_fig3} gives Haskell declarations that can represent
 the AST for !+example+!. We use GHC's GADT syntax
 \citep[Section~7.4.7]{GHCManual} to specify the value of the |e| and
 |x| (``entry'' and ``exit'') types for each constructor. The entry and
-exit types given for each reflect the control-flow of the
+exit types reflect the control-flow of the
 represented statement. The |CExpr| and |Var| types do not affect
 control flow in our subset, so we do not annotate them like
 |CStmt|. Hoopl defines the |Label| type; we use it to define the
@@ -248,7 +248,7 @@ successors and predecessors of closed blocks.
 %include DeadCodeC.lhs
 %let includeAst = False
   \end{minipage}
-  \caption{Haskell datatypes capable of representing the AST of !+example+!.}
+  \caption{Haskell data declarations for representing the AST of !+example+!.}
 \label{hoopl_fig3}
 \end{myfig}
 
@@ -302,7 +302,7 @@ statement. However, the type of \refNode{hoopl_lst4_start}, |CStmt C
 O|, shows that control-flow must explicitly transfer to the block (in
 this case, through a function call). The type |CStmt O C| on
 \refNode{hoopl_lst4_return} shows the opposite --- control-flow does
-implicitly exit the block; instead, control-flow explicitly returns to
+not implicitly exit the block; instead, control-flow explicitly returns to
 the caller of the function. 
 
 \begin{myfig}
@@ -313,7 +313,7 @@ the caller of the function.
 > (<*>)     :: Graph n e O -> Graph n O x -> Graph n e x
 > (|*><*|)  :: Graph n e C -> Graph n C x -> Graph n e x
 \end{minipage}
-\caption{Hoopl's definition of the |Graph| instance for the |GraphRep| class.}
+\caption{Primitives provided by Hoopl for constructing graphs.}
 \label{hoopl_fig4}
 \end{myfig}
 
@@ -329,12 +329,13 @@ into a graph of one block with the same shape.
 
 \intent{Introduce |(<*>)|.}  The |(<*>)| operator, pronounced
 ``concat,'' connects an ``open on exit'' (|e O|) graph to one ``open
-on entry'' (|O x|). The first argument becomes the predecessor to the
-second in the concatenated graph. The resulting graph's shape, |e x|,
-combines the entry shape of the first argument and the exit shape of
-the second. For example, if |n1| has type |CStmt C O| and |n2| has
-type |CStmt O O|, then |n1 <*> n2| would have type |CStmt C O| and
-|n1| will be the unique predecessor to |n2| in |n1 <*> n2|.
+on entry'' (|O x|). The resulting graph's shape, |e x|, combines the
+entry shape of the first argument and the exit shape of the
+second. Necessarily, the graph represented by first argument becomes
+the predecessor of the graph represented by the second argument. For
+example, if |n1| has type |CStmt C O| and |n2| has type |CStmt O O|,
+then |n1 <*> n2| would have type |CStmt C O| and |n1| will be the
+unique predecessor to |n2| in |n1 <*> n2|.
 
 \begin{myfig}
 \begin{minipage}{\hsize}
@@ -362,11 +363,12 @@ combines smaller graphs into larger graphs using the |(||*><*||)|
 operator (pronounced ``append''). Unlike |(<*>)|, this operator does
 not imply any control-flow between its arguments. 
 
-Hoopl defines control-flow between blocks using the |NonLocal| class'
-two members, |entryLabel| and |successors|:\footnote{The |(||*><*||)|
-  and |(<*>)| operators in Figure~\ref{hoopl_fig4} specify a
-  |NonLocal| constraint on |n|, which we hid to simplify the
-  presentation.}
+The (<*>) operator defines control-flow within a basic block, and the
+|(||*><*||)| operator combines unconnected blocks into a larger
+graph. Hoopl defines the |NonLocal| class to bridge the gap between
+these two operators:\footnote{The |(||*><*||)| and |(<*>)| operators
+  in Figure~\ref{hoopl_fig4} specify a |NonLocal| constraint on |n|,
+  which we hid to simplify the presentation.}
 
 \begin{singlespace}
 > class NonLocal n where 
@@ -374,16 +376,25 @@ two members, |entryLabel| and |successors|:\footnote{The |(||*><*||)|
 >   successors  :: n e C -> [Label]
 \end{singlespace}
 
-Hoopl defines the |Label| type. |Labels| uniquely name blocks in the
-graph. The |entryLabel| method returns the entry point for a given
-block. A |C x| block can only be the target of an explicit
-control-flow transfer; therefore, |entryLabel| only applies to
-``closed on entry'' blocks. Similarly, |successors| returns a list of
-successors for a given block, therefore it only applies to |e C|
-blocks.
+Hoopl defines the |Label| type and the client program uses them for
+two purposes: uniquely identifying each block in the graph, and for
+specifying the explicity successors of each block in the graph. Hoopl
+use |entryLabel| method to find the entry point for a given block. The
+|n C x| type of its argument ensures |entryLabel| can only be applied
+to ``closed on entry'' nodes; precisely those nodes that can be the
+target of an explicit control-flow transfer. Similarly, Hoopl uses
+|successors| to determine the successors of a given block, but
+constrains the argument so only ``closed on exit'' blocks therefore it
+only applies to |e C| blocks.
 
-\intent{Illustrate use of |NonLocal| in our example.}
-Now we can give the |NonLocal| instance for |CStmt|:
+\intent{Illustrate use of |NonLocal| in our example.}  The client
+program must define an instance of |NonLocal| for its AST. Hoopl will
+use that instance to recover the control-flow between basic blocks in
+the CFG. In particular, this implies that the AST must store the label
+for a ``closed on entry'' node and the labels of successors for a
+``closed on exit'' node in the AST itself. This leads to the following
+instance of |NonLocal| instance for our example AST, |CStmt|:
+
 \begin{singlespace}
 %let nonLocalInst = True
 %include DeadCodeC.lhs
@@ -396,19 +407,6 @@ for |successors| as |Return| is the only ``closed on exit'' |CStmt|
 value. However, we do not specify the destination of a |Return| so
 |successors| always returns an empty list.
 
-%% \subsection*{Summary} \intent{Summarize CFGs in Hoopl} Hoopl
-%% ensures that client programs build well-formed CFGs using the |O|
-%% and |C| types. The library defines five primitives and one class
-%% for creating graphs controls graph creation through the |GraphRep|
-%% class --- and that class ensures graphs are built from basic
-%% blocks, connected by |Labels|. Hoopl recovers control-flow
-%% information using the |NonLocal| class, through its |entryLabel|
-%% and |successors| methods. This section introduced our example
-%% function, !+example+!, in Figure~\ref{hoopl_fig1}, defined an AST
-%% in Figure~\ref{hoopl_fig2} that represents the subset of the C
-%% language used by !+example+!, and showed how to build a
-%% representation of !+example+! in Figure~\ref{hoopl_fig5}.
-
 \section{Facts, Meet Operators and Lattices}
 \intent{Reminder about the role that facts and the meet operator
   play.}
@@ -418,7 +416,7 @@ Figure~\ref{fig_back14} on Page~\pageref{fig_back14}, iteratively
 computes output \emph{facts} for each block in the CFG until reaching
 a fixed point. Input facts correspond to the \inBa set for each block;
 output facts correspond to the \outBa set for the block.\footnote{In a
-  backwards analysis, the correspondance is reversed}. The first
+  backwards analysis, the correspondence is reversed}. The first
 iteration uses some initial value for each \inBa and \outBa set. Each
 subsequent iteration uses a \emph{meet operator} to combine \outBa
 sets from the predecessors of each block into an \inBa set for that
@@ -590,7 +588,7 @@ represents the set of live variables found so far. We first remove
 |var| from |f|, as assignments always eliminate live
 variables.\footnote{If this statement represents the declaration of
   |var|, then |var| will not be live again. However, if |var| is used
-  again we will add it back to the live set.}  The auxilary function |uses|
+  again we will add it back to the live set.}  The auxiliary function |uses|
 computes the live variables in |expr|; we add those variables to 
 our updated |f| and return the result. 
 
@@ -679,7 +677,7 @@ with a higher-rank type.
 receive the node to rewrite as their first argument. The facts
 computed for that node are given in the second argument. A backwards
 rewriter can receive a dictionary of facts, indexed by labels, if the
-node is closed on exit (analagous to the backwards transfer function);
+node is closed on exit (analogous to the backwards transfer function);
 otherwise, the rewriter receives a single fact. A forwards rewriter
 always receives a single fact.
 
@@ -699,7 +697,7 @@ emptyGraph|. The shape type prevents |C O| and |O C| nodes from being
 deleted. To see why, consider the shape of each node and its successor
 (or predecessor, in the second case). A |C O| node necessarily
 precedes an |O x| node. If the |C O| node were deleted, the |O x| node
-cannot replace it. A |C O| node can have zero or more predecssors; a
+cannot replace it. A |C O| node can have zero or more predecessors; a
 |O x| node can only have one. The predecessors to the |C O| node
 cannot become the predecessors to the |O x| node; therefore, deleting
 a |C O| node is not possible. A similar argument holds for |O C|
@@ -739,7 +737,7 @@ nodes.
 Figure~\ref{hoopl_fig12} shows |eliminate|, the rewrite function for
 our example optimization. We define the local function |rewrite| by
 cases for each constructor in |CStmt|. All cases except |Assign|
-return |Nothing|, leaving the CFG uchanged. If the test |not (var
+return |Nothing|, leaving the CFG unchanged. If the test |not (var
 `member` live)| in the |Assign| case succeeds, |rewrite| removes the
 assignment by returning |Just emptyGraph|. Otherwise, the assignment
 remains.
@@ -933,3 +931,17 @@ void example() \{
 %%
 \noindent\end{document}
 
+
+% LocalWords:  Hoopl dataflow Haskell Hoopl's Kildall's CFG rewriter hoopl API
+% LocalWords:  liveness CFGs AST parameterization parameterized stmt pred curr
+% LocalWords:  succ invis GHC's GADT CExpr CStmt lst assignc Const mkFirst Bool
+% LocalWords:  mkMiddle mkLast GraphRep concat NonLocal entryLabel OldFact expr
+% LocalWords:  DataflowLattice NewFact ChangeFlag newtype NoChange SomeChange
+% LocalWords:  changeIf FwdTransfer BwdTransfer mkFTransfer mkBTransfer forall
+% LocalWords:  parameterize GHCManual FactBase exprs Kildall FwdRewrite monadic
+% LocalWords:  mkFRewrite mkBRewrite Rewriters emptyGraph FuelMonad Whalley fp
+% LocalWords:  BwdPass FwdPass analyzeAndRewriteBwd analyzeAndRewriteFwd bp
+% LocalWords:  CheckpointMonad LabelsPtr MaybeC MaybeO monad deadCode JustC
+% LocalWords:  runInfinite runSimpleUniqueMonad UniqueMonad CheckingFuelMonad
+% LocalWords:  SimpleUniqueMonad analyzedAndRewriteBwd entryPoints runWithFuel
+% LocalWords:  infiniteFuel printf
