@@ -99,11 +99,12 @@
 %if includeDeadCode || includeAll
 
 > deadCode :: Graph CStmt C C -> Graph CStmt C C
-> deadCode program = runSimpleUniqueMonad $ runWithFuel infiniteFuel $ do
->       (program', _, _) <- (analyzeAndRewriteBwd 
->                            pass (JustC entryPoints) program facts)
->       return program' :: SimpleFuelMonad (Graph CStmt C C)
+> deadCode program = runSimpleUniqueMonad $ runWithFuel infiniteFuel $ opt
 >   where
+>     opt :: CheckingFuelMonad SimpleUniqueMonad (Graph CStmt C C))
+>     opt = do
+>       (program', _, _) <- analyzeAndRewriteBwd pass (JustC entryPoints) program facts
+>       return program' 
 >
 >     pass = BwdPass { bp_lattice = lattice
 >                   , bp_transfer = liveness 
