@@ -101,7 +101,7 @@
 > deadCode :: Graph CStmt C C -> Graph CStmt C C
 > deadCode program = runSimpleUniqueMonad $ runWithFuel infiniteFuel $ opt
 >   where
->     opt :: CheckingFuelMonad SimpleUniqueMonad (Graph CStmt C C))
+>     opt :: CheckingFuelMonad SimpleUniqueMonad (Graph CStmt C C)
 >     opt = do
 >       (program', _, _) <- analyzeAndRewriteBwd pass (JustC entryPoints) program facts
 >       return program' 
