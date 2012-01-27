@@ -1,11 +1,6 @@
 %&preamble
-\input{nodocclass}
-\ifnodocclass
-  \documentclass[12pt]{report}
-  \usepackage{standalone}
-  \input{tikz.preamble}
-  \input{preamble}
-\else\fi
+\input{nodocclass}\dodocclass
+%include polycode.fmt
 %include lineno.fmt
 %include subst.fmt
 \begin{document}
@@ -508,7 +503,7 @@ Part~\subref{mil_fig_monadic_comp}.
 \begin{myfig}
   \begin{tabular}{cc}
     |f = 1| & 
-    \begin{minipage}[t]{1in}
+    \begin{minipage}{1.5in}\disableoverfull
 > m = do 
 >   print 0
 >   return 1
@@ -551,17 +546,21 @@ an effect each time.
     \begin{minipage}[t]{\widthof{|hello = print "hello"|}}
 > hello = do
 >   print 0
->
+    \end{minipage} &     
+    \begin{minipage}[t]{\widthof{\ \ \binds \_ <- \invoke v207/;}}
+      \begin{AVerb}[gobble=8,numbers=left]
+        \block hello(): \mkthunk[m:] \label{mil_fig_thunk_hello}
+        \block m():
+          \ldots
+      \end{AVerb} 
+    \end{minipage} \\
+    \begin{minipage}[t]{\widthof{|hello = print "hello"|}}
 > main = do
 >   hello
 >   hello
     \end{minipage} &
     \begin{minipage}[t]{\widthof{\ \ \binds \_ <- \invoke v207/;}}
       \begin{AVerb}[gobble=8,numbers=left]
-        \block hello(): \mkthunk[m:] \label{mil_fig_thunk_hello}
-        \block m():
-          \ldots
-
         \block main(): 
           \vbinds t1 <- \goto hello(); \label{mil_fig_get_hello1}
           \vbinds \_ <- \invoke t1/; \label{mil_fig_invoke_hello1}
@@ -592,11 +591,11 @@ than here.
 
 \begin{myfig}
   \begin{tabular}{cc}
-    \begin{minipage}[t]{\widthof{|kleisli f g x = do|\quad}}
+    \begin{minipage}[t]{2in}\disableoverfull
 > kleisli f g x = do
 >   v <- g x
 >   f v
-    \end{minipage} & \begin{minipage}[t]{\widthof{\ \ \block b204 (g, x, f): \mkthunk[m205:g, x, f]}}
+    \end{minipage} & \begin{minipage}[t]{\widthof{\ \ \block b204 (g, x, f): \mkthunk[m205:g, x, f]}}\disableoverfull
       \begin{AVerb}[gobble=8,numbers=left]
         \block kleisli(): \mkclo[k201:]
         \ccblock k201()f: \mkclo[k202:f]

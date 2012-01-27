@@ -1,11 +1,6 @@
 %&preamble
-\input{nodocclass}
-\ifnodocclass
-  \documentclass[12pt]{report}
-  \usepackage{standalone}
-  \input{tikz.preamble}
-  \input{preamble}
-\else\fi
+\input{nodocclass}\dodocclass
+%include polycode.fmt
 %include lineno.fmt
 %include subst.fmt
 \begin{document}
@@ -250,7 +245,6 @@ possible block shapes.
     lines show required blocks. }
   \label{hoopl_tbl1}
 \end{myfig}
-\showthe\emergencystretch
 
 \intent{Show example with O and C types applied.}
 Figure~\ref{hoopl_fig3} gives Haskell declarations that can represent

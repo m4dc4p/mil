@@ -1,14 +1,10 @@
 %&preamble
-\input{nodocclass}
-\ifnodocclass
-  \documentclass[12pt]{report}
-  \usepackage{standalone}
-  \input{tikz.preamble}
-  \input{preamble}
-\else\fi
+\input{nodocclass}\dodocclass
 %include polycode.fmt
+%include lineno.fmt
+%include subst.fmt
 \begin{document}
-
+\numbersoff
 \input{document.preamble}
 \renewcommand{\textfraction}{0.1}
 \renewcommand{\topfraction}{0.9}

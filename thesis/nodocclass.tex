@@ -11,3 +11,26 @@
     \else\let\which=\notloaded%%
     \fi%%
   \fi\which}
+%%
+%% Handles setting documentclass and inputting
+%% files when a document is compiled by itself
+%% or as part of the thesis, and if preamble.fmt
+%% is present or not.
+%%
+\makeatletter\def\dodocclass{\@ifundefined{preambledocclass}{%%
+    %% This code executes when preamble.fmt does NOT
+    %% exist.
+  \documentclass[12pt]{report}%%
+  \input{tikz.preamble}%%
+  \input{preamble}}{%%
+    %% This code executes when preamble.fmt exists.
+ \ifx\documentclass\@twoclasseserror%%
+    %% This code executes when \dodocclass is
+    %% evaluated in context of a top-level file.
+    \expandafter\@gobble%%
+ \else%%
+    %% This code executes when \dodocclass is
+    %% evaluated in sub-file.
+    \expandafter\@firstofone%%
+ \fi%%
+ {\documentclass[class=report]{standalone}}}}\makeatother%%
