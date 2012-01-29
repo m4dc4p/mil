@@ -358,9 +358,12 @@
 \newcommand\intent[1]{{\begin{singlespace}\noindent\leftskip=-1in\emph{\footnotesize Intent: #1}\end{singlespace}}\nopagebreak[1]}
 
 %% In aligned/alignedat/gathered environments, you don't et
-%% automatice equation numbers. This command makes sure to
+%% automatic equation numbers. This command makes sure to
 %% label them properly.
 \newcommand\labeleq[1]{\refstepcounter{equation}\label{#1}}
+
+%% Labels an equation in an aligned environment.
+\newcommand\labeledeq[1]{\labeleq{#1}\eqref{#1}}
 
 %% Creates a hanging paragraph, where the first line is not
 %% indented but all other lines are.

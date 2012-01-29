@@ -869,6 +869,12 @@ not arbitrary expressions. The |Tail| constructors implement that
 restriction by only taking |Name| arguments. Similarly, |Stmt|
 constructors do not take any argument but |Names| or |Tails|.
 
+\section{Related Work}
+
+\subsection{Compiling with Continuations}
+
+\intent{Describe criticisms by Kennedy against his MIL; compare to our MIL.}
+
 \section{Summary}
 \label{mil_sec6}
 

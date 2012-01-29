@@ -941,6 +941,10 @@ create the |blocks| argument passed to |collapseRewrite|. The
 creates the appropriate |Jump| or |Capture| value. The result of
 |destinations| becomes the |blocks| argument for |collapseRewrite|.
 
+\section{Related Work}
+
+\intent{Describe the work of Danvy, Apel, and Tarditi; contrast to MIL uncurrying.}
+
 \section{Future Work}
 \label{uncurry_sec_future}
 \intent{Discuss strategies for uncurrying: local only, across blocks,
