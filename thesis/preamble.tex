@@ -251,7 +251,7 @@
     \ensurett{#2}%%
     \mathclose{\copy\brackrbox}\xspace}}
 %% Binding statement: v <- {...}
-\protected\def\binds#1<-#2;{\ensuremath{\ensurett{\removespaces #1\texttt{<-}#2}\xspace}}
+\protected\def\binds#1<-#2;{\ensuremath{\ensurett{\removespaces #1\ \texttt{<-}\ \removespaces #2}\xspace}}
 %% In order to use \binds in verbatim environment, have to define
 %% delimiters while they are active. The below defines \vbinds which
 %% must be used in AVerb environments.  Notice the active space as

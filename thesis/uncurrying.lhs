@@ -327,7 +327,7 @@ one enter operation (\app v210 * f/), and the creation of one closure
 \intent{Describe uncurrying in more general terms -- what do we do,
   what don't we do.}  Our uncurrying optimization transforms MIL
 programs to eliminate \enter operations as we did by hand for the
-program in Figure~\ref{uncurry_fig_compose_a}. In essence, we detemine
+program in Figure~\ref{uncurry_fig_compose_a}. In essence, we determine
 if an \enter operation results in a known closure, allowing us to
 replace that expression with the closure returned.
 
@@ -480,14 +480,16 @@ entered it.
 \intent{Point out we don't inline closures from |Goto| expressions.}
 The example we discussed in Section~\ref{uncurry_sec_mil} does not
 match with the optimization just discussed on one crucial point:
-replacing calls to normal blocks on the \rhs of a \mbind with
-their closure result. Our implementation relies on another, more
-general, optimization that inlines simple blocks into their
-predecessor. We describe the optimization in detail in
-Chapter~\ref{ref_chapter_monadic}, but in short that optimization will
-inline calls to blocks such as \lab compose/, so a statement like \binds v <-
-\goto compose(); becomes \binds v <- \mkclo[absBodyL201:];, where \lab absBodyL201/ is the
-label in the closure returned by \goto compose().
+replacing calls to normal blocks on the \rhs of a \mbind with their
+closure result. Our implementation relies on another, more general,
+optimization that inlines simple blocks into their predecessor. We
+discuss the optimization in Chapter~\ref{ref_chapter_conclusion},
+Section~\ref{conc_inline_monadic} on
+Page~\pageref{conc_inline_monadic}, but in short that optimization
+will inline calls to blocks such as \lab compose/, so a statement like
+\binds v <- \goto compose(); becomes \binds v <-
+\mkclo[absBodyL201:];, where \lab absBodyL201/ is the label in the
+closure returned by \goto compose().
 
 \section{Implementation}
 \label{uncurry_sec_impl}

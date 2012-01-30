@@ -14,6 +14,7 @@
 \section{Future Work}
 
 \subsection{Inlining Monadic Code}
+\label{conc_inline_monadic}
 
 Wadler gave the so-called \emph{monad laws} \citeyearpar{Wadler1995},
 which state properties that all well-defined monads will obey. Figure
@@ -140,7 +141,29 @@ the use of \var x/:
 
 \subsection{Eliminating Thunks}
 
-\subsection{Dead-Code Eliminiation}
+\subsection{Dead-Code Elimination}
+
+At least two forms of dead-code elimination apply to MIL: eliminating 
+useless bindings and eliminating unused blocks. Both arise when
+applying the uncurrying optimization discussed in Chapter~\ref{ref_chapter_uncurrying}.
+
+A useless binding causes no side-effects and assigns to a variable
+that is not subsequently used. On Page~\pageref{uncurry_fig_compose},
+we gave the \lamC definition of |compose1|, which just captures the
+first argument to |compose|, and the corresponding MIL code:
+
+> compose1 f = compose f
+
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}
+    \block compose1(): \mkclo[absBodyL208:]
+    \ccblock absBodyL208()f: \goto absBlockL209(f)
+    \block absBlockL209(f):
+    \vbinds v210 <- \goto compose(); \label{absBlockL209_call}
+    \app v210 * f/ \label{absBlockL209_enter}
+  \end{AVerb}
+\end{singlespace}
+
 
 \subsection{Push Through Cases}
 
