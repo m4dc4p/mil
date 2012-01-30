@@ -88,7 +88,7 @@ following MIL block:
   \begin{AVerb}[gobble=4]
     \block b(\dots):
       \dots
-      \app f*y/
+      \app f * y/
   \end{AVerb}
 \end{singlespace}
 

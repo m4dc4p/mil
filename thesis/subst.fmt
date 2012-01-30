@@ -1,7 +1,7 @@
 %format . = "\ .\ "
 %format ^ = "\char`^"
 %format == = "=="
-%format /= = "/="
+%format /= = "\mathbin{/\hskip-2\thinskipamt=}"
 %format not = "\ensuremath{\mathit{not}}"
 %format t_1 = "\ensuremath{t_1}"
 %format t_2 = "\ensuremath{t_2}"
