@@ -143,27 +143,66 @@ the use of \var x/:
 
 \subsection{Dead-Code Elimination}
 
-At least two forms of dead-code elimination apply to MIL: eliminating 
-useless bindings and eliminating unused blocks. Both arise when
-applying the uncurrying optimization discussed in Chapter~\ref{ref_chapter_uncurrying}.
+The Left-Unit (Equation~\eqref{eq_left_unit} on
+Page~\pageref{eq_left_unit}) law lets us eliminate a simple form of
+dead-code, in which we can guarantee that the binding eliminated has
+no observable side-effect. However, the law does not apply to any
+monadic expression more complicated than |return x|. We treat
+allocation as a monadic operation in MIL, but we cannot really observe
+any side-effect of allocation (except our program may consumre more
+memory or run slower). Therefore we can eliminate any closure, thunk
+or constructor allocation expressions that bind to a dead variable.
 
-A useless binding causes no side-effects and assigns to a variable
-that is not subsequently used. On Page~\pageref{uncurry_fig_compose},
-we gave the \lamC definition of |compose1|, which just captures the
-first argument to |compose|, and the corresponding MIL code:
-
-> compose1 f = compose f
+On Page~\pageref{uncurry_fig_compose}, we gave the \lamC definition of
+|compose1|, which just captures the first argument to |compose|, and the
+corresponding MIL code:
 
 \begin{singlespace}\correctspaceskip
-  \begin{AVerb}
+  \begin{AVerb}[gobble=4]
     \block compose1(): \mkclo[absBodyL208:]
     \ccblock absBodyL208()f: \goto absBlockL209(f)
     \block absBlockL209(f):
-    \vbinds v210 <- \goto compose(); \label{absBlockL209_call}
-    \app v210 * f/ \label{absBlockL209_enter}
+      \vbinds v210 <- \goto compose(); 
+      \app v210 * f/ 
+    
+    \block compose(): \mkclo[absBodyL201:]
+    \ccblock absBodyL201()f: \mkclo[absBodyL202:f]
   \end{AVerb}
 \end{singlespace}
 
+\noindent We can use the Associativity law (Equation~\eqref{eq_assoc} on
+Page~\pageref{conc_inline_monadic}) to inline the allocation returned
+by block \lab compose/ into block \lab absBlockL209/, giving us:
+
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \dots
+    \block absBlockL209(f):
+      \vbinds v210 <- \mkclo[absBodyL201:]; 
+      \app v210 * f/ 
+    
+    \block compose(): \mkclo[absBodyL201:]
+    \ccblock absBodyL201()f: \mkclo[absBodyL202:f]
+  \end{AVerb}
+\end{singlespace}
+
+\noindent Our uncurrying optimization then rewrites block \lab absBlockL209/ so it
+directly returns the closure previously returned by \lab absBodyL201/:
+
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \dots
+    \block absBlockL209(f):
+      \vbinds v210 <- \mkclo[absBodyL201:]; 
+      \mkclo[absBodyL202:f]
+    
+    \block compose(): \mkclo[absBodyL201:]
+    \ccblock absBodyL201()f: \mkclo[absBodyL202:f]
+  \end{AVerb}
+\end{singlespace}
+
+\noindent We can then apply dead-code eliminiation to remove the allocation
+bound to \var v210/, since that variable is now dead.
 
 \subsection{Push Through Cases}
 
