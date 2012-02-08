@@ -153,7 +153,7 @@ value \var f/, \var t/ or \var f/ (respectively), and \var ys/.
 
 \begin{myfig}
   \begin{tabular}{cc}
-\begin{minipage}{1in}
+\begin{minipage}{3in}
 > uncurry xs t y n f = 
 >   let cap ys g v = (g v) ys
 >       cap1 = cap xs
@@ -161,7 +161,7 @@ value \var f/, \var t/ or \var f/ (respectively), and \var ys/.
 >        True -> (cap1 f) y
 >        False -> (cap1 f) n
 \end{minipage} &
-\begin{minipage}{1in}
+\begin{minipage}{3in}
    \begin{AVerb}[gobble=6]
       \block uncurry4 (t, f, y, n, xs):
         \vbinds cap1 <- \mkclo[k203:xs];
@@ -179,8 +179,8 @@ value \var f/, \var t/ or \var f/ (respectively), and \var ys/.
         \app v212*n/
       \block caseEval214 (t, cap1, f, y, n):
         \case t;
-          %\alt True () -> \goto altTrue208(cap1, f, y);
-          %\alt False () -> \goto altFalse211(cap1, f, n);
+          \valt True()->\goto altTrue208(cap1, f, y);
+          \valt False()->\goto altFalse211(cap1, f, n);
    \end{AVerb}
 \end{minipage} \\\\
   \scap{conc_uncurry_a} & \scap{conc_uncurry_b}  
@@ -196,8 +196,8 @@ Therefore, we could reasonably uncurry \lab altFalse211/ and
   \begin{AVerb}
     ...
     b205 (g, v, ys):
-      v206 <- g @ v
-      v206 @ ys
+      v206 <- \app g*v/
+      \app v206*ys/
     altTrue208 (cap1, f, y):
       b205(f, y, ?)
     altFalse211 (cap1, f, n):
@@ -211,12 +211,12 @@ in scope that is expected by \lab b205/. That argument is captured
 by \var cap1/. In order to bring it in scope, we need to rewrite the live
 variables available to each block, starting from \lab caseEval214/:
 
-\begin{singlespace}
+\begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
     ...
     b205 (g, v, ys):
-      v206 <- g @ v
-      v206 @ ys
+      v206 <- \app g*v/
+      \app v206*ys/
     altTrue208 (ys, f, y):
       b205(f, y, ys)
     altFalse211 (ys, f, n):

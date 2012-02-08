@@ -259,6 +259,8 @@
 %% first argument) in the verbatim environment gets eaten.
 \begingroup\catcode`\!=\active \lccode`\!=`\< \lccode`\~=`\- 
   \catcode`\ =\active\lowercase{\endgroup\def\vbinds#1!~#2;}{\binds#1<-#2;}
+\begingroup\catcode`\!=\active \lccode`\!=`\> \lccode`\~=`\- 
+  \catcode`\ =\active\lowercase{\endgroup\def\valt#1(#2)#3~!#4;}{\alt#1(#2)#3->#4;}
 %% Return statement: return ... ;
 \protected\def\return#1/{\milres return/\ensurett{\ \removespaces #1}}
 %% A closure capturing block. k {v1, ..., vN} x: ...
@@ -277,7 +279,7 @@
 %% Case statement
 \protected\def\case#1;{\milres case\ \ensuremath{\ensurett{\removespaces #1}}\ of/}
 %% Case alternative
-\protected\def\alt#1(#2)#3->#4;{\ensuremath{\ensurett{#1\ \ignorespaces#2\ \texttt{->}\ \ignorespaces #4}}}
+\protected\def\alt#1(#2)#3->#4;{\ensuremath{\ensurett{\ignorespaces #1\ \ignorespaces#2\ \texttt{->}\ \ignorespaces #4}}}
 %% Invoke
 \protected\def\invoke#1/{\edef\arg{#1}%%
   \milres invoke/\ifx\arg\empty%%
