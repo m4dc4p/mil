@@ -139,6 +139,98 @@ the use of \var x/:
 
 \subsection{Uncurrying Across Blocks}
 
+Our uncurrying optimization only works within a single MIL
+block. Extending the optimization across blocks seems obvious, but
+presents several implementation challenges. Figure~\ref{conc_uncurry}
+illustrates why. In Part~\subref{conc_uncurry_a}, |cap1| partially
+applies |cap|, capturing |xs|. In turn, |cap1| is applied to |f| and
+either |y| or |n| in the arms of the |case| statement. In
+Part~\subref{conc_uncurry_b}, the \lab uncurry/ block creates the
+closure represented by |cap1|. Tracing the usage of that closure
+through \lab caseEval214/ shows that the two case arm blocks, \lab
+altTrue208/ and \lab altFalse211/, eventually call \lab b205/ with the
+value \var f/, \var t/ or \var f/ (respectively), and \var ys/.
+
+\begin{myfig}
+  \begin{tabular}{cc}
+\begin{minipage}{1in}
+> uncurry xs t y n f = 
+>   let cap ys g v = (g v) ys
+>       cap1 = cap xs
+>   in case t of 
+>        True -> (cap1 f) y
+>        False -> (cap1 f) n
+\end{minipage} &
+\begin{minipage}{1in}
+   \begin{AVerb}[gobble=6]
+      \block uncurry4 (t, f, y, n, xs):
+        \vbinds cap1 <- \mkclo[k203:xs];
+        \goto caseEval214(t, cap1, f, y, n)
+      \ccblock k203(ys)g: \mkclo[k204: g, ys]
+      \ccblock k204(g, ys)v: \mkclo[b205: g, v, ys]
+      \block b205 (g, v, ys):
+        \vbinds v206 <- \app g*v/;
+        \app v206*ys/
+      \block altTrue208(cap1, f, y):
+        \vbinds v209 <- \app cap1*f/;
+        \app v209*y/
+      \block altFalse211(cap1, f, n):
+        \vbinds v212 <- \app cap1*f/;
+        \app v212*n/
+      \block caseEval214 (t, cap1, f, y, n):
+        \case t;
+          %\alt True () -> \goto altTrue208(cap1, f, y);
+          %\alt False () -> \goto altFalse211(cap1, f, n);
+   \end{AVerb}
+\end{minipage} \\\\
+  \scap{conc_uncurry_a} & \scap{conc_uncurry_b}  
+  \end{tabular}
+  \caption{}
+  \label{conc_uncurry}
+\end{myfig}
+
+Therefore, we could reasonably uncurry \lab altFalse211/ and
+\lab altTrue208/ to call the block directly:
+
+\begin{singlespace}
+  \begin{AVerb}
+    ...
+    b205 (g, v, ys):
+      v206 <- g @ v
+      v206 @ ys
+    altTrue208 (cap1, f, y):
+      b205(f, y, ?)
+    altFalse211 (cap1, f, n):
+      b205(f, n, ?)
+  \end{AVerb}
+\end{singlespace}
+
+\noindent Unfortuantely, as represetned by the !+?+! symbol,
+\lab altTrue208/ and \lab altFalse211/ do not have the \var ys/ argument
+in scope that is expected by \lab b205/. That argument is captured
+by \var cap1/. In order to bring it in scope, we need to rewrite the live
+variables available to each block, starting from \lab caseEval214/:
+
+\begin{singlespace}
+  \begin{AVerb}[gobble=4]
+    ...
+    b205 (g, v, ys):
+      v206 <- g @ v
+      v206 @ ys
+    altTrue208 (ys, f, y):
+      b205(f, y, ys)
+    altFalse211 (ys, f, n):
+      b205(f, n, ys)
+    caseEval214 (t, ys, f, y, n):
+      case t of
+        True -> altTrue208(ys, f, y)
+        False -> altFalse211(ys, f, n)
+  \end{AVerb}
+\end{singlespace}
+
+Rewriting blocks to track live variables in order to support this
+optimization does not seem impossible, but it does seem tricky.
+
 \subsection{Eliminating Thunks}
 
 \subsection{Dead-Code Elimination}
@@ -208,7 +300,7 @@ bound to \var v210/, since that variable is now dead.
 
 \subsection{Lazy Code Motion}
 
-\section{Future Work: Compiling MIL}
+\section{Future Work: MIL}
 
 \subsection{Register Allocation through Renaming}
 

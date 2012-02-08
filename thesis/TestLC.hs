@@ -1004,12 +1004,13 @@ L211 caseEvalL211 (map1, t, f):
 
 -}
 uncurry4 = [("uncurry4",
-             _let "mapCap" (lam "xs" $ \xs ->
-                            lam "t" $ \t ->
-                            lam "f" $ \f -> f `app` xs `app` t) $ \mapCap ->
-             _let "map1" (mapCap `app` var "xs") $ \map1 ->
-             _case (lit 1) $
-                (alt "1" [] $ \_ -> map1 `app` var "t" `app` var "f"))]
+             _let "cap" (lam "ys" $ \ys ->
+                            lam "g" $ \g ->
+                            lam "v" $ \v -> g `app` v `app` ys) $ \cap ->
+             _let "cap1" (cap `app` var "xs") $ \cap1 ->
+             _case (var "t") $
+                (alt "True" [] $ \_ -> cap1 `app` var "f" `app` var "y") .
+                (alt "False" [] $ \_ -> cap1 `app` var "f" `app` var "n"))]
 
 uncurry5 = [("uncurry5",
            lam "f" $ \f ->
