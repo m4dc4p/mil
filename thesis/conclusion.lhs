@@ -140,6 +140,50 @@ the use of \var x/:
 
 \subsection{Eliminating Thunks}
 
+Monadic thunks and closures share many characteristics. For example,
+they both represent suspended computation, and they both capture an
+environment of values. They also can be a source of inefficiency, as
+well. Our compiler for \lamC to MIL produces many blocks the
+immediately invoke some thunk. For example, the following \lamC
+definition:
+
+> main x = do
+>   print x
+
+\noindent compiles to this MIL code (in part):
+
+\begin{singlespace}
+  \begin{AVerb}
+    \block printmon (a): \mkthunk[printbody: a]
+    \block printbody (a): \prim print(a)
+
+    \block main (x):
+      \vbinds v206 <- \mkclo[printmon:];
+      \vbinds v207 <- \app v206 * x/;
+      \vbinds () <- \invoke v207/;
+  \end{AVerb}
+\end{singlespace}
+
+\noindent The application \app v206 * x/ results in a thunk (\mkthunk
+[printbody: a]) which is immediately invoked. A more efficient program
+would bypass the allocation and instead directly invoke the monadic
+action:
+
+\begin{singlespace}
+  \begin{AVerb}
+    \block printmon (a): \mkthunk[printbody: a]
+    \block printbody (a): \prim print(a)
+
+    \block main (x):
+      \vbinds v206 <- \mkclo[printmon:];
+      \vbinds v207 <- \mkthunk[printbody: x];
+      \vbinds () <- \invoke v207/;
+  \end{AVerb}
+\end{singlespace}
+
+\noindent It seems our uncurrying analysis could be adapted to thunks in order to
+implement such an optimization.
+
 \subsection{Dead-Code Eliminiation}
 
 \subsection{Push Through Cases}

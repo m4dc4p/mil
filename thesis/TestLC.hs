@@ -815,8 +815,8 @@ myMap = [("map",
 myId = ("id", lam "x" $ \x -> x)
 
 -- A function that executes a monadic primitive
--- directly, with no function applicatin
-simplePrint = [("simplePrint", lam "x" $ \x -> mPrint `app` x)]
+-- directly, with no function application
+simplePrint = [("simplePrint", lam "x" $ \x -> bindE "()" (mPrint `app` x) $ \x -> ret x)]
 
 -- A function where the result of a Case statement is
 -- applied to an argument

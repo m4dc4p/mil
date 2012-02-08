@@ -254,7 +254,7 @@ the captured argument.
 \ccblock absBodyL202(f)g: \mkclo[absBodyL203:f, g]
 \ccblock absBodyL203(f, g)x: \goto absBlockL204(f, g, x)
 \block absBlockL204(f, g, x):
-  \vbinds v205 <- \app g * x/;
+  \vbinds v205 <- \app g*x/;
   \app f * v205/
       \end{AVerb}
     \end{minipage} \\
