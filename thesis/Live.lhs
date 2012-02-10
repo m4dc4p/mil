@@ -229,10 +229,9 @@ statement should not be modified.
 
 
 For completeness, our |safe| function is below. Instructions that only
-allocate are considered safe. |Prim| actions are also considered safe,
-because we assume they do no contain side-effects. We do not consider
-|Goto| expressions safe, as the block called may contain a |Run|
-expression.
+allocate are considered safe. We do not consider |Goto| expressions
+safe, as the block called may contain a |Run| expression. |Prim| and
+|Enter| expressions are not safe, as they may have side-effects.
 
 %if False
 
@@ -246,8 +245,6 @@ expression.
 >     safe (Return _) = True
 >     safe (Closure _ _) = True
 >     safe (Constr _ _) = True
->     safe (Prim _ _) = True 
->     safe (Enter _ _) = True
 >     safe (Thunk _ _) = True 
 >     safe (LitM _) = True
 >     safe _ = False
