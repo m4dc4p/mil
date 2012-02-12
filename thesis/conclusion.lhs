@@ -342,13 +342,181 @@ bound to \var v210/, since that variable is now dead.
 
 \subsection{Push Through Cases}
 
-\subsection{Lazy Code Motion}
+> dec :: Int -> Maybe Int
+> dec i = if i > 0 
+>          then Just (i - 1)
+>          else Nothing
+>
+> loop :: Int -> (Int -> Int) -> Int
+> loop n f = case dec n of
+>   Just i -> loop (f n) f
+>   Nothing -> f 0
 
-\section{Future Work: MIL}
+\begin{myfig}
+  \begin{minipage}{\textwidth}
+    \begin{singlespace}
+      \begin{AVerb}[gobble=8]
+        \block loop(n, f):
+           \vbinds v215<- \goto dec(n);
+           \case v215;
+              \valt{}Just(i)->\goto altJust(f, i);
+              \valt{}Nothing()->\goto altNothing(f);
+      
+        \block dec(i):
+           \vbinds v233<- \prim gt(i, 0);
+           \case v233;
+              \valt{}True()->\goto altTrue(i);
+              \valt{}False()->\goto altFalse();
+      
+        \block altNothing(f): \app{}f * 0/
+      
+        \block altJust(f, n):
+           \vbinds v207<- \app f*n/;
+           \goto loop(v207, f)
+      
+        \block altTrue(i):
+           \vbinds v225<- \prim minus(i, 1);
+           \prim Just(v225)
+      
+        \block altFalse(): \prim Nothing()
+      \end{AVerb}
+    \end{singlespace}
+  \end{minipage}
+  \caption{Initial form of our function.}
+\end{myfig}
 
-\subsection{Register Allocation through Renaming}
+\begin{myfig}
+  \begin{minipage}{\textwidth}
+    \begin{singlespace}
+      \begin{AVerb}[gobble=8]
+        \block loop(n, f):
+           \vbinds v233<- \prim gt(i, 0);
+           \case v233;
+              \valt{}True()->\goto altTrue(i, f, n);
+              \valt{}False()->\goto altFalse(f, n);
+      
+        \block altTrue(i, f, n):
+           \vbinds v225<- \prim minus(i, 1);
+           \vbinds v215<-\prim Just(v225);
+           \case v215;
+              \valt{}Just(i)->\goto altJust(f, i);
+              \valt{}Nothing()->\goto altNothing(f);
+      
+        \block altFalse(f, n): 
+           \vbinds v215<-\prim Nothing();
+           \case v215;
+              \valt{}Just(i)->\goto altJust(f, n);
+              \valt{}Nothing()->\goto altNothing(f);
+    
+        \block altNothing(f): \app{}f * 0/
+      
+        \block altJust(f, n):
+           \vbinds v207<- \app f*n/;
+           \goto loop(v207, f)
+      
+      \end{AVerb}
+    \end{singlespace}
+  \end{minipage}
+  \caption{First transformation.}
+\end{myfig}
 
-\section{Related Work}
+\begin{myfig}
+  \begin{minipage}{\textwidth}
+    \begin{singlespace}\correctspaceskip
+      \begin{AVerb}[gobble=8]
+        \block loop(n, f):
+           \vbinds v233<- \prim gt(i, 0);
+           \case v233;
+              \valt{}True()->\goto altTrue(i, f, n);
+              \valt{}False()->\goto altFalse(f, n);
+      
+        \block altTrue(i, f, n):
+           \vbinds v225<- \prim minus(i, 1);
+           \goto altJust(f, v225)
+      
+        \block altFalse(f, n): 
+           \goto altNothing(f)
+    
+        \block altNothing(f): \app{}f * 0/
+      
+        \block altJust(f, n):
+           \vbinds v207<- \app f*n/;
+           \goto loop(v207, f)
+      \end{AVerb}
+    \end{singlespace}
+  \end{minipage}
+  \caption{Final form of our functino.}
+\end{myfig}
+
+\begin{myfig}
+  \begin{tikzpicture}[>=stealth, node distance=.5in]\nomd
+    
+  \node[stmt] (loop) {
+    \begin{minipage}{2.4in}
+      \begin{AVerb}[gobble=8]
+        \block loop(n, f):
+          \vbinds v215<- \goto dec(n);
+          \case v215;
+            \valt{}Just(i)->\goto altJust(f, i);
+            \valt{}Nothing()->\goto altNothing(f);
+      \end{AVerb}
+    \end{minipage}
+  };
+
+  \node[stmt, right=0.45in of loop] (dec) {
+    \begin{minipage}{2.2in}
+      \begin{AVerb}[gobble=8]
+        \block dec(i):
+          \vbinds v233<- \prim gt(i, 0);
+          \case v233;
+            \valt{}True()->\goto altTrue(i);
+            \valt{}False()->\goto altFalse();
+      \end{AVerb}
+    \end{minipage}
+  };
+
+  \node[stmt, below right=0.35in and -1.15in of loop] (altNothing) {
+    \begin{minipage}{\widthof{\block altNothing(f):}}
+      \begin{AVerb}[gobble=8]
+        \block altNothing(f):
+           \app{}f * 0/
+      \end{AVerb}
+    \end{minipage}
+  };
+
+  \node[stmt, below left=0.35in and -1.15in of loop] (altJust) {
+    \begin{minipage}{\widthof{\block altJust(f, n):\ \ \ }}
+      \begin{AVerb}[gobble=8]
+        \block altJust(f, n):
+          \vbinds v207<- \app f*n/;
+          \goto loop(v207, f)
+      \end{AVerb}
+    \end{minipage}
+  };
+
+  \node[stmt, below=0.35in of dec] (altTrue) {
+    \begin{minipage}{\widthof{\block altTrue(i): \prim minus(i, 1)}}
+      \begin{AVerb}[gobble=8]
+        \block altTrue(i):
+          \vbinds v225<- \prim minus(i, 1);
+          \prim Just(v225)
+      \end{AVerb}
+    \end{minipage}
+  };
+
+  \node[stmt, below=0.35in of altTrue] (altFalse) {
+    \begin{minipage}{\widthof{\block altFalse(): \prim Nothing()}}
+      \begin{AVerb}[gobble=8]
+        \block altFalse(): \prim Nothing()
+      \end{AVerb}
+    \end{minipage}
+  };
+
+  \draw [->] (loop.south) ||- ($(loop.south) - (0in,0.1in)$) -|| (altJust.north);
+  \draw [->] (loop.south) ||- ($(loop.south) - (0in,0.1in)$) -|| (altNothing.north);
+  \draw [->] (altJust.south) ||- ($(altJust.south) - (1in,0.3in)$) ||- (loop.west);
+  \end{tikzpicture}
+\end{myfig}
 
 \section{Summary}
 

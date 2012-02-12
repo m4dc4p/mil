@@ -303,6 +303,8 @@ prims = [printPrim
         , neqPrim
         , ("mkData_Nil", mkDataPrim "Nil" 0)
         , ("mkData_Cons", mkDataPrim "Cons" 2)
+        , ("mkData_Nothing", mkDataPrim "Nothing" 0)
+        , ("mkData_Just", mkDataPrim "Just" 1)
         , ("mkData_Unit", mkDataPrim "Unit" 0)
         ] ++ prioSetPrims
   where

@@ -9,14 +9,21 @@
 
 \usepackage[T1]{fontenc}
 \usepackage{calc}
+\usepackage[osf]{mathpazo}
+\renewcommand\ttdefault{lmtt}
 %%\usepackage{palatino}
 %%\usepackage{bookman}
 %%\usepackage[default]{droidserif}
+%%\usepackage[defaultmono]{droidmono}
 %%\usepackage{fouriernc}
 %%\usepackage{tgbonum} %% TEX Gyre Bonum (http://www.tug.dk/FontCatalogue/tgbonum/)
-\usepackage{tgschola} %% TEX Gyre Schola (http://www.tug.dk/FontCatalogue/tgschola/)
-\usepackage{amsfonts}
-\renewcommand\ttdefault{lmtt}
+%%\usepackage{tgschola} %% TEX Gyre Schola (http://www.tug.dk/FontCatalogue/tgschola/)
+%%%%\usepackage{DejaVuSansMono}
+%%\usepackage{DejaVuSerifCondensed} %% DejaVu Serif Condensed (http://www.tug.dk/FontCatalogue/dejavuserifcondensed/)
+%% \let\oldtt=\texttt \let\oldttfamily=\ttfamily
+%% \renewcommand\texttt[1]{\fontsize{13}{1.08333\baselineskip}\oldtt{#1}}
+%% \renewcommand\ttfamily{\fontsize{13}{1.08333\baselineskip}\oldttfamily}
+%% \DeclareMathSizes{12}{14}{12}{10}
 \usepackage{helvet}
 \usepackage{xspace}
 \usepackage{url}
@@ -135,15 +142,15 @@
 %% by asterisks (*).
 \protected\def\lcapp#1/{\def\lcappB##1*##2/{\def\arg{##2}%
     \ensuremath{\ifx\arg\empty%%
-      \lcname ##1/%%
+      ##1%%
       \else%%
-      \lcname##1/\ \lcappB##2/%%
+      ##1\ \lcappB##2/%%
       \fi}}%%
   %% Adding a star here makes
   %% sure our application always ends with an asterisks, ensuring
   %% #2 will be \empty at some point.
   \lcappB#1*/}
-\protected\def\lcabs#1.{\ensuremath{\lambda#1.\ }}
+\protected\def\lcabs#1.{\ensuremath{\lambda\relax #1.\ }}
 %% LC primitve function.
 \protected\def\lcprim#1*{\ensuremath{#1^*}}
 %% LC constructor

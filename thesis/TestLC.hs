@@ -1077,6 +1077,19 @@ mil_bind = [("bind", lam "f" $ \f ->
                  bindE "y" (f `app` x) $ \y ->
                    (lam "z" $ \z -> z `app` y) `app` y)]
 
+-- Safe decrment
+safeDec = [("dec", 
+                 lam "i" $ \i ->
+                   _case (i `gt` lit 0) $
+                    (alt "True" [] $ \_ -> mkJust (i `minus` (lit 1))) .
+                    (alt "False" [] $ \_ -> mkNothing))
+          ,("loop",
+                  lam "n" $ \n ->
+                  lam "f" $ \f ->
+                    _case (var "dec" `app` n) $
+                     (alt "Just" ["i"] $ \_ -> var "loop" `app` (f `app` n) `app` f) .
+                     (alt "Nothing" [] $ \_ -> f `app` (lit 0)))]
+
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
 
@@ -1087,6 +1100,12 @@ mPrint = EPrim "print" typ []
 mReadChar = EPrim "readChar" typ []
 mkUnit = ECon "Unit" [] typ
 ret = (EPrim "return" typ [] `app`)
+
+mkJust :: Expr -> Expr
+mkJust expr = (ECon "Just" [typ] typ) `app` expr
+
+mkNothing :: Expr
+mkNothing = ECon "Nothing" [] typ
 
 mkNil :: Expr
 mkNil = ECon "Nil" [] typ
