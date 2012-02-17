@@ -13,6 +13,15 @@
 
 \section{Future Work}
 
+Many optimizations which use dataflow analysis to transform imperitave
+programs exist (in particular, Muchnik \citeyearpar{Muchnick1998}
+gives a broad survey). ``Future work'' could apply most of those to
+MIL programs, but that would not make for interesting
+reading. Instead, this section describes optimizations that take
+particular advantage of our MIL program's structure. Some rely on the
+monadic structure built into MIL; others extend our existing dataflow
+analysis to more complicated transformations.
+
 \subsection{Inlining Monadic Code}
 \label{conc_inline_monadic}
 
@@ -370,11 +379,11 @@ point, and then inspects the value using case discrimination at
 another point. Figure~\ref{conc_fig_cons_dest} shows one such
 program. The |dec| function decrements a value, but only if the value
 is greater than 0. It returns a |Maybe| value, indicating if the value
-could be decremented or not. The |loop| function applies its argument
-to an ever-decreasing index |n| number of times. When |dec n| returns
-|Nothing|, |loop| stops executing.\footnote{This example is pretty
-  contrived, but |dec| could be used for something more interesting,
-  such as array bounds checks.}
+could be decremented or not. The |loop| function decrements |n| and
+applies |f| to the result. When |dec n| returns |Nothing|, |loop|
+stops executing.\footnote{This example is pretty contrived, but |dec|
+  could be used for something more interesting, such as array bounds
+  checks.}
 
 \begin{myfig}
 \begin{minipage}{\textwidth}
@@ -382,7 +391,7 @@ to an ever-decreasing index |n| number of times. When |dec n| returns
 > dec i = if i > 0 
 >          then Just (i - 1)
 >          else Nothing
->
+
 > loop :: Int -> (Int -> Int) -> Int
 > loop n f = case dec n of
 >   Just i -> loop (f i) f
@@ -395,12 +404,16 @@ to an ever-decreasing index |n| number of times. When |dec n| returns
 These two functions starkly illustrate the \emph{construct/destruct}
 pattern. |loop| discriminates on the result of |dec n|, immediately
 destructing the value created by |dec|. Figure~\ref{conc_fig_push1}
-shows unoptimized MIL code for these two functions. The \lab loop/
-block evaluates the \lab dec/ block on
-Line~\ref{conc_fig_push1_goto_dec}. The result (a |Just (n - 1)| or
-|Nothing| value) is bound to \var v215/; in turn, \var v215/ is
-immedieatly taken apart by the \milres case/ statement on the
-following line. This pattern results in |n| unnecessary allocations.
+shows unoptimized MIL code for these two functions. \lab loop/
+evaluates \goto dec(n) on Line~\ref{conc_fig_push1_goto_dec} and binds
+the result to \var v215/. The \milres case/ statement on the next line
+immediately \var v215/ apart, throwing away the allocated value just
+created. This pattern introduces at least one allocation in every
+invocation of |loop|.\footnote{A sufficiently clever compiler could
+  put |Maybe| values into registers and avoid a heap allocation, of
+  coures. But, no compiler can be clever enough to cover all possible
+  data types. We can always create one sufficiently large that a heap
+  allocation must occur.}
 
 \begin{myfig}
   \begin{minipage}{\textwidth}
@@ -436,12 +449,12 @@ following line. This pattern results in |n| unnecessary allocations.
   \label{conc_fig_push1}
 \end{myfig}
 
-Inspecting the \lab dec/ block in Figure~\ref{conc_fig_push1} on
-Line~\ref{conc_fig_push1_dec} shows that it evaluates a condition and
-branches to eitehr \lab altTrue/ or \lab altFalse/. We cannot directly
-inline \lab loop/ into \lab dec/, because \lab loop/ ends with a 
-\milres case/ statement. However, we can move the body of \lab loop/ into
-each arm of the \milres case/ statement that ends \lab loop/.
+Inspecting the \lab dec/ block in Figure~\ref{conc_fig_push1} shows
+that it evaluates a condition and branches to either \lab altTrue/ or
+\lab altFalse/. We cannot directly inline \lab loop/ into \lab dec/,
+because \lab loop/ ends with a \milres case/ statement. However, we
+can move the body of \lab loop/ into each arm of the \milres case/
+statement that ends \lab loop/.
 
 Figure~\ref{conf_fig_push2} shows that we inline \lab dec/ into \lab
 loop/, and then pushed the portion of \lab loop/ that followed the
