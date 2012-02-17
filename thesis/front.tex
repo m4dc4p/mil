@@ -7,53 +7,40 @@
 \author{Justin Bailey \\ \url{justinb@cs.pdx.edu}}
 \title{Using Dataflow Optimization Techniques with a Monadic Intermediate Language}
 \maketitle 
-\thispagestyle{empty}
-\newpage
-\pagestyle{plain}
-\pagenumbering{roman}
-\section*{Acknowledgements}
+
+\pagenumbering{roman}\pagestyle{plain}
+\addcontentsline{toc}{section}{\textbf{Acknowledgements}}
+\section*{Acknowledgments}
+Thanks very much!
 \newpage
 
 \begin{center}
-  \newlength{\abstractLen}
-  \setlength{\abstractLen}{\textwidth*\real{0.85}}
-  \begin{minipage}{\abstractLen}
-    \begin{center}
-      {\sffamily\bfseries Abstract}
-    \end{center}
-    \bigskip
-    \noindent
-    Dataflow analysis of programs represented as control-flow graphs
-    (CFGs) of basic blocks underlies many optimizations implemented by
-    imperative language compilers. Functional language compilers, in
-    contrast, traditionally optimize by rewriting programs according to
-    algebraic laws. We show that, by compiling to a \emph{monadic
-      intermediate language}, we can treat our functional programs as
-    CFGs of basic blocks. Doing so enables us to re-use the rich body of
-    dataflow techniques developed for imperative language compilers. We
-    first implement dead code elimination, an optimization common to
-    both functional and imperative compilers. We then demonstrate
-    \emph{uncurrying}, an optimization specific to functional language
-    compilers. Next, we use the \emph{monad laws} to derive inlining and
-    copy-propagation optimizations. %% Finally, we implement \emph{Lazy
-    %%   Code Motion} (LCM), one of the most complicated dataflow-based
-    %% optimizations. To our knowledge this is the first implementation of
-    %% LCM over a monadic intermediate language. 
-    Throughout, we use the
-    \emph{Hoopl} library to implement our optimizations, making our work
-    a case-study for the library as well.
-  \end{minipage}
-\end{center}
-%%\end{abstract}
-
-\ifthenelse{\boolean{standaloneFlag}}{}{
+  {\sffamily\bfseries Abstract}
   \addcontentsline{toc}{section}{\textbf{Abstract}}
-  \singlespacing%%
-    \tableofcontents%%
-    \afterpage{\addcontentsline{toc}{section}{\textbf{List of Figures}}}
-    \listoffigures%%
-    %% \afterpage{\addcontentsline{toc}{section}{\textbf{List of Tables}}}
-    %% \listoftables%%
-    \newpage}
+\end{center}
+\bigskip
+\noindent
+Dataflow analysis of programs represented as control-flow graphs
+(CFGs) of basic blocks underlies many optimizations implemented by
+imperative language compilers. Functional language compilers, in
+contrast, traditionally optimize by rewriting programs according to
+algebraic laws. We show that, by compiling to a \emph{monadic
+  intermediate language}, we can treat our functional programs as CFGs
+of basic blocks. Doing so enables us to re-use the rich body of
+dataflow techniques developed for imperative language compilers. We
+first implement dead code elimination, an optimization common to both
+functional and imperative compilers. We then demonstrate
+\emph{uncurrying}, an optimization specific to functional language
+compilers. Next, we use the \emph{monad laws} to derive inlining and
+copy-propagation optimizations.  Throughout, we use the \emph{Hoopl}
+library to implement our optimizations, making our work a case-study
+for the library as well.
+\newpage
 
+\singlespacing
+\tableofcontents
+\newpage
+\addcontentsline{toc}{section}{\textbf{List of Figures}}
+\listoffigures
+\newpage
 \end{document}

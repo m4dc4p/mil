@@ -94,10 +94,10 @@ following MIL block:
 \end{singlespace}
 
 The Associativity law provides an inlining mechanism for MIL
-programs. The inner monadic computation mentioned on the left-hand
+programs. The inner monadic computation mentioned on the right-hand
 side of the law, |do { y <- m }|, can be an arbitrarily long monadic
 program. All MIL blocks are monadic programs --- therefore, we can use
-this law to inline any block. For example, consider these two blocks:
+this law to inline almost any block. For example, consider these two blocks:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
@@ -136,6 +136,28 @@ the use of \var x/:
       \goto b(t2)
   \end{AVerb}
 \end{singlespace}
+
+MIL blocks that end in \milres case/ statements cannot be
+inlined, in general. The branching introduced by the \milres case/
+prevents the block from begin inlined. To illustrate, consider
+these two blocks:
+
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}
+    \block l1(a):
+       \vbinds b <- \goto l2(a);
+       \return b/
+
+    \block l2(b):
+      \case b;
+        \valt{}True() -> \dots;
+        \valt{}False() -> \dots;
+  \end{AVerb}
+\end{singlespace}
+
+The block \lab l2/ cannot be inlined into the body of \lab l1/ because
+our syntax does not allow a \milres case/ in the middle of a block. It
+also breaks the fundamental model of each block being a basic block.
 
 \subsection{Uncurrying Across Blocks}
 
@@ -337,11 +359,25 @@ directly returns the closure previously returned by \lab absBodyL201/:
   \end{AVerb}
 \end{singlespace}
 
-\noindent We can then apply dead-code eliminiation to remove the allocation
-bound to \var v210/, since that variable is now dead.
+\noindent We can then apply dead-code eliminiation to remove the
+allocation bound to \var v210/, since that variable is now dead.
 
 \subsection{Push Through Cases}
 
+Functional language programs commonly implement a pattern of
+\emph{construct/destruct}, where the program creates some value at one
+point, and then inspects the value using case discrimination at
+another point. Figure~\ref{conc_fig_cons_dest} shows one such
+program. The |dec| function decrements a value, but only if the value
+is greater than 0. It returns a |Maybe| value, indicating if the value
+could be decremented or not. The |loop| function applies its argument
+to an ever-decreasing index |n| number of times. When |dec n| returns
+|Nothing|, |loop| stops executing.\footnote{This example is pretty
+  contrived, but |dec| could be used for something more interesting,
+  such as array bounds checks.}
+
+\begin{myfig}
+\begin{minipage}{\textwidth}
 > dec :: Int -> Maybe Int
 > dec i = if i > 0 
 >          then Just (i - 1)
@@ -349,21 +385,35 @@ bound to \var v210/, since that variable is now dead.
 >
 > loop :: Int -> (Int -> Int) -> Int
 > loop n f = case dec n of
->   Just i -> loop (f n) f
+>   Just i -> loop (f i) f
 >   Nothing -> f 0
+\end{minipage}
+\caption{A program that illustrates the \emph{construct/destruct} pattern.}
+\label{conc_fig_cons_dest}
+\end{myfig}
+
+These two functions starkly illustrate the \emph{construct/destruct}
+pattern. |loop| discriminates on the result of |dec n|, immediately
+destructing the value created by |dec|. Figure~\ref{conc_fig_push1}
+shows unoptimized MIL code for these two functions. The \lab loop/
+block evaluates the \lab dec/ block on
+Line~\ref{conc_fig_push1_goto_dec}. The result (a |Just (n - 1)| or
+|Nothing| value) is bound to \var v215/; in turn, \var v215/ is
+immedieatly taken apart by the \milres case/ statement on the
+following line. This pattern results in |n| unnecessary allocations.
 
 \begin{myfig}
   \begin{minipage}{\textwidth}
     \begin{singlespace}
-      \begin{AVerb}[gobble=8]
+      \begin{AVerb}[gobble=8,numbers=left]
         \block loop(n, f):
-           \vbinds v215<- \goto dec(n);
+           \vbinds v215<-\goto dec(n); \label{conc_fig_push1_goto_dec}
            \case v215;
               \valt{}Just(i)->\goto altJust(f, i);
               \valt{}Nothing()->\goto altNothing(f);
       
-        \block dec(i):
-           \vbinds v233<- \prim gt(i, 0);
+        \block dec(i): \label{conc_fig_push1_dec}
+           \vbinds v233<-\prim gt(i, 0);
            \case v233;
               \valt{}True()->\goto altTrue(i);
               \valt{}False()->\goto altFalse();
@@ -383,20 +433,35 @@ bound to \var v210/, since that variable is now dead.
     \end{singlespace}
   \end{minipage}
   \caption{Initial form of our function.}
+  \label{conc_fig_push1}
 \end{myfig}
 
+Inspecting the \lab dec/ block in Figure~\ref{conc_fig_push1} on
+Line~\ref{conc_fig_push1_dec} shows that it evaluates a condition and
+branches to eitehr \lab altTrue/ or \lab altFalse/. We cannot directly
+inline \lab loop/ into \lab dec/, because \lab loop/ ends with a 
+\milres case/ statement. However, we can move the body of \lab loop/ into
+each arm of the \milres case/ statement that ends \lab loop/.
+
+Figure~\ref{conf_fig_push2} shows that we inline \lab dec/ into \lab
+loop/, and then pushed the portion of \lab loop/ that followed the
+statement \binds v215 <- \goto dec(n); into the \lab altTrue/ and \lab
+altFalse/ blocks. For example, where \lab altFalse/ previously
+contained one statement (\prim Nothing()), we now bind \var v215/ to
+that value. In both blocks, the value bound is immediately destructed
+by a \milres case/ statement. 
 \begin{myfig}
   \begin{minipage}{\textwidth}
     \begin{singlespace}
       \begin{AVerb}[gobble=8]
         \block loop(n, f):
-           \vbinds v233<- \prim gt(i, 0);
+           \vbinds v233<-\prim gt(i, 0);
            \case v233;
               \valt{}True()->\goto altTrue(i, f, n);
               \valt{}False()->\goto altFalse(f, n);
       
         \block altTrue(i, f, n):
-           \vbinds v225<- \prim minus(i, 1);
+           \vbinds v225<-\prim minus(i, 1);
            \vbinds v215<-\prim Just(v225);
            \case v215;
               \valt{}Just(i)->\goto altJust(f, i);
@@ -418,7 +483,17 @@ bound to \var v210/, since that variable is now dead.
     \end{singlespace}
   \end{minipage}
   \caption{First transformation.}
+  \label{conc_fig_push2}
 \end{myfig}
+
+A simple dataflow analysis (such as constant folding) of \lab altTrue/
+and \lab altFalse/ in Figure~\ref{conc_fig_push2} would show that one
+or the other branch in each case is never
+taken. Figure~\ref{conf_fig_push3} shows how we could rewrite \lab
+altTrue/ and \lab altFalse/, eliminating the allocation and
+discrimination. This version of the program will perform no
+allocations of |Maybe| values whatsoever, but we are still guaranteed
+that |f| will not be applied to an index value less than 0.
 
 \begin{myfig}
   \begin{minipage}{\textwidth}
@@ -445,78 +520,78 @@ bound to \var v210/, since that variable is now dead.
       \end{AVerb}
     \end{singlespace}
   \end{minipage}
-  \caption{Final form of our functino.}
+  \caption{Final form of our function.}
 \end{myfig}
 
-\begin{myfig}
-  \begin{tikzpicture}[>=stealth, node distance=.5in]\nomd
+%% \begin{myfig}
+%%   \begin{tikzpicture}[>=stealth, node distance=.5in]\nomd
     
-  \node[stmt] (loop) {
-    \begin{minipage}{2.4in}
-      \begin{AVerb}[gobble=8]
-        \block loop(n, f):
-          \vbinds v215<- \goto dec(n);
-          \case v215;
-            \valt{}Just(i)->\goto altJust(f, i);
-            \valt{}Nothing()->\goto altNothing(f);
-      \end{AVerb}
-    \end{minipage}
-  };
+%%   \node[stmt] (loop) {
+%%     \begin{minipage}{2.4in}
+%%       \begin{AVerb}[gobble=8]
+%%         \block loop(n, f):
+%%           \vbinds v215<- \goto dec(n);
+%%           \case v215;
+%%             \valt{}Just(i)->\goto altJust(f, i);
+%%             \valt{}Nothing()->\goto altNothing(f);
+%%       \end{AVerb}
+%%     \end{minipage}
+%%   };
 
-  \node[stmt, right=0.45in of loop] (dec) {
-    \begin{minipage}{2.2in}
-      \begin{AVerb}[gobble=8]
-        \block dec(i):
-          \vbinds v233<- \prim gt(i, 0);
-          \case v233;
-            \valt{}True()->\goto altTrue(i);
-            \valt{}False()->\goto altFalse();
-      \end{AVerb}
-    \end{minipage}
-  };
+%%   \node[stmt, right=0.45in of loop] (dec) {
+%%     \begin{minipage}{2.2in}
+%%       \begin{AVerb}[gobble=8]
+%%         \block dec(i):
+%%           \vbinds v233<- \prim gt(i, 0);
+%%           \case v233;
+%%             \valt{}True()->\goto altTrue(i);
+%%             \valt{}False()->\goto altFalse();
+%%       \end{AVerb}
+%%     \end{minipage}
+%%   };
 
-  \node[stmt, below right=0.35in and -1.15in of loop] (altNothing) {
-    \begin{minipage}{\widthof{\block altNothing(f):}}
-      \begin{AVerb}[gobble=8]
-        \block altNothing(f):
-           \app{}f * 0/
-      \end{AVerb}
-    \end{minipage}
-  };
+%%   \node[stmt, below right=0.35in and -1.15in of loop] (altNothing) {
+%%     \begin{minipage}{\widthof{\block altNothing(f):}}
+%%       \begin{AVerb}[gobble=8]
+%%         \block altNothing(f):
+%%            \app{}f * 0/
+%%       \end{AVerb}
+%%     \end{minipage}
+%%   };
 
-  \node[stmt, below left=0.35in and -1.15in of loop] (altJust) {
-    \begin{minipage}{\widthof{\block altJust(f, n):\ \ \ }}
-      \begin{AVerb}[gobble=8]
-        \block altJust(f, n):
-          \vbinds v207<- \app f*n/;
-          \goto loop(v207, f)
-      \end{AVerb}
-    \end{minipage}
-  };
+%%   \node[stmt, below left=0.35in and -1.15in of loop] (altJust) {
+%%     \begin{minipage}{\widthof{\block altJust(f, n):\ \ \ }}
+%%       \begin{AVerb}[gobble=8]
+%%         \block altJust(f, n):
+%%           \vbinds v207<- \app f*n/;
+%%           \goto loop(v207, f)
+%%       \end{AVerb}
+%%     \end{minipage}
+%%   };
 
-  \node[stmt, below=0.35in of dec] (altTrue) {
-    \begin{minipage}{\widthof{\block altTrue(i): \prim minus(i, 1)}}
-      \begin{AVerb}[gobble=8]
-        \block altTrue(i):
-          \vbinds v225<- \prim minus(i, 1);
-          \prim Just(v225)
-      \end{AVerb}
-    \end{minipage}
-  };
+%%   \node[stmt, below=0.35in of dec] (altTrue) {
+%%     \begin{minipage}{\widthof{\block altTrue(i): \prim minus(i, 1)}}
+%%       \begin{AVerb}[gobble=8]
+%%         \block altTrue(i):
+%%           \vbinds v225<- \prim minus(i, 1);
+%%           \prim Just(v225)
+%%       \end{AVerb}
+%%     \end{minipage}
+%%   };
 
-  \node[stmt, below=0.35in of altTrue] (altFalse) {
-    \begin{minipage}{\widthof{\block altFalse(): \prim Nothing()}}
-      \begin{AVerb}[gobble=8]
-        \block altFalse(): \prim Nothing()
-      \end{AVerb}
-    \end{minipage}
-  };
+%%   \node[stmt, below=0.35in of altTrue] (altFalse) {
+%%     \begin{minipage}{\widthof{\block altFalse(): \prim Nothing()}}
+%%       \begin{AVerb}[gobble=8]
+%%         \block altFalse(): \prim Nothing()
+%%       \end{AVerb}
+%%     \end{minipage}
+%%   };
 
-  \draw [->] (loop.south) ||- ($(loop.south) - (0in,0.1in)$) -|| (altJust.north);
-  \draw [->] (loop.south) ||- ($(loop.south) - (0in,0.1in)$) -|| (altNothing.north);
-  \draw [->] (altJust.south) ||- ($(altJust.south) - (1in,0.3in)$) ||- (loop.west);
-  \end{tikzpicture}
-\end{myfig}
+%%   \draw [->] (loop.south) ||- ($(loop.south) - (0in,0.1in)$) -|| (altJust.north);
+%%   \draw [->] (loop.south) ||- ($(loop.south) - (0in,0.1in)$) -|| (altNothing.north);
+%%   \draw [->] (altJust.south) ||- ($(altJust.south) - (1in,0.3in)$) ||- (loop.west);
+%%   \end{tikzpicture}
+%% \end{myfig}
 
 \section{Summary}
 

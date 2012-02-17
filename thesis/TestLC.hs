@@ -1077,7 +1077,7 @@ mil_bind = [("bind", lam "f" $ \f ->
                  bindE "y" (f `app` x) $ \y ->
                    (lam "z" $ \z -> z `app` y) `app` y)]
 
--- Safe decrment
+-- Safe decrement
 safeDec = [("dec", 
                  lam "i" $ \i ->
                    _case (i `gt` lit 0) $
@@ -1087,8 +1087,22 @@ safeDec = [("dec",
                   lam "n" $ \n ->
                   lam "f" $ \f ->
                     _case (var "dec" `app` n) $
-                     (alt "Just" ["i"] $ \_ -> var "loop" `app` (f `app` n) `app` f) .
+                     (alt "Just" ["i"] $ \[i] -> f `app` (var "loop" `app` i `app` f)) .
                      (alt "Nothing" [] $ \_ -> f `app` (lit 0)))]
+
+-- Safe decrement with a monadic action.
+safeDecM = [("dec", 
+                 lam "i" $ \i ->
+                   _case (i `gt` lit 0) $
+                    (alt "True" [] $ \_ -> mkJust (i `minus` (lit 1))) .
+                    (alt "False" [] $ \_ -> mkNothing))
+          ,("loop",
+                  lam "n" $ \n ->
+                  lam "f" $ \f ->
+                    bindE "t" (_case (var "dec" `app` n) $
+                     (alt "Just" ["i"] $ \[i] -> bindE "()" (f `app` i) $ \_ -> var "loop" `app` i `app` f) .
+                     (alt "Nothing" [] $ \_ -> f `app` (lit 0))) $ \t -> ret t)]
+
 
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])

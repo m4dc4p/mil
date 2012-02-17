@@ -59,9 +59,9 @@
 
 \input{conclusion}
 
-\begin{singlespace}
-  \pagestyle{plain}
-  \printbibliography
-\end{singlespace}
+\afterpage{\pagestyle{plain}
+  \begin{singlespace}
+    \printbibliography
+  \end{singlespace}}
 
 \end{document}
