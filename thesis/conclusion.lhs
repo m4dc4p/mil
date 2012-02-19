@@ -9,9 +9,30 @@
 \chapter{Conclusion \& Future Work}
 \label{ref_chapter_conclusion}
 
-\section{Hoopl Refinements}
+\intent{Introduce our contributions.}  Our work sought to apply the
+dataflow algorithm to an area where it has not normally been used:
+functional languages. We say normally, because at least GHC applies
+the dataflow algorithm to its low-level intermediate language, \Cmm
+(pronounced ``C minus minus''). Even in that case, \Cmm resembles its
+imperative namesake much more than a functional language. We applied
+the dataflow algorithm to a monadic intermediate language that closely
+resembles monadic programming (in syntax and behavior) in a functional
+language like Haskell. In turn, we described \emph{uncurrying}, an
+optimization specific to functional languages,\footnote{Or, at least,
+  languages capable of creating closures.} and presented a novel
+implementation based on the dataflow algorithm.
+
+\intent{Signposts for chapter.} This chapter finalizes the
+presentation of our work. Though we described only uncurrying in great
+detail, we explored a number of other optimizations to varying
+degrees. We describe those in Section~\ref{conc_future_work}. We made
+extensive use of the Hoopl library througout our research, and offer
+some thoughts on future improvements to the library's interface in
+Chapter~\ref{conc_hoopl}. In Section~\ref{conc_conc} we conclude this
+thesis.
 
 \section{Future Work}
+\label{conc_future_work}
 
 Many optimizations which use dataflow analysis to transform imperitave
 programs exist (in particular, Muchnik \citeyearpar{Muchnick1998}
@@ -186,8 +207,8 @@ value \var f/, \var t/ or \var f/ (respectively), and \var ys/.
   \begin{tabular}{cc}
 \begin{minipage}{3in}
 > uncurry xs t y n f = 
->   let cap ys g v = (g v) ys
->       cap1 = cap xs
+>   let  cap ys g v = (g v) ys
+>        cap1 = cap xs
 >   in case t of 
 >        True -> (cap1 f) y
 >        False -> (cap1 f) n
@@ -606,7 +627,24 @@ that |f| will not be applied to an index value less than 0.
 %%   \end{tikzpicture}
 %% \end{myfig}
 
+\section{Hoopl Refinements}
+\label{conc_hoopl}
+
+\subsection{Backwards \& Forwards Types}
+\intent{Separating analysis direction uses types makes it impossible
+to compose forwards and backwards analysis.}
+
+\subsection{Facts and Type Families}
+\intent{|Fact| vs. |FactBase| usually just caused confusion.}
+
+\subsection{Invasive Types}
+\intent{Hoopl's use of |O| and |C| types requires your AST to support Hoopl from the beginning.}
+
+\subsection{Restricted Signatures}
+\intent{The closed model for creating rewrite functions makes it impossible to maintain any state during rewrite. Hard to know where you are or where you started.}
+
 \section{Summary}
+\label{conc_conc}
 
 \standaloneBib 
 

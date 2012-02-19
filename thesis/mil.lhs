@@ -462,7 +462,7 @@ and \lab k3/. \lab main/ corresponds to our
 top-level expression |compose a b c|. 
 
 \intent{Point out where intermediate values are created and captured.}
-By examping \lab main/ in Figure \ref{mil_fig2} we can see how MIL
+By examining \lab main/ in Figure \ref{mil_fig2} we can see how MIL
 makes explicit the intermediate closures created while evaluating
 \lcapp compose * a * b * c/. Line~\ref{mil_t0_fig2} executes the block
 \lab k0/, allocating a closure pointing to \lab k1/ and assigning it
