@@ -183,7 +183,7 @@ executed by writing \goto b(v_1, \dots, v_n) (``goto'').
 
 \intent{Remind reader about \cc blocks.}
 \Cc blocks are also like labelled locations, except they expect to
-recieve a closure and an argument when called. We write \cc blocks as:
+receive a closure and an argument when called. We write \cc blocks as:
 
 \ccblock k(v_1, \dots, v_n)x: \ldots
 
@@ -591,7 +591,7 @@ ignored.
 \intent{Details on |Jump| value.} A |Jump| block always has the form
 ``\ccblock k(v_1, \dots, v_n)x: \goto b(\ldots)'' where the arguments
 to \lab b/ are not necessarily in the same order as in the closure
-\clo[k:v_1, \dots, v_n] recieved by \lab k/. Each integer in the list
+\clo[k:v_1, \dots, v_n] received by \lab k/. Each integer in the list
 given to |Jump| indicates the position of a variable in the closure
 received by the block \lab k/. The arguments to the block \lab b/ are
 built by traversing the list, putting the variable indicated by each

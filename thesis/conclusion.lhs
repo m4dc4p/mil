@@ -531,7 +531,7 @@ that |f| will not be applied to an index value less than 0.
 
 \begin{myfig}
   \begin{minipage}{\textwidth}
-    \begin{singlespace}\correctspaceskip
+    \begin{singlespace}
       \begin{AVerb}[gobble=8]
         \block loop(n, f):
            \vbinds v233<- \prim gt(i, 0);
@@ -630,15 +630,64 @@ that |f| will not be applied to an index value less than 0.
 \section{Hoopl Refinements}
 \label{conc_hoopl}
 
-\subsection{Backwards \& Forwards Types}
-\intent{Separating analysis direction uses types makes it impossible
-to compose forwards and backwards analysis.}
+\intent{Summary of our Hoopl usage.} The Hoopl library played a
+critical role in our work. The library presents a simple and powerful
+interface for describing, analyzing and transforming CFGs. It allowed
+us to explore a variety of optimizations that used dataflow analysis,
+without the burden of implementing the dataflow algorithm ourselves.
+Of course, by spending so much time with the library, we found some
+areas where the library's interface left us struggling to bend our
+algorithm to fit with Hoopl's view of dataflow analysis.
+
+\subsection{Invasive Types}
+\intent{Hoopl's use of |O| and |C| types requires your AST to support
+  Hoopl from the beginning.} Hoopl uses the the |O| and |C| types
+(described in Section~\ref{hoopl_sec_cfg}) to specify the shape of
+each node in the CFG; only nodes with compatible types can be
+connected to each other. This design allows the compiler to enforce
+some desirable properties; for example, a basic block will not contain
+any nodes that can branch to more than one destination. Unfortunately,
+this design requires that the |O| and |C| types be present on the
+client AST. We found life much easier when we designed our AST with
+Hoopl in mind from the beginning; otherwise, we found ourselves writng
+a lot of code to transform between our existing AST and a nearly
+identical, Hoopl-ized, version of the same.
+
+``Smart'' constructors could be used to reduce the boilerplate required when using Hoopl against an existing AST. For example, consider the the AST given in
+Figure~\ref{hoopl_fig3} on Page~\pageref{hoopl_fig3}. Instead of
+defining |CStmt| using GADTS, imagine we defined |CStmtX| as a normal
+ADT and |CStmt| as a |newtype|:
+
+\begin{singlespace}
+> data CStmtX = Entry Label |
+>   Assign Var CExpr
+>   {-"\dots"-}
+>
+> newtype CStmt o c = CStmt CStmtX
+\end{singlespace}
+
+\noindent To create Hoopl-ized values, we define a function for each constructor
+(i.e., |Entry|, |Assign|, etc.) that both creates the correct |CStmtX| value and
+parameterizes it by shape:
+
+\begin{singlespace}
+> entry :: Label -> CStmt O C
+> entry l = CStmt (Entry l)
+>
+> assign :: Var -> CExpr -> CStmt O O
+> assign v e = CStmt (Assign v e)
+\end{singlespace}
+
+However, this approach still requires that a fair amount of
+boilerplate code be created. GADTs alleviate the problem somewhat
+(since the compiler implements ``smart'' constructors for you), but
+that does not help when working against an AST that cannot be
+changed. Metaprogramming techniques using Template Haskell, combined
+with one of the several generic programming libraries available to
+Haskell may ultimately be the best approach here.
 
 \subsection{Facts and Type Families}
 \intent{|Fact| vs. |FactBase| usually just caused confusion.}
-
-\subsection{Invasive Types}
-\intent{Hoopl's use of |O| and |C| types requires your AST to support Hoopl from the beginning.}
 
 \subsection{Restricted Signatures}
 \intent{The closed model for creating rewrite functions makes it impossible to maintain any state during rewrite. Hard to know where you are or where you started.}
