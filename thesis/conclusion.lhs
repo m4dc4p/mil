@@ -653,10 +653,12 @@ Hoopl in mind from the beginning; otherwise, we found ourselves writng
 a lot of code to transform between our existing AST and a nearly
 identical, Hoopl-ized, version of the same.
 
-``Smart'' constructors could be used to reduce the boilerplate required when using Hoopl against an existing AST. For example, consider the the AST given in
-Figure~\ref{hoopl_fig3} on Page~\pageref{hoopl_fig3}. Instead of
-defining |CStmt| using GADTS, imagine we defined |CStmtX| as a normal
-ADT and |CStmt| as a |newtype|:
+``Smart'' constructors could be used to reduce the boilerplate
+required when using Hoopl against an existing AST. For example,
+consider the the AST given in Figure~\ref{hoopl_fig3} on
+Page~\pageref{hoopl_fig3}. Instead of defining |CStmt| using GADTS,
+imagine we defined |CStmtX| as a normal ADT and |CStmt| as a
+|newtype|:
 
 \begin{singlespace}
 > data CStmtX = Entry Label |
@@ -686,14 +688,80 @@ changed. Metaprogramming techniques using Template Haskell, combined
 with one of the several generic programming libraries available to
 Haskell may ultimately be the best approach here.
 
-\subsection{Facts and Type Families}
-\intent{|Fact| vs. |FactBase| usually just caused confusion.}
-
 \subsection{Restricted Signatures}
-\intent{The closed model for creating rewrite functions makes it impossible to maintain any state during rewrite. Hard to know where you are or where you started.}
+\intent{Review of combinators for creating rewrite and transfer
+  functions.} Hoopl does not specify transfer and rewrite functions
+using simple function signatures. Instead, as detailed in
+Section~\ref{hoopl_sec5}, Hoopl represents those functions using the
+|BwdTransfer|, |BwdRewrite|, |FwdTransfer| and |FwdRewrite| types.
+Client programs cannot directly create these values; instead, Hoopl
+defines a function for creating each type: 
+
+\begin{singlespace}
+> mkFTransfer :: (forall e x . n e x -> f -> Fact x f) -> FwdTransfer n f
+> mkBTransfer :: (forall e x . n e x -> Fact x f -> f) -> BwdTransfer n f      
+> mkFRewrite :: FuelMonad m => 
+>   (forall e x . n e x -> f -> m (Maybe (Graph n e x))) 
+>   -> FwdRewrite m n f
+> mkBRewrite :: FuelMonad m => 
+>   (forall e x . n e x -> Fact x f -> m (Maybe (Graph n e x)))
+>   -> BwdRewrite m n f
+\end{singlespace}
+
+\noindent As Hoopl does
+not directly export the constructors for |FwdTransfer|, etc. this
+scheme limits the signature of transfer and rewrite functions to
+those shown above. 
+
+\intent{Why the type signatures are too restrictive.} Unfortunately,
+this scheme added some burden to our implementation. At several times
+we wished that Hoopl allowed an accumulating parameter for
+intermediate results in the signature of both transfer and rewrite
+functions. Normally the |Fact| value should serve as an accumulator,
+but it seems less than ideal to pollute the |Fact| value with
+intermediate results that are only used within the transfer (or
+rewrite) function.
+
+\intent{Custom monad does allow arbitrary state, but the
+  implementation cost is high.} Hoopl does allow the client program to
+define a custom monad for using during rewrite, which does allow
+intermediate results to be used. Implementing and using the monad
+requires a modest amount of work: the client must make their monad an
+instance of the |CheckpointMonad| class and use the |liftFuel|
+function to lift custom monadic operations into the |FuelMonad|
+class. Unfortunately, the custom monad still does not help with the
+transfer function.
+
+\intent{Summarize complaint.}  Earlier versions of the Hoopl library
+allowed the client to return an arbitrary \emph{function} from the
+transfer and rewrite functions. While that may have been too liberal,
+we certainly wished for a slightly less restricted interface during
+our work.
 
 \section{Summary}
 \label{conc_conc}
+
+\intent{Review goals.} When Kildall first described the dataflow
+algorithm he applied it to Algol 60, an imperative,
+structured programming language. Work since then has largely applied
+the algorithm to imperative languages, though it has been used in
+other contexts as well. We set out to explore its use within the
+context of a functional language; specifically, we hypothesized that,
+by compiling to a monadic intermediate language, we could obtain a
+basic-block structure that would be amiable to dataflow analysis. We
+intended to implement optimizations drawn from the literature of
+imperative and functional compilers, showing that the algorithm could be
+applied in both contexts. 
+
+\intent{Contributions: Uncurrying.} Our work
+contributes in several areas. Most importantly, we described
+uncurrying in terms of dataflow analysis over our monadic intermediate
+language. We did not find other work in this area, making us the first
+to implement uncurrying over a MIL using dataflow analysis. In fact,
+leaving aside our MIL, we did not find any other description of
+uncurrying which used dataflow analysis. 
+
+\intent{Contribution: MIL \& Hoopl.}
 
 \standaloneBib 
 
