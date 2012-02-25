@@ -26,7 +26,7 @@ implementation based on the dataflow algorithm.
 presentation of our work. Though we described only uncurrying in great
 detail, we explored a number of other optimizations to varying
 degrees. We describe those in Section~\ref{conc_future_work}. We made
-extensive use of the Hoopl library througout our research, and offer
+extensive use of the Hoopl library throughout our research, and offer
 some thoughts on future improvements to the library's interface in
 Chapter~\ref{conc_hoopl}. In Section~\ref{conc_conc} we conclude this
 thesis.
@@ -34,7 +34,7 @@ thesis.
 \section{Future Work}
 \label{conc_future_work}
 
-Many optimizations which use dataflow analysis to transform imperitave
+Many optimizations which use dataflow analysis to transform imperative
 programs exist (in particular, Muchnik \citeyearpar{Muchnick1998}
 gives a broad survey). ``Future work'' could apply most of those to
 MIL programs, but that would not make for interesting
@@ -86,7 +86,7 @@ the ``\binds x\ <-\ \return y/;'' and \goto l(x,y) statements::
   \end{AVerb}
 \end{singlespace}
 
-\noindent If no interverning statement binds \var x/ again, we can use
+\noindent If no intervening statement binds \var x/ again, we can use
 the Left-Unit law to replace all occurrences of \var x/ with \var y/:
 
 \begin{singlespace}\correctspaceskip
@@ -237,7 +237,7 @@ value \var f/, \var t/ or \var f/ (respectively), and \var ys/.
 \end{minipage} \\\\
   \scap{conc_uncurry_a} & \scap{conc_uncurry_b}  
   \end{tabular}
-  \caption{}
+  \caption{A program that illustrates challenges that occur when uncurrying across blocks.}
   \label{conc_uncurry}
 \end{myfig}
 
@@ -257,7 +257,7 @@ Therefore, we could reasonably uncurry \lab altFalse211/ and
   \end{AVerb}
 \end{singlespace}
 
-\noindent Unfortuantely, as represetned by the !+?+! symbol,
+\noindent Unfortunately, as represented by the !+?+! symbol,
 \lab altTrue208/ and \lab altFalse211/ do not have the \var ys/ argument
 in scope that is expected by \lab b205/. That argument is captured
 by \var cap1/. In order to bring it in scope, we need to rewrite the live
@@ -337,7 +337,7 @@ dead-code, in which we can guarantee that the binding eliminated has
 no observable side-effect. However, the law does not apply to any
 monadic expression more complicated than |return x|. We treat
 allocation as a monadic operation in MIL, but we cannot really observe
-any side-effect of allocation (except our program may consumre more
+any side-effect of allocation (except our program may consume more
 memory or run slower). Therefore we can eliminate any closure, thunk
 or constructor allocation expressions that bind to a dead variable.
 
@@ -389,7 +389,7 @@ directly returns the closure previously returned by \lab absBodyL201/:
   \end{AVerb}
 \end{singlespace}
 
-\noindent We can then apply dead-code eliminiation to remove the
+\noindent We can then apply dead-code elimination to remove the
 allocation bound to \var v210/, since that variable is now dead.
 
 \subsection{Push Through Cases}
@@ -432,7 +432,7 @@ immediately \var v215/ apart, throwing away the allocated value just
 created. This pattern introduces at least one allocation in every
 invocation of |loop|.\footnote{A sufficiently clever compiler could
   put |Maybe| values into registers and avoid a heap allocation, of
-  coures. But, no compiler can be clever enough to cover all possible
+  course. But, no compiler can be clever enough to cover all possible
   data types. We can always create one sufficiently large that a heap
   allocation must occur.}
 
@@ -649,14 +649,14 @@ some desirable properties; for example, a basic block will not contain
 any nodes that can branch to more than one destination. Unfortunately,
 this design requires that the |O| and |C| types be present on the
 client AST. We found life much easier when we designed our AST with
-Hoopl in mind from the beginning; otherwise, we found ourselves writng
+Hoopl in mind from the beginning; otherwise, we found ourselves writing
 a lot of code to transform between our existing AST and a nearly
 identical, Hoopl-ized, version of the same.
 
 ``Smart'' constructors could be used to reduce the boilerplate
 required when using Hoopl against an existing AST. For example,
 consider the the AST given in Figure~\ref{hoopl_fig3} on
-Page~\pageref{hoopl_fig3}. Instead of defining |CStmt| using GADTS,
+Page~\pageref{hoopl_fig3}. Instead of defining |CStmt| using GADTs,
 imagine we defined |CStmtX| as a normal ADT and |CStmt| as a
 |newtype|:
 
@@ -741,17 +741,34 @@ our work.
 \section{Summary}
 \label{conc_conc}
 
-\intent{Review goals.} When Kildall first described the dataflow
-algorithm he applied it to Algol 60, an imperative,
-structured programming language. Work since then has largely applied
-the algorithm to imperative languages, though it has been used in
-other contexts as well. We set out to explore its use within the
-context of a functional language; specifically, we hypothesized that,
+\intent{Review goals.} Kildall applied his dataflow algorithm to Algol
+60, an imperative, structured programming language. Most work in
+dataflow analysis since then has focused on imperative programming
+languages. We set out to explore the algorithm's use within the
+context of a functional programming language; specifically, we hypothesized that,
 by compiling to a monadic intermediate language, we could obtain a
 basic-block structure that would be amiable to dataflow analysis. We
 intended to implement optimizations drawn from the literature of
-imperative and functional compilers, showing that the algorithm could be
-applied in both contexts. 
+imperative and functional compilers, showing that the algorithm could
+be applied in both contexts.
+
+\intent{Contribution: MIL.} The monadic intermediate language
+we described builds on a large body of work on monadic programming,
+intermediate languages, and implementation techniques for functional
+languages. While the overall concept is well-known, we believe MILs
+still offers some novelty. MIL makes allocation explicit but still
+offers high-level features like function application and case
+discrimination. MIL programs, by design, consist of basic-block
+elements. Of course, many intermediate languages consist of
+basic-blocks, but MIL again combines that structure with a monadic
+programming model, giving a ``pure'' flavor to low level operations.
+
+\intent{Contributions: Hoopl.} Our work relied quite a bit on the
+Hoopl library. Without it, we may not have even chosen this
+research. While we did not contribute materially to Hoopl itself, this
+work offers a significant amount of expository material describing
+Hoopl, as well as at least one implementation of a non-trivial
+optimization, that cannot be found elsewhere.
 
 \intent{Contributions: Uncurrying.} Our work
 contributes in several areas. Most importantly, we described
@@ -761,7 +778,7 @@ to implement uncurrying over a MIL using dataflow analysis. In fact,
 leaving aside our MIL, we did not find any other description of
 uncurrying which used dataflow analysis. 
 
-\intent{Contribution: MIL \& Hoopl.}
+\intent{Summary \& Conclusion.}
 
 \standaloneBib 
 
