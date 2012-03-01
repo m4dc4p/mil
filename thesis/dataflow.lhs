@@ -18,15 +18,15 @@
 In 1973, Gary Kildall described a framework for analyzing and
 transforming programs, calling it a \emph{global analysis algorithm}
 \citep{Kildall1973}. His algorithm represents programs as
-\emph{directed graphs}, where each node is a statement or expression
-in the program. The edges between nodes represent possible runtime
-execution paths. An \emph{optimizing function} is applied to each node
-in the graph, transforming an \emph{input pool} of facts into an
-\emph{output pool}. When cycles occur in the graph, output pools can
-change input pools, causing the algorithm to apply the optimizing
-function again. His algorithm terminates when all output pools stop
-changing; the facts gathered can then be used to transform the
-program.
+\emph{directed graphs}, where each node corresponds to a statement or
+expression in the program. The edges between nodes represent possible
+runtime execution paths. An \emph{optimizing function} is applied to
+each node in the graph, transforming an \emph{input pool} of facts
+into an \emph{output pool}. When cycles occur in the graph, output
+pools can change input pools, causing the algorithm to apply the
+optimizing function again. His algorithm terminates when all output
+pools stop changing; the facts gathered can then be used to transform
+the program.
 
 Though Kildall named his algorithm ``global,'' he also applied it to
 smaller pieces of programs such as subroutines or function
@@ -36,11 +36,11 @@ backwards.
 
 This chapter describes Kildall's algorithm, now known as \emph{the
   dataflow algorithm} or the technique of \emph{dataflow analysis}. In
-Section~\ref{sec_back1} we define \emph{control-flow graphs} (CFGs),
+Section~\ref{sec_back1} we define \emph{control-flow graphs} (\Cfgs),
 which the directed graphs representing the program are now called.
 Section~\ref{sec_back3} introduces ``basic blocks,'' not something
 originally defined by Kildall but now a fundamental way of
-representing nodes in CFGs. We show the modern representation
+representing nodes in \Cfgs. We show the modern representation
 of the dataflow algorithm in Section~\ref{back_sec_df}, introducing
 terms and definitions that have been defined since Kildall's original
 work. In Section~\ref{back_subsec_eq} we show the general form of
@@ -63,7 +63,7 @@ Section~\ref{sec_back9}.
 %% sense than the first summary).
 
 Figure~\ref{fig_back1} shows a simple C program and its
-\emph{control-flow graph} (CFG). Each \emph{node} in
+\emph{control-flow graph} (\Cfg). Each \emph{node} in
 Part~\subref{fig_back1_b} represents a statement or expression in the
 original program. For example, \refNode{lst_back2_assigna} and
 \refNode{lst_back2_assignb} represent the assignment statements on
@@ -73,7 +73,7 @@ cause a runtime effect, we do not represent it in the graph.  Nodes
 \entryN and \exitN designate where program execution \emph{enters} and
 \emph{leaves} the graph. If the graph represented the entire program,
 we would say execution \emph{begins} at \entryN and \emph{terminates}
-at \exitN. However, the CFG may be embedded in a larger program, for
+at \exitN. However, the \Cfg may be embedded in a larger program, for
 which reason we say \emph{enters} and \emph{leaves}.
 
 \begin{myfig}[th]
@@ -84,7 +84,7 @@ which reason we say \emph{enters} and \emph{leaves}.
 \scap{fig_back1_a} & \scap{fig_back1_b} 
 \end{tabular}
 \caption{\subref{fig_back1_a} A C-language program fragment. \subref{fig_back1_b} The
-  \emph{control-flow graph} (CFG) for the program.}
+  \emph{control-flow graph} (\Cfg) for the program.}
 \label{fig_back1}
 \end{myfig}
 
@@ -122,8 +122,8 @@ how to make the program more efficient.
 %% %% sense than the first summary).
 
 %% Basic blocks
-Consider the C-language fragment and control-flow graphs (CFG) in
-Figure~\ref{fig_back4}.  Part~\subref{fig_back4_b} shows the CFG for
+Consider the C-language fragment and control-flow graphs (\Cfg) in
+Figure~\ref{fig_back4}.  Part~\subref{fig_back4_b} shows the \Cfg for
 Part~\subref{fig_back4_a}: a long, straight sequence of nodes, one
 after another. Part~\subref{fig_back4_c} represents the assignment statements on
 lines~\ref{lst_back3_start} -- \ref{lst_back3_end} as a \emph{basic
@@ -148,9 +148,9 @@ to consist of one statement each.
   \vtop{\centering\scap{fig_back4_a}} & \vtop{\centering\scap{fig_back4_b}} & \vtop{\centering\scap{fig_back4_c}} \\
 \end{tabular}
 \caption{\subref{fig_back4_a}: A C-language fragment to illustrate
-  \emph{basic blocks}.  \subref{fig_back4_b}: The CFG for
+  \emph{basic blocks}.  \subref{fig_back4_b}: The \Cfg for
   \subref{fig_back4_a} without basic blocks. \subref{fig_back4_c}: The
-  CFG for \subref{fig_back4_c} using basic blocks.}
+  \Cfg for \subref{fig_back4_c} using basic blocks.}
 \label{fig_back4}
 \end{myfig}
 
@@ -263,11 +263,10 @@ through this analysis, concentrating on the nodes that reference $i$:
 predecessors: \refNode{lst_back17_assign} and
 \refNode{lst_back17_incr}. Their \out sets,
 \outB{lst_back17_assign} and \outB{lst_back17_incr}, give differing
-values to $i$: 0 and $\top$. To combine these values when computing
+values to $i$: $0$ and $\top$. To combine these values when computing
 \inB{lst_back17_test}, we use a \emph{meet operator}.
 
-The \emph{meet operator}, \lub (pronounced ``least upper bound'' or
-``lub''), defines how we will combine values in
+The \emph{meet operator}, \lub, defines how we will combine values in
 \setLC. Figure~\ref{tbl_back4} gives the definition of \lub. For any
 value of $x \in \setLC$, $\bot \lub x$ results in $x$. Conversely, $x
 \lub \top$ results in $\top$. Two differing constants, $C_1$ and
@@ -302,7 +301,7 @@ block with two predecessors. \OutB{fig_back15_b1} has the fact
 definition of \lub intuitively says that, when we do not know anything
 about a variable, we can use the information we already have
 instead. \OutB{fig_back15_b2} adds no information about $x$; we can
-assume it is 1, the best possible value. Our definition of \lub
+assume it is $1$, the best possible value. Our definition of \lub
 follows that intuition and tells us that \inB{fig_back15_b3} should be
 \factC{x}{1 \lub \bot}, or \factC{x}{1}.
 
@@ -351,7 +350,7 @@ all of the \out sets into one using $\wedge$:
 \end{equation}
 \end{singlespace}
 
-Using these equations, we can show how the \inB{lst_back17_test}
+\noindent With these definitions, we can now show how the \inB{lst_back17_test}
 set in Figure~\ref{fig_back11} is derived:
 
 \begin{singlespace}\correctspaceskip
@@ -532,7 +531,7 @@ set:
 \end{singlespace}
 
 Now consider the second iteration, where \inB{lst_back15_test} assigns
-$\top$ to $i$. \outB{lst_back15_assign} gives $i$ the value 0 (by !+i
+$\top$ to $i$. \outB{lst_back15_assign} gives $i$ the value $0$ (by !+i
 = 0+!). However, \outB{lst_back15_incr} assigns $i$ the value $\top$,
 because !+i+++! is a non-constant update. We can see why
 $\factC{i}{\top} \in \inB{lst_back15_test}$ by
@@ -600,7 +599,7 @@ And now we can redefine height as the largest $n$ such that:
 \end{equation}
 
 We can show by contradiction that the height of our lattice is
-3. Suppose there exists $x_1 \sqlt x_2 \sqlt \dots \sqlt x_n$, such that n = 4. If
+$3$. Suppose there exists $x_1 \sqlt x_2 \sqlt \dots \sqlt x_n$, such that $n = 4$. If
 $x_4$ is $\top$, then $x_3$ must be an integer or $\bot$. If $x_3$ is
 $\bot$, by Equation~\eqref{eqn_back17}, there is no such $x_2$ such
 that $x_2 \sqlt \bot$. Therefore, $x_3$ cannot be $\bot$. If $x_3$ is
@@ -608,7 +607,7 @@ an integer, again by Equation~\eqref{eqn_back17}, $x_2$ must be
 $\bot$. In turn, there is no such $x_1$ such that $x_1 \sqlt
 \bot$. Therefore, $x_4$ cannot be $\top$ and in fact, by similar
 arguments, it cannot exist. Using similar logic, we can show by cases
-that $n$ (and the height of our lattice) must be 3.
+that $n$ (and the height of our lattice) must be $3$.
 
 Now let us address the transfer function. A \emph{monotone} function 
 has the following property:
@@ -663,7 +662,7 @@ all of the \out sets for the predecessors of a block $B$ in order to
 calculate \inBa. Together, Equations~\eqref{eqn_back3} and
 \eqref{eqn_back16} specify a forwards dataflow analysis.
 
-\begin{myfig}
+\begin{myfig}[p]
   \input{fig_back10}
   \caption{The transfer function and associated definitions for the
     constant propagation analysis. Equation~\eqref{eqn_back3} shows
@@ -681,7 +680,7 @@ parameters:
   \begin{align*}
     \setL{Fact} & \; & \text{\emph{Our set of facts}}. \\
     \wedge  & \; & \text{\emph{Our \emph{meet} operator.}} \\
-    \mathit{t}(f, s) & \; & \text{\emph{Our transfer function, with $f \in \setL{Fact}$ and $s$ a node in the CFG.}} \\
+    \mathit{t}(f, s) & \; & \text{\emph{Our transfer function, with $f \in \setL{Fact}$ and $s$ a node in the \Cfg.}} \\
     D & \; & \text{\emph{Direction, \emph{forwards} or \emph{backwards}}}. 
   \end{align*}
 \end{singlespace}
@@ -837,7 +836,7 @@ as it is no longer used.
 
 This chapter gave an overview of \emph{dataflow optimization}. The
 dataflow \emph{algorithm} gives a general technique for applying an
-\emph{optimizing function} to the \emph{control flow graph} (CFG)
+\emph{optimizing function} to the \emph{control flow graph} (\Cfg)
 representing a given program. The optimizing function computes
 \emph{facts} about each node in the graph, using a \emph{transfer}
 function. A given analysis can proceed \emph{forwards} (where \inBa
@@ -846,7 +845,7 @@ produce \inBa facts). Each optimization defines a specific \emph{meet
   operator} that combines facts for nodes with multiple predecessors
 (for forwards analysis) or successors (for backwards). We compute
 facts \emph{iteratively}, stopping when they reach a \emph{fixed
-  point}. Finally, we \emph{rewrite} the CFG using the facts computed. The 
+  point}. Finally, we \emph{rewrite} the \Cfg using the facts computed. The 
 meaning of our program does not change, but its behavior will be ``better,'' 
 whatever that means for the particular optimization applied.
 

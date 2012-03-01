@@ -5,9 +5,11 @@
     \input{tikz.preamble}
     %% Indicates the preamble declared the 
     %% documentclass
-    \def\preambledocclass{}}\makeatother
+    \def\preambledocclass{}}
 
 \usepackage[T1]{fontenc}
+\renewcommand\@makefnmark{\mbox{\textsuperscript{%
+      \normalfont\ensuremath{\@thefnmark}}}}
 \usepackage{calc}
 \usepackage[osf,sc]{mathpazo}
 \renewcommand\ttdefault{lmtt}
@@ -31,11 +33,9 @@
 %%
 %% From http://tex.stackexchange.com/questions/25644
 \usepackage[labelformat=simple]{subcaption}
-\makeatletter
-  \def\thesubfigure{(\alph{subfigure})}
-  \providecommand\thefigsubsep{~}
-  \def\p@subfigure{\@nameuse{thefigure}\thefigsubsep}
-\makeatother
+\def\thesubfigure{(\alph{subfigure})}
+\providecommand\thefigsubsep{~}
+\def\p@subfigure{\@nameuse{thefigure}\thefigsubsep}
 
 \usepackage{ifthen}
 \usepackage{stmaryrd}
@@ -77,10 +77,8 @@
 \hyphenation{data-flow mo-na-dic} 
 
 %% Should unindent all haskell code set in a display (versus inline)
-\makeatletter
 \@ifundefined{hscodestyle}{}
   {\renewcommand{\hscodestyle}{\advance\leftskip -\mathindent}}
-\makeatother
 
 %% Recommended stretch for CM 10pt roman.
 \emergencystretch=3em
@@ -101,7 +99,7 @@
 \newcommand{\setLC}{\setL{Const}}
 
 %% Lub, subset operators.
-\protected\def\lub{\ifmmode\sqcap\else\raisebox{.1em}{\ensuremath{\sqcap}}\fi\xspace}
+\protected\def\lub{\ensuremath{\sqcap}\xspace}
 \newcommand{\sqlt}{\ensuremath{\sqsubset}\xspace}
 \newcommand{\sqlte}{\ensuremath{\sqsubseteq}\xspace}
 
@@ -219,6 +217,8 @@
 \def\dom(#1){\ensuremath{\mfun{dom}(#1)}\xspace}
 % Set of all integers.
 \def\ZZ{\ensuremath{\mathbb{Z}}}
+\def\Cfg{\textsc{cfg}\xspace}
+\def\Cfgs{\textsc{cfg}s\xspace}
 %%
 
 %% Uncurrrying Chapter 
@@ -407,3 +407,4 @@
 
 %% All of lhs2tex's included definitions.
 \input{lhs2tex}
+\makeatother
