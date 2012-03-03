@@ -673,22 +673,10 @@ calculate \inBa. Together, Equations~\eqref{eqn_back3} and
 \label{fig_back10}
 \end{myfig}
 
-We can now define any dataflow analysis in terms of these four
-parameters:
-
-\begin{singlespace}\correctspaceskip
-  \begin{align*}
-    \setL{Fact} & \; & \text{\emph{Our set of facts}}. \\
-    \wedge  & \; & \text{\emph{Our \emph{meet} operator.}} \\
-    \mathit{t}(f, s) & \; & \text{\emph{Our transfer function, with $f \in \setL{Fact}$ and $s$ a node in the \Cfg.}} \\
-    D & \; & \text{\emph{Direction, \emph{forwards} or \emph{backwards}}}. 
-  \end{align*}
-\end{singlespace}
-
 We can define an iterative dataflow algorithm in terms of these
 parameters. Figure~\ref{fig_back14} gives the algorithm for a forwards
 analysis.\footnote{The backwards case is almost identical.} On
-Line~\ref{fig_back14_init}, we initialize all \out and \inE sets to
+Line~$\ref{fig_back14_init}$, we initialize all \out and \inE sets to
 some suitable initial value from \setL{Fact}. The superscript on \inE
 and \out sets refer to sets from the $i^{th}$ iteration;
 initialization constitutes the ``zeroth'' iteration. Sometimes the
@@ -720,14 +708,14 @@ other \out sets.
 \end{myfig}
 
 The main loop of the algorithm always executes at least once. On
-Line~\ref{fig_back14_in}, we calculate \inE facts for each node $B$ in
+Line~$\ref{fig_back14_in}$, we calculate \inE facts for each node $B$ in
 the next iteration, $\inBa^{i+1}$, by applying $\wedge$ to the
 $\out^i$ sets of $B$'s predecessors from the current
-iteration. Line~\ref{fig_back14_out} calculates $\outBa^{i+1}$ for
+iteration. Line~$\ref{fig_back14_out}$ calculates $\outBa^{i+1}$ for
 each node by applying the transfer function, $t$, to that node, along
 with $\inBa^{i}$, the \inE facts for the current iteration.
 
-Line~\ref{fig_back14_loop} checks if all \out$^{i+1}$ sets are equal
+Line~$\ref{fig_back14_loop}$ checks if all \out$^{i+1}$ sets are equal
 to their previous value, \out$\mathllap{^i}$. If not, the loop
 repeats. Otherwise the algorithm terminates. The final values for each
 \outBa set then hold the facts representing the result of our
@@ -758,10 +746,10 @@ solution in that the maximum fixed point solution may make more
 conservative estimates than necessary. In particular,
 the algorithm does not consider branches that will never be taken. For
 example, the C program from Figure~\ref{fig_back1_a} will never
-execute Line~\ref{lst_back19_test_true}, because the test !+if(a > b)+!
+execute Line~$\ref{lst_back19_test_true}$, because the test !+if(a > b)+!
 is always false:
-\begin{center}
-\begin{minipage}{2in}\singlespacing\vskip-\baselineskip
+
+\begin{singlespace}\correctspaceskip
 \begin{AVerb}[numbers=left]
 int a = 1, b = 2, c; \label{lst_back19_assign}
 if(a > b) \label{lst_back19_test}
@@ -770,8 +758,7 @@ else
   c = 3; \label{lst_back19_test_false}
 \dots
 \end{AVerb}
-\end{minipage}
-\end{center}
+\end{singlespace}
 
 Our algorithm, however, does not take such conditions into
 account. The ideal solution is called the \emph{meet over paths}
@@ -788,23 +775,23 @@ probably will not be as good as the ideal.
 Figure~\ref{fig_back7}, Part~\subref{fig_back7_initial} gave a sample
 program which we wished to optimize using a \emph{constant propagation}
 dataflow analysis. Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt} gave
-the result, replacing all occurrences of $m$ with 10. Now knowing
+the result, replacing all occurrences of $m$ with $10$. Now knowing
 the dataflow algorithm and the equations for constant propagation, we
 can derive how that transformation is made.
 
 Figure~\ref{fig_back12} gives the facts calculated for all nodes in our
 program, during each iteration of the analysis. The first iteration
-calculates that \outB{lst_back15_assign} assigns $m$ the value 10, due
+calculates that \outB{lst_back15_assign} assigns $m$ the value $10$, due
 to the assignment !+m = 10+! on Line~\ref{fig_back7_m}. The second
 iteration propagates this value to \inB{lst_back15_test} and in turn
 to \outB{lst_back15_test}, because the test on
-Line~\ref{fig_back7_test} does not affect $m$. In the third iteration,
+Line~$\ref{fig_back7_test}$ does not affect $m$. In the third iteration,
 we see the same with \inB{lst_back15_mult} and \outB{lst_back15_mult}
-on Line~\ref{fig_back7_loop}. The analysis continues for two more
+on Line~$\ref{fig_back7_loop}$. The analysis continues for two more
 iterations as other values propagate, but at this point we have all
 the information we need to optimize the program. Once the analysis
 reaches a fixed point, we can safely replace all occurrences of $m$
-with 10, resulting in the optimized program given in
+with $10$, resulting in the optimized program given in
 Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt}.
 
 \begin{myfig}
@@ -820,7 +807,7 @@ Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt}.
     reproduces the control-flow graph for our program. After 5
     iterations the facts reach a fixed point (i.e., they stop
     changing) and we can see that \inB{lst_back15_mult} shows that $m$
-    is always 10, proving we can rewrite the multiplication safely. }
+    is always $10$, proving we can rewrite the multiplication safely. }
   \label{fig_back12}
 \end{myfig}
 

@@ -34,7 +34,7 @@ analysis. We return to Lerner and colleagues' work in Section~\ref{hoopl_sec9}.
 \intent{Broad description of how Hoopl abstracts the dataflow
   algorithm.} Hoopl implements the generic portions of the dataflow
 algorithm: iterative computation, traversing the control-flow graph
-(CFG), and combining facts. The \emph{client program}, a term Hoopl
+(\Cfg), and combining facts. The \emph{client program}, a term Hoopl
 uses to mean the program using the library for some optimization,
 provides data structures and functions specific to that optimization:
 the representation of facts, a transfer function, a rewriter, and a
@@ -117,10 +117,10 @@ Figure~\ref{hoopl_fig1_b}.
 \intent{Introduce Hoopl-managed structures} In order to implement
 dataflow analysis generically, Hoopl defines several core data
 structures which client programs must use. These include the
-representation of CFGs, the type of transfer and rewrite functions,
-and the representation of the meet operator. Hoopl controls the CFG
+representation of \Cfgs, the type of transfer and rewrite functions,
+and the representation of the meet operator. Hoopl controls the \Cfg
 representation so it can traverse, propagate facts around, and rewrite
-the CFG. Hoopl specifies the type of the transfer and rewrite function
+the \Cfg. Hoopl specifies the type of the transfer and rewrite function
 such that they produce usable information (and rewrites). Finally,
 Hoopl specifies the meet operator (but not its implementation) so that
 the library can recognize fixed points.
@@ -129,13 +129,13 @@ the library can recognize fixed points.
 client programs specify those items related to their specific
 optimization: the abstract syntax tree (AST) of the language analyzed,
 the representation of facts, and the implementation of the transfer
-and rewrite functions. Each node in the CFG typically contains an
+and rewrite functions. Each node in the \Cfg typically contains an
 expression or statement from the AST of the language which the client
 program analyzes. While Hoopl controls the edges between nodes in the
-CFG, it does not specify the contents of those nodes. Similarly, while
+\Cfg, it does not specify the contents of those nodes. Similarly, while
 Hoopl determines when the analysis reaches a fixed point, it requires
 that the client specify when one set of facts equals another. Finally,
-Hoopl applies the transfer and rewrite functions to the CFG but
+Hoopl applies the transfer and rewrite functions to the \Cfg but
 requires that the client program implement them for their specific AST
 and optimization.
 
@@ -143,14 +143,14 @@ and optimization.
 \label{hoopl_sec_cfg}
 
 \intent{Introduce parameterization of blocks by AST and shape. }
-Hoopl defines CFGs in terms of basic blocks, parameterized by
+Hoopl defines \Cfgs in terms of basic blocks, parameterized by
 \emph{content} and \emph{shape}. Content means statements or
 expressions from the client's AST. Shape applies to both the entry and
 exit point of a block and specifies how control-flow enters and leaves
 that block. An ``open'' block allows control-flow to fall-through
 implicitly from its predecessor or to fall-through to its
 successor. A ``closed'' block requires that control-flow explicitly
-transfer to or from the block. Shape constrains the CFG such that only
+transfer to or from the block. Shape constrains the \Cfg such that only
 blocks with compatible shapes can be connected: successors of a
 closed block must be closed; the predecessor of an open block must be
 open.
@@ -240,7 +240,7 @@ possible block shapes.
     \end{tikzpicture} & Function bodies. 
   \end{tabular}
   \caption{This table shows the four possible block shapes. Each row
-    gives example statements and a representative CFG using a block of
+    gives example statements and a representative \Cfg using a block of
     the given shape. Dashed lines indicate optional blocks. Solid
     lines show required blocks. }
   \label{hoopl_tbl1}
@@ -297,8 +297,8 @@ call to the next statement. Therefore, we give |Call| the type |O O|.
   \label{hoopl_fig2}
 \end{myfig}
 
-\intent{Make connection between CFG using program text and CFG using
-  AST.}  Figure~\ref{hoopl_fig2} shows a CFG for
+\intent{Make connection between \Cfg using program text and \Cfg using
+  AST.}  Figure~\ref{hoopl_fig2} shows a \Cfg for
 !+example+!. Part~\subref{hoopl_fig2_a} shows the program with C
 syntax. Part~\subref{hoopl_fig2_b} uses the AST just given.  Each
 block in Part~\subref{hoopl_fig2_a} corresponds to the adjacent
@@ -307,7 +307,7 @@ Block~\refNode{hoopl_lst3_assignc} (``!+c = 4+!'') corresponds to
 Block~\refNode{hoopl_lst4_assignc} (``|Assign "c" (Const 4)|''). Also
 notice that the entry and exit points ($E$ and $X$, respectively) in
 Part~\subref{hoopl_fig2_a} do not appear explicitly in our program
-text, but they must be represented in the CFG. 
+text, but they must be represented in the \Cfg. 
 
 \intent{Show how types constrain control flow.}  Each block in
 Figure~\ref{hoopl_fig2_b} shows the type associated with its
@@ -334,7 +334,7 @@ the caller of the function.
 
 \intent{Introduce Hoopl functions for building graphs.}
 Figure~\ref{hoopl_fig4} shows the five primitive functions that Hoopl
-provides for client programs to use when constructing CFGs. The |n| type parameter
+provides for client programs to use when constructing \Cfgs. The |n| type parameter
 represents the AST defined by the client program (|CStmt| in our
 example). Hoopl defines the |Graph| type. 
 
@@ -358,20 +358,20 @@ unique predecessor to |n2| in |n1 <*> n2|.
 %include DeadCodeC.lhs
 %let buildFoo = False
 \end{minipage}
-\caption{A definition that creates a CFG for !+example+!, using the
+\caption{A definition that creates a \Cfg for !+example+!, using the
   AST from Figure~\ref{hoopl_fig3} and the functions shown in
   Figure~\ref{hoopl_fig4}.}
 \label{hoopl_fig5}
 \end{myfig}
 
 \intent{Illustrate use of |(<*>)|.}  Returning to our example, we can
-construct the CFG from Figure~\ref{hoopl_fig2_b} using the code in
+construct the \Cfg from Figure~\ref{hoopl_fig2_b} using the code in
 Figure~\ref{hoopl_fig5}.  The |l| parameter (with type |Label|)
 defines the entry point for this block. Each statement in the block is
 mapped to a graph by applying |mkFirst|, |mkMiddle| or |mkLast| as
 appropriate. We concatenate the graphs using the |(<*>)| operator,
 forming one large graph with type |CStmt C C|. This construction
-exactly represents the CFG in Figure~\ref{hoopl_fig2_b}.
+exactly represents the \Cfg in Figure~\ref{hoopl_fig2_b}.
 
 \intent{Show how Hoopl manages control-flow between blocks.}  Hoopl
 combines smaller graphs into larger graphs using the |(||*><*||)|
@@ -404,7 +404,7 @@ successors of a ``closed on exit'' block.
 \intent{Illustrate use of |NonLocal| in our example.}  The client
 program must define an instance of |NonLocal| for its AST. Hoopl will
 use that instance to recover the control-flow between basic blocks in
-the CFG. Therefore, as seen in Figure~\ref{hoopl_fig3}, the AST must
+the \Cfg. Therefore, as seen in Figure~\ref{hoopl_fig3}, the AST must
 store the label of a ``closed on entry'' node and the labels of
 successors for a ``closed on exit'' node in the AST itself. 
 
@@ -428,7 +428,7 @@ value. However, we do not specify the destination of a |Return| so
 
 The dataflow algorithm, as given for the forwards case in
 Figure~\ref{fig_back14} on Page~\pageref{fig_back14}, iteratively
-computes output \emph{facts} for each block in the CFG until reaching
+computes output \emph{facts} for each block in the \Cfg until reaching
 a fixed point. Input facts correspond to the \inBa set for each block;
 output facts correspond to the \outBa set for the block.\footnote{In a
   backwards analysis, the correspondence is reversed}. The first
@@ -467,7 +467,7 @@ consisting of a value and a |ChangeFlag|. The arguments represent
 possibly differing output facts; the result represents the meet of
 those facts. Hoopl determines that a fixed point has been reached when
 |fact_join| returns |NoChange| for all blocks in the
-CFG.\footnote{Hoopl uses this strategy for efficiency: if the client
+\Cfg.\footnote{Hoopl uses this strategy for efficiency: if the client
   does not specify when facts change, Hoopl would need to do many
   comparisons on each iteration to determine if a fixed point had been
   reached.} The client program must ensure that the meet defines a
@@ -523,11 +523,11 @@ initial value for all \inBa and \outBa sets.
 \label{hoopl_sec5}
 \intent{Reminder about what transfer functions do \& that they can go
   forwards or backwards.}  The dataflow algorithm specifies two sets
-of facts for every block in the CFG: \inBa and \outBa.  \inBa
+of facts for every block in the \Cfg: \inBa and \outBa.  \inBa
 represents facts known when control-flow enters the block; \outBa
 those facts known when control-flow leaves the block. The
 \emph{transfer function} computes output facts for each block in the
-CFG, using the contents of the block and its input facts. A forwards
+\Cfg, using the contents of the block and its input facts. A forwards
 analysis uses \inBa as the input facts and computes \outBa; A
 backwards analysis does the opposite, computing \inBa from \outBa and
 the contents of the block.
@@ -628,12 +628,12 @@ point, and we return the empty set.\par}
 \section{Iteration \& Fixed Points}
 \intent{Describe how Hoopl iterates on facts; how Hoopl determines
   when a fixed point has been reached.}  The dataflow algorithm
-iterates over a program's CFG until the facts for each block reach a
+iterates over a program's \Cfg until the facts for each block reach a
 fixed point. Hoopl uses the meet operator (the |fact_join| field of
 the |DataflowLattice| type) given by the client to determine when
 the analysis should terminate.
 
-Hoopl associates each block in the CFG with a |Label|. On each
+Hoopl associates each block in the \Cfg with a |Label|. On each
 iteration, at each label, Hoopl computes the meet of facts from the
 prior iteration with facts from the current iteration. Recall that
 |fact_join| returns a |ChangeFlag|, as well as new facts. Therefore,
@@ -644,8 +644,8 @@ continues to iterate. Otherwise, the analysis terminates.
 \label{hoopl_sec9}
 \intent{Introduce rewriting in Hoopl.} Kildall's formulation of the
 dataflow algorithm \citep{Kildall1973} does not give a general method
-for transforming CFGs based on the results of the analysis
-performed. He assumed that the CFG would be transformed after each
+for transforming \Cfgs based on the results of the analysis
+performed. He assumed that the \Cfg would be transformed after each
 analysis; he did not address the issue of determining when an analysis
 should be performed again (possibly leading to further
 rewrites). Kildall also did not address the question of composing
@@ -655,10 +655,10 @@ at a time, in no particular order.
 Lerner, Grove and Chambers \citeyearpar{Lerner2002} developed a
 variation of the dataflow algorithm that addresses both of these
 concerns. Kildall's dataflow algorithm computes facts over a static
-CFG; Lerner and colleagues' algorithm recursively transforms the CFG
-\emph{during} analysis. After transforming some or all of the CFG,
-their algorithm recursively computes facts for the new CFG; the
-transformation and analysis of the CFG continues until reaching a
+\Cfg; Lerner and colleagues' algorithm recursively transforms the \Cfg
+\emph{during} analysis. After transforming some or all of the \Cfg,
+their algorithm recursively computes facts for the new \Cfg; the
+transformation and analysis of the \Cfg continues until reaching a
 fixed point.
 
 This algorithm does not produce better results than Kildall's, in the
@@ -739,7 +739,7 @@ nodes.
   \end{minipage}
   \caption{The rewrite function for our dead-code elimination
     optimization. |Assign| statements are deleted when they assign to
-    a dead variable. In all other cases the CFG remains unchanged.}
+    a dead variable. In all other cases the \Cfg remains unchanged.}
   \label{hoopl_fig12}
 \end{myfig}
 
@@ -747,7 +747,7 @@ nodes.
 Figure~\ref{hoopl_fig12} shows |eliminate|, the rewrite function for
 our example optimization. We define the local function |rewrite| by
 cases for each constructor in |CStmt|. All cases except |Assign|
-return |Nothing|, leaving the CFG unchanged. If the test |not (var
+return |Nothing|, leaving the \Cfg unchanged. If the test |not (var
 `member` live)| in the |Assign| case succeeds, |rewrite| removes the
 assignment by returning |Just emptyGraph|. Otherwise, the assignment
 remains.
@@ -821,11 +821,11 @@ inside a Hoopl-specified monad. We address those arguments in turn.
 several Hoopl requirements:
 \begin{itemize}
 \item |CheckpointMonad| -- This class provides methods that allow
-  Hoopl to rollback monadic changes to the CFG, providing support for
+  Hoopl to rollback monadic changes to the \Cfg, providing support for
   Hoopl's implementation of Lerner and colleague's technique.
-\item |NonLocal| -- This class allows Hoopl to traverse the CFG.
+\item |NonLocal| -- This class allows Hoopl to traverse the \Cfg.
 \item |LabelsPtr| -- This class gives Hoopl the means to find external entry
-  points to the CFG.
+  points to the \Cfg.
 \end{itemize}
 
 \itempar{|BwdPass m n f|} This argument packages the client's
@@ -833,10 +833,10 @@ definitions of the lattice, transfer function, and rewrite function
 for this particular analysis.
 
 \itempar{|MaybeC e entries|} This gives all the entry points to the
-program, which may not always be all the |Labels| in the CFG ---
+program, which may not always be all the |Labels| in the \Cfg ---
 just those where control-flow can start. 
 
-\itempar{|Graph n e x|} This argument holds the CFG to be
+\itempar{|Graph n e x|} This argument holds the \Cfg to be
 optimized. In practice, |e x| is always |C C|. 
 
 \itempar{|Fact x f|} This argument gives the initial input facts for
@@ -846,7 +846,7 @@ all nodes in the graph.
   |runSimpleUniqueMonad|} Figure~\ref{hoopl_fig13} shows |deadCode|,
 which puts all the pieces of our example optimization together and
 applies them to a given program. The type, |Graph CStmt C C -> Graph
-CStmt C C|, shows that |deadCode| modifies a CFG composed of |CStmt|
+CStmt C C|, shows that |deadCode| modifies a \Cfg composed of |CStmt|
 values. 
 
 \intent{Describe how arguments to |analyzeAndRewriteBwd| are
@@ -867,7 +867,7 @@ optimizing. Finally, the inputs facts (an empty set) are given in the
 fourth argument.
 
 |analyzeAndRewriteBwd| returns a transformed program, the final facts
-computed, and any facts that should propagate ``out'' of the CFG. We capture
+computed, and any facts that should propagate ``out'' of the \Cfg. We capture
 the transformed program in |program'| and return it. 
 
 In |deadCode|, we use |(runWithFuel infiniteFuel)| and
@@ -899,40 +899,6 @@ originally described by Lerner and colleagues
 \citep{Lerner2002}. Hoopl requires that the client program define the
 facts to analyze, a transfer function, a rewriting function, and a
 meet operator (which, in turn, defines a lattice for the facts given).
-
-\section{Dead-Code Elimination}
-\label{hoopl_sec7}
-\intent{Give complete text of our example.}  This section gives our
-entire example program. All the code shown so far appears, as well as
-code for printing before and after results and |main|, which runs the
-optimization over our sample program.
-
-\begin{singlespace}\disableoverfull
-%let includeAll = True
-%include DeadCodeC.lhs
-%let includeAll = False
-\end{singlespace}
-
-\noindent Executing ``main'' produces output showing our optimized function:
-\begin{singlespace}\correctspaceskip
-\begin{AVerb}
-Original Program
-----------------
-void example() \{
-  c = 4;
-  a = c + 1;
-  printf("%d",c);
-  a = c + 2;
-\}
-
-Optimized Program
------------------
-void example() \{
-  c = 4;
-  printf("%d",c);
-\}  
-\end{AVerb}
-\end{singlespace}
 
 \standaloneBib 
 %% Some interaction with standalone makes the thesis break unless we

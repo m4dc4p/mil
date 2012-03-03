@@ -5,7 +5,79 @@
 
 \chapter{Introduction}
 
-Compilers \wlog{hsize is: \the\hsize} for imperative languages implement many optimizations using
+\intent{Introduce the algorithm and what it does.}
+The \emph{dataflow algorithm} treats programs as \emph{control-flow}
+graphs, with edges representing execution paths and nodes representing
+statements in the program. A particular dataflow analysis computes
+some desired property for each node in the graph based on a static
+approximation of the program's run-time behavior; the results of the
+analysis can be used to transform the program. In most cases this
+transformation optimizes the program according to some measure, such
+as making it run faster, using less memory, or consuming less power.
+
+\intent{Describe traditional application of dataflow analysis to imperative programs.}
+Kildall, who first described the dataflow algorithm, used it to
+optimize programs written in \textsc{algol 60},
+an imperative programming language. For example, he implemented
+\emph{constant propagation}, where program variables with constant values
+are replaced by the values themselves, and \emph{common-subexpression
+elimination}, which transforms the program so that it only computes
+redundant expressions once. Research and refinements since then
+continued to focus on imperative languages, as the algorithm applies
+naturally to languages with explicit control-flow.
+
+\intent{Contrast dataflow analysis with rewrite based transformations} In
+contrast, much research on the analysis and optimization of programs
+written in functional programming languages focuses on algebraic,
+rewrite-based techniques. This approach searches for syntactic
+patterns in the program's text and rewrites those patterns according
+to some set of rules. The goal remains the same, namely producing a
+program optimized according to some criteria. 
+
+\intent{Introduce idea of dataflow analysis over MIL.}
+Dataflow analysis on imperative programs arises naturally due to the
+explicit flow-of-control from statement to statement. For functional
+languages, with flow-of-control determined by evaluation order, the
+fit seems more awkward. However, \emph{monadic} functional programs
+embody the best of both styles: expression-based evaluation \emph{and}
+explicit control-flow.
+
+\intent{Thesis: Interesting things happen when we apply dataflow analysis to MIL.}
+We propose that dataflow analysis can be used quite effectively on
+programs written in our \emph{Monadic Intermediate Language} (\mil), a
+pure, monadic, functional language of our own design. We will show
+that dataflow analysis can be used to implement functional-language
+specific optimizations and that our MIL lends itself to established
+dataflow analyses, such as dead-code elimination.
+
+\intent{Signposts for dataflow chapter.} Chapter~\ref{ref_chapter_background}  gives 
+a thorough introduction to the dataflow algorithm in its traditional
+setting. We explain the algorithm by
+applying \emph{constant-propagation} to a simple C program. We
+introduce fundamental definitions used throughout this thesis, such as
+control-flow graphs and basic blocks. We discuss the theoretical basis
+of the algorithm, including its correctness and quality of
+solutions. Finally, we give the \emph{dataflow equations} that can be
+used to describe any particular dataflow analysis.
+
+\intent{Signposts for hoopl chapter.} In Chapter~\ref{ref_chapter_hoopl},
+we describe how to use \hoopl \citep{Hoopl-3.8.7.0}, a Haskell library
+for implementing dataflow-based optimizations that we used to
+implement all dataflow analyses described in this document. We use the
+same structure for this Chapter as the previous, making the connection
+between the more abstract description of the dataflow algorithm and
+its use explicit. Chapter~\ref{ref_chapter_hoopl} uses \emph{dead-code
+elimination} for a subset of the C programming language as a running
+example. In Appendix~\ref{ref_appendix_deadcode}, we give the complete source
+code for the program described.
+
+\intent{Signposts for MIL chapter.}
+
+\intent{Signposts for Uncurrying chapter.}
+
+\intent{conclude}
+
+Compilers for imperative languages implement many optimizations using
 \emph{dataflow analysis}. This method treats the program as a graph,
 where edges represent execution paths and nodes represent statements
 in the program. Dataflow analysis computes facts about each node and
@@ -28,13 +100,7 @@ common to imperative and functional languages, including constant
 propagation and dead-code elimination. We implement an optimization
 which eliminates intermediate closure construction, showing that this
 technique can be used for optimizations specific to functional
-languages. %% Finally, we implement \emph{lazy code motion}, which to our
-%% knowledge has not been applied to programs in a monadic language
-%% before.
+languages.
 
-We use the Hoopl library \citep{Hoopl-3.8.7.0} to implement our
-optimizations. Besides showing that it is possible (and even
-desirable) to use dataflow analysis in this context, our work also
-serves as a case-study for advanced uses of Hoopl.
 
 \end{document}

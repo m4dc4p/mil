@@ -643,7 +643,7 @@ algorithm to fit with Hoopl's view of dataflow analysis.
 \intent{Hoopl's use of |O| and |C| types requires your AST to support
   Hoopl from the beginning.} Hoopl uses the the |O| and |C| types
 (described in Section~\ref{hoopl_sec_cfg}) to specify the shape of
-each node in the CFG; only nodes with compatible types can be
+each node in the \Cfg; only nodes with compatible types can be
 connected to each other. This design allows the compiler to enforce
 some desirable properties; for example, a basic block will not contain
 any nodes that can branch to more than one destination. Unfortunately,
