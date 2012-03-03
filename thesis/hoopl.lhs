@@ -6,7 +6,7 @@
 \begin{document}
 \numbersoff
 \input{document.preamble}
-\chapter{The Hoopl Library}
+\chapter[The \textnormal{\Hoopl} Library]{The \Hoopl Library}
 \label{ref_chapter_hoopl}
 
 \section{Introduction}
@@ -14,15 +14,15 @@
 
 \intent{Introduction} The dataflow algorithm describes a 
 method for analyzing programs based on the computation of facts
-between nodes in the program's control-flow graph. The Hoopl library
+between nodes in the program's control-flow graph. The \hoopl library
 \citep{Hoopl-3.8.7.0}, written in Haskell, provides a framework for
-using the dataflow algorithm. Hoopl enables the user to implement
+using the dataflow algorithm. \Hoopl enables the user to implement
 their own analyses for their own programming language. A thorough
 description of the library's implementation can be found in the
 authors' paper \citep{Ramsey2010}; here, we discuss the abstractions
 they provide and how to use them.
 
-\intent{Overview of the implementation provided by Hoopl.} Hoopl's
+\intent{Overview of the implementation provided by \hoopl.} \Hoopl's
 implementation follows a variation of the dataflow algorithm described
 by Lerner, Grove and Chambers \citeyearpar{Lerner2002}. In brief,
 Lerner and colleagues' dataflow algorithm interleaves analysis and
@@ -31,16 +31,16 @@ quality solutions than Kildall's original formulation
 \citep{Kildall1973}, it arguably simplifies the implementation of individual
 analysis. We return to Lerner and colleagues' work in Section~\ref{hoopl_sec9}.
 
-\intent{Broad description of how Hoopl abstracts the dataflow
-  algorithm.} Hoopl implements the generic portions of the dataflow
+\intent{Broad description of how \hoopl abstracts the dataflow
+  algorithm.} \Hoopl implements the generic portions of the dataflow
 algorithm: iterative computation, traversing the control-flow graph
-(\Cfg), and combining facts. The \emph{client program}, a term Hoopl
+(\Cfg), and combining facts. The \emph{client program}, a term \hoopl
 uses to mean the program using the library for some optimization,
 provides data structures and functions specific to that optimization:
 the representation of facts, a transfer function, a rewriter, and a
 meet operator.
 
-\intent{Introduce example} We will illustrate Hoopl concepts using a
+\intent{Introduce example} We will illustrate \hoopl concepts using a
 running example motivated by the C-language function defined in
 Figure~\ref{hoopl_fig1_a}. A cursory examination of that listing shows
 the assignments to !+a+! on Lines~\ref{hoopl_lst1_assign_a} and
@@ -94,48 +94,48 @@ Figure~\ref{hoopl_fig1_a}, transforming it to resemble
 Figure~\ref{hoopl_fig1_b}.
 
 \intent{Provides signposts for chapter.}  This chapter provides enough
-background to understand the use of Hoopl in later chapters. It
+background to understand the use of \hoopl in later chapters. It
 assumes the reader has a fair knowledge of the Haskell programming
 language. We also assume familiarity with language extensions, such as
 GADTs \citep{Schrijvers2009}, as implemented by GHC 7.2
 \citep{GHC-7.2.1}. This chapter's structure mirrors that covering
 dataflow analysis (Chapter~\ref{ref_chapter_background}), presenting
-parallel concepts in terms of Hoopl
+parallel concepts in terms of \hoopl
 structures. Section~\ref{hoopl_sec1} gives an overview of the types,
 data structures, and functions provided by
-Hoopl. Sections~\ref{hoopl_sec_cfg} through \ref{hoopl_sec6} give
+\hoopl. Sections~\ref{hoopl_sec_cfg} through \ref{hoopl_sec6} give
 detailed information about each item. Throughout, we develop our
 client program to implement dead-code elimination. We conclude with a
-summary of Hoopl in Section~\ref{hoopl_sec3}. Section~\ref{hoopl_sec7}
+summary of \hoopl in Section~\ref{hoopl_sec3}. Section~\ref{hoopl_sec7}
 shows all the code for our dead-code optimization in one place, as
 well as output demonstrating the optimization shown in
 Figure~\ref{hoopl_fig1_b}.
 
-\section{Hoopl's API}
+\section{\Hoopl's API}
 \label{hoopl_sec1}
 
-\intent{Introduce Hoopl-managed structures} In order to implement
-dataflow analysis generically, Hoopl defines several core data
+\intent{Introduce \hoopl-managed structures} In order to implement
+dataflow analysis generically, \hoopl defines several core data
 structures which client programs must use. These include the
 representation of \Cfgs, the type of transfer and rewrite functions,
-and the representation of the meet operator. Hoopl controls the \Cfg
+and the representation of the meet operator. \Hoopl controls the \Cfg
 representation so it can traverse, propagate facts around, and rewrite
-the \Cfg. Hoopl specifies the type of the transfer and rewrite function
+the \Cfg. \Hoopl specifies the type of the transfer and rewrite function
 such that they produce usable information (and rewrites). Finally,
-Hoopl specifies the meet operator (but not its implementation) so that
+\hoopl specifies the meet operator (but not its implementation) so that
 the library can recognize fixed points.
 
-\intent{Introduce client-managed structures} Hoopl requires that
+\intent{Introduce client-managed structures} \Hoopl requires that
 client programs specify those items related to their specific
 optimization: the abstract syntax tree (AST) of the language analyzed,
 the representation of facts, and the implementation of the transfer
 and rewrite functions. Each node in the \Cfg typically contains an
 expression or statement from the AST of the language which the client
-program analyzes. While Hoopl controls the edges between nodes in the
+program analyzes. While \hoopl controls the edges between nodes in the
 \Cfg, it does not specify the contents of those nodes. Similarly, while
-Hoopl determines when the analysis reaches a fixed point, it requires
+\hoopl determines when the analysis reaches a fixed point, it requires
 that the client specify when one set of facts equals another. Finally,
-Hoopl applies the transfer and rewrite functions to the \Cfg but
+\hoopl applies the transfer and rewrite functions to the \Cfg but
 requires that the client program implement them for their specific AST
 and optimization.
 
@@ -143,7 +143,7 @@ and optimization.
 \label{hoopl_sec_cfg}
 
 \intent{Introduce parameterization of blocks by AST and shape. }
-Hoopl defines \Cfgs in terms of basic blocks, parameterized by
+\Hoopl defines \Cfgs in terms of basic blocks, parameterized by
 \emph{content} and \emph{shape}. Content means statements or
 expressions from the client's AST. Shape applies to both the entry and
 exit point of a block and specifies how control-flow enters and leaves
@@ -155,7 +155,7 @@ blocks with compatible shapes can be connected: successors of a
 closed block must be closed; the predecessor of an open block must be
 open.
 
-\intent{Introduce meaning and definition of O and C types.}  Hoopl
+\intent{Introduce meaning and definition of O and C types.}  \Hoopl
 provides types named |O| (for open) and |C| (for closed) to describe
 the entry and exit shape of a given block. We write |O O|
 (``open/open''), |O C| (``open/closed''), etc., where the first type
@@ -254,7 +254,7 @@ the AST for !+example+!. We use GHC's GADT syntax
 exit types reflect the control-flow of the
 represented statement. The |CExpr| and |Var| types do not affect
 control flow in our subset, so we do not annotate them like
-|CStmt|. Hoopl defines the |Label| type; we use it to define the
+|CStmt|. \Hoopl defines the |Label| type; we use it to define the
 successors and predecessors of closed blocks.
 
 \begin{myfig}
@@ -328,15 +328,15 @@ the caller of the function.
 > (<*>)     :: Graph n e O -> Graph n O x -> Graph n e x
 > (|*><*|)  :: Graph n e C -> Graph n C x -> Graph n e x
 \end{minipage}
-\caption{Primitives provided by Hoopl for constructing graphs.}
+\caption{Primitives provided by \hoopl for constructing graphs.}
 \label{hoopl_fig4}
 \end{myfig}
 
-\intent{Introduce Hoopl functions for building graphs.}
-Figure~\ref{hoopl_fig4} shows the five primitive functions that Hoopl
+\intent{Introduce \hoopl functions for building graphs.}
+Figure~\ref{hoopl_fig4} shows the five primitive functions that \hoopl
 provides for client programs to use when constructing \Cfgs. The |n| type parameter
 represents the AST defined by the client program (|CStmt| in our
-example). Hoopl defines the |Graph| type. 
+example). \Hoopl defines the |Graph| type. 
 
 \intent{Introduce |mkFirst|, |mkMiddle|, and |mkLast|.}
 The |mkFirst|, |mkMiddle| and |mkLast| functions turn a single block
@@ -373,14 +373,14 @@ appropriate. We concatenate the graphs using the |(<*>)| operator,
 forming one large graph with type |CStmt C C|. This construction
 exactly represents the \Cfg in Figure~\ref{hoopl_fig2_b}.
 
-\intent{Show how Hoopl manages control-flow between blocks.}  Hoopl
+\intent{Show how \hoopl manages control-flow between blocks.}  \Hoopl
 combines smaller graphs into larger graphs using the |(||*><*||)|
 operator (pronounced ``append''). Unlike |(<*>)|, this operator does
 not imply any control-flow between its arguments. 
 
 The (<*>) operator defines control-flow within a basic block, and the
 |(||*><*||)| operator combines unconnected blocks into a larger
-graph. Hoopl defines the |NonLocal| class to bridge the gap between
+graph. \Hoopl defines the |NonLocal| class to bridge the gap between
 these two operators:\footnote{The |(||*><*||)| and |(<*>)| operators
   in Figure~\ref{hoopl_fig4} specify a |NonLocal| constraint on |n|,
   which we hid to simplify the presentation.}
@@ -391,18 +391,18 @@ these two operators:\footnote{The |(||*><*||)| and |(<*>)| operators
 >   successors  :: n e C -> [Label]
 \end{singlespace}
 
-\noindent Hoopl defines the |Label| type and the client program uses
+\noindent \Hoopl defines the |Label| type and the client program uses
 them for two purposes: uniquely identifying each block in the graph,
 and for specifying the explicit successors of each block in the
-graph. Hoopl use |entryLabel| method to find the entry point for a
+graph. \Hoopl use |entryLabel| method to find the entry point for a
 given block. The |n C x| type of its argument ensures |entryLabel| can
 only be applied to ``closed on entry'' nodes; precisely those nodes
 that can be the target of an explicit control-flow
-transfer. Similarly, Hoopl uses |successors| to determine the explicit
+transfer. Similarly, \hoopl uses |successors| to determine the explicit
 successors of a ``closed on exit'' block.
 
 \intent{Illustrate use of |NonLocal| in our example.}  The client
-program must define an instance of |NonLocal| for its AST. Hoopl will
+program must define an instance of |NonLocal| for its AST. \Hoopl will
 use that instance to recover the control-flow between basic blocks in
 the \Cfg. Therefore, as seen in Figure~\ref{hoopl_fig3}, the AST must
 store the label of a ``closed on entry'' node and the labels of
@@ -439,7 +439,7 @@ block. The set of values representing facts and the meet operator
 together form a \emph{lattice}.
 
 \intent{Introduce |DataflowLattice| type and show connection to facts
-  and the meet operator.}  Hoopl provides the |DataflowLattice|
+  and the meet operator.}  \Hoopl provides the |DataflowLattice|
 type (shown in Figure~\ref{hoopl_fig7}). |DataflowLattice| defines the
 following fields: |fact_name|, used for documentation; |fact_bot|,
 for specifying initial facts; and |fact_join|, for the implementation
@@ -457,7 +457,7 @@ of the analysis' meet operator.
 >
 > data ChangeFlag = NoChange | SomeChange 
   \end{minipage}
-  \caption{|DataflowLattice| and associated types defined by Hoopl for
+  \caption{|DataflowLattice| and associated types defined by \hoopl for
     representing and combining facts.}
   \label{hoopl_fig7}
 \end{myfig}
@@ -465,10 +465,10 @@ of the analysis' meet operator.
 The meet operator, |fact_join|, takes two arguments and returns a pair
 consisting of a value and a |ChangeFlag|. The arguments represent
 possibly differing output facts; the result represents the meet of
-those facts. Hoopl determines that a fixed point has been reached when
+those facts. \Hoopl determines that a fixed point has been reached when
 |fact_join| returns |NoChange| for all blocks in the
-\Cfg.\footnote{Hoopl uses this strategy for efficiency: if the client
-  does not specify when facts change, Hoopl would need to do many
+\Cfg.\footnote{\Hoopl uses this strategy for efficiency: if the client
+  does not specify when facts change, \hoopl would need to do many
   comparisons on each iteration to determine if a fixed point had been
   reached.} The client program must ensure that the meet defines a
 finite-height lattice; otherwise, the analysis may not terminate.
@@ -534,11 +534,11 @@ the contents of the block.
 
 \intent{Introduce |FwdTransfer| and |BwdTransfer| types; Show how
   |mkFTransfer| and |mkBTransfer| construct transfer functions.}
-Hoopl defines the |FwdTransfer| and |BwdTransfer| types, shown in
+\Hoopl defines the |FwdTransfer| and |BwdTransfer| types, shown in
 Figure~\ref{hoopl_fig10}, to represent forwards and backwards transfer
 functions. The |n| parameter represents the block's contents (i.e.,
 the AST of the language analyzed). The |f| parameter represents the
-facts computed. Hoopl does not export the constructors for
+facts computed. \Hoopl does not export the constructors for
 |FwdTransfer| or |BwdTransfer|; instead, clients use the |mkFTransfer|
 and |mkBTransfer| functions, whose signatures are also shown in
 Figure~\ref{hoopl_fig10}.
@@ -551,13 +551,13 @@ Figure~\ref{hoopl_fig10}.
 > mkFTransfer :: (forall e x . n e x -> f -> Fact x f) -> FwdTransfer n f
 > mkBTransfer :: (forall e x . n e x -> Fact x f -> f) -> BwdTransfer n f      
     \end{minipage}
-  \caption{Hoopl's |FwdTransfer| and |BwdTransfer| types. They can be
+  \caption{\Hoopl's |FwdTransfer| and |BwdTransfer| types. They can be
     constructed with the functions |mkFTransfer| and |mkBTransfer|.}
   \label{hoopl_fig10}
 \end{myfig}
 
 \intent{Explain why |mkFTransfer| and |mkBTransfer| require
-  higher-rank types.}  Hoopl requires that we parameterize our AST
+  higher-rank types.}  \Hoopl requires that we parameterize our AST
 (i.e., the |n| type) using the |O| and |C| types from
 Section~\ref{hoopl_sec_cfg}.  A standard Haskell function cannot
 pattern match on values with different types (e.g., |Assign| has type
@@ -570,10 +570,10 @@ constructors in the AST.
 
 \intent{Types families and |Fact C| vs. |Fact O|} Notice that
 |mkFTransfer| takes a transfer function that produces a |Fact x f|
-value. Hoopl defines |Fact x f| as an \emph{indexed type family}
+value. \Hoopl defines |Fact x f| as an \emph{indexed type family}
 \citep[Section~7.2.2]{GHCManual}, where the meaning of |Fact x f|
 depends on the type of |x|.  When |x| is |C|, then |Fact x f| is a
-synonym for |FactBase f| (another Hoopl type), which is a dictionary
+synonym for |FactBase f| (another \hoopl type), which is a dictionary
 of facts indexed by |Labels|. When |x| is |O|, |Fact x f| is just a
 synonym for |f| (i.e., a plain fact). The definition of |Fact x f|
 extends the dataflow algorithm slightly by allowing the transfer
@@ -626,23 +626,23 @@ point, and we return the empty set.\par}
 \end{myfig}
 
 \section{Iteration \& Fixed Points}
-\intent{Describe how Hoopl iterates on facts; how Hoopl determines
+\intent{Describe how \hoopl iterates on facts; how \hoopl determines
   when a fixed point has been reached.}  The dataflow algorithm
 iterates over a program's \Cfg until the facts for each block reach a
-fixed point. Hoopl uses the meet operator (the |fact_join| field of
+fixed point. \Hoopl uses the meet operator (the |fact_join| field of
 the |DataflowLattice| type) given by the client to determine when
 the analysis should terminate.
 
-Hoopl associates each block in the \Cfg with a |Label|. On each
-iteration, at each label, Hoopl computes the meet of facts from the
+\Hoopl associates each block in the \Cfg with a |Label|. On each
+iteration, at each label, \hoopl computes the meet of facts from the
 prior iteration with facts from the current iteration. Recall that
 |fact_join| returns a |ChangeFlag|, as well as new facts. Therefore,
-if any application of |fact_join| results in |SomeChange|, Hoopl
+if any application of |fact_join| results in |SomeChange|, \hoopl
 continues to iterate. Otherwise, the analysis terminates.
 
 \section{Interleaved Analysis \& Rewriting}
 \label{hoopl_sec9}
-\intent{Introduce rewriting in Hoopl.} Kildall's formulation of the
+\intent{Introduce rewriting in \hoopl.} Kildall's formulation of the
 dataflow algorithm \citep{Kildall1973} does not give a general method
 for transforming \Cfgs based on the results of the analysis
 performed. He assumed that the \Cfg would be transformed after each
@@ -667,15 +667,15 @@ sense defined by Section~\ref{back_sec_quality} (Page
 describe, their algorithm removes the need to manually combine
 multiple dataflow analyses' into one ``super-analysis.'' Instead, each
 dataflow analysis can be implemented separately; their algorith
-composes those separate pieces automatically. Hoopl implements a
+composes those separate pieces automatically. \Hoopl implements a
 version of the interleaved analysis and rewriting algorithm just
 described.
 
-\section{Rewriting with Hoopl}
+\section{Rewriting with \hoopl}
 \intent{Introduce |FwdRewrite| and |BwdRewrite| type.}
-Figure~\ref{hoopl_fig15} shows the two types Hoopl provides for
+Figure~\ref{hoopl_fig15} shows the two types \hoopl provides for
 rewriting, |FwdRewrite| and |BwdRewrite|. These types correspond to
-the |FwdTransfer| and |BwdTransfer| types; Hoopl requires that a
+the |FwdTransfer| and |BwdTransfer| types; \hoopl requires that a
 |FwdTransfer| be paired with a |FwdRewrite|, and a |BwdTransfer| with
 a |BwdRewrite|.  Client programs use the |mkFRewrite| and |mkBRewrite|
 functions to create |FwdRewrite| and |BwdRewrite| values. For the same
@@ -696,7 +696,7 @@ returns a monadic |Maybe (Graph n e x)| value. The monadic portion
 relates to optimization fuel, a concept described in
 Section~\ref{hoopl_sec8}. The |Maybe| portion indicates if the
 rewriter wants to change the node given in any way. |Nothing| means no
-change to the node. A |Just| value causes Hoopl to replace the current
+change to the node. A |Just| value causes \hoopl to replace the current
 block with a |Graph n e x| value. Returning a |Graph| value allows the
 rewriter to replace a single node with many nodes, but the graph
 returned must have the same |e x| type (i.e., shape) as the input
@@ -725,7 +725,7 @@ nodes.
 >   (forall e x . n e x -> Fact x f -> m (Maybe (Graph n e x)))
 >   -> BwdRewrite m n f
   \end{minipage}
-  \caption{The |FwdRewrite| and |BwdRewrite| types provided by Hoopl,
+  \caption{The |FwdRewrite| and |BwdRewrite| types provided by \hoopl,
     as well as the functions used to construct them, |mkBRewrite| and
     |mkFRewrite|.}
   \label{hoopl_fig15}
@@ -755,12 +755,12 @@ remains.
 \subsection{Optimization Fuel}
 \label{hoopl_sec8}
 \intent{Describe optimization fuel and purpose of |FuelMonad|
-  constraint.}  Hoopl implements ``optimization fuel,'' originally
+  constraint.}  \Hoopl implements ``optimization fuel,'' originally
 described by Whalley \citeyearpar{Whalley1994}, as an aid in debugging
 optimizations. Each rewrite costs one ``unit'' of fuel. If fuel runs
-out, Hoopl stops iterating. This allows the programmer to debug faulty
+out, \hoopl stops iterating. This allows the programmer to debug faulty
 optimizations by decreasing the fuel supply in a classic
-divide-and-conquer approach. The |FuelMonad| constraint ensures Hoopl
+divide-and-conquer approach. The |FuelMonad| constraint ensures \hoopl
 can manage fuel during rewriting. Normally, the client program does
 not worry about fuel.
 
@@ -768,9 +768,9 @@ not worry about fuel.
 \label{hoopl_sec6}
 \intent{Introduce |BwdPass|/|FwdPass| and
   |analyzeAndRewriteBwd|/|analyzeAndRewriteFwd|.}
-Figure~\ref{hoopl_fig14} shows Hoopl's |BwdPass| and |FwdPass|
+Figure~\ref{hoopl_fig14} shows \hoopl's |BwdPass| and |FwdPass|
 types. The figure also shows the signatures for |analyzeAndRewriteBwd|
-and |analyzeAndRewriteFwd|, Hoopl functions that the client program
+and |analyzeAndRewriteFwd|, \hoopl functions that the client program
 uses to apply a given analysis and transformation. As the names
 suggest, one pair applies to backwards dataflow-analyses and the other
 to forwards analyses. We will only discuss the backwards case here.
@@ -801,7 +801,7 @@ to forwards analyses. We will only discuss the backwards case here.
 >   -> Fact x f 
 >   -> m (Graph n e x, FactBase f, MaybeO e f)
   \end{minipage}
-  \caption{Hoopl's types and functions used to execute backwards and
+  \caption{\Hoopl's types and functions used to execute backwards and
     forwards analysis and transformation. |BwdPass| and |FwdPass|
     package the client program's definition of lattice, transfer
     function, and rewrite function. Except for direction,
@@ -815,16 +815,16 @@ to forwards analyses. We will only discuss the backwards case here.
 The |BwdPass| type packages a lattice definition, transfer function, and
 rewrite function into one structure. The |analyzeAndRewriteBwd|
 function takes a number of interesting arguments and must be run
-inside a Hoopl-specified monad. We address those arguments in turn.
+inside a \hoopl-specified monad. We address those arguments in turn.
 
 \itempar{(|CheckpointMonad m|, |NonLocal n|, |LabelsPtr entries|)} These constraints reflect
-several Hoopl requirements:
+several \hoopl requirements:
 \begin{itemize}
 \item |CheckpointMonad| -- This class provides methods that allow
-  Hoopl to rollback monadic changes to the \Cfg, providing support for
-  Hoopl's implementation of Lerner and colleague's technique.
-\item |NonLocal| -- This class allows Hoopl to traverse the \Cfg.
-\item |LabelsPtr| -- This class gives Hoopl the means to find external entry
+  \hoopl to rollback monadic changes to the \Cfg, providing support for
+  \hoopl's implementation of Lerner and colleague's technique.
+\item |NonLocal| -- This class allows \hoopl to traverse the \Cfg.
+\item |LabelsPtr| -- This class gives \hoopl the means to find external entry
   points to the \Cfg.
 \end{itemize}
 
@@ -856,7 +856,7 @@ instance of |CheckpointMonad| and
 |UniqueMonad| (a class that controls the creation of new
   |Label| values --- allowing rewriters to create new |C x|
   nodes). The |CheckingFuelMonad| and |SimpleUniqueMonad| types in the
-signature of |opt| are the Hoopl-provided implementations of
+signature of |opt| are the \hoopl-provided implementations of
 |CheckpointMonad| and |UniqueMonad|. 
 
 The first argument to |analyzedAndRewriteBwd|, |pass|, packages up the
@@ -871,7 +871,7 @@ computed, and any facts that should propagate ``out'' of the \Cfg. We capture
 the transformed program in |program'| and return it. 
 
 In |deadCode|, we use |(runWithFuel infiniteFuel)| and
-|runSimpleUniqueMonad| (all provided by Hoopl) to execute the monadic
+|runSimpleUniqueMonad| (all provided by \hoopl) to execute the monadic
 program returned by |opt| and ultimately, we return the transformed
 program.
 
@@ -890,13 +890,13 @@ program.
 
 \section{Summary}
 \label{hoopl_sec3}
-\intent{Summarize Hoopl's features.} This chapter gave an introduction
-to the essential features of the Hoopl library. Hoopl implements the
+\intent{Summarize \hoopl's features.} This chapter gave an introduction
+to the essential features of the \hoopl library. \Hoopl implements the
 generic portions of the dataflow algorithm; in particular, it
-determines when facts reach a fixed point. Hoopl's implementation of
+determines when facts reach a fixed point. \Hoopl's implementation of
 the dataflow algorithm interleaves analysis and rewriting, a technique
 originally described by Lerner and colleagues
-\citep{Lerner2002}. Hoopl requires that the client program define the
+\citep{Lerner2002}. \Hoopl requires that the client program define the
 facts to analyze, a transfer function, a rewriting function, and a
 meet operator (which, in turn, defines a lattice for the facts given).
 
