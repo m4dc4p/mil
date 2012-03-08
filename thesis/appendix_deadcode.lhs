@@ -6,7 +6,7 @@
 \begin{document}
 \numbersoff
 \input{document.preamble}
-\newpage\appendix\chapter{Dead-Code Elimination Example}\fancyhead[L]{\small\textsc{Appendix \thechapter}: \leftmark}
+\chapter{Dead-Code Elimination Example}
 \label{ref_appendix_deadcode}
 
 \intent{Give complete text of our example.}  This section gives our

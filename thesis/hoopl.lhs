@@ -6,7 +6,7 @@
 \begin{document}
 \numbersoff
 \input{document.preamble}
-\chapter[The \textnormal{\Hoopl} Library]{The \Hoopl Library}
+\chapter[The \textnormal{\Hoopl\unskip} Library]{The \Hoopl Library}
 \label{ref_chapter_hoopl}
 
 \section{Introduction}
