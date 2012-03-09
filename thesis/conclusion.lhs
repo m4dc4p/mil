@@ -643,7 +643,7 @@ algorithm to fit with Hoopl's view of dataflow analysis.
 \intent{Hoopl's use of |O| and |C| types requires your AST to support
   Hoopl from the beginning.} Hoopl uses the the |O| and |C| types
 (described in Section~\ref{hoopl_sec_cfg}) to specify the shape of
-each node in the \Cfg; only nodes with compatible types can be
+each node in the \cfg; only nodes with compatible types can be
 connected to each other. This design allows the compiler to enforce
 some desirable properties; for example, a basic block will not contain
 any nodes that can branch to more than one destination. Unfortunately,
@@ -741,8 +741,8 @@ our work.
 \section{Summary}
 \label{conc_conc}
 
-\intent{Review goals.} Kildall applied his dataflow algorithm to Algol
-60, an imperative, structured programming language. Most work in
+\intent{Review goals.} Kildall applied his dataflow algorithm to \textsc{algol
+60}, an imperative, structured programming language. Most work in
 dataflow analysis since then has focused on imperative programming
 languages. We set out to explore the algorithm's use within the
 context of a functional programming language; specifically, we hypothesized that,

@@ -12,13 +12,6 @@
 \renewcommand\@makefnmark{\mbox{\textsuperscript{%
       \normalfont\ensuremath{\@thefnmark}}}}
 
-\usepackage{tocloft}
-%% Make room to set ``Chapter N  '' 
-\setlength\cftchapnumwidth{\widthof{Chapter\ \ 9\quad}}
-%% Chapter entries in TOC need to include ``Chapter''
-\renewcommand\cftchappresnum{Chapter\ \ }
-\renewcommand\cftchapaftersnum{\quad}
-
 \usepackage{calc}
 \usepackage[osf,sc]{mathpazo}
 \renewcommand\ttdefault{lmtt}
@@ -58,11 +51,11 @@
 \usepackage{microtype}
 
 %% GSO margins.
-\usepackage[left=1.5in, right=1in, top=1in, bottom=1in]{geometry}
+\usepackage[left=1.5in, right=1in, top=1in, bottom=1in,includeheadfoot]{geometry}
 \usepackage{array}
 \usepackage{abstract}
 
-%% GSO requires 12 pt font for all headings
+%% GSO requires 12 pt font for all chapter headings
 \usepackage[bf,sf,tiny,compact]{titlesec}
 \titleformat{\chapter}[display]
             {}% format
@@ -70,13 +63,26 @@
             {\baselineskip}
             {\sffamily\bfseries}
             {}
-%% \usepackage[raggedright]{titletoc}
-%% \titlecontents{chapter}[1.5in]
-%%         {\bigskip}%% above
-%%         {\bfseries Chapter \thecontentslabel\ }%% before with label
-%%         {}%% before w/o label
-%%         {\titlerule*[1pc]{.}\thecontentspage}%% filler and page
-%%         {}%% after
+%% Reduce vertical space above chapter headings on chapter
+%% pages.
+\titlespacing*{\chapter}{0pt}{0pt}{2\bigskipamount}
+
+%% GSO TOC requirements.
+\usepackage{tocloft}
+%% Make room to set ``Chapter N  '' 
+\setlength\cftchapnumwidth{\widthof{Chapter\ \ 9\quad}}
+%% Chapter entries in TOC need to include ``Chapter''
+\renewcommand\cftchappresnum{Chapter\ \ }
+\renewcommand\cftchapaftersnum{\quad}
+%% Make ``Contents'' and ``List of Figures'' 12 pt Sans Serif
+\renewcommand\cfttoctitlefont{\sffamily\bfseries\normalsize}
+\renewcommand\cftloftitlefont{\sffamily\bfseries\normalsize}
+%% Reduce vertical space above ``Contents'' and ``List of Figures''
+\setlength\cftbeforetoctitleskip{0pt}
+\setlength\cftbeforeloftitleskip{0pt}
+%% Ensure entries in LOF are on the left margin.
+\setlength\cftfigindent{0pt}
+
 \usepackage{fancyhdr}
 \pagestyle{fancy}
 \fancyhf{}
@@ -382,6 +388,7 @@
 
 %% Describe intent of a passage
 \newcommand\intent[1]{{\begin{singlespace}\noindent\leftskip=-1in\emph{\footnotesize Intent: #1}\end{singlespace}}\nopagebreak[1]}
+\renewcommand\intent[1]{}
 
 %% In aligned/alignedat/gathered environments, you don't et
 %% automatic equation numbers. This command makes sure to
@@ -417,8 +424,9 @@
 
 %% Abbreviations
 \def\mil{\textsc{mil}\xspace}
-\def\Cfg{\textsc{cfg}\xspace}
-\def\Cfgs{\textsc{cfg}s\xspace}
+\def\Mil{\textsc{Mil}\xspace}
+\def\cfg{\textsc{cfg}\xspace}
+\def\cfgs{\textsc{cfg}s\xspace}
 \def\hoopl{\textsc{hoopl}\xspace}
 \def\Hoopl{\textsc{Hoopl}\xspace}
 \def\ast{\textsc{ast}\xspace}

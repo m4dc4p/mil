@@ -31,7 +31,7 @@ described by \citet{Flanagan1993}, is an intermediate form for
 functional languages which makes all intermediate values explicit. It
 is useful for showing the exact order of evaluation for expressions.
 
-Our intermediate language, MIL (``monadic intermediate language''),
+Our monadic intermediate language (\mil),
 specifically supports functional language features, but also follows
 the form of three-address code, an intermediate language more
 associated with imperative languages. MIL directly supports function
@@ -756,7 +756,7 @@ of these errors; the rest we ignore in the interest of simplicity.
 
 \intent{Reminder about open/closed shapes.}  As described in
 Section~\ref{hoopl_sec_cfg}, Hoopl characterizes control-flow between
-nodes in a control-flow graph (\Cfg) by their entry and exit
+nodes in a control-flow graph (\cfg) by their entry and exit
 shape. Hoopl uses the |O| and |C| types to express the shape of the
 entry and exit points for a node. A node that is open on exit can only
 be followed a node that is open on entry. A sequence of nodes can be
@@ -790,14 +790,14 @@ entry and exit shape of the statement. |BlockEntry| and |CloEntry|
 represent the two types of blocks (basic and \cc, respectively). Their
 shape, |C O|, shows that they can only be used to begin a MIL
 block. The |Name| and |Label| arguments help Hoopl connect nodes
-together in the \Cfg.  The |Bind| statement (with shape |O O|)
+together in the \cfg.  The |Bind| statement (with shape |O O|)
 represents statements inside the block. The type ensures no block
 begins or ends with a |Bind|. Blocks can end with either a |CaseM| or
 |Done| statement. The |CaseM| value represents the \milres case/
 statement. |Done| does not appear explicitly in Figure~\ref{mil_fig3},
 but the AST uses it to end a block with a |Tail| expression. The
 |Name| and |Label| arguments to |CaseM| and |Done| make it easier to
-know the basic block being analyzed when traversing the \Cfg backwards.
+know the basic block being analyzed when traversing the \cfg backwards.
 
 \begin{myfig}
   \begin{minipage}{\linewidth}\begin{withHsLabeled}{mil_stmt_ast}\numbersoff
@@ -839,7 +839,7 @@ program.
 Figure~\ref{mil_fig_tail_ast} shows the various |Tail| values
 that implement the \term tail/ terms in Figure~\ref{mil_fig3}. Notice
 the definition does not parameterize on shape. These expressions are not
-used to construct \Cfgs and therefore did not need to be parameterized. 
+used to construct \cfgs and therefore did not need to be parameterized. 
 
 \intent{Enumerate |Tail| constructors, call out |Run| and |Constr|
   because they have different names than in Figure~\ref{mil_fig3}.}

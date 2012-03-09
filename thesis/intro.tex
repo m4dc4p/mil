@@ -13,16 +13,12 @@ some desired property for each node in the graph based on a static
 approximation of the program's run-time behavior; the results of the
 analysis can be used to transform the program. In most cases this
 transformation optimizes the program according to some measure, such
-as making it run faster, using less memory, or consuming less power.
+as making it run faster, use less memory, or consume less power.
 
 \intent{Describe traditional application of dataflow analysis to imperative programs.}
-Kildall, who first described the dataflow algorithm, used it to
-optimize programs written in \textsc{algol 60},
-an imperative programming language. For example, he implemented
-\emph{constant propagation}, where program variables with constant values
-are replaced by the values themselves, and \emph{common-subexpression
-elimination}, which transforms the program so that it only computes
-redundant expressions once. Research and refinements since then
+Kildall invented the dataflow algorithm \citep{Kildall1973} and applied it to
+programs written in \textsc{algol 60},
+an imperative programming language. Research and refinements since then
 continued to focus on imperative languages, as the algorithm applies
 naturally to languages with explicit control-flow.
 
@@ -34,7 +30,7 @@ patterns in the program's text and rewrites those patterns according
 to some set of rules. The goal remains the same, namely producing a
 program optimized according to some criteria. 
 
-\intent{Introduce idea of dataflow analysis over MIL.}
+\intent{Introduce idea of dataflow analysis over \mil.}
 Dataflow analysis on imperative programs arises naturally due to the
 explicit flow-of-control from statement to statement. For functional
 languages, with flow-of-control determined by evaluation order, the
@@ -42,12 +38,12 @@ fit seems more awkward. However, \emph{monadic} functional programs
 embody the best of both styles: expression-based evaluation \emph{and}
 explicit control-flow.
 
-\intent{Thesis: Interesting things happen when we apply dataflow analysis to MIL.}
+\intent{Thesis: Interesting things happen when we apply dataflow analysis to \mil.}
 We propose that dataflow analysis can be used quite effectively on
-programs written in our \emph{Monadic Intermediate Language} (\mil), a
+programs written in our \emph{monadic intermediate language} (\mil), a
 pure, monadic, functional language of our own design. We will show
 that dataflow analysis can be used to implement functional-language
-specific optimizations and that our MIL lends itself to established
+specific optimizations and that our \mil lends itself to established
 dataflow analyses, such as dead-code elimination.
 
 \intent{Signposts for dataflow chapter.} Chapter~\ref{ref_chapter_background}  gives 
@@ -60,53 +56,34 @@ of the algorithm, including its correctness and quality of
 solutions. Finally, we give the \emph{dataflow equations} that can be
 used to describe any particular dataflow analysis.
 
-\intent{Signposts for hoopl chapter.} In Chapter~\ref{ref_chapter_hoopl},
+\intent{Signposts for \hoopl chapter.} In Chapter~\ref{ref_chapter_hoopl},
 we describe how to use \hoopl \citep{Hoopl-3.8.7.0}, a Haskell library
 used to implement all dataflow analyses described in this document. We
-use the same structure for this Chapter as the previous, making the
+use the same structure for this chapter as the previous, making the
 connection between the more abstract description of the dataflow
 algorithm and \hoopl's implementation
 explicit. Chapter~\ref{ref_chapter_hoopl} uses \emph{dead-code
 elimination} for a subset of the C programming language as a running
-example. In Appendix~\ref{ref_appendix_deadcode}, we give the complete
-source code for the program described.
+example.\footnote{The Appendix gives the complete
+source code for the program described.}k
 
-\intent{Signposts for MIL chapter.} We introduce our monadic 
-intermediate langauge (\mil) in Chapter~\ref{ref_chapter_mil}. We describe
+\intent{Signposts for \mil chapter.} We introduce our monadic 
+intermediate language (\mil) in Chapter~\ref{ref_chapter_mil}. We describe
 \mil's design goals, syntax, and features. We also briefly describe
 \lamC, the language used for the example programs in this Chapter and the next. We
 discuss the more interesting challenges we faced compiling \lamC
 to \mil. We also discuss \hoopl's impact on the \ast we implemented to
 represent \mil programs.
 
-\intent{Signposts for Uncurrying chapter.} 
+\intent{Signposts for Uncurrying chapter.} Chapter~\ref{ref_chapter_uncurrying} brings
+together the concepts introduced in previous chapters and describes our
+\emph{uncurrying} optimization. We motivate the optimization and formulate it in terms
+of dataflow equations applied to \mil programs. We then describe how
+we implemented the optimization using \hoopl.
 
-\intent{conclude}
-
-Compilers for imperative languages implement many optimizations using
-\emph{dataflow analysis}. This method treats the program as a graph,
-where edges represent execution paths and nodes represent statements
-in the program. Dataflow analysis computes facts about each node and
-then transforms the graph into an equivalent, yet faster (or smaller,
-or more efficient, etc.) program. Optimizations which use dataflow
-analysis include constant propagation, dead-code elimination,
-common-subexpression elimination and many others.
-
-Dataflow analysis on imperative programs arises naturally due to the
-explicit flow-of-control from statement to statement. For pure
-functional languages, with flow-of-control determined by evaluation
-order, the fit seems more awkward. However, call-by-value, pure,
-\emph{monadic} functional programs embody the best of both
-styles: expression-based evaluation \emph{and} explicit
-control-flow. 
-
-Our work, then, defines a monadic language and optimizes programs in
-it using dataflow analysis. We implement a number of optimizations
-common to imperative and functional languages, including constant
-propagation and dead-code elimination. We implement an optimization
-which eliminates intermediate closure construction, showing that this
-technique can be used for optimizations specific to functional
-languages.
-
+\intent{conclude} Concluding our work in Chapter~\ref{ref_chapter_conclude}, we discuss
+several ways in which this work could be extended. We also reflect
+on \hoopl, proposing ways in which we feel the library could be
+improved. Finally, we summarize our goals and the contributions of this work.
 
 \end{document}

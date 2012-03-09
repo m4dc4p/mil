@@ -36,11 +36,11 @@ backwards.
 
 This chapter describes Kildall's algorithm, now known as \emph{the
   dataflow algorithm} or the technique of \emph{dataflow analysis}. In
-Section~\ref{sec_back1} we define \emph{control-flow graphs} (\Cfgs),
+Section~\ref{sec_back1} we define \emph{control-flow graphs} (\cfgs),
 which the directed graphs representing the program are now called.
 Section~\ref{sec_back3} introduces ``basic blocks,'' not something
 originally defined by Kildall but now a fundamental way of
-representing nodes in \Cfgs. We show the modern representation
+representing nodes in \cfgs. We show the modern representation
 of the dataflow algorithm in Section~\ref{back_sec_df}, introducing
 terms and definitions that have been defined since Kildall's original
 work. In Section~\ref{back_subsec_eq} we show the general form of
@@ -63,7 +63,7 @@ Section~\ref{sec_back9}.
 %% sense than the first summary).
 
 Figure~\ref{fig_back1} shows a simple C program and its
-\emph{control-flow graph} (\Cfg). Each \emph{node} in
+\emph{control-flow graph} (\cfg). Each \emph{node} in
 Part~\subref{fig_back1_b} represents a statement or expression in the
 original program. For example, \refNode{lst_back2_assigna} and
 \refNode{lst_back2_assignb} represent the assignment statements on
@@ -73,7 +73,7 @@ cause a runtime effect, we do not represent it in the graph.  Nodes
 \entryN and \exitN designate where program execution \emph{enters} and
 \emph{leaves} the graph. If the graph represented the entire program,
 we would say execution \emph{begins} at \entryN and \emph{terminates}
-at \exitN. However, the \Cfg may be embedded in a larger program, for
+at \exitN. However, the \cfg may be embedded in a larger program, for
 which reason we say \emph{enters} and \emph{leaves}.
 
 \begin{myfig}[th]
@@ -84,7 +84,7 @@ which reason we say \emph{enters} and \emph{leaves}.
 \scap{fig_back1_a} & \scap{fig_back1_b} 
 \end{tabular}
 \caption{\subref{fig_back1_a} A C-language program fragment. \subref{fig_back1_b} The
-  \emph{control-flow graph} (\Cfg) for the program.}
+  \emph{control-flow graph} (\cfg) for the program.}
 \label{fig_back1}
 \end{myfig}
 
@@ -122,8 +122,8 @@ how to make the program more efficient.
 %% %% sense than the first summary).
 
 %% Basic blocks
-Consider the C-language fragment and control-flow graphs (\Cfg) in
-Figure~\ref{fig_back4}.  Part~\subref{fig_back4_b} shows the \Cfg for
+Consider the C-language fragment and control-flow graphs (\cfg) in
+Figure~\ref{fig_back4}.  Part~\subref{fig_back4_b} shows the \cfg for
 Part~\subref{fig_back4_a}: a long, straight sequence of nodes, one
 after another. Part~\subref{fig_back4_c} represents the assignment statements on
 lines~\ref{lst_back3_start} -- \ref{lst_back3_end} as a \emph{basic
@@ -148,9 +148,9 @@ to consist of one statement each.
   \vtop{\centering\scap{fig_back4_a}} & \vtop{\centering\scap{fig_back4_b}} & \vtop{\centering\scap{fig_back4_c}} \\
 \end{tabular}
 \caption{\subref{fig_back4_a}: A C-language fragment to illustrate
-  \emph{basic blocks}.  \subref{fig_back4_b}: The \Cfg for
+  \emph{basic blocks}.  \subref{fig_back4_b}: The \cfg for
   \subref{fig_back4_a} without basic blocks. \subref{fig_back4_c}: The
-  \Cfg for \subref{fig_back4_c} using basic blocks.}
+  \cfg for \subref{fig_back4_c} using basic blocks.}
 \label{fig_back4}
 \end{myfig}
 
@@ -823,7 +823,7 @@ as it is no longer used.
 
 This chapter gave an overview of \emph{dataflow optimization}. The
 dataflow \emph{algorithm} gives a general technique for applying an
-\emph{optimizing function} to the \emph{control flow graph} (\Cfg)
+\emph{optimizing function} to the \emph{control flow graph} (\cfg)
 representing a given program. The optimizing function computes
 \emph{facts} about each node in the graph, using a \emph{transfer}
 function. A given analysis can proceed \emph{forwards} (where \inBa
@@ -832,7 +832,7 @@ produce \inBa facts). Each optimization defines a specific \emph{meet
   operator} that combines facts for nodes with multiple predecessors
 (for forwards analysis) or successors (for backwards). We compute
 facts \emph{iteratively}, stopping when they reach a \emph{fixed
-  point}. Finally, we \emph{rewrite} the \Cfg using the facts computed. The 
+  point}. Finally, we \emph{rewrite} the \cfg using the facts computed. The 
 meaning of our program does not change, but its behavior will be ``better,'' 
 whatever that means for the particular optimization applied.
 

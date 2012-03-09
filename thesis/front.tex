@@ -9,30 +9,29 @@
 \maketitle 
 
 \pagenumbering{roman}\pagestyle{plain}
-\begin{center}
-  {\sffamily\bfseries Abstract}
-  \addcontentsline{toc}{section}{\textbf{Abstract}}
-\end{center}
-\bigskip
-\noindent
-Dataflow analysis of programs represented as control-flow graphs
-(CFGs) of basic blocks underlies many optimizations implemented by
-imperative language compilers. Functional language compilers, in
-contrast, traditionally optimize by rewriting programs according to
-algebraic laws. We show that, by compiling to a \emph{monadic
-  intermediate language}, we can treat our functional programs as CFGs
-of basic blocks. Doing so enables us to re-use the rich body of
-dataflow techniques developed for imperative language compilers. We
-first implement dead code elimination, an optimization common to both
-functional and imperative compilers. We then demonstrate
-\emph{uncurrying}, an optimization specific to functional language
-compilers. Next, we use the \emph{monad laws} to derive inlining and
-copy-propagation optimizations.  Throughout, we use the \emph{Hoopl}
-library to implement our optimizations, making our work a case-study
-for the library as well.
+\addcontentsline{toc}{section}{Abstract}
+\section*{Abstract}
+The \emph{dataflow algorithm}, which analyzes programs using
+their \emph{control-flow graph}, underlies many optimizations
+implemented in modern compilers for imperative languages. Functional
+language compilers, in contrast, traditionally optimize by rewriting
+programs according to algebraic laws. By compiling functional programs
+to a \emph{monadic intermediate language} (\mil), we can describe
+traditional functional language optimizations using \emph{dataflow
+equations}, the parameters that drive dataflow algorithm. Our work
+gives an overview of dataflow analysis and describes how to
+use \hoopl, a Haskell library implementing the dataflow algorithm. We introduce
+\mil, an intermediate language designed for monadic programming, 
+implementation of high-level functional language features, and
+dataflow analysis. This work gives a novel description of
+the \emph{uncurrying} optimization in terms of dataflow equations. We
+also discuss how \mil programs can be optimized using the \emph{monad
+laws} (independent of the dataflow algorithm), and a way in which
+dataflow analysis could eliminate unnecessary allocations in the
+presence of conditional expressions. 
 \newpage
 
-\addcontentsline{toc}{section}{\textbf{Acknowledgements}}
+\addcontentsline{toc}{section}{Acknowledgments}
 \section*{Acknowledgments}
 Thanks very much!
 \newpage
@@ -40,7 +39,7 @@ Thanks very much!
 \singlespacing
 \tableofcontents
 \newpage
-\addcontentsline{toc}{section}{\textbf{List of Figures}}
+\addcontentsline{toc}{section}{List of Figures}
 \listoffigures
 \newpage
 \end{document}
