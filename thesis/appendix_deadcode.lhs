@@ -6,7 +6,11 @@
 \begin{document}
 \numbersoff
 \input{document.preamble}
-\chapter{Dead-Code Elimination Example}
+%% \chapter{Dead-Code Elimination Example}
+\addcontentsline{toc}{chapter}{\textbf{Appendix}}
+\chaptermark{Dead-Code Elimination Example}
+\thispagestyle{plain}
+\makeatletter\@@makechapterhead{Dead-Code Elimination Example}\makeatother
 \label{ref_appendix_deadcode}
 
 \intent{Give complete text of our example.}  This section gives our

@@ -62,18 +62,24 @@ used to describe any particular dataflow analysis.
 
 \intent{Signposts for hoopl chapter.} In Chapter~\ref{ref_chapter_hoopl},
 we describe how to use \hoopl \citep{Hoopl-3.8.7.0}, a Haskell library
-for implementing dataflow-based optimizations that we used to
-implement all dataflow analyses described in this document. We use the
-same structure for this Chapter as the previous, making the connection
-between the more abstract description of the dataflow algorithm and
-its use explicit. Chapter~\ref{ref_chapter_hoopl} uses \emph{dead-code
+used to implement all dataflow analyses described in this document. We
+use the same structure for this Chapter as the previous, making the
+connection between the more abstract description of the dataflow
+algorithm and \hoopl's implementation
+explicit. Chapter~\ref{ref_chapter_hoopl} uses \emph{dead-code
 elimination} for a subset of the C programming language as a running
-example. In Appendix~\ref{ref_appendix_deadcode}, we give the complete source
-code for the program described.
+example. In Appendix~\ref{ref_appendix_deadcode}, we give the complete
+source code for the program described.
 
-\intent{Signposts for MIL chapter.}
+\intent{Signposts for MIL chapter.} We introduce our monadic 
+intermediate langauge (\mil) in Chapter~\ref{ref_chapter_mil}. We describe
+\mil's design goals, syntax, and features. We also briefly describe
+\lamC, the language used for the example programs in this Chapter and the next. We
+discuss the more interesting challenges we faced compiling \lamC
+to \mil. We also discuss \hoopl's impact on the \ast we implemented to
+represent \mil programs.
 
-\intent{Signposts for Uncurrying chapter.}
+\intent{Signposts for Uncurrying chapter.} 
 
 \intent{conclude}
 
