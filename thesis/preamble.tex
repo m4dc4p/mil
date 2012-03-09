@@ -8,8 +8,17 @@
     \def\preambledocclass{}}
 
 \usepackage[T1]{fontenc}
+%% Footnotes with old style caps hard to read - this helps.
 \renewcommand\@makefnmark{\mbox{\textsuperscript{%
       \normalfont\ensuremath{\@thefnmark}}}}
+
+\usepackage{tocloft}
+%% Make room to set ``Chapter N  '' 
+\setlength\cftchapnumwidth{\widthof{Chapter\ \ 9\quad}}
+%% Chapter entries in TOC need to include ``Chapter''
+\renewcommand\cftchappresnum{Chapter\ \ }
+\renewcommand\cftchapaftersnum{\quad}
+
 \usepackage{calc}
 \usepackage[osf,sc]{mathpazo}
 \renewcommand\ttdefault{lmtt}
@@ -61,12 +70,19 @@
             {\baselineskip}
             {\sffamily\bfseries}
             {}
- 
+%% \usepackage[raggedright]{titletoc}
+%% \titlecontents{chapter}[1.5in]
+%%         {\bigskip}%% above
+%%         {\bfseries Chapter \thecontentslabel\ }%% before with label
+%%         {}%% before w/o label
+%%         {\titlerule*[1pc]{.}\thecontentspage}%% filler and page
+%%         {}%% after
 \usepackage{fancyhdr}
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\small\textsc{\chaptertitlename \thechapter}}
+\fancyhead[L]{\small\textsc{\chaptertitlename\ \thechapter}}
 \fancyhead[R]{\small\leftmark}
+\fancyfoot[C]{\small\thepage}
 \headheight=15pt
 \fancypagestyle{plain}{%
   \fancyhf{} % clear all header and footer fields
@@ -405,6 +421,7 @@
 \def\Cfgs{\textsc{cfg}s\xspace}
 \def\hoopl{\textsc{hoopl}\xspace}
 \def\Hoopl{\textsc{Hoopl}\xspace}
+\def\ast{\textsc{ast}\xspace}
 
 %% Indicates the preamble has been loadd.
 \def\preambleloaded{}

@@ -32,25 +32,24 @@
 \input{conclusion}
 
 \newpage
-{\fancyhead{}
+\fancyhead{}
 \fancyhead[L]{\small\textsc{Bibliography}}
+\addcontentsline{toc}{chapter}{\textbf{Bibliography}}
+\begin{singlespace}
+  \printbibliography
+\end{singlespace}
+
+\newpage
+\fancyhead{}
+\fancyhead[L]{\small\textsc{\chaptertitlename}}
+\fancyhead[R]{\small\leftmark}
 \titleformat{\chapter}[display]
             {}% format
             {\sffamily\bfseries\chaptertitlename}
             {\baselineskip}
             {\sffamily\bfseries}
             {}
-\addcontentsline{toc}{chapter}{\textbf{Bibliography}}
-\begin{singlespace}
-  \printbibliography
-\end{singlespace}}
-
-\newpage
-\fancyhead{}
-\fancyhead[L]{\small\textsc{\chaptertitlename}}
-\fancyhead[R]{\small\leftmark}
 \appendix
-
 \input{appendix_deadcode}
 
 \end{document}
