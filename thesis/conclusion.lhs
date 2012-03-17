@@ -9,59 +9,48 @@
 \chapter{Conclusion \& Future Work}
 \label{ref_chapter_conclusion}
 
-\intent{Introduce our contributions.}  Our work sought to apply the
-dataflow algorithm to an area where it has not normally been used:
-functional languages. We say normally, because at least GHC applies
-the dataflow algorithm to its low-level intermediate language, \Cmm
-(pronounced ``C minus minus''). Even in that case, \Cmm resembles its
-imperative namesake much more than a functional language. We applied
-the dataflow algorithm to a monadic intermediate language that closely
-resembles monadic programming (in syntax and behavior) in a functional
-language like Haskell. In turn, we described \emph{uncurrying}, an
-optimization specific to functional languages,\footnote{Or, at least,
-  languages capable of creating closures.} and presented a novel
-implementation based on the dataflow algorithm.
+\intent{Introduce our contributions.}  Our work applied the dataflow
+algorithm to an area outside its traditional scope: functional
+languages. We based our work on a \emph{monadic intermediate language}
+(\mil) that supported high-level functional programming and exposed
+certain low-level implementation details. We implemented our analysis
+in Haskell using the \hoopl library; we also gave a thorough
+description of how to implement dataflow-based optimizations using
+\hoopl. We then demonstrated the utility of our work by using \hoopl
+and \mil to create a novel implementation of the uncurrying
+optimization. 
 
-\intent{Signposts for chapter.} This chapter finalizes the
-presentation of our work. Though we described only uncurrying in great
-detail, we explored a number of other optimizations to varying
-degrees. We describe those in Section~\ref{conc_future_work}. We made
-extensive use of the Hoopl library throughout our research, and offer
-some thoughts on future improvements to the library's interface in
-Chapter~\ref{conc_hoopl}. In Section~\ref{conc_conc} we conclude this
-thesis.
+\intent{Signposts for chapter.} Though we choose the uncurrying
+optimization to demonstrate our approach, several avenues of future
+work remain.  We explore optimizations that take advantage of the
+unique features of \mil in Section~\ref{conc_future_work}. We offer
+some thoughts on the \hoopl library in
+Section~\ref{conc_hoopl}. Section~\ref{conc_conc} offers our closing
+thoughts.
 
 \section{Future Work}
 \label{conc_future_work}
 
-Many optimizations which use dataflow analysis to transform imperative
-programs exist (in particular, Muchnik \citeyearpar{Muchnick1998}
-gives a broad survey). ``Future work'' could apply most of those to
-MIL programs, but that would not make for interesting
-reading. Instead, this section describes optimizations that take
-particular advantage of our MIL program's structure. Some rely on the
-monadic structure built into MIL; others extend our existing dataflow
-analysis to more complicated transformations.
+This section describes optimizations that take particular advantage of
+\mil's features. Sections~\ref{conc_inline_monadic} and
+\ref{conc_deadcode} describe transformations based on the monadic
+structure of \mil programs.  We extend uncurrying across \mil blocks
+in Section~\ref{conc_uncurrying}, and discuss how to extend the same
+optimization to thunks in Section~\ref{conc_thunks}.
+Section~\ref{conc_cases} proposes a new analysis to eliminate
+unnecessary allocations across \milres case/ statements.
 
 \subsection{Inlining Monadic Code}
 \label{conc_inline_monadic}
-
-Wadler gave the so-called \emph{monad laws} \citeyearpar{Wadler1995},
-which state properties that all well-defined monads will obey. Figure
-~\ref{conc_fig_monad_laws} gives the three laws: left-unit,
-right-unit, and associativity.\footnote{Left-unit and right-unit can
-  also be called left-identity and right-identity.} While these laws
-can be interpreted as specifications of behavior, they can also be
-interpreted as \emph{transformations}.
+Figure~\ref{conc_fig_monad_laws} shows the \emph{monad laws}:
+left-Unit, Right-Unit, and Associativity.  While these laws can be
+interpreted as specifications of behavior, they can also be
+interpreted as \emph{transformations}. 
 
 \begin{myfig}
   \begin{math}
     \begin{aligned}
-      |do { x <- return y; m }| & \equiv\
-      \begin{cases}
-        |do { m }| & \text{when |x| is |y|.} \\
-        |do { {-"\lamSubst{y}{x}\ "-} m}| & \text{otherwise.}
-      \end{cases} & \text{\it Left-Unit} & \quad\labeledeq{eq_left_unit} \\
+      |do { x <- return y; m }| & \equiv\ |do { {-"\lamSubst{y}{x}\ "-} m}| & \text{\it Left-Unit} & \quad\labeledeq{eq_left_unit} \\
       |do { x <- m; return x }| & \equiv\ |do { m }| & \text{\it Right-Unit} & \quad\labeledeq{eq_right_unit} \\
       \llap{|do { x <- do {y <- m; n}; o }|} & \equiv\ |do { y <- m; x <- n; o} |& \text{\it Associativity} & \quad\labeledeq{eq_assoc}
     \end{aligned}
@@ -72,15 +61,14 @@ interpreted as \emph{transformations}.
   \label{conc_fig_monad_laws}
 \end{myfig}
 
-In fact, transformations of MIL programs using the monad laws can be
-interpreted as optimizations. For example, the following block binds
+For example, the following block binds
 \var x/ to the value of \var y/, keeping both variables live between
-the ``\binds x\ <-\ \return y/;'' and \goto l(x,y) statements::
+the ``\binds x\ <-\ \return y/;'' and \goto l(x,y) statements:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
     \block b():
-      \vbinds x <- \return y/;
+      \vbinds x<- \return y/;
       \dots
       \goto l(x, y)
   \end{AVerb}
@@ -92,23 +80,34 @@ the Left-Unit law to replace all occurrences of \var x/ with \var y/:
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
     \block b():
+      \vbinds x<- \return y/;
       $\dots$
       \goto l(y, y)
   \end{AVerb}
 \end{singlespace}
 
-\noindent If variables represent registers, then this can reduce the number of registers used
-in a given block of MIL code.
+\noindent Because we know \return y/ produces no side-effects, we can
+eliminate the binding for \var x/. If variables represent registers,
+this optimization reduces the number of registers used by the block and
+makes it smaller: 
 
-The Right-Unit law shortens the ``tail'' of MIL blocks that end with a
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \block b():
+      $\dots$
+      \goto l(y, y)
+  \end{AVerb}
+\end{singlespace}
+
+The Right-Unit law shortens the ``tail'' of \mil blocks that end with a
 \return/ statement. For example, Right-Unit can be used to transform the
-following MIL block:
+following block:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
     \block b(\dots):
       \dots
-      \vbinds x <- \app f*y/;
+      \vbinds x<- \app f*y/;
       \return x/
   \end{AVerb}
 \end{singlespace}
@@ -123,21 +122,27 @@ following MIL block:
   \end{AVerb}
 \end{singlespace}
 
-The Associativity law provides an inlining mechanism for MIL
+\noindent Not only does this tranformation eliminate a redundant
+\milres return/ statement, it may also allow further optimizations. In
+particular, if we know that the closure represented by \var f/ refers to
+block \lab b/, our uncurrying optimization will tranform \app f * y/
+into either a jump or an allocation.
+
+The Associativity law provides an inlining mechanism for \mil
 programs. The inner monadic computation mentioned on the right-hand
-side of the law, |do { y <- m }|, can be an arbitrarily long monadic
-program. All MIL blocks are monadic programs --- therefore, we can use
+side of the law, |do { y <- m; n }|, can be an arbitrarily long monadic
+program. All \mil blocks are monadic programs --- therefore, we can use
 this law to inline almost any block. For example, consider these two blocks:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
     \block compose(f, g, x): 
-      \vbinds t1 <- \app g*x/;
-      \vbinds t2 <- \app f*t1/;
+      \vbinds t1<- \app g*x/;
+      \vbinds t2<- \app f*t1/;
       \return t2/ 
 
     \block main(a,b,c): 
-      x <- compose(a,b,c)
+      \vbinds x<- compose(a,b,c);
       \goto b(x)
   \end{AVerb}
 \end{singlespace}
@@ -148,48 +153,111 @@ long as we appropriately rename variables:
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
     \block main(a,b,c): 
-      \vbinds t1 <- \app b*c/;
-      \vbinds t2 <- \app a*t1/;
+      \vbinds t1<- \app b*c/;
+      \vbinds t2<- \app a*t1/;
       x <- \return t2/ 
       \goto b(x)
   \end{AVerb}
 \end{singlespace}
 
-\noindent Notice we can now also apply Equation~\eqref{eq_left_unit}, eliminating
+\noindent Notice that we can now also apply Equation~\eqref{eq_left_unit}, eliminating
 the use of \var x/:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
     \block main(a,b,c): 
-      \vbinds t1 <- \app b*c/;
-      \vbinds t2 <- \app a*t1/;
+      \vbinds t1<- \app b*c/;
+      \vbinds t2<- \app a*t1/;
       \goto b(t2)
   \end{AVerb}
 \end{singlespace}
 
-MIL blocks that end in \milres case/ statements cannot be
-inlined, in general. The branching introduced by the \milres case/
-prevents the block from begin inlined. To illustrate, consider
-these two blocks:
+However, \mil's syntax prevents blocks that end in \milres case/
+statements from being inlined. To illustrate, consider \lab b1/ and \lab b2/:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}
-    \block l1(a):
-       \vbinds b <- \goto l2(a);
-       \return b/
+    \block b1(a):
+       \vbinds t1<- \goto b2(a);
+       \dots
+       \goto b3(t1)
 
-    \block l2(b):
-      \case b;
-        \valt{}True() -> \dots;
-        \valt{}False() -> \dots;
+    \block b2(a):
+      \case a;
+        \valt{}True()->\goto t(\dots);
+        \valt{}False()->\goto f(\dots);
   \end{AVerb}
 \end{singlespace}
 
-The block \lab l2/ cannot be inlined into the body of \lab l1/ because
-our syntax does not allow a \milres case/ in the middle of a block. It
-also breaks the fundamental model of each block being a basic block.
+\noindent Even if our syntax allowed it, inlining \lab b2/ into
+\lab b1/ would break \mil's fundamental model of each block being a basic
+block. 
+
+\subsection{Dead-Code Elimination}
+\label{conc_deadcode}
+
+The Left-Unit law lets us eliminate a simple form of
+dead-code, in which we can guarantee that the binding eliminated has
+no observable side-effect. However, the law does not apply to any
+monadic expression more complicated than |return x|. We treat
+allocation as a monadic operation in MIL, but we cannot really observe
+any side-effect of allocation (except our program may consume more
+memory or run slower). Therefore we can eliminate any closure, thunk
+or constructor allocation expressions that bind to a dead variable.
+
+On Page~\pageref{uncurry_fig_compose}, we gave the \lamC definition of
+|compose1|, which just captures the first argument to |compose|, and the
+corresponding MIL code:
+
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \block compose1(): \mkclo[absBodyL208:]
+    \ccblock absBodyL208()f: \goto absBlockL209(f)
+    \block absBlockL209(f):
+      \vbinds v210 <- \goto compose(); 
+      \app v210 * f/ 
+    
+    \block compose(): \mkclo[absBodyL201:]
+    \ccblock absBodyL201()f: \mkclo[absBodyL202:f]
+  \end{AVerb}
+\end{singlespace}
+
+\noindent We can use the Associativity law (Equation~\eqref{eq_assoc} on
+Page~\pageref{conc_inline_monadic}) to inline the allocation returned
+by block \lab compose/ into block \lab absBlockL209/, giving us:
+
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \dots
+    \block absBlockL209(f):
+      \vbinds v210 <- \mkclo[absBodyL201:]; 
+      \app v210 * f/ 
+    
+    \block compose(): \mkclo[absBodyL201:]
+    \ccblock absBodyL201()f: \mkclo[absBodyL202:f]
+  \end{AVerb}
+\end{singlespace}
+
+\noindent Our uncurrying optimization then rewrites block \lab absBlockL209/ so it
+directly returns the closure previously returned by \lab absBodyL201/:
+
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \dots
+    \block absBlockL209(f):
+      \vbinds v210 <- \mkclo[absBodyL201:]; 
+      \mkclo[absBodyL202:f]
+    
+    \block compose(): \mkclo[absBodyL201:]
+    \ccblock absBodyL201()f: \mkclo[absBodyL202:f]
+  \end{AVerb}
+\end{singlespace}
+
+\noindent We can then apply dead-code elimination to remove the
+allocation bound to \var v210/, since that variable is now dead.
 
 \subsection{Uncurrying Across Blocks}
+\label{conc_uncurrying}
 
 Our uncurrying optimization only works within a single MIL
 block. Extending the optimization across blocks seems obvious, but
@@ -284,6 +352,7 @@ Rewriting blocks to track live variables in order to support this
 optimization does not seem impossible, but it does seem tricky.
 
 \subsection{Eliminating Thunks}
+\label{conc_thunks}
 
 Monadic thunks and closures share many characteristics. For example,
 they both represent suspended computation, and they both capture an
@@ -329,70 +398,8 @@ action:
 \noindent It seems our uncurrying analysis could be adapted to thunks in order to
 implement such an optimization.
 
-\subsection{Dead-Code Elimination}
-
-The Left-Unit (Equation~\eqref{eq_left_unit} on
-Page~\pageref{eq_left_unit}) law lets us eliminate a simple form of
-dead-code, in which we can guarantee that the binding eliminated has
-no observable side-effect. However, the law does not apply to any
-monadic expression more complicated than |return x|. We treat
-allocation as a monadic operation in MIL, but we cannot really observe
-any side-effect of allocation (except our program may consume more
-memory or run slower). Therefore we can eliminate any closure, thunk
-or constructor allocation expressions that bind to a dead variable.
-
-On Page~\pageref{uncurry_fig_compose}, we gave the \lamC definition of
-|compose1|, which just captures the first argument to |compose|, and the
-corresponding MIL code:
-
-\begin{singlespace}\correctspaceskip
-  \begin{AVerb}[gobble=4]
-    \block compose1(): \mkclo[absBodyL208:]
-    \ccblock absBodyL208()f: \goto absBlockL209(f)
-    \block absBlockL209(f):
-      \vbinds v210 <- \goto compose(); 
-      \app v210 * f/ 
-    
-    \block compose(): \mkclo[absBodyL201:]
-    \ccblock absBodyL201()f: \mkclo[absBodyL202:f]
-  \end{AVerb}
-\end{singlespace}
-
-\noindent We can use the Associativity law (Equation~\eqref{eq_assoc} on
-Page~\pageref{conc_inline_monadic}) to inline the allocation returned
-by block \lab compose/ into block \lab absBlockL209/, giving us:
-
-\begin{singlespace}\correctspaceskip
-  \begin{AVerb}[gobble=4]
-    \dots
-    \block absBlockL209(f):
-      \vbinds v210 <- \mkclo[absBodyL201:]; 
-      \app v210 * f/ 
-    
-    \block compose(): \mkclo[absBodyL201:]
-    \ccblock absBodyL201()f: \mkclo[absBodyL202:f]
-  \end{AVerb}
-\end{singlespace}
-
-\noindent Our uncurrying optimization then rewrites block \lab absBlockL209/ so it
-directly returns the closure previously returned by \lab absBodyL201/:
-
-\begin{singlespace}\correctspaceskip
-  \begin{AVerb}[gobble=4]
-    \dots
-    \block absBlockL209(f):
-      \vbinds v210 <- \mkclo[absBodyL201:]; 
-      \mkclo[absBodyL202:f]
-    
-    \block compose(): \mkclo[absBodyL201:]
-    \ccblock absBodyL201()f: \mkclo[absBodyL202:f]
-  \end{AVerb}
-\end{singlespace}
-
-\noindent We can then apply dead-code elimination to remove the
-allocation bound to \var v210/, since that variable is now dead.
-
 \subsection{Push Through Cases}
+\label{conc_cases}
 
 Functional language programs commonly implement a pattern of
 \emph{construct/destruct}, where the program creates some value at one
