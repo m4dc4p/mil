@@ -292,7 +292,8 @@
 \begingroup\catcode`\!=\active \lccode`\!=`\> \lccode`\~=`\- 
   \catcode`\ =\active\lowercase{\endgroup\def\valt#1(#2)#3~!#4;}{\alt#1(#2)#3->#4;}
 %% Return statement: return ... ;
-\protected\def\return#1/{\milres return/\ensurett{\ \removespaces #1}}
+\protected\def\return#1/{\def\retarg{#1}%%
+  \milres return/\ifx\empty\retarg\else\ensurett{\ \removespaces #1}\fi}
 %% A closure capturing block. k {v1, ..., vN} x: ...
 \protected\def\ccblock#1(#2)#3:{\lab#1/\ensuremath{\thinspace\{\ensurett{#2}\}}\ \ensurett{#3\hbox{:}}}
 %% A normal block
@@ -309,11 +310,9 @@
 %% Case statement
 \protected\def\case#1;{\milres case\ \ensuremath{\ensurett{\removespaces #1}}\ of/}
 %% Case alternative
-% \protected\def\alt#1(#2)#3->#4;{\ensuremath{\ensurett{\ignorespaces #1\ \ignorespaces#2\ \texttt{->}\ \ignorespaces #4}}}
-% \ifx\arg\empty\else\ignorespaces#2\ \fi
 \protected\def\alt#1(#2)#3->#4;{\def\altarg{#2}%%
   \ensuremath{\ensurett{%%
-      \ignorespaces #1\ \ifx\altarg\empty\else\ignorespaces#2\ \fi\texttt{->}\ \ignorespaces #4}}}
+      \removespaces #1\ \ifx\altarg\empty\else\ignorespaces#2\ \fi\texttt{->}\ \ignorespaces #4}}}
 %% Invoke
 \protected\def\invoke#1/{\edef\arg{#1}%%
   \milres invoke/\ifx\arg\empty%%

@@ -172,11 +172,17 @@ the use of \var x/:
   \end{AVerb}
 \end{singlespace}
 
-However, \mil's syntax prevents blocks that end in \milres case/
-statements from being inlined. To illustrate, consider \lab b1/ and \lab b2/:
+\Mil's syntax does not allow all monadic blocks to be inlined. \Mil
+ensures that every block is also a basic block. A basic block cannot
+branch to multiple destinations. Therefore, blocks that end in \milres
+case/ statements cannot be inlined.
+
+However, we can still transform around blocks that end in \milres
+case/ statements. Consider the blocks \lab b1/, \lab t/ and \lab f/ in
+the following program:
 
 \begin{singlespace}\correctspaceskip
-  \begin{AVerb}
+  \begin{AVerb}[gobble=4]
     \block b1(a):
        \vbinds t1<- \goto b2(a);
        \dots
@@ -184,14 +190,55 @@ statements from being inlined. To illustrate, consider \lab b1/ and \lab b2/:
 
     \block b2(a):
       \case a;
-        \valt{}True()->\goto t(\dots);
-        \valt{}False()->\goto f(\dots);
+        \valt{}True()->\goto t(a);
+        \valt{}False()->\goto f(a);
+
+    \block t(\dots):
+       \dots
+       \return x/
+
+    \block f(\dots):
+       \dots
+       \return x/
   \end{AVerb}
 \end{singlespace}
 
-\noindent Even if our syntax allowed it, inlining \lab b2/ into
-\lab b1/ would break \mil's fundamental model of each block being a basic
-block. 
+\lab b1/ binds \var t1/ to the result of \lab b2/. \lab b2/ returns
+the result of either block \lab t/ or \lab f/. Because \lab t/ and
+\lab f/ do not end in a \milres case/ statement, we can move the code
+that follows \var t1/'s binding in \lab b1/ to \lab t/ and \lab f/:
+
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \block b1(a):
+       \goto b2(a)
+
+    \block b2(a):
+      \case a;
+        \valt True()->\goto t(a);
+        \valt False()->\goto f(a);
+
+    \block t(a):
+       \dots
+       \vbinds t1<-\return x/;
+       \goto b3(t1)
+
+    \block f(\dots):
+       \dots
+       \vbinds t1<-\return x/;
+       \goto b3(t1)
+  \end{AVerb}
+\end{singlespace}
+
+\noindent This new program may be more efficient. For example, blocks
+\lab t/ and \lab f/ end in tail calls, where before they ended in a
+\return/. We can use the Left-Unit law to substitute \var x/ for \var
+t1/ in \lab t/ and \lab f/ as well (which, in turn, allows us to
+remove \var t1/'s binding in both blocks as it is no longer live). We may be able to
+rewrite calls \lab b1/ to \lab b2/, and remove \lab b1/
+altogether. Finally, the ``Push Through Cases'' optimization described
+in Section~\ref{conc_cases} may be able to optimize \lab t/ and \lab
+f/ even further.
 
 \subsection{Dead-Code Elimination}
 \label{conc_deadcode}
