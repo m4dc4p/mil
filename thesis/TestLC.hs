@@ -7,8 +7,9 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 
-import qualified Printer.Common as PP
-import Printer.LambdaCase
+-- To support pretty printing.
+-- import qualified Printer.Common as PP
+-- import Printer.LambdaCase
 import Syntax.Common
 import Syntax.LambdaCase hiding (Alt)
 -- import qualified PrioSetLC as Prio
@@ -37,7 +38,8 @@ progM prelude@(prims, _) progs = do
       tops = map fst progs
 
       printDef :: Def -> Doc
-      printDef def = text (show (ppr def))
+      -- printDef def = text (show (ppr def))
+      printDef def = text (show def)
 
 m205 :: Graph Stmt C C
 m205 = mkFirst (BlockEntry undefined undefined ["g", "f", "x"]) <*>
@@ -1173,5 +1175,6 @@ prim n _ = var n
 
 typ = TyLabel "t"
 
-instance Printable Def where
-  ppr (name, body) = PP.text name PP.<+> PP.text "=" PP.<+> ppr body
+-- For pretty printing.
+-- instance Printable Def where
+--   ppr (name, body) = PP.text name PP.<+> PP.text "=" PP.<+> ppr body

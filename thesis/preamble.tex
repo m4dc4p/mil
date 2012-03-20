@@ -262,7 +262,7 @@
 \protected\def\milres#1/{\text{\ttfamily\bfseries #1}}
 \protected\def\lab#1/{\textbf{\ensurett{\removespaces #1}}}
 %% Constructs a closure: l { v1, ..., vN }
-\protected\long\def\mkclo[#1:#2]{\lab #1/\ensuremath{\,\{\ensurett{#2}\}}\xspace}
+\protected\long\def\mkclo[#1:#2]{\lab #1/\ensuremath{\,\{\ensurett{\removespaces #2}\}}\xspace}
 %% Tuple version of closurs: {l: v1, ..., vN}.
 \protected\long\def\clo[#1:#2]{\def\argA{#1}\def\argB{#2}\ensuremath{\{%%
       \ifx\argA\empty%%
@@ -272,14 +272,11 @@
         \fi%%
       \fi\ensurett{#2}\}}\xspace}
 %% Construct a thunk
-\newbox\bracklbox \newbox\brackrbox
-\setbox0=\hbox{$\{$} \setbox\bracklbox=\hbox to \wd0{\hfil[\kern0.25mm}
-\setbox0=\hbox{$\}$} \setbox\brackrbox=\hbox to \wd0{\kern0.25mm]\hfil}
 \protected\def\mkthunk[#1:#2]{\lab #1/%%
   \ensuremath{\,%%
-    \mathopen{\copy\bracklbox}%%
-    \ensurett{#2}%%
-    \mathclose{\copy\brackrbox}\xspace}}
+    %%\mathopen{\copy\bracklbox}%%
+    \mathopen{[}\ensurett{\removespaces #2}\mathclose{]}
+    \xspace}}
 %% Binding statement: v <- {...}
 \protected\def\binds#1<-#2;{\ensuremath{\ensurett{\removespaces #1\ \texttt{<-}\ \removespaces #2}\xspace}}
 %% In order to use \binds in verbatim environment, have to define
@@ -312,7 +309,7 @@
 %% Case alternative
 \protected\def\alt#1(#2)#3->#4;{\def\altarg{#2}%%
   \ensuremath{\ensurett{%%
-      \removespaces #1\ \ifx\altarg\empty\else\ignorespaces#2\ \fi\texttt{->}\ \ignorespaces #4}}}
+      \removespaces #1\ \ifx\altarg\empty\else\ignorespaces#2\ \fi\texttt{->}\ \removespaces #4}}}
 %% Invoke
 \protected\def\invoke#1/{\edef\arg{#1}%%
   \milres invoke/\ifx\arg\empty%%

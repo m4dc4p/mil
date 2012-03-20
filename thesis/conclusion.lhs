@@ -243,85 +243,82 @@ f/ even further.
 \subsection{Dead-Code Elimination}
 \label{conc_deadcode}
 
-The Left-Unit law lets us eliminate a simple form of
-dead-code, in which we can guarantee that the binding eliminated has
-no observable side-effect. However, the law does not apply to any
-monadic expression more complicated than |return x|. We treat
-allocation as a monadic operation in MIL, but we cannot really observe
-any side-effect of allocation (except our program may consume more
-memory or run slower). Therefore we can eliminate any closure, thunk
-or constructor allocation expressions that bind to a dead variable.
+\Mil treats allocation as a monadic operation, but we cannot really
+observe any side-effect of allocation. Therefore we can eliminate any
+closure, thunk or constructor allocation that binds to a
+dead variable.
 
-On Page~\pageref{uncurry_fig_compose}, we gave the \lamC definition of
-|compose1|, which just captures the first argument to |compose|, and the
-corresponding MIL code:
+For example, consider |compose1|, which just captures the first
+argument to |compose|:
+
+> compose1 f = compose f.
+
+\noindent And the corresponding \mil code:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
     \block compose1(): \mkclo[absBodyL208:]
     \ccblock absBodyL208()f: \goto absBlockL209(f)
     \block absBlockL209(f):
-      \vbinds v210 <- \goto compose(); 
+      \vbinds v210<- \goto compose(); 
       \app v210 * f/ 
     
     \block compose(): \mkclo[absBodyL201:]
     \ccblock absBodyL201()f: \mkclo[absBodyL202:f]
+    \ccblock absBodyL202(f)g: \dots
   \end{AVerb}
 \end{singlespace}
 
-\noindent We can use the Associativity law (Equation~\eqref{eq_assoc} on
-Page~\pageref{conc_inline_monadic}) to inline the allocation returned
-by block \lab compose/ into block \lab absBlockL209/, giving us:
+\noindent We can use the Associativity law to inline the allocation
+returned by \lab compose/ into \lab absBlockL209/, giving
+us:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
-    \dots
     \block absBlockL209(f):
-      \vbinds v210 <- \mkclo[absBodyL201:]; 
+      \vbinds v210<- \mkclo[absBodyL201:]; 
       \app v210 * f/ 
-    
-    \block compose(): \mkclo[absBodyL201:]
-    \ccblock absBodyL201()f: \mkclo[absBodyL202:f]
   \end{AVerb}
 \end{singlespace}
 
-\noindent Our uncurrying optimization then rewrites block \lab absBlockL209/ so it
-directly returns the closure previously returned by \lab absBodyL201/:
+\noindent Our uncurrying optimization can now that the expression \app
+v210 * f/ evaluates to \mkclo[absBodyL202:f] (because \var v210/ holds
+the closure \mkclo[absBodyL201:]). We can replace \app v210 * f/ with
+\mkclo[absBodyL202:f]:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
-    \dots
     \block absBlockL209(f):
-      \vbinds v210 <- \mkclo[absBodyL201:]; 
+      \vbinds v210<- \mkclo[absBodyL201:]; 
       \mkclo[absBodyL202:f]
-    
-    \block compose(): \mkclo[absBodyL201:]
-    \ccblock absBodyL201()f: \mkclo[absBodyL202:f]
   \end{AVerb}
 \end{singlespace}
 
-\noindent We can then apply dead-code elimination to remove the
-allocation bound to \var v210/, since that variable is now dead.
+\noindent After this rewrite, \var v210/ is no longer live. Because
+closure allocation has no observable side-effect, we remove the
+binding, eliminating one allocation:
+
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \block absBlockL209(f):
+      \mkclo[absBodyL202:f]
+  \end{AVerb}
+\end{singlespace}
+
+\noindent This optimization extends to thunk and data allocations. 
 
 \subsection{Uncurrying Across Blocks}
 \label{conc_uncurrying}
 
-Our uncurrying optimization only works within a single MIL
+Our uncurrying optimization only works within a single \mil
 block. Extending the optimization across blocks seems obvious, but
-presents several implementation challenges. Figure~\ref{conc_uncurry}
-illustrates why. In Part~\subref{conc_uncurry_a}, |cap1| partially
-applies |cap|, capturing |xs|. In turn, |cap1| is applied to |f| and
-either |y| or |n| in the arms of the |case| statement. In
-Part~\subref{conc_uncurry_b}, the \lab uncurry/ block creates the
-closure represented by |cap1|. Tracing the usage of that closure
-through \lab caseEval214/ shows that the two case arm blocks, \lab
-altTrue208/ and \lab altFalse211/, eventually call \lab b205/ with the
-value \var f/, \var t/ or \var f/ (respectively), and \var ys/.
+presents several implementation challenges, as
+Figure~\ref{conc_uncurry} illustrates. 
 
 \begin{myfig}
   \begin{tabular}{cc}
 \begin{minipage}{3in}
-> uncurry xs t y n f = 
+> uncurry t f y n xs = 
 >   let  cap ys g v = (g v) ys
 >        cap1 = cap xs
 >   in case t of 
@@ -330,20 +327,20 @@ value \var f/, \var t/ or \var f/ (respectively), and \var ys/.
 \end{minipage} &
 \begin{minipage}{3in}
    \begin{AVerb}[gobble=6]
-      \block uncurry4 (t, f, y, n, xs):
-        \vbinds cap1 <- \mkclo[k203:xs];
+      \block uncurry (t, f, y, n, xs):
+        \vbinds cap1<- \mkclo[k203:xs];
         \goto caseEval214(t, cap1, f, y, n)
       \ccblock k203(ys)g: \mkclo[k204: g, ys]
       \ccblock k204(g, ys)v: \mkclo[b205: g, v, ys]
       \block b205 (g, v, ys):
-        \vbinds v206 <- \app g*v/;
-        \app v206*ys/
+        \vbinds v206<- \app g*v/;
+        \app v206 * ys/
       \block altTrue208(cap1, f, y):
-        \vbinds v209 <- \app cap1*f/;
-        \app v209*y/
+        \vbinds v209<- \app cap1*f/;
+        \app v209 * y/
       \block altFalse211(cap1, f, n):
-        \vbinds v212 <- \app cap1*f/;
-        \app v212*n/
+        \vbinds v212<- \app cap1*f/;
+        \app v212 * n/
       \block caseEval214 (t, cap1, f, y, n):
         \case t;
           \valt True()->\goto altTrue208(cap1, f, y);
@@ -352,50 +349,64 @@ value \var f/, \var t/ or \var f/ (respectively), and \var ys/.
 \end{minipage} \\\\
   \scap{conc_uncurry_a} & \scap{conc_uncurry_b}  
   \end{tabular}
-  \caption{A program that illustrates challenges that occur when uncurrying across blocks.}
+  \caption{A program that illustrates challenges that occur when
+    uncurrying across blocks. Part~\subref{conc_uncurry_a} gives a
+    \lamC definition; Part~\subref{conc_uncurry_b} shows its \mil
+    equivalent. The |xs| argument to |cap| is live in each |case|
+    alternative, but it is ``hidden'' in the closure created by
+    |cap1|.}
   \label{conc_uncurry}
 \end{myfig}
 
-Therefore, we could reasonably uncurry \lab altFalse211/ and
-\lab altTrue208/ to call the block directly:
+In Part~\subref{conc_uncurry_a}, |cap1| partially applies |cap| and
+captures the |xs| argument to |uncurry|. Each case alternative
+ultimately applies |cap1| to two arguments, resulting in the
+evaulation of |cap|. Even though the |xs| argument to |cap| is not
+syntactically present in either case arm, it is still live.
 
-\begin{singlespace}
-  \begin{AVerb}
-    ...
-    b205 (g, v, ys):
-      v206 <- \app g*v/
-      \app v206*ys/
-    altTrue208 (cap1, f, y):
-      b205(f, y, ?)
-    altFalse211 (cap1, f, n):
-      b205(f, n, ?)
-  \end{AVerb}
-\end{singlespace}
+Part~\subref{conc_uncurry_b} shows how |xs| is hidden. The blocks \lab
+altTrue208/ and \lab altFalse211/ represent the two different case
+arms. The \var xs/ argument to \lab uncurry/ does not appear in either
+block. However, the \var cap1/ argument that does appear in both holds
+the closure \mkclo[k203:xs], illustrating that \var xs/ is present but
+hidden. 
 
-\noindent Unfortunately, as represented by the !+?+! symbol,
-\lab altTrue208/ and \lab altFalse211/ do not have the \var ys/ argument
-in scope that is expected by \lab b205/. That argument is captured
-by \var cap1/. In order to bring it in scope, we need to rewrite the live
-variables available to each block, starting from \lab caseEval214/:
+\lab altTrue208/ and \lab altFalse211/ both ultimately call block \lab
+b205/.  We could try to rewrite \lab altFalse211/ and
+\lab altTrue208/ to call \lab b205/ directly:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
-    ...
-    b205 (g, v, ys):
-      v206 <- \app g*v/
-      \app v206*ys/
-    altTrue208 (ys, f, y):
-      b205(f, y, ys)
-    altFalse211 (ys, f, n):
-      b205(f, n, ys)
-    caseEval214 (t, ys, f, y, n):
-      case t of
-        True -> altTrue208(ys, f, y)
-        False -> altFalse211(ys, f, n)
+    \block altTrue208 (cap1, f, y):
+      \goto b205(f, y, ?)
+    \block altFalse211 (cap1, f, n):
+      \goto b205(f, n, ?)
   \end{AVerb}
 \end{singlespace}
 
-Rewriting blocks to track live variables in order to support this
+\noindent Unfortunately, as shown by the !+?+! symbol, \lab
+altTrue208/ and \lab altFalse211/ do not have the \var ys/ argument in
+scope that is expected by \lab b205/. That argument should be \var
+xs/, but it is hidden in the closure represented by \var cap1/. In
+order to bring \var xs/ into scope, we need to rewrite the live
+variables available to each block, starting from \lab uncurry/:
+
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \block uncurry (t, f, y, n, xs):
+      \goto caseEval214(t, xs, f, y, n)
+    \block altTrue208 (ys, f, y):
+      \goto b205(f, y, ys)
+    \block altFalse211 (ys, f, n):
+      \goto b205(f, n, ys)
+    \block caseEval214 (t, ys, f, y, n):
+      \case t;
+        \valt True()-> \goto altTrue208(ys, f, y);
+        \valt False()-> \goto altFalse211(ys, f, n);
+  \end{AVerb}
+\end{singlespace}
+
+\noindent Rewriting blocks to track live variables to support this
 optimization does not seem impossible, but it does seem tricky.
 
 \subsection{Eliminating Thunks}
@@ -404,14 +415,14 @@ optimization does not seem impossible, but it does seem tricky.
 Monadic thunks and closures share many characteristics. For example,
 they both represent suspended computation, and they both capture an
 environment of values. They also can be a source of inefficiency, as
-well. Our compiler for \lamC to MIL produces many blocks the
+well. Our compiler for \lamC to \mil produces many blocks the
 immediately invoke some thunk. For example, the following \lamC
 definition:
 
 > main x = do
 >   print x
 
-\noindent compiles to this MIL code (in part):
+\noindent compiles to this \mil code (in part):
 
 \begin{singlespace}
   \begin{AVerb}
@@ -419,9 +430,9 @@ definition:
     \block printbody (a): \prim print(a)
 
     \block main (x):
-      \vbinds v206 <- \mkclo[printmon:];
-      \vbinds v207 <- \app v206 * x/;
-      \vbinds () <- \invoke v207/;
+      \vbinds v206<- \mkclo[printmon:];
+      \vbinds v207<- \app v206 * x/;
+      \vbinds ()<- \invoke v207/;
   \end{AVerb}
 \end{singlespace}
 
@@ -436,9 +447,9 @@ action:
     \block printbody (a): \prim print(a)
 
     \block main (x):
-      \vbinds v206 <- \mkclo[printmon:];
-      \vbinds v207 <- \mkthunk[printbody: x];
-      \vbinds () <- \invoke v207/;
+      \vbinds v206<- \mkclo[printmon:];
+      \vbinds v207<- \mkthunk[printbody: x];
+      \vbinds ()<- \invoke v207/;
   \end{AVerb}
 \end{singlespace}
 
@@ -479,7 +490,7 @@ stops executing.\footnote{This example is pretty contrived, but |dec|
 These two functions starkly illustrate the \emph{construct/destruct}
 pattern. |loop| discriminates on the result of |dec n|, immediately
 destructing the value created by |dec|. Figure~\ref{conc_fig_push1}
-shows unoptimized MIL code for these two functions. \lab loop/
+shows unoptimized \mil code for these two functions. \lab loop/
 evaluates \goto dec(n) on Line~\ref{conc_fig_push1_goto_dec} and binds
 the result to \var v215/. The \milres case/ statement on the next line
 immediately \var v215/ apart, throwing away the allocated value just
@@ -806,15 +817,15 @@ intended to implement optimizations drawn from the literature of
 imperative and functional compilers, showing that the algorithm could
 be applied in both contexts.
 
-\intent{Contribution: MIL.} The monadic intermediate language
+\intent{Contribution: \mil.} The monadic intermediate language
 we described builds on a large body of work on monadic programming,
 intermediate languages, and implementation techniques for functional
-languages. While the overall concept is well-known, we believe MILs
-still offers some novelty. MIL makes allocation explicit but still
+languages. While the overall concept is well-known, we believe \mil
+still offers some novelty. \Mil makes allocation explicit but still
 offers high-level features like function application and case
-discrimination. MIL programs, by design, consist of basic-block
+discrimination. \Mil programs, by design, consist of basic-block
 elements. Of course, many intermediate languages consist of
-basic-blocks, but MIL again combines that structure with a monadic
+basic-blocks, but \mil again combines that structure with a monadic
 programming model, giving a ``pure'' flavor to low level operations.
 
 \intent{Contributions: Hoopl.} Our work relied quite a bit on the
@@ -828,8 +839,8 @@ optimization, that cannot be found elsewhere.
 contributes in several areas. Most importantly, we described
 uncurrying in terms of dataflow analysis over our monadic intermediate
 language. We did not find other work in this area, making us the first
-to implement uncurrying over a MIL using dataflow analysis. In fact,
-leaving aside our MIL, we did not find any other description of
+to implement uncurrying over a \mil using dataflow analysis. In fact,
+leaving aside our \mil, we did not find any other description of
 uncurrying which used dataflow analysis. 
 
 \intent{Summary \& Conclusion.}
