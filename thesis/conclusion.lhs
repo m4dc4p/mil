@@ -483,16 +483,14 @@ further optimizations possible.
 \label{conc_cases}
 
 Functional language programs commonly implement a pattern of
-\emph{construct/destruct}, where the program creates some value at one
-point, and then inspects the value using case discrimination at
-another point. Figure~\ref{conc_fig_cons_dest} shows one such
-program. The |dec| function decrements a value, but only if the value
-is greater than 0. It returns a |Maybe| value, indicating if the value
-could be decremented or not. The |loop| function decrements |n| and
-applies |f| to the result. When |dec n| returns |Nothing|, |loop|
-stops executing.\footnote{This example is pretty contrived, but |dec|
-  could be used for something more interesting, such as array bounds
-  checks.}
+\emph{construct/destruct}, where the program constructs a value and
+then inspects (or destructs) the value shortly
+thereafter. Figure~\ref{conc_fig_cons_dest} shows one such
+program. The |dec| function returns a |Maybe| value, indicating if its
+argument could be decremented or not. The |loop| function
+discriminates on the result of |dec n|, immediately throwing away the
+|Maybe| value created by |dec|. The ``safe'' decrement implemented by |dec|
+guarantees we will not apply |f| to values less than $0$.
 
 \begin{myfig}
 \begin{minipage}{\textwidth}
@@ -510,19 +508,11 @@ stops executing.\footnote{This example is pretty contrived, but |dec|
 \label{conc_fig_cons_dest}
 \end{myfig}
 
-These two functions starkly illustrate the \emph{construct/destruct}
-pattern. |loop| discriminates on the result of |dec n|, immediately
-destructing the value created by |dec|. Figure~\ref{conc_fig_push1}
-shows unoptimized \mil code for these two functions. \lab loop/
-evaluates \goto dec(n) on Line~\ref{conc_fig_push1_goto_dec} and binds
-the result to \var v215/. The \milres case/ statement on the next line
-immediately \var v215/ apart, throwing away the allocated value just
-created. This pattern introduces at least one allocation in every
-invocation of |loop|.\footnote{A sufficiently clever compiler could
-  put |Maybe| values into registers and avoid a heap allocation, of
-  course. But, no compiler can be clever enough to cover all possible
-  data types. We can always create one sufficiently large that a heap
-  allocation must occur.}
+Figure~\ref{conc_fig_push1} shows unoptimized \mil code for these two
+functions. \lab loop/ evaluates \goto dec(n) on
+Line~\ref{conc_fig_push1_goto_dec} and binds the result to \var
+v215/. The \milres case/ statement on the next line immediately takes
+\var v215/ apart, throwing away the allocated value just created. 
 
 \begin{myfig}
   \begin{minipage}{\textwidth}
@@ -531,14 +521,14 @@ invocation of |loop|.\footnote{A sufficiently clever compiler could
         \block loop(n, f):
            \vbinds v215<-\goto dec(n); \label{conc_fig_push1_goto_dec}
            \case v215;
-              \valt{}Just(i)->\goto altJust(f, i);
-              \valt{}Nothing()->\goto altNothing(f);
+              \valt Just(i)->\goto altJust(f, i);
+              \valt Nothing()->\goto altNothing(f);
       
         \block dec(i): \label{conc_fig_push1_dec}
            \vbinds v233<-\prim gt(i, 0);
            \case v233;
-              \valt{}True()->\goto altTrue(i);
-              \valt{}False()->\goto altFalse();
+              \valt True()->\goto altTrue(i);
+              \valt False()->\goto altFalse();
       
         \block altNothing(f): \app{}f * 0/
       
@@ -560,62 +550,81 @@ invocation of |loop|.\footnote{A sufficiently clever compiler could
 
 Inspecting the \lab dec/ block in Figure~\ref{conc_fig_push1} shows
 that it evaluates a condition and branches to either \lab altTrue/ or
-\lab altFalse/. We cannot directly inline \lab loop/ into \lab dec/,
-because \lab loop/ ends with a \milres case/ statement. However, we
-can move the body of \lab loop/ into each arm of the \milres case/
-statement that ends \lab loop/.
+\lab altFalse/. As discussed in Section~\ref{conc_inline_monadic}, we
+cannot directly inline \lab loop/ into \lab dec/, because \lab loop/
+ends with a \milres case/ statement. However, we can move the body of
+\lab loop/ into each arm of the \milres case/ statement that ends \lab
+loop/.
 
-Figure~\ref{conf_fig_push2} shows that we inline \lab dec/ into \lab
-loop/, and then pushed the portion of \lab loop/ that followed the
-statement \binds v215 <- \goto dec(n); into the \lab altTrue/ and \lab
-altFalse/ blocks. For example, where \lab altFalse/ previously
-contained one statement (\prim Nothing()), we now bind \var v215/ to
-that value. In both blocks, the value bound is immediately destructed
-by a \milres case/ statement. 
-\begin{myfig}
-  \begin{minipage}{\textwidth}
-    \begin{singlespace}
-      \begin{AVerb}[gobble=8]
-        \block loop(n, f):
-           \vbinds v233<-\prim gt(i, 0);
-           \case v233;
-              \valt{}True()->\goto altTrue(i, f, n);
-              \valt{}False()->\goto altFalse(f, n);
-      
-        \block altTrue(i, f, n):
-           \vbinds v225<-\prim minus(i, 1);
-           \vbinds v215<-\prim Just(v225);
-           \case v215;
-              \valt{}Just(i)->\goto altJust(f, i);
-              \valt{}Nothing()->\goto altNothing(f);
-      
-        \block altFalse(f, n): 
-           \vbinds v215<-\prim Nothing();
-           \case v215;
-              \valt{}Just(i)->\goto altJust(f, n);
-              \valt{}Nothing()->\goto altNothing(f);
-    
-        \block altNothing(f): \app{}f * 0/
-      
-        \block altJust(f, n):
-           \vbinds v207<- \app f*n/;
-           \goto loop(v207, f)
-      
-      \end{AVerb}
-    \end{singlespace}
-  \end{minipage}
-  \caption{First transformation.}
-  \label{conc_fig_push2}
-\end{myfig}
+We begin by inlining \lab dec/ into \lab loop/. Notice that the \milres case/ statement
+now jumps to \lab altTrue/ and \lab altFalse/, where before it jumped to \lab altJust/ and
+\lab altNothing/:
 
-A simple dataflow analysis (such as constant folding) of \lab altTrue/
-and \lab altFalse/ in Figure~\ref{conc_fig_push2} would show that one
-or the other branch in each case is never
-taken. Figure~\ref{conf_fig_push3} shows how we could rewrite \lab
-altTrue/ and \lab altFalse/, eliminating the allocation and
-discrimination. This version of the program will perform no
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \block loop(n, f):
+      \vbinds v233<-\prim gt(i, 0);
+      \case v233;
+        \valt True()->\goto altTrue(i, f, n);
+        \valt False()->\goto altFalse(f, n);
+  \end{AVerb}
+\end{singlespace}
+
+\noindent We also move the original case statement from \lab loop/ to
+the end of \lab altTrue/ and \lab altFalse/. This transformation
+requires that we bind the original result of \lab altTrue/ and \lab
+altFalse/ to the variable that the original case statement inspected
+(\var v215/). For example, \lab altTrue/ previously returned \prim
+Just (v225); now, we bind \var v215/ to that value. In both blocks,
+the value bound is immediately destructed by a \milres case/
+statement:
+
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \block altTrue(i, f, n):
+      \vbinds v225<-\prim minus(i, 1);
+      \vbinds v215<-\prim Just(v225);
+      \case v215;
+        \valt Just(i)->\goto altJust(f, i);
+        \valt Nothing()->\goto altNothing(f);
+      
+    \block altFalse(f, n): 
+      \vbinds v215<-\prim Nothing();
+      \case v215;
+        \valt Just(i)->\goto altJust(f, n);
+        \valt Nothing()->\goto altNothing(f);
+  \end{AVerb}
+\end{singlespace}
+
+Dataflow analysis of \lab altTrue/ and \lab altFalse/ could show that
+each block contains a case alternative that will never be
+executed. For example, in \lab altTrue/, \var v215/ must always be a
+\var Just/ value, and the \var Nothing/ alternative will never
+execute. We can eliminate the case statement in both blocks and replace 
+them with a jump. Notice that, in the \lab altTrue/ case, we need to
+recognize that \var i/ in \var Just i/ is really \var v225/:
+
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \block altTrue(i, f, n):
+      \vbinds v225<- \prim minus(i, 1);
+      \vbinds v215<-\prim Just(v225);
+      \goto altJust(f, v225)
+      
+    \block altFalse(f, n): 
+      \vbinds v215<-\prim Nothing();
+      \goto altNothing(f)
+
+  \end{AVerb}
+\end{singlespace}
+
+Dead-code elimination would find that the bindings for \var v215/ in
+both blocks is dead, and would eliminate the
+allocation. Figure~\ref{conc_fig_push3} shows the final form of our
+program, where we have eliminated the unnecessary allocation between
+\lab dec/ and \lab loop/. This version of the program will perform no
 allocations of |Maybe| values whatsoever, but we are still guaranteed
-that |f| will not be applied to an index value less than 0.
+that |f| will not be applied to an index value less than $0$.
 
 \begin{myfig}
   \begin{minipage}{\textwidth}
@@ -644,76 +653,6 @@ that |f| will not be applied to an index value less than 0.
   \end{minipage}
   \caption{Final form of our function.}
 \end{myfig}
-
-%% \begin{myfig}
-%%   \begin{tikzpicture}[>=stealth, node distance=.5in]\nomd
-    
-%%   \node[stmt] (loop) {
-%%     \begin{minipage}{2.4in}
-%%       \begin{AVerb}[gobble=8]
-%%         \block loop(n, f):
-%%           \vbinds v215<- \goto dec(n);
-%%           \case v215;
-%%             \valt{}Just(i)->\goto altJust(f, i);
-%%             \valt{}Nothing()->\goto altNothing(f);
-%%       \end{AVerb}
-%%     \end{minipage}
-%%   };
-
-%%   \node[stmt, right=0.45in of loop] (dec) {
-%%     \begin{minipage}{2.2in}
-%%       \begin{AVerb}[gobble=8]
-%%         \block dec(i):
-%%           \vbinds v233<- \prim gt(i, 0);
-%%           \case v233;
-%%             \valt{}True()->\goto altTrue(i);
-%%             \valt{}False()->\goto altFalse();
-%%       \end{AVerb}
-%%     \end{minipage}
-%%   };
-
-%%   \node[stmt, below right=0.35in and -1.15in of loop] (altNothing) {
-%%     \begin{minipage}{\widthof{\block altNothing(f):}}
-%%       \begin{AVerb}[gobble=8]
-%%         \block altNothing(f):
-%%            \app{}f * 0/
-%%       \end{AVerb}
-%%     \end{minipage}
-%%   };
-
-%%   \node[stmt, below left=0.35in and -1.15in of loop] (altJust) {
-%%     \begin{minipage}{\widthof{\block altJust(f, n):\ \ \ }}
-%%       \begin{AVerb}[gobble=8]
-%%         \block altJust(f, n):
-%%           \vbinds v207<- \app f*n/;
-%%           \goto loop(v207, f)
-%%       \end{AVerb}
-%%     \end{minipage}
-%%   };
-
-%%   \node[stmt, below=0.35in of dec] (altTrue) {
-%%     \begin{minipage}{\widthof{\block altTrue(i): \prim minus(i, 1)}}
-%%       \begin{AVerb}[gobble=8]
-%%         \block altTrue(i):
-%%           \vbinds v225<- \prim minus(i, 1);
-%%           \prim Just(v225)
-%%       \end{AVerb}
-%%     \end{minipage}
-%%   };
-
-%%   \node[stmt, below=0.35in of altTrue] (altFalse) {
-%%     \begin{minipage}{\widthof{\block altFalse(): \prim Nothing()}}
-%%       \begin{AVerb}[gobble=8]
-%%         \block altFalse(): \prim Nothing()
-%%       \end{AVerb}
-%%     \end{minipage}
-%%   };
-
-%%   \draw [->] (loop.south) ||- ($(loop.south) - (0in,0.1in)$) -|| (altJust.north);
-%%   \draw [->] (loop.south) ||- ($(loop.south) - (0in,0.1in)$) -|| (altNothing.north);
-%%   \draw [->] (altJust.south) ||- ($(altJust.south) - (1in,0.3in)$) ||- (loop.west);
-%%   \end{tikzpicture}
-%% \end{myfig}
 
 \section{Hoopl Refinements}
 \label{conc_hoopl}
