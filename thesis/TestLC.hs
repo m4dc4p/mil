@@ -39,7 +39,7 @@ progM prelude@(prims, _) progs = do
 
       printDef :: Def -> Doc
       -- printDef def = text (show (ppr def))
-      printDef def = text (show def)
+      printDef def = text (show "foo")
 
 m205 :: Graph Stmt C C
 m205 = mkFirst (BlockEntry undefined undefined ["g", "f", "x"]) <*>
@@ -819,6 +819,11 @@ myId = ("id", lam "x" $ \x -> x)
 -- A function that executes a monadic primitive
 -- directly, with no function application
 simplePrint = [("simplePrint", lam "x" $ \x -> bindE "()" (mPrint `app` x) $ \x -> ret x)]
+
+-- A function that executes a monadic primitive
+-- directly, with no function application
+simpleEcho = [("simplerPrint", bindE "x" mReadChar $ \x -> 
+                 bindE "()" (mPrint `app` x) $ \x -> ret x)]
 
 -- A function where the result of a Case statement is
 -- applied to an argument

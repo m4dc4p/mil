@@ -1,0 +1,30 @@
+%&preamble
+\input{nodocclass}\dodocclass
+%include polycode.fmt
+%include lineno.fmt
+%include subst.fmt
+\begin{document}
+\fancyhf{}
+\numbersoff
+\input{document.preamble}
+
+\section*{Abbreviations}
+Abbreviations such as \mil and \cfg appear in small caps. When an
+acronym starts a sentence, its first letter is capitalized (e.g.,
+``\Mil'').
+
+\section*{Numbers}
+Chapter, Section, Page and Figure references use old-style numerals:
+0, 1, 2, 3, etc.  Line numbers are also old-style.
+
+Superscripts, subscripts, and footnotes use ``normal'' numerals: $0,
+1, 2, 3,$ etc.  Numbers in mathematical expressions are normal (e.g.,
+``$x = 10$, '' not ``$x = $\ 10'').  Indexed variables (e.g., $B_1$,
+$t_1$, etc.) also use normal numerals.
+
+\section*{Syntax}
+\Mil program fragments appear in typewriter font: \binds x <- \goto readChar();,
+\lab main/, \block print(x):, etc. \lamC program fragments use italic
+font: \lcdef compose (f,g,x)=\lcapp f * (g * x)/;.
+
+\end{document}

@@ -947,36 +947,6 @@ creates the appropriate |Jump| or |Capture| value. The result of
 
 \intent{Describe the work of Danvy, Apel, and Tarditi; contrast to MIL uncurrying.}
 
-\section{Future Work}
-\label{uncurry_sec_future}
-\intent{Discuss strategies for uncurrying: local only, across blocks,
-  by duplication.}  The uncurrying optimization described in this
-chapter only works within single blocks. We only apply the
-optimization to closures. However, the optimization can be extended to
-work across blocks and to work with monadic thunks. We discuss these
-extensions in Sections~\ref{uncurry_sec_blocks} and
-\ref{uncurry_sec_thunks}, respectively.
-
-\subsection{Uncurrying Across Blocks}
-
-\intent{Motivate multi-block uncurrying with example}
-Uncurrying across blocks can further reduce the number of
-\enter operations and closures created. For example, consider
-a program that creates a partially applied function and passes
-it through a case statement.
-
-\begin{myfig}
-  \caption{A MIL program that would benefit from uncurrying across
-    blocks.}
-  \label{uncurry_fig_blocks}
-\end{myfig}
-
-\intent{Discuss live variable analysis difficulty}
-
-\intent{Discuss implications for separate compilation}
-
-\subsection{Extending Uncurrying to Thunks}
-
 \section{Reflection}
 \label{uncurry_sec_refl}
 \end{document}

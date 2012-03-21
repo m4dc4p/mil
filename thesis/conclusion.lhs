@@ -327,12 +327,12 @@ Figure~\ref{conc_uncurry} illustrates.
 \end{minipage} &
 \begin{minipage}{3in}
    \begin{AVerb}[gobble=6]
-      \block uncurry (t, f, y, n, xs):
+      \block uncurry(t, f, y, n, xs):
         \vbinds cap1<- \mkclo[k203:xs];
         \goto caseEval214(t, cap1, f, y, n)
       \ccblock k203(ys)g: \mkclo[k204: g, ys]
       \ccblock k204(g, ys)v: \mkclo[b205: g, v, ys]
-      \block b205 (g, v, ys):
+      \block b205(g, v, ys):
         \vbinds v206<- \app g*v/;
         \app v206 * ys/
       \block altTrue208(cap1, f, y):
@@ -341,7 +341,7 @@ Figure~\ref{conc_uncurry} illustrates.
       \block altFalse211(cap1, f, n):
         \vbinds v212<- \app cap1*f/;
         \app v212 * n/
-      \block caseEval214 (t, cap1, f, y, n):
+      \block caseEval214(t, cap1, f, y, n):
         \case t;
           \valt True()->\goto altTrue208(cap1, f, y);
           \valt False()->\goto altFalse211(cap1, f, n);
@@ -377,9 +377,9 @@ b205/.  We could try to rewrite \lab altFalse211/ and
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
-    \block altTrue208 (cap1, f, y):
+    \block altTrue208(cap1, f, y):
       \goto b205(f, y, ?)
-    \block altFalse211 (cap1, f, n):
+    \block altFalse211(cap1, f, n):
       \goto b205(f, n, ?)
   \end{AVerb}
 \end{singlespace}
@@ -393,13 +393,13 @@ variables available to each block, starting from \lab uncurry/:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
-    \block uncurry (t, f, y, n, xs):
+    \block uncurry(t, f, y, n, xs):
       \goto caseEval214(t, xs, f, y, n)
-    \block altTrue208 (ys, f, y):
+    \block altTrue208(ys, f, y):
       \goto b205(f, y, ys)
-    \block altFalse211 (ys, f, n):
+    \block altFalse211(ys, f, n):
       \goto b205(f, n, ys)
-    \block caseEval214 (t, ys, f, y, n):
+    \block caseEval214(t, ys, f, y, n):
       \case t;
         \valt True()-> \goto altTrue208(ys, f, y);
         \valt False()-> \goto altFalse211(ys, f, n);
@@ -415,46 +415,69 @@ optimization does not seem impossible, but it does seem tricky.
 Monadic thunks and closures share many characteristics. For example,
 they both represent suspended computation, and they both capture an
 environment of values. They also can be a source of inefficiency, as
-well. Our compiler for \lamC to \mil produces many blocks the
+well. Our compiler for \lamC to \mil produces many blocks that
 immediately invoke some thunk. For example, the following \lamC
-definition:
+definition reads a character and prints it to the screen:
 
+\begin{singlespace}
 > main x = do
->   print x
+>   c <- readChar 
+>   print c
+\end{singlespace}
 
-\noindent compiles to this \mil code (in part):
+\noindent Our compiler translates the program in this \mil code (in part):
 
-\begin{singlespace}
-  \begin{AVerb}
-    \block printmon (a): \mkthunk[printbody: a]
-    \block printbody (a): \prim print(a)
-
-    \block main (x):
-      \vbinds v206<- \mkclo[printmon:];
-      \vbinds v207<- \app v206 * x/;
-      \vbinds ()<- \invoke v207/;
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \block main():
+      \vbinds v206<-\mkthunk[readCharbody:];
+      \vbinds c<-\invoke v206/;
+      \dots
+    \block readCharbody(): \prim readChar()
   \end{AVerb}
 \end{singlespace}
 
-\noindent The application \app v206 * x/ results in a thunk (\mkthunk
-[printbody: a]) which is immediately invoked. A more efficient program
-would bypass the allocation and instead directly invoke the monadic
-action:
+In this program, \lab main/ allocates a thunk pointing to
+\lab readCharbody/ and binds it to \var v206/. The next line invokes
+the thunk just constructed, binding the result to \var c/. A straightforward
+adaption of our uncurrying optimization could transform this program
+so it executes \lab readCharbody/ directly, instead of invoking the thunk:
 
-\begin{singlespace}
-  \begin{AVerb}
-    \block printmon (a): \mkthunk[printbody: a]
-    \block printbody (a): \prim print(a)
-
-    \block main (x):
-      \vbinds v206<- \mkclo[printmon:];
-      \vbinds v207<- \mkthunk[printbody: x];
-      \vbinds ()<- \invoke v207/;
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \block main():
+      \vbinds v206<-\mkthunk[readCharbody:];
+      \vbinds c<-\goto readCharbody();
+      \dots
   \end{AVerb}
 \end{singlespace}
 
-\noindent It seems our uncurrying analysis could be adapted to thunks in order to
-implement such an optimization.
+Of course, we can continue to apply furhter optimizations to the
+program. Dead-code elimination would find that \var v206/ is no longer
+live, letting us eliminate the allocation of the thunk:
+
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \block main():
+      \vbinds c<-\goto readCharbody();
+      \dots
+  \end{AVerb}
+\end{singlespace}
+
+\noindent The associativity law also lets inline the body of \lab readCharBody/
+into \lab main/, removing an extra jump:
+
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \block main():
+      \vbinds c<-\prim readChar();
+      \dots
+  \end{AVerb}
+\end{singlespace}
+
+\noindent While these last transformations do not relate directly to
+eliminating thunks, they do show that each optimization tends to make
+further optimizations possible.
 
 \subsection{Push Through Cases}
 \label{conc_cases}
