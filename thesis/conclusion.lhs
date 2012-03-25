@@ -23,10 +23,11 @@ optimization.
 \intent{Signposts for chapter.} Though we choose the uncurrying
 optimization to demonstrate our approach, several avenues of future
 work remain.  We explore optimizations that take advantage of the
-unique features of \mil in Section~\ref{conc_future_work}. We offer
-some thoughts on the \hoopl library in
-Section~\ref{conc_hoopl}. Section~\ref{conc_conc} offers our closing
-thoughts.
+unique features of \mil in
+Section~\ref{conc_future_work}. Section~\ref{conc_hoopl} describes
+challenges we encountered using the \hoopl library, and give some
+suggestions for improvements. Section~\ref{conc_conc} offers our
+closing thoughts.
 
 \section{Future Work}
 \label{conc_future_work}
@@ -654,36 +655,38 @@ that |f| will not be applied to an index value less than $0$.
   \caption{Final form of our function.}
 \end{myfig}
 
-\section{Hoopl Refinements}
+\section{\Hoopl Refinements}
 \label{conc_hoopl}
 
-\intent{Summary of our Hoopl usage.} The Hoopl library played a
+\intent{Summary of our \hoopl usage.} The \hoopl library played a
 critical role in our work. The library presents a simple and powerful
-interface for describing, analyzing and transforming CFGs. It allowed
-us to explore a variety of optimizations that used dataflow analysis,
-without the burden of implementing the dataflow algorithm ourselves.
-Of course, by spending so much time with the library, we found some
-areas where the library's interface left us struggling to bend our
-algorithm to fit with Hoopl's view of dataflow analysis.
+interface for describing, analyzing and transforming \cfgs. \Hoopl
+allowed us to explore a variety of optimizations that used dataflow
+analysis, without the burden of implementing the dataflow algorithm
+from scratch.  Of course, by spending so much time with the library,
+we found some areas where the library's interface left us struggling
+to bend our algorithm to fit with \hoopl's view of dataflow
+analysis. The following sections describe the issues we encountered,
+and offer some possible solutions.
 
 \subsection{Invasive Types}
-\intent{Hoopl's use of |O| and |C| types requires your AST to support
-  Hoopl from the beginning.} Hoopl uses the the |O| and |C| types
-(described in Section~\ref{hoopl_sec_cfg}) to specify the shape of
-each node in the \cfg; only nodes with compatible types can be
-connected to each other. This design allows the compiler to enforce
-some desirable properties; for example, a basic block will not contain
-any nodes that can branch to more than one destination. Unfortunately,
-this design requires that the |O| and |C| types be present on the
-client AST. We found life much easier when we designed our AST with
-Hoopl in mind from the beginning; otherwise, we found ourselves writing
-a lot of code to transform between our existing AST and a nearly
-identical, Hoopl-ized, version of the same.
+\intent{\hoopl's use of |O| and |C| types requires your \ast to support
+  \hoopl from the beginning.} \Hoopl uses the |O| and |C| types
+(described on Page~\pageref{hoopl_sec_cfg}) to specify the shape of
+each node in a \cfg; only nodes with compatible types can be connected
+to each other. This design allows the compiler to enforce some
+desirable properties; for example, a basic block will not contain any
+nodes that can branch to more than one destination. Unfortunately,
+this design also requires that the |O| and |C| types be present on the
+client \ast. In preliminary work, we implemented an \ast without using
+\hoopl's shape types. This choice reuiqred us to write a significant
+amount of ``boilerplate'' to translate between our initial
+representation and one that used \hoopl's desired types.
 
 ``Smart'' constructors could be used to reduce the boilerplate
-required when using Hoopl against an existing AST. For example,
-consider the the AST given in Figure~\ref{hoopl_fig3} on
-Page~\pageref{hoopl_fig3}. Instead of defining |CStmt| using GADTs,
+required when using \hoopl against an existing \ast. For example,
+consider the the \ast given in Figure~\ref{hoopl_fig3} on
+Page~\pageref{hoopl_fig3}. Instead of defining |CStmt| using gadts,
 imagine we defined |CStmtX| as a normal ADT and |CStmt| as a
 |newtype|:
 
@@ -695,9 +698,8 @@ imagine we defined |CStmtX| as a normal ADT and |CStmt| as a
 > newtype CStmt o c = CStmt CStmtX
 \end{singlespace}
 
-\noindent To create Hoopl-ized values, we define a function for each constructor
-(i.e., |Entry|, |Assign|, etc.) that both creates the correct |CStmtX| value and
-parameterizes it by shape:
+\noindent To create \hoopl-ized values, we define a function for each
+|CStmtX| constructor, parameterized by shape:
 
 \begin{singlespace}
 > entry :: Label -> CStmt O C
@@ -705,24 +707,26 @@ parameterizes it by shape:
 >
 > assign :: Var -> CExpr -> CStmt O O
 > assign v e = CStmt (Assign v e)
+>
+> {-"\dots"-}
 \end{singlespace}
 
-However, this approach still requires that a fair amount of
-boilerplate code be created. GADTs alleviate the problem somewhat
-(since the compiler implements ``smart'' constructors for you), but
-that does not help when working against an AST that cannot be
-changed. Metaprogramming techniques using Template Haskell, combined
-with one of the several generic programming libraries available to
-Haskell may ultimately be the best approach here.
+However, this approach still requires a fair amount of boilerplate
+code. \Gadts alleviate the problem somewhat (since the compiler
+implements ``smart'' constructors for you), but that does not help
+when working against an \ast that cannot be changed. Metaprogramming
+techniques using Template Haskell may ultimately be the best approach
+here.
 
 \subsection{Restricted Signatures}
 \intent{Review of combinators for creating rewrite and transfer
-  functions.} Hoopl does not specify transfer and rewrite functions
+  functions.} \Hoopl does not specify transfer and rewrite functions
 using simple function signatures. Instead, as detailed in
-Section~\ref{hoopl_sec5}, Hoopl represents those functions using the
-|BwdTransfer|, |BwdRewrite|, |FwdTransfer| and |FwdRewrite| types.
-Client programs cannot directly create these values; instead, Hoopl
-defines a function for creating each type: 
+Section~\ref{hoopl_sec5} (Page~\pageref{hoopl_sec5}), \hoopl
+represents those functions using the |BwdTransfer|, |BwdRewrite|,
+|FwdTransfer| and |FwdRewrite| types.  Client programs cannot directly
+create these values; instead, \hoopl defines a function for creating
+each type:
 
 \begin{singlespace}
 > mkFTransfer :: (forall e x . n e x -> f -> Fact x f) -> FwdTransfer n f
@@ -735,31 +739,40 @@ defines a function for creating each type:
 >   -> BwdRewrite m n f
 \end{singlespace}
 
-\noindent As Hoopl does
-not directly export the constructors for |FwdTransfer|, etc. this
-scheme limits the signature of transfer and rewrite functions to
-those shown above. 
+\intent{Why the type signatures are too restrictive.}  Unfortunately,
+this scheme complicated our implementation at times. \Hoopl's type for
+transfer functions only allows information to be stored in three
+places: the client's \ast, the facts computed, and any values declared
+in some scope external to the transfer function. Each of these
+locations leads to different complications. 
 
-\intent{Why the type signatures are too restrictive.} Unfortunately,
-this scheme added some burden to our implementation. At several times
-we wished that Hoopl allowed an accumulating parameter for
-intermediate results in the signature of both transfer and rewrite
-functions. Normally the |Fact| value should serve as an accumulator,
-but it seems less than ideal to pollute the |Fact| value with
-intermediate results that are only used within the transfer (or
-rewrite) function.
+To illustrate, imagine a forwards transfer function that analyzes a block
+statement by statement (so it does not have access to an entire block
+at once), but that also needs to know the label of the current block
+being analyzed. \Hoopl requires that such a function have the signature:
+
+> forall e x . n e x -> f -> Fact x f
+
+\noindent We could store the label of the current block in the
+client's \ast; that would mean each value of type |n| would need to
+hold a label representing the current block. Possible, but burdensome
+at least. The label of the current block could be part of the facts
+computed. This works, but seems wasteful, as the label would not
+matter outside each block, but it would be carried by all values of
+type |f|. We could also capture the current label for the block in
+some outer scope, but that seems to imply we would be applying \hoopl
+to a single block at a time, which would not work for any inter-block
+analysis.
 
 \intent{Custom monad does allow arbitrary state, but the
-  implementation cost is high.} Hoopl does allow the client program to
-define a custom monad for using during rewrite, which does allow
-intermediate results to be used. Implementing and using the monad
-requires a modest amount of work: the client must make their monad an
-instance of the |CheckpointMonad| class and use the |liftFuel|
-function to lift custom monadic operations into the |FuelMonad|
-class. Unfortunately, the custom monad still does not help with the
+  implementation cost is high.} A simple accumulating parameter on
+transfer function would alleviate this issue. \Hoopl does allow the
+client program to define a custom monad that will be used by the
+rewrite functions, and that can give access to intermediate
+results. Unfortunately, the custom monad still does not help with the
 transfer function.
 
-\intent{Summarize complaint.}  Earlier versions of the Hoopl library
+\intent{Summarize complaint.}  Earlier versions of the \hoopl library
 allowed the client to return an arbitrary \emph{function} from the
 transfer and rewrite functions. While that may have been too liberal,
 we certainly wished for a slightly less restricted interface during
@@ -768,44 +781,39 @@ our work.
 \section{Summary}
 \label{conc_conc}
 
-\intent{Review goals.} Kildall applied his dataflow algorithm to \textsc{algol
-60}, an imperative, structured programming language. Most work in
+\intent{Review goals.} Kildall applied his dataflow algorithm to
+\algol, an imperative, structured programming language. Most work in
 dataflow analysis since then has focused on imperative programming
 languages. We set out to explore the algorithm's use within the
-context of a functional programming language; specifically, we hypothesized that,
-by compiling to a monadic intermediate language, we could obtain a
-basic-block structure that would be amiable to dataflow analysis. We
-intended to implement optimizations drawn from the literature of
-imperative and functional compilers, showing that the algorithm could
-be applied in both contexts.
+context of a functional programming language; specifically, we
+hypothesized that, by compiling to a monadic intermediate language, we
+could obtain a basic-block structure that would be ameniable to
+dataflow analysis. We intended to implement optimizations drawn from
+the literature of imperative and functional compilers, showing that
+the algorithm could be applied in both contexts.
 
 \intent{Contribution: \mil.} The monadic intermediate language
 we described builds on a large body of work on monadic programming,
 intermediate languages, and implementation techniques for functional
 languages. While the overall concept is well-known, we believe \mil
-still offers some novelty. \Mil makes allocation explicit but still
+offers some novelty. \Mil makes allocation explicit but still
 offers high-level features like function application and case
 discrimination. \Mil programs, by design, consist of basic-block
 elements. Of course, many intermediate languages consist of
 basic-blocks, but \mil again combines that structure with a monadic
-programming model, giving a ``pure'' flavor to low level operations.
+programming model, giving a ``pure'' flavor to low-level operations.
 
-\intent{Contributions: Hoopl.} Our work relied quite a bit on the
-Hoopl library. Without it, we may not have even chosen this
-research. While we did not contribute materially to Hoopl itself, this
+\intent{Contributions: \hoopl.} Our work made significant use of the
+\hoopl library. Without it, we may not have even pursued this
+research. While we did not contribute materially to \hoopl itself, this
 work offers a significant amount of expository material describing
-Hoopl, as well as at least one implementation of a non-trivial
-optimization, that cannot be found elsewhere.
+\hoopl, as well as at least one implementation of a non-trivial
+optimization that cannot be found elsewhere.
 
-\intent{Contributions: Uncurrying.} Our work
-contributes in several areas. Most importantly, we described
-uncurrying in terms of dataflow analysis over our monadic intermediate
-language. We did not find other work in this area, making us the first
-to implement uncurrying over a \mil using dataflow analysis. In fact,
-leaving aside our \mil, we did not find any other description of
-uncurrying which used dataflow analysis. 
-
-\intent{Summary \& Conclusion.}
+\intent{Contributions: Uncurrying.} Our work contributes in several
+areas. Most importantly, we described uncurrying in terms of dataflow
+analysis. We did not find other work in this area, and so we believe
+that we are the first to implement uncurrying using dataflow analysis.
 
 \standaloneBib 
 
