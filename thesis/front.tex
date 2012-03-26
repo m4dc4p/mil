@@ -11,24 +11,25 @@
 \pagenumbering{roman}\pagestyle{plain}
 \addcontentsline{toc}{section}{Abstract}
 \section*{Abstract}
-The \emph{dataflow algorithm}, which analyzes programs using
-their \emph{control-flow graph}, underlies many optimizations
-implemented in modern compilers for imperative languages. Functional
-language compilers, in contrast, traditionally optimize by rewriting
-programs according to algebraic laws. By compiling functional programs
-to a \emph{monadic intermediate language} (\mil), we can describe
-traditional functional language optimizations using \emph{dataflow
-equations}, the parameters that drive dataflow algorithm. Our work
-gives an overview of dataflow analysis and describes how to
-use \hoopl, a Haskell library implementing the dataflow algorithm. We introduce
-\mil, an intermediate language designed for monadic programming, 
-implementation of high-level functional language features, and
-dataflow analysis. This work gives a novel description of
-the \emph{uncurrying} optimization in terms of dataflow equations. We
-also discuss how \mil programs can be optimized using the \emph{monad
-laws} (independent of the dataflow algorithm), and a way in which
-dataflow analysis could eliminate unnecessary allocations in the
-presence of conditional expressions. 
+{%%
+%% don't allow paragraph to end without a little space
+\parfillskip 3em plus 1fil%
+%% protusion on the first line looks odd, disable it for 
+%% this paragraph.
+%\microtypesetup{protrusion=false}%
+Our work applies the \emph{dataflow algorithm} to an area outside the
+algorithm's traditional scope: functional languages. Our approach
+relies on a \emph{monadic intermediate language} that allows us to
+represent both low-level, imperative features such as computed jumps
+and explicit allocation, as well as high-level, functional-language
+features like pattern-matching and partial application. We prototyped
+our work in Haskell, relying extensively on the \hoopl library, and
+this dissertation demonstrates many of the library's features. We
+demonstrate the efficacy of our approach by giving a novel description
+of the \emph{uncurrying} optimization in terms of the dataflow
+algorithm. We believe this document shows that dataflow analysis can
+be applied to functional languages in practical and interesting
+ways.\par}
 \newpage
 
 \addcontentsline{toc}{section}{Acknowledgments}
@@ -39,7 +40,7 @@ Thanks very much!
 \singlespacing
 \tableofcontents
 \newpage
-\addcontentsline{toc}{section}{List of Figures}
+\addcontentsline{toc}{section}{Figures}
 \listoffigures
 \newpage
 \end{document}
