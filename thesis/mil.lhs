@@ -347,15 +347,14 @@ t2/. Thus, the \lab compose/ block returns the value of \lcapp f * (g
 \section{Allocation as a Side-Effect} 
 \label{mil_monad}
 
-\intent{Motivate why we consider allocation impure.}
-Functional languages normally treat data allocation as a pure operation, in
-that the program cannot directly observe any effect from an allocation. Of
-course, when implementing such operations, allocation is definitely impure:
-the heap may be updated and a garbage collection might be triggered.
-
-\intent{Illustrate allocation as in invisible effect in \lamA.} For
-example, consider the operations that occur when calculating |compose
-a b c| using call- by-value evaluation:
+\intent{Motivate why we consider allocation impure.}  Functional
+languages normally treat data allocation as a hidden operation, in
+that the program cannot directly observe any effect from an
+allocation. Of course, allocation causes effects, such as updating the
+heap or triggering a garbage collection.  For example, using the
+definition of |compose| given above, consider the sequence of
+reductions that occur when calculating |compose a b c| using
+call-by-value evaluation:
 
 \begin{singlespace}\noindent
   \begin{math}\begin{array}{rl}
@@ -366,13 +365,59 @@ a b c| using call- by-value evaluation:
     \end{array}\end{math}
 \end{singlespace}
 
-\intent{Introduce notation to make the environment and intermediate functions
-explicit.}
-This representation hides an important detail: each
-application creates a closure representing a function and its
-environment (or \emph{free variables}). We can make these values more
-obvious by writing each $\lambda$-expression as a new function,
-annotated with its free variables in braces:
+\intent{Make allocations in reductions really clear.}
+This notation hides an important detail: in a
+naive implementation of \lamC, each reduction of the form $\lcapp
+(\lcabs x. \dots) * a/$ allocates a closure representing the
+function $(\lcabs x. \dots)$ and its environment. 
+
+As described by Wadler \citeyearpar{Wadler1990}, \emph{monads}
+can be used distinguish \emph{pure} and \emph{impure} functions. A
+\emph{pure} function has no side-effects: it will not print to the
+screen, throw an exception, write to disk, or in any other way change
+the observable state of the machine.\footnote{We mean ``observable''
+  from the program's standpoint. Even a pure computation will generate
+  heat, if nothing else.} An \emph{impure} function may change the
+machine's state in an observable way.
+
+\intent{Rewrite |compose| to show monadic effects.}  We can rewrite
+|compose| to make the allocation of closures explicit. First we define
+|closure| as a monadic operation that takes a function and a list of
+variables representing the environment:
+
+> compose = do
+>   let k0 f = do
+>         t1 <- closure k1 [f]
+>         return t1
+>       k1 f g = do
+>         t1 <- closure k2 [f,g]
+>         return t1
+>       k2 f g x = do 
+>         t1 <- f (g x)
+>         return t1
+>   t1 <- closure k0
+>   return t1
+
+Each $\lambda$ in the definition of |compose| becomes a $k_n$ 
+definition. Each $k_n$, except the last, creates a closure
+pointing to the next $k_n$ definition and capturing its arguments
+as the environment. The final definition, $k_2$, 
+
+>
+> main a b c = do
+>   t0 <- compose
+>   t1 <- app t1 a
+>   t2 <- app t2 b
+>   t3 <- app t2 c
+>   return t3
+
+\intent{Introduce notation to make the environment and intermediate
+  functions explicit.}  
+
+We
+can make these allocations more obvious by writing each
+$\lambda$-expression as a new function, annotated with its free
+variables in braces:
 
 \begin{singlespace}\noindent
   \begin{math}\begin{array}{rl}
