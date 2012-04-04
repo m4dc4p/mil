@@ -426,12 +426,15 @@
 \def\Cmm{C\texttt{-{}-}\xspace}
 
 %% Abbreviations
-\def\mil{\textsc{mil}\xspace}
-\def\Mil{\textsc{Mil}\xspace}
+\makeatletter
+\protected\def\ifhelvet#1#2{\edef\fam{\f@family}\def\helvet{phv}%
+  \ifx\fam\helvet#1\else#2\fi}\makeatother
+\protected\def\mil{\ifhelvet{MIL}{\textsc{mil}}\xspace}
+\protected\def\Mil{\ifhelvet{MIL}{\textsc{Mil}}\xspace}
+\protected\def\hoopl{\ifhelvet{Hoopl}{\textsc{hoopl}}\xspace}
+\protected\def\Hoopl{\ifhelvet{Hoopl}{\textsc{Hoopl}}\xspace}
 \def\cfg{\textsc{cfg}\xspace}
 \def\cfgs{\textsc{cfg}s\xspace}
-\def\hoopl{\textsc{hoopl}\xspace}
-\def\Hoopl{\textsc{Hoopl}\xspace}
 \def\ast{\textsc{ast}\xspace}
 \def\gadt{\textsc{gadt}\xspace}
 \def\Gadt{\textsc{Gadt}\xspace}

@@ -18,6 +18,10 @@ Abbreviations such as \mil and \cfg appear in small caps. When an
 acronym starts a sentence, its first letter is capitalized (e.g.,
 ``\Mil'').
 
+Abbreviations in section and chapter headings in the body text, which are always
+in Helvetica (a sans-serif font) should not
+appear in small caps. For example, ``\textsf{MIL}'' instead of ``\textsf{\textsc{mil}}.''
+
 New terms are written in italic type when they are first
 introduced. For example, ``The \emph{dataflow algorithm} defines a
 general approach to program analysis\dots''. Abbreviations
