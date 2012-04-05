@@ -381,113 +381,64 @@ the observable state of the machine.\footnote{We mean ``observable''
 machine's state in an observable way.
 
 \intent{Rewrite |compose| to show monadic effects.}  We can rewrite
-|compose| to make the allocation of closures explicit. First we define
-|closure| as a monadic operation that takes a function and a list of
-variables representing the environment:
+|compose| to make the allocation of closures explicit. We define
+|closure| as a monadic operation that allocates some memory and stores
+a reference to a function. We then rewrite |compose| to show where
+allocations occur:\footnote{This code is purposely verbose to make the monadic
+structure clear. Each sequence |do {t <- closure k; return t}| can just be
+written as |do { closure k }|.}
 
 > compose = do
 >   let k0 f = do
->         t1 <- closure k1 [f]
->         return t1
->       k1 f g = do
->         t1 <- closure k2 [f,g]
->         return t1
->       k2 f g x = do 
->         t1 <- f (g x)
->         return t1
->   t1 <- closure k0
->   return t1
+>     let k1 g = do
+>           let k2 x = do 
+>                 t <- f (g x)
+>                 return t
+>           t <- closure k2 
+>           return t
+>         t <- closure k1 
+>         return t
+>   t <- closure k0
+>   return t
 
-Each $\lambda$ in the definition of |compose| becomes a $k_n$ 
-definition. Each $k_n$, except the last, creates a closure
-pointing to the next $k_n$ definition and capturing its arguments
-as the environment. The final definition, $k_2$, 
+Each $\lambda$ in the definition of |compose| becomes a $k_n$
+definition. Each $k_n$, except $k_2$, allocates and returns a closure
+that points to the next $k_{n+1}$ definition. Of course a closure
+includes an environment, but \lamC cannot express that
+directly. Instead, we use nested definitions to ensure that |f| and
+|g| are in scope for $k_2$, which implements the body of
+|compose|. Notice that the application |f (g x)| also becomes monadic,
+as |f (g x)| may cause an allocation.
 
->
+\intent{Show how closures created by |compose| are used} Now that we
+have rewritten |compose| in monadic style, we cannot just write
+|compose a b c| any longer. Each application allocates, so we need to
+rewrite the expression using monadic style. We define a monadic
+function |app| that takes a closure and an argument. |app| will
+retrieve the function referred to by the closure, call that
+function with the argument supplied, and return the result: 
+
 > main a b c = do
->   t0 <- compose
->   t1 <- app t1 a
->   t2 <- app t2 b
->   t3 <- app t2 c
+>   k0 <- compose
+>   k1 <- app t1 a
+>   k2 <- app t2 b
+>   k3 <- app t2 c
 >   return t3
 
-\intent{Introduce notation to make the environment and intermediate
-  functions explicit.}  
+For convenience, we defined |main| as a function that takes three
+arguments and applies |compose| to them. The first line allocates an
+initial closure that serves as the entry point for |compose|. Each
+line after gathers an additional argument and ``adds'' it to the
+closure represented.\footnote{As noted, \lamC cannot directly
+  manipulate the environment associated with a closure.} The final
+line returns the result of |compose a b c|. 
 
-We
-can make these allocations more obvious by writing each
-$\lambda$-expression as a new function, annotated with its free
-variables in braces:
-
-\begin{singlespace}\noindent
-  \begin{math}\begin{array}{rl}
-      k_1 \left\{\strut \right\} f &= \lcabs g. \lcabs x. \lcapp f * (g * x)/ \\
-      k_2 \left\{\strut f\right\} g & = \lcabs x. \lcapp f * (g * x)/ \\
-      k_3 \left\{\strut f, g\right\} x &= \lcapp f * (g * x)/ \\
-    \end{array}\end{math}
-\end{singlespace}
-
-\intent{Explain why the notation above is not sufficient to show
-  allocation as an effect.}  This notation, however, is not quite
-enough. Each time we return a $\lambda$ value in \lamC, we allocate a
-closure to represent the result. \lcname k_1/ does not
-return the result of executing \lcabs g. \lcabs x. \lcapp f * (g *
-x)/; rather, \lcname k_1/ returns a closure that indirectly represents
-the execution of \lcabs g. \lcabs x. \lcapp f * (g * x)/. These allocations
-are not pure --- they affect the state of the machine and can
-trigger observable effects. 
-
-As described by Wadler \citeyearpar{Wadler1990}, \emph{monads}
-can be used distinguish \emph{pure} and \emph{impure} functions. A
-\emph{pure} function has no side-effects: it will not print to the
-screen, throw an exception, write to disk, or in any other way change
-the observable state of the machine.\footnote{We mean ``observable''
-  from the program's standpoint. Even a pure computation will generate
-  heat, if nothing else.} An \emph{impure} function may change the
-machine's state in an observable way.
-
-\intent{Explain our $k$ and \hsdo notation together.}  Therefore, we
-rewrite the \rhs of \lcname k_1/ as $\hsdo\left\{\lcapp k_2 *
-\left\{\parstrut f\right\}/;\right\}$, denoting two concepts. First,
-\lcapp k_2 * \left\{\parstrut f\right\}/ indicates that we create a
-closure pointing to \lcname k_2/ and holding an environment
-containing \lcname f/. Second, because allocation has an observable
-effect, we use $\mathbf{do}$ notation to show that \lcname k_1/ does
-not represent a pure value --- it evaluates to a computation that must
-be executed. We do the same for \lcname k_2/; \lcname k_3/ remains
-unchanged as it does not evaluate to a $\lambda$ and therefore does
-not directly have an observable effect:
-
-\begin{singlespace}\noindent
-  \begin{math}\begin{array}{rl}
-      k_1 \left\{\strut \right\} f &= \hsdo \left\{\lcapp k_2 * \left\{\strut f\right\}/;\right\} \\
-      k_2 \left\{\strut f\right\} g & = \hsdo \left\{\lcapp k_3 * \left\{\strut f, g\right\}/;\right\} \\
-      k_3 \left\{\strut f, g\right\} x &= \lcapp f * (g * x)/ \\
-    \end{array}\end{math}
-\end{singlespace}
-
-\intent{Show example with new notation and explain why it is important.}
-With these definitions, we can rewrite the evaluation of \lcapp compose * a * b * c/
-as a sequence of side-effecting monadic allocations:
-
-\begin{singlespace}\noindent
-  \begin{math}\begin{array}{rl}
-      \lcapp compose * a * b * c/ &= \lcapp (\lcabs f. \lcabs g. \lcabs x. {\lcapp f * (g * x)/}) * a * b * c/\\
-      &= \lcapp {\lcapp (k_1 \left\{\strut\right\} * a)/} * b * c/ \\
-      &= \lcapp ({(\hsdo \left\{\lcapp k_2 * \left\{\strut a\right\}/;\right\})} * b) * c/ \\
-      &= \lcapp {\lcapp (k_2 \left\{\strut a\right\} * b)/} * c/ \\
-      &= \lcapp {(\hsdo \left\{\lcapp k_3 * \left\{\strut a, b\right\}/;\right\})} * c/ \\
-      &= \lcapp k_3 \left\{\strut a, b\right\} * c/ \\
-      &= \lcapp a * (b * c)/ \\
-      \multicolumn{2}{l}{\vrule width.95\hsize height0pt depth0pt}
-    \end{array}\end{math}
-\end{singlespace}
-
-\noindent In \lamC, the values created by \lcname k_1/ and \lcname
-k_2/ are not explicitly represented. In the above, each \hsdo line
-indicates that an allocation will occur. While this detail is hidden
-from most high-level languages, \mil treats allocation as an impure
-operation. Allocation affects the machine and \mil makes it explicit.
+In our original expression, the allocation caused by each
+$\lambda$-value was not clear. In the above, each line indicates that
+an allocation will occur. Of course, in \lamC we do not really define
+the |closure| or |app| functions, and closure allocation is not
+directly visible. \Mil, however, treats allocation as an impure
+operation and makes it explicit.
 
 \begin{myfig}[t]
   \input{lst_mil2}
