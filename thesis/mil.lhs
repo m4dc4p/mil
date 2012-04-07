@@ -352,18 +352,17 @@ languages normally treat data allocation as a hidden operation, in
 that the program cannot directly observe any effect from an
 allocation. Of course, allocation causes effects, such as updating the
 heap or triggering a garbage collection.  For example, using the
-definition of |compose| given above, consider the sequence of
+definition of |compose| given in Figure~\ref{mil_fig1a}, consider the sequence of
 reductions that occur when calculating |compose a b c| using
 call-by-value evaluation:
 
-\begin{singlespace}\noindent
-  \begin{math}\begin{array}{rl}
+\begin{singlespace}\begin{math}\begin{array}{rl}
       \lcapp compose * a * b * c/ &= \lcapp (\lcabs f. \lcabs g. \lcabs x. {\lcapp f * (g * x)/}) * a * b * c/ \\
       &= \lcapp (\lcabs g. \lcabs x. {\lcapp a * (g * x)/}) * b * c/ \\
       &= \lcapp (\lcabs x. {\lcapp a * (b * x)/}) * c/ \\
       &= \lcapp a * (b * c)/ \\
-    \end{array}\end{math}
-\end{singlespace}
+\end{array}\end{math}
+\end{singlespace}\medskip
 
 \intent{Make allocations in reductions really clear.}
 This notation hides an important detail: in a
@@ -378,67 +377,103 @@ screen, throw an exception, write to disk, or in any other way change
 the observable state of the machine.\footnote{We mean ``observable''
   from the program's standpoint. Even a pure computation will generate
   heat, if nothing else.} An \emph{impure} function may change the
-machine's state in an observable way.
+machine's state in an observable way. We will use a monadic form
+of |compose| to make closure allocation an impure, effectual operation.
 
-\intent{Rewrite |compose| to show monadic effects.}  We can rewrite
-|compose| to make the allocation of closures explicit. We define
-|closure| as a monadic operation that allocates some memory and stores
-a reference to a function. We then rewrite |compose| to show where
-allocations occur:\footnote{This code is purposely verbose to make the monadic
-structure clear. Each sequence |do {t <- closure k; return t}| can just be
-written as |do { closure k }|.}
+\intent{Rewrite |compose| to show monadic effects.}
+Figure~\ref{mil_fig_compose} shows |compose| rewritten in a monadic
+style that makes closure allocations explicit. The |closure| operation
+is a monadic function that allocates memory and stores its arguments
+for retrieval later. The first argument is the function that the
+closure points to. The second argument represents the environment that
+will be used when that function is evaluated.
 
-> compose = do
->   let k0 f = do
->     let k1 g = do
->           let k2 x = do 
->                 t <- f (g x)
->                 return t
->           t <- closure k2 
->           return t
->         t <- closure k1 
->         return t
->   t <- closure k0
+\begin{myfig}
+  \begin{minipage}{2in}
+> k_0 = do
+>   t <- closure k_1 []
 >   return t
+> k_1 [] f = do
+>   t <- closure k_2 [f]
+>   return t
+> k_2 [f] g = do
+>   t <- closure compose [f, g]
+>   return t
+> compose [f, g] x = do 
+>   t <- f (g x)
+>   return t
+  \end{minipage}
+  \caption{A rewritten version of |compose| that makes closure
+    allocation explicit. \lamC does not support pattern-matching on
+    functin arguments, but use it for clarity here. }
+  \label{mil_fig_compose}
+\end{myfig}
 
-Each $\lambda$ in the definition of |compose| becomes a $k_n$
-definition. Each $k_n$, except $k_2$, allocates and returns a closure
-that points to the next $k_{n+1}$ definition. Of course a closure
-includes an environment, but \lamC cannot express that
-directly. Instead, we use nested definitions to ensure that |f| and
-|g| are in scope for $k_2$, which implements the body of
-|compose|. Notice that the application |f (g x)| also becomes monadic,
-as |f (g x)| may cause an allocation.
+Each $\lambda$ in Figure~\ref{mil_fig1a} becomes a |k_n| definition in
+Figure~\ref{mil_fig_compose}. |k_0| corresponds to the expression
+\lcapp \lcabs f. \lcabs g. \lcabs x. f * (g * x)/, allocating a
+closure with an empty environment and pointing to |k_1|. |k_1| corresponds
+to \lcapp \lcabs g. \lcabs x. f * (g * x)/, while |k_2| corresponds
+to  \lcapp \lcabs x. f * (g * x)/. Each |k_n|
+definition (except |k_0|) takes two arguments. The first is a list of
+values representing the environment of the function, and the second a
+new value representing the argument of the original $\lambda$
+expression. |k_1| and |k_2| each allocate and return a new
+closure. The closure stores a reference to the next $k_{n+1}$
+definition and a list of values representing the current
+environment. |compose| evaluates |f (g x)|; however, this expression
+also becomes monadic, as |f (g x)| may cause an allocation.
 
-\intent{Show how closures created by |compose| are used} Now that we
-have rewritten |compose| in monadic style, we cannot just write
-|compose a b c| any longer. Each application allocates, so we need to
-rewrite the expression using monadic style. We define a monadic
-function |app| that takes a closure and an argument. |app| will
-retrieve the function referred to by the closure, call that
-function with the argument supplied, and return the result: 
+\intent{Show how closures created by |compose| are used}
+Figure~\ref{mil_fig_mon_compose} shows a program that evalutes
+|compose a b c| using our rewritten, monadic |compose|. To evaluate
+each closure, we define a monadic function |app| that takes a closure
+and an argument. |app| evaluates the function referred to by the
+closure, using the environment stored in the closure and passing the
+additional argument supplied.
 
+\begin{myfig}
+  \begin{minipage}{2in}
 > main a b c = do
->   k0 <- compose
->   k1 <- app t1 a
->   k2 <- app t2 b
->   k3 <- app t2 c
+>   t0 <- k_0
+>   t1 <- app t0 a
+>   t2 <- app t1 b
+>   t3 <- app t2 c
 >   return t3
+  \end{minipage}
+  \caption{A program that evaluates \lcapp compose * a * b * c/ using our
+    rewritten, monadic form of |compose|.}
+  \label{mil_fig_mon_compose}
+\end{myfig}
 
-For convenience, we defined |main| as a function that takes three
-arguments and applies |compose| to them. The first line allocates an
+The first line of the program in Figure~\ref{mil_fig_mon_compose} allocates an
 initial closure that serves as the entry point for |compose|. Each
 line after gathers an additional argument and ``adds'' it to the
-closure represented.\footnote{As noted, \lamC cannot directly
-  manipulate the environment associated with a closure.} The final
-line returns the result of |compose a b c|. 
+closure represented. The final line returns the result of |compose a b
+c|.  In our original expression, the allocation caused by each
+$\lambda$ was not clear. In |main|, each line indicates that an
+allocation will occur.
 
-In our original expression, the allocation caused by each
-$\lambda$-value was not clear. In the above, each line indicates that
-an allocation will occur. Of course, in \lamC we do not really define
-the |closure| or |app| functions, and closure allocation is not
-directly visible. \Mil, however, treats allocation as an impure
-operation and makes it explicit.
+Of course, in \lamC we do not really define the |closure| or |app|
+functions, and closure allocation is not directly visible. \Mil,
+however, treats allocation as an impure operation and makes it
+explicit. Figure \ref{mil_fig2} shows a complete \mil program for
+\lcdef main()= \lcapp compose * a * b * c/;. \lab main/ corresponds to
+the definition of |main| in Figure~\ref{mil_fig_mon_compose}. \lab k0/
+corresponds to |k_0| and acts as the entry point for |compose|. Notice
+that \lab k0/ is not a closure-capturing block; \lab k0/ just
+allocates the initial closure that will be used to evaluate |compose a
+b c|. The closure-capturing blocks \lab k1/ and \lab k2/ correspond to
+|k_1| and |k_2|. The second argument to each |closure| operation
+corresponds to the variables captured by the closures allocated in the
+body of \lab k1/ and \lab k2/; the list of values passed as an
+argument to |k_1| and |k_2| correspond to the environment defined for
+the \lab k1/ and \lab k2/ closure-capturing blocks. In
+Figure~\ref{mil_fig_compose}, |k_2| creates a closure pointing to
+|compose|. However, in \mil a closure-capturing block cannot do
+anything but allocate another closure or jump to a block. Therefore,
+in Figure~\ref{mil_fig2}, \lab k2/ refers to \lab k3/, which then
+jumps to \lab compose/.
 
 \begin{myfig}[t]
   \input{lst_mil2}
@@ -448,42 +483,33 @@ operation and makes it explicit.
   \label{mil_fig2}
 \end{myfig}
 
-\intent{Describe \mil program for |main = compose a b c|.}  Figure
-\ref{mil_fig2} shows the complete \mil program for \lcdef main()=
-\lcapp compose * a * b * c/;. The closure-capturing blocks \lab k1/,
-\lab k2/ and \lab k3/ correspond to the \lcname k_1/, \lcname k_2,/
-and \lcname k_3/ definitions above. The free variables annotated on each
-definition correspond to the variables in braces next to \lab k1/, \lab k2/
-and \lab k3/. \lab main/ corresponds to our
-top-level expression |compose a b c|. 
-
 \intent{Point out where intermediate values are created and captured.}
-By examining \lab main/ in Figure \ref{mil_fig2} we can see how \mil
+By examining \lab main/ in Figure~\ref{mil_fig2} we can see how \mil
 makes explicit the intermediate closures created while evaluating
 \lcapp compose * a * b * c/. Line~\ref{mil_t0_fig2} executes the block
 \lab k0/, allocating a closure pointing to \lab k1/ and assigning it
 to \var t0/. On line \ref{mil_t1_fig2}, we apply \var t0/ to \var a/;
-\lab k1/ executes and creates a closure which we write \mkclo[k2:f],
-meaning the closure points to \lab k2/ and holds the value of \var
-f/. We assign that closure to \var t1/. On Line~\ref{mil_t2_fig2} we
-apply \var t1/ to the second argument, \var b/. This executes \lab
-k2/, which expects to find one argument in its environment, just as we
-stored in \var t1/. \lab k2/ creates another closure, \mkclo[k3:f, g],
-which we assign to \var t2/. This closure points to \lab k3/ and holds
-two variables in its environent. Finally, on line \ref{mil_t3_fig2},
-we apply \var t2/ to the final argument, \var c/. \lab k3/ executes
-and immediately jumps to \lab compose/ with our arguments. The result,
-assigned to \var t3/, is returned on the last line of \lab main/.
+\lab k1/ executes and creates a closure  that points to \lab k2/ and
+holds the value of \var a/. We assign \mkclo[k2: a] to \var t1/. On
+Line~\ref{mil_t2_fig2} we apply \var t1/ to the second argument, \var
+b/. This executes \lab k2/, which expects to find one argument in its
+environment, just as we stored in \var t1/. \lab k2/ creates another
+closure, \mkclo[k3:a, b], which we assign to \var t2/. This closure
+points to \lab k3/ and holds two variables in its environent. Finally,
+on line \ref{mil_t3_fig2}, we apply \var t2/ to the final argument,
+\var c/. \lab k3/ executes and immediately jumps to \lab compose/ with
+our arguments. The result, assigned to \var t3/, is returned on the
+last line of \lab main/.
 
 \section{Monadic Thunks}
 \label{mil_thunks}
 
-\intent{Introduce idea of monads as suspended computation.}
-In another sense, also described in Wadler's \citeyear{Wadler1990} paper, a
-monadic value represents a \emph{computation}. Where a pure function evaluates
-to a ``pure'' value that is immediately available, a monadic function gives
-back a suspended computation that we need to execute before we can get to the
-value ``inside'' the computation.
+\intent{Introduce idea of monads as suspended computation.}  In
+another sense, also described in Wadler's \citeyear{Wadler1990} paper,
+a monadic value represents a \emph{computation}. Where a pure function
+evaluates to a ``pure'' value that is immediately available, a monadic
+function gives back a suspended computation that we need to execute
+before we can get to the value ``inside'' the computation.
 
 \intent{Contrast pure and monadic values.}  Consider the \lamC
 functions in Figure~\ref{mil_fig_monadic}.\footnote{Some syntactic

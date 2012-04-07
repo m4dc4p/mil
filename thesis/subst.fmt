@@ -9,6 +9,10 @@
 %format v_n = "\ensuremath{v_n}"
 %format x_1 = "\ensuremath{x_1}"
 %format x_n = "\ensuremath{x_n}"
+%format k_0 = "\ensuremath{k_0}"
+%format k_1 = "\ensuremath{k_1}"
+%format k_2 = "\ensuremath{k_2}"
+%format k_n = "\ensuremath{k_n}"
 % Hoopl spaceship
 %format <*> = "\ensuremath{\mathbin{\text{<}\mkern-1.5mu\mathord{*}\mkern-1.5mu\text{>}}}"
 % Hoopl funny operator

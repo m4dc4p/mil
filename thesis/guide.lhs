@@ -66,4 +66,11 @@ or case alternatives always indent two spaces from their parent:
 >   print c
 \end{singlespace}
 
+\section*{Dashes}
+
+Em-dashes (---) have a space on either side: like --- so, not
+like---this. Compound words, as well as hyphenated words, use dashes
+(-). En-dashes (--) are only used for ranges of numbers ($1$--$10$, not
+$1$-$10$).
+
 \end{document}
