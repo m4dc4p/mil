@@ -10,35 +10,32 @@
 \label{ref_chapter_mil}
 
 Most compilers do not generate executable machine code directly from a
-program source file. Rather, the compiler typically implements of
-pipeline of \emph{intermediate languages}. The compiler analyzes and
-optionally transforms (e.g., for optimization) the program during each
-stage of the pipeline. Typically, each intermediate language exposes
-more details about the implementation of the program than the one
-before.
+program source file. Rather, the compiler transforms the program into
+a number of different \emph{intermediate languages}, where each
+intermediate language exposes different details about the
+implementation of the program. Each intermediate language provides
+specialized support for aspect of the analysis and transformation of
+the program performed by the compiler.
 
 A number of intermediate languages have been described for both
-imperative and functional language compilers. Register transfer
-languages (RTLs) makes data movement between memory and processor
-registers explicit. RTLs aids in optimizing the use of registers,
-typically a scarce resource on most processors. Single-static
-assignment form (described in detail by \citet[pg.~252]{Muchnick1998})
-appears similar to an RTL, but never re-uses a register assignment
-(thus, ``single-static assignment''). It is particularly useful for
-discovering constant values and for untangling register usage in the
-presence of complex control-flow. Administrative-Normal Form, first
-described by \citet{Flanagan1993}, is an intermediate form for
-functional languages which makes all intermediate values explicit. It
-is useful for showing the exact order of evaluation for expressions.
+imperative and functional languages. \emph{Three-address code}
+(described in standard textbooks, such as \cite[Chap.~6,
+  Sec.~6.2]{Aho2006}) is mostly associated with imperative languages
+and emphasizes simplicity by requiring all operations to specify at
+most two operands and one destination. Three-address code aids in
+optimizing the use of registers, typically a scarce resource on most
+processors. Administrative-Normal Form, first described by
+\citet{Flanagan1993}, is an intermediate form for functional languages
+which makes all intermediate values explicit. It is useful for showing
+the exact order of evaluation for expressions. 
 
-Our monadic intermediate language (\mil),
-specifically supports functional language features, but also follows
-the form of three-address code, an intermediate language more
-associated with imperative languages. \Mil directly supports function
-application and abstraction. All intermediate values are named. \Mil 
-specifies evaluation order and separates stateful computation using a
-monadic programming style. \Mil's syntax enforces basic-block structure
-on programs, making them ideal for dataflow analysis.
+Our monadic intermediate language (\mil), specifically supports
+functional language features, but also follows the form of
+three-address code. \Mil directly supports function application and
+abstraction. All intermediate values are named. \Mil specifies
+evaluation order and separates stateful computation using a monadic
+programming style. \Mil's syntax enforces basic-block structure on
+programs, making them ideal for dataflow analysis.
 
 \intent{Signposts.}  We first describe our source language, \lamC, in
 Section~\ref{mil_src}.  The motivation and roots of \mil are given in
@@ -55,11 +52,10 @@ rerpresent \mil programs. We conclude in Section~\ref{mil_sec6}.
 \section{Source Language: \lamC}
 \label{mil_src}
 
-\intent{Introduce \lamC; where it came from, references, etc.}  We
-call our source language ``$\lambda$-case'' and write its name as
-\lamC. \lamC derives from the \lamA, with syntactic and semantic
-elements borrowed from Haskell. In particular, \lamC uses Haskell's
-\hsdo notation (and notion) for monadic programming. Jones and
+\intent{Introduce \lamC; where it came from, references, etc.}  Our
+source language, \lamC (pronounced ``lambda-case''), derives from the \lamA, with
+elements borrowed from the Haskell languages's
+use of \hsdo notation to represent monadic programs. Jones and
 colleagues developed \lamC as an intermediate representation for the
 Habit programming language \citep{Habit2010}. The Habit ``Compilation
 Strategy'' report \citep{HabitComp2010} gives full details on
@@ -67,17 +63,20 @@ Strategy'' report \citep{HabitComp2010} gives full details on
   in this work: patterns and guards. Details on those elements can be
   found in the aforementioned report.} The report describes several
 different intermediate languages; \lamC corresponds to ``Normalized
-MPEG.''
+\textsc{mpeg}.''
 
 Figure~\ref{mil_fig_lam_syntax} gives the full syntax of \lamC. In the
-figure, \term x/, \term x_1/, etc.\ represent simple variables, not
-terms; however, \term t/, \term t_1/, etc.\ do represent arbitrary
-terms. All \term def/ terms are global to the program in which
-they are defined. Definitions can be recursive, but only functions can
-be mutually-recursive. Simple variables are supported in definitions
-and case alternatives --- pattern-matching outside the constructor
-name in an alternative is not supported. The language is untyped and
-does not support data declarations.
+figure, \term x/, \term x_1/, etc.\ represent simple variables, while
+\term t/, \term t_1/, etc.\ represent arbitrary terms. All \term def/
+terms are global to the program in which they are defined. Definitions
+with zero arguments are values and cannot be recursive; definitions
+with more than one argument are functions and can be recursive. Only
+variables can appear as arguments in definitions and case
+alternatives --- the language does not support more sophisticated
+pattern-matching. The language is untyped and does not support data
+declarations. While most elements should be recognizable
+from Haskell or the \lamA, we will explain the the \emph{monadic
+  bind} and \emph{primitive} terms further.
 
 \begin{myfig}
   \begin{tabular}{r@@{}lr}
@@ -91,7 +90,7 @@ does not support data declarations.
       \quad $\ldots$\endgraf%%
       \quad \term alt_n/%%
       \end{minipage}}:Case Discimination/ \\
-    \termcase |x <- t_1; t_2|:Monadic Bind/ \\
+    \termcase |do { x <- t_1; t_2 }|:Monadic Bind/ \\
     \termcase {\begin{minipage}[t]{\widthof{$\mathbf{let}\ \term def_1/\quad$}}
         $\mathbf{let}\ \term def_1/$\endgraf%%
         $\phantom{\mathbf{let}}\ \ldots$\endgraf%%
@@ -108,35 +107,25 @@ does not support data declarations.
   \label{mil_fig_lam_syntax}
 \end{myfig}
 
-While most elements should be recognizable
-from Haskell or the \lamA, we will explain the the \emph{monadic
-  bind}, \emph{let} and \emph{primitive} terms further.
+\intent{Describe bind.}  \runin{Monadic Bind} The monadic binding
+term, |do { x <- t_1; t_2 }|, states that the result of running the
+monadic computation, |t_1|, will be bound to |x| and that |t_2| will
+then be executed with |x| in scope. Note that |x| can only be a
+variable; \lamC does not support pattern-matching on the \lhs of a
+bind. When |t_2| is another monadic bind, we do not nest the \hsdo
+keyword: for brevity, we write |do { x <- t_1; y <- t_2}| rather
+than |do { x <- t_1; do { y <- t_2}}|.
 
-\intent{Describe bind.}  The monadic binding term, |x <- t_1; t_2|,
-states that the result of the monadic computation, |t_1|, will be
-bound to |x| and that |t_2| will then be evaluated with |x| in
-scope. |x| can only be a variable; \lamC does not support
-pattern-matching on the \lhs of a bind. The monadic context in which
-\term t_1/ is evaluated depends on the type of the expression (as
-expressed in Habit).
-
-\intent{Describe let.}  The term |let {-"\term def_1/, $\ldots$, \term
-  def_n/"-} in t| brings the definitions \term def_1/, $\ldots$, \term
-def_n/ into the scope of \term t/. The definitions are local and will
-not be in scope outside of \term t/. Like top-level definitions,
-\hslet definitions can be values or functions,\footnote{Technically,
-  values are functions with zero arguments.} and they can be
-recursive, but only functions can be mutually-recursive.
-
-\intent{Describe primitives.}  The primitive expression \lcprim p*
-treats \term p/ as it if were a definition, except the body of the 
-primitive is not defined in \lamC. 
+\intent{Describe primitives.}  \runin{Primitives} The primitive expression \lcprim p*
+refers to a primitive definition named $p$. Primitives refer to functionality
+that is not implemented in \lamC itself. In all other respects the
+primitive \lcprim p* is treated like any other function value. 
 
 \section{\Mil's Purpose}
 \label{mil_sec3}
 
-\intent{Remark on intermediate languages and \mil's focus.} An
-intermediate language always seeks to highlight some specific
+\intent{Remark on intermediate languages and \mil's focus.} The design
+of an intermediate language typically exposes some specific
 implementation detail while hiding others in order to support certain
 analysis and transformation goals. Exposing intermediate values gives
 us the chance to analyze and eliminate them. Hiding implementation
@@ -145,9 +134,10 @@ simpler.
 
 \intent{Relate \mil to three-address code.} \Mil's syntax and design
 borrow heavily from three-address code, an intermediate form normally
-associated with imperative languages. Three-address code represents
-programs such that all operations specify two operands and a
-destination. Three-address code also hides details of memory
+associated with imperative languages and described in standard
+textbooks (e.g., \cite{Aho2006}). Three-address code represents
+programs such that all operations specify at most two operands and a
+single destination. Three-address code hides details of memory
 management by assuming that infinitely many storage locations can be
 named and updated. For example, the expression:
 
@@ -157,64 +147,37 @@ named and updated. For example, the expression:
   \end{equation*}
 \end{singlespace}
 
-\noindent would be expressed in three-address code as:
+\noindent could be expressed in three-address code as:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
-    \vbinds t_1 <- mul b c;
-    \vbinds t_2 <- add t_1 d;
-    \vbinds t_3 <- div t_2 2;
+    \vbinds t_1<-mul b c;
+    \vbinds t_2<-add t_1 d;
+    \vbinds t_3<-div t_2 2;
   \end{AVerb}
 \end{singlespace}
 
-\noindent where \var t_1/, \var t_2/ and \var t_3/ are new temporary storage
-locations. 
+\noindent where \var t_1/, \var t_2/ and \var t_3/ represent temporary
+storage locations and \var mul/, \var add/, and \var div/ represent
+the corresponding arithmetic operation.
+
+\intent{Remark on Wadler \& MLj work.} \Mil seeks to expose certain
+effects that are not normally represented in functional languages. As
+described by Wadler \citeyearpar{Wadler1990}, \emph{monads} can be
+used distinguish \emph{pure} and \emph{impure} functions. A
+\emph{pure} function has no side-effects: it will not in any way
+change the observable state of the machine. An \emph{impure} function
+may change the machine's state in an observable way. Most functional
+languages treat data and closure allocation as pure operations. \Mil
+uses monads to treat those allocations as impure operations.
 
 \intent{Highlight focus of \mil (closure allocation).} Three-address
 code emphasizes assignments and low-level operations, features
 important to imperative languages. \Mil emphasizes allocation and
 side-effecting computations, features important to functional
-languages.\footnote{Most importantly, features important to a pure
-  functional language like Habit.} Though the operations supported by
-\mil differ from traditional three-address code, the intention remains
-the same: hide some details while exposing those we care about.
-
-For example, the previously given expression can be written in Habit
-as:
-
-\begin{singlespace}
-\begin{center}
-> div (plus (mul b c) d) 2,
-\end{center}
-\end{singlespace}
-
-\noindent and implemented in \mil as:
-
-\begin{singlespace}\correctspaceskip
-  \begin{AVerb}[gobble=4, numbers=left]
-    \vbinds t_1 <- \mkclo[mul:b]; \label{mil_arith_mul1}
-    \vbinds t_2 <- \app t_1*c/; \label{mil_arith_mul2}
-    \vbinds t_3 <- \mkclo[add:t_2];
-    \vbinds t_4 <- \app t_3*d/;
-    \vbinds t_5 <- \mkclo[div:t_5];
-    \vbinds t_6 <- \app t_5*2/;
-  \end{AVerb}
-\end{singlespace}
-
-\intent{Explain example, pointing out treatment of allocation.}
-\noindent Line~\ref{mil_arith_mul1} shows \mil's emphasis on
-allocation. \mkclo[mul:b] allocates a closure pointing to \lab mul/
-and capturing the value of the variable \var b/. We make allocation of
-closures a monadic, side-effecting operation by placing \mkclo[mul:b]
-on the \rhs of the monadic binding operator (\mbind). However, we do
-not need to mention the actual address of the locaton \var t_1/, \var
-b/ or even \lab mul/ --- those details are hidden. On
-Line~\ref{mil_arith_mul2}, we represent function application with the
-``enter'' operator, \enter. Line~\ref{mil_arith_mul2} executes the
-multiplication and returns a result, which we store in \var
-t_2/. Though \mil represents function application explicitly, we hide
-implementation details such as stack operations or register spilling. The
-rest of the program executes similarly.
+languages. Though the operations supported by \mil differ from
+traditional three-address code, the intention remains the same: hide
+some details while exposing those we care about.
 
 %% Syntax of MIL
 \section{\Mil Syntax}
@@ -222,7 +185,7 @@ rest of the program executes similarly.
 
 \intent{Introduce \mil syntax.}  Figure \ref{mil_fig3} gives the syntax
 for \mil. Where the term \var v_1/, etc. appears, only simple variables
-are allowed.  This includes most terms in the language, staying true
+are allowed. This includes most terms in the language, staying true
 to the design of three-address code. Bold terms such as \lab b/, \lab
 k/, and \lab m/ represent labeled locations in the \mil program. \var
 C/ represents the name of a data constructor. Bold text such as
@@ -233,74 +196,80 @@ program consists of a number of labeled blocks.
 
 \intent{Describe closure-capturing blocks} \Cc blocks specify an
 environment $\left\{\parstrut\ensurett{v_1, \dots, v_n}\right\}$ and
-an argument, \var v/. \Cc blocks only execute when initiated by the
-\emph{enter} expression, \app f * x/. In \app f * x/, \var f/ refers
-to a closure. The closure will point to a \cc block named \lab k/. The
-environment declared for \lab k/ correspond to the environment
-captured by the closure. The argument \var x/ becomes the argument
-\var v/ declared in the \cc block. Though the syntax for \cc blocks
-allows any \term tail/ in the body of the block, in practice they
-always return a closure or jump to a basic block.
+an argument, \var v/. \Cc blocks only execute when initiated by an
+\emph{enter} expression of the form \app f * x/. In \app f * x/, \var
+f/ refers to a closure that will point to a \cc block named \lab
+k/. The environment declared for \lab k/ corresponds to the
+environment captured by the closure. The argument \var x/ becomes the
+argument \var v/ declared in the \cc block. We chose to only allow a
+single tail expression in the body of a \cc block in order to
+simplify analysis of their behavior.
 
 \intent{Describe basic blocks.} Basic blocks consist of a sequence of
 statements that execute in order without any intra-block jumps or
 conditional branches. Each basic block ends by evaluating a \term
 tail/ or a conditional branch. A block body cannot end with a bind
 statement. The arguments \ensuremath{\ensurett{(v_1, \dots, v_n)}} are
-the only variables in scope while the block executes. The name of the
-block (\lab b/) is global to the program but it cannot be captured in a
-closure (as closures must always refer to \cc blocks). Basic blocks always
-execute as the result of the goto tail expression, \goto b(v_1, \dots, v_n).
+the only variables in scope at the start of the block. The name of the
+block (\lab b/) is global to the program but it cannot be captured in
+a closure (as closures must always refer to \cc blocks). Basic blocks
+always execute as the result of a ``\emph{Goto Block}'' tail
+expression of the form \goto b(v_1, \dots, v_n).
 
-\intent{Describe bind.}
-The bind statement can appear multiple
-times in a block. Each binding assigns the result of the \emph{tail}
-on the \rhs to a variable on the left. If a variable is
-bound more than once, later bindings will shadow previous
-bindings.
+\intent{Describe bind.}  The bind statement can appear multiple times
+in a block. Each binding assigns the result of the \emph{tail} on the
+\rhs to a variable on the left. If a variable is bound more than once,
+later bindings will shadow previous bindings.
 
-\intent{Describe \milres case/.}
-The \milres case/ statement examines a
-discriminant and selects one alternative based on the value found. The
-discriminant is always a simple variable, not an expression. Each
-alternative specifies a \emph{constructor} and
-variables for each value held by the constructor. Alternatives always
-jump immediately to a block --- they do not allow any other statement.
+\intent{Describe \milres case/.}  The \milres case/ statement examines
+a discriminant and selects one alternative based on the value
+found. The discriminant is always a simple variable, not an
+expression. Each alternative specifies a \emph{constructor} and
+variables for each value held by the constructor. No ``default''
+alternative exists --- all possible constructors need to be
+specified. Again, to simplify later analysis, we chose that
+alternatives must always jump immediately to a block --- they do not
+allow any other expression.
 
 \intent{Introduce tail expressions.} \emph{Tail} expressions represent
-effects and always appear on the \rhs of a \mbind statement or at the
-end of a basic block. \milres return/ takes a variable (\emph{not} an
-expression) and makes its value monadic. The ``enter'' operator,
-\enter, implements function application, ``entering'' the closure
-represented by its \lhs with the argument on its \rhs. The \milres invoke/
-operator executes the thunk referred to by its argument (thunks are
-described in Section~\ref{mil_thunks}).
+effects and always appear on the \rhs of a bind statement, at the
+end of a basic block, or as the body of a \cc block. \milres return/
+takes a variable (\emph{not} an expression) and makes its value
+monadic. The ``enter'' operator, \enter, implements function
+application, ``entering'' the closure represented by its \lhs with the
+argument on its \rhs. The \milres invoke/ operator executes the thunk
+referred to by its argument (thunks are described in
+Section~\ref{mil_thunks}).
 
-\intent{Describe goto for blocks and primitives.}  The goto block and
-goto primitive expressions implement labeled jumps with arguments. In
-the first case, \lab b/ represents a labeled block elsewhere in the
-program.  The primitive term, \lab p/\suptt*, is also bolded but does
-not strictly represent a labeled location. Rather, it is treated as a
-labeled location that is implemented outside of \mil. Otherwise,
-primitives are treated like blocks.
+\intent{Describe goto for blocks and primitives.}  The ``\emph{goto
+  block}'' and ``\emph{goto primitive}'' expressions implement labeled
+jumps with arguments. In the first case, \lab b/ represents a labeled
+block elsewhere in the program.  The primitive term, \lab p/\suptt*,
+is also bolded but does not strictly represent a labeled
+location. Rather, it is treated as a labeled location that is
+implemented outside of \mil. Otherwise, primitives are treated like
+blocks.
 
-\intent{Describe closure and thunk allocation.} Closure allocation
-creates a closure pointing the block labelled \lab k/, capturing the
-variables $!+v_1, \dots, v_n+!$. A thunk, details for which can be
-found in Section~\ref{mil_thunks}, is allocated
-similarly. The constructor expression creates a data value with the
-given tag, $!+C+!$, and the variables $!+v_1, \dots, v_n+!$ in the
-corresponding fields.
+\intent{Describe closure and thunk allocation.} Closure allocation,
+written as \mkclo[k:v_1, \dots, v_n], creates a closure pointing to the
+block labelled \lab k/, capturing the variables $\var v_1/, \dots,
+\var v_n/$. A thunk, details for which can be found in
+Section~\ref{mil_thunks}, is allocated similarly. The constructor
+expression $\ensurett{C\ v_1\ \dots\ v_n}$ creates a data value with the
+given tag, $!+C+!$, and the variables $\ensurett{v_1, \dots, v_n}$ in
+the corresponding fields.
 
-\subsection{\Mil Example: \lcname compose/}
-\intent{Show an LC program and its translation in \mil.}  To give a
-sense of \mil, consider the definition of \lcname compose/ given in
-Figure~\ref{mil_fig1a}. Figure~\ref{mil_fig1b} shows a \mil program
-implementing the definition. The three \cc blocks, \lab k1/, \lab k2/
-and \lab k3/ progressivly capture the three arguments \term f/, \term
-g/, and \term x/. \lab k3/ executes when all arguments are captured,
-and immediately jumps to \lab compose/, the block implementing the
-body of \term compose/.
+\subsection*{\Mil Example: \lcname compose/}
+\intent{Show an LC program and its translation in \mil.}  Consider the
+definition of \lcname compose/ given in Figure~\ref{mil_fig1a} and the
+corresponding \mil program in Part~\subref{mil_fig1b}. The three \cc
+blocks, \lab k1/, \lab k2/ and \lab k3/ correspond to the three
+$\lambda$ values $(\lcabs f. \dots)$, $(\lcabs g. \dots)$, and
+$(\lcabs x. \dots)$.  Each block, except \lab k3/, captures a single
+argument and returns a new closure holding previously captured values
+plus the new argument. \lab k3/ executes when all arguments are
+captured, and immediately jumps to \lab compose/, the block
+implementing the body of \term compose/.
 
 The basic block defined on Line~\ref{mil_block_decl_fig1b} gives the
 name of the block (\lab compose/) and arguments that will be passed in
@@ -369,16 +338,6 @@ This notation hides an important detail: in a
 naive implementation of \lamC, each reduction of the form $\lcapp
 (\lcabs x. \dots) * a/$ allocates a closure representing the
 function $(\lcabs x. \dots)$ and its environment. 
-
-As described by Wadler \citeyearpar{Wadler1990}, \emph{monads}
-can be used distinguish \emph{pure} and \emph{impure} functions. A
-\emph{pure} function has no side-effects: it will not print to the
-screen, throw an exception, write to disk, or in any other way change
-the observable state of the machine.\footnote{We mean ``observable''
-  from the program's standpoint. Even a pure computation will generate
-  heat, if nothing else.} An \emph{impure} function may change the
-machine's state in an observable way. We will use a monadic form
-of |compose| to make closure allocation an impure, effectual operation.
 
 \intent{Rewrite |compose| to show monadic effects.}
 Figure~\ref{mil_fig_compose} shows |compose| rewritten in a monadic
@@ -470,10 +429,11 @@ body of \lab k1/ and \lab k2/; the list of values passed as an
 argument to |k_1| and |k_2| correspond to the environment defined for
 the \lab k1/ and \lab k2/ closure-capturing blocks. In
 Figure~\ref{mil_fig_compose}, |k_2| creates a closure pointing to
-|compose|. However, in \mil a closure-capturing block cannot do
-anything but allocate another closure or jump to a block. Therefore,
-in Figure~\ref{mil_fig2}, \lab k2/ refers to \lab k3/, which then
-jumps to \lab compose/.
+|compose|. However, in \mil a closure can only store the label of
+another \cc block. Therefore, since we cannot create a closure
+referring to \lab compose/, \lab k2/ returns a closure refering to
+\lab k3/. Because the body of a \cc block must be a tail, \lab k3/
+jumps immediately to \lab compose/ when executed.
 
 \begin{myfig}[t]
   \input{lst_mil2}

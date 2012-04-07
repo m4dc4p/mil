@@ -1,11 +1,12 @@
 \begin{myfig}
 \begin{centering}\begin{tabular}{r@{}lrl}
+  \termrule variable:\var v_1/, \dots, \var v_n/:Variables/\\\\
   %% The kern below makes the space between "v" and ":" look better.
   \termrule block:{\ccblock k(v_1, \dots, v_n)v\kern.07em:\ \term tail/}:Closure-Capturing Block/\\
   \termcase {\block b(v_1, \dots, v_n):\ \rlap{\begin{minipage}[t]{\widthof{\quad\term stmt_1/}}\disableparspacing;%%
-      \term stmt_1/\endgraf%%
+      \term stmt/\endgraf%%
       $\dots$\endgraf%%
-      \term stmt_n/\end{minipage}}}:Basic Block/\\
+      \term tail/\end{minipage}}}:Basic Block/\\
 
   \termrule stmt:{\binds v\ <-\ \term tail/;}:Bind/ \\
   \termcase {\begin{minipage}[t]{\widthof{\quad\case v;}}\disableparspacing;%%

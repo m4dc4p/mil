@@ -368,7 +368,7 @@
 \newenvironment{withHsLabeled}[1]{\numberson\numbersreset\mkhslabel{#1}}{\unhslabel\numbersoff}
 
 %% Paragraph run-in
-\newcommand{\runin}[1]{\begingroup\noindent\sffamily\textbf{#1}\qquad\endgroup}
+\newcommand{\runin}[1]{\noindent{\sffamily\textbf{#1}}\qquad}
 
 %% Chapter bibliographies
 \newcommand{\standaloneBib}{%%
@@ -443,6 +443,10 @@
 \def\ast{\textsc{ast}\xspace}
 \def\Ast{\textsc{Ast}\xspace}
 \def\algol{\textsc{algol 60}\xspace}
+\def\rtls{\textsc{rtl}s\xspace}
+\def\Rtls{\textsc{Rtl}s\xspace}
+\def\rtl{\textsc{rtl}\xspace}
+\def\Rtl{\textsc{Rtl}\xspace}
 %% Indicates the preamble has been loadd.
 \def\preambleloaded{}
 
