@@ -19,6 +19,9 @@
 \usepackage{xspace}
 \usepackage{url}
 \usepackage{fancyvrb}
+%% Make sure line numbers are printed with math numerals,
+%% not old-style numbers
+\renewcommand{\theFancyVerbLine}{\scriptsize\ensuremath{\number\value{FancyVerbLine}}}
 \usepackage[doublespacing]{setspace}
 %% below only necessary when using doublespacing -- corrects
 %% the vertical space inserted when switching to singlespace
@@ -424,6 +427,15 @@
 
 %% C-- (C minus minus)
 \def\Cmm{C\texttt{-{}-}\xspace}
+
+%% Used above Haskell and MIL code samples in figures; eliminates
+%% extraneous vertical space.  
+\def\elimdisplayskip{\abovedisplayshortskip=0in%
+  \abovedisplayskip=0in%
+  \belowdisplayshortskip=0in%
+  \belowdisplayskip=0in%
+  \parskip=0pt%
+  \vskip-\baselineskip}
 
 %% Abbreviations
 \makeatletter

@@ -880,6 +880,17 @@ monadTest4 = [("monadTest4"
                  mPrint `app` lit 2)]
 
 -- Optimization goes really wrong here.
+{- 
+   monadTest5 = do
+     let f = do
+           () <- print 1
+           return ()
+         g = \_ -> do
+           () <- print 2
+           return ()
+     () <- g f
+     return ()
+-}
 monadTest5 = [("monadTest5"
                , _let "f" (bindE "()" (mPrint `app` lit 1) ret) $ \f ->
                  _let "g" (lam "x" $ \_ -> bindE "()" (mPrint `app` lit 2) ret) $ \g ->
@@ -964,50 +975,14 @@ myConst = [("const",
 
 {- An example to demonstrate uncurrying across case statements.
 
-Incorrectly rewrites :(
+Incorrectly rewrites with uncurrying across blocks.
 
- ========= LambdaCase =================
-uncurry4 = let val mapCap :: #.t
-                 = (\xs :: #.t -> (\t :: #.t -> (\f :: #.t -> ((f xs) t))))
-in let val map1 :: #.t
-         = (mapCap xs) in case 1 of
-                            1 -> ((map1 t) f)
-
- ========= Unoptimized MIL ============
-L200 uncurry4 (t, f, xs):
-  mapCap <- letBodymapCapL201()
-  map1 <- letBodymap1L207(mapCap, xs)
-  result213 <- caseEvalL211(map1, t, f)
-  return result213
-L201 letBodymapCapL201 (): closure absBodyL202 {}
-L202 absBodyL202 {} xs: closure absBodyL203 {xs}
-L203 absBodyL203 {xs} t: closure absBodyL204 {xs, t}
-L204 absBodyL204 {xs, t} f: absBlockL205(xs, t, f)
-L205 absBlockL205 (xs, t, f):
-  v206 <- f @ xs
-  v206 @ t
-L207 letBodymap1L207 (mapCap, xs): mapCap @ xs
-L208 altBody1L208 (map1, t, f):
-  v209 <- map1 @ t
-  v210 <- v209 @ f
-  return v210
-L211 caseEvalL211 (map1, t, f):
-  v212 <- num 1
-  case v212 of 1 -> altBody1L208(map1, t, f)
-
- ========= Optimized MIL ==============
-L200 uncurry4 (t, f, xs):
-  map1 <- closure absBodyL203 {xs}
-  caseEvalL211(map1, t, f)
-L203 absBodyL203 {xs} t: closure absBodyL204 {xs, t}
-L204 absBodyL204 {xs, t} f: absBlockL205(xs, t, f)
-L205 absBlockL205 (xs, t, f):
-  v206 <- f @ xs
-  v206 @ t
-L208 altBody1L208 (map1, t, f): absBlockL205(xs, t, f)
-L211 caseEvalL211 (map1, t, f):
-  v212 <- num 1
-  case v212 of 1 -> altBody1L208(map1, t, f)
+uncurry4 = 
+  let cap = \ys -> \g -> \v -> g (v  ys)
+      cap1 = cap xs
+  in case t of
+       True -> cap1 (f y)
+       False -> cap1 (f n)
 
 -}
 uncurry4 = [("uncurry4",

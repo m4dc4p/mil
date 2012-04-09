@@ -89,7 +89,7 @@ EBind evaluates its right-hand side as a monadic value. Therefore, the
 translated code for the monadic expression will evaluate to a monadic
 thunk. 
 
-> compileStmt bind@(EBind (Ident v _) _ _ _) ctx = withFree (return . delete v) $ \fvs -> do
+> compileStmt bind@(EBind (Ident v _) _ action rest) ctx = withFree (const (return $ bindFree v action rest)) $ \fvs -> do
 >   dest <- blockDefn "m" fvs $ \n l -> do
 >     let compM (EBind (Ident v _) _ b r) = withFree (return . delete v) $ \_ -> do
 >           rest <- compM r 
@@ -97,6 +97,8 @@ thunk.
 >         compM e = compResultVar e (\v -> return (mkLast (Done n l (Run v))))
 >     compM bind 
 >   ctx (Thunk dest fvs)
+>   where
+>     bindFree v action rest = delete v (nub (free action ++ free rest))
 
 An EVar term, in this case, must appear in "variable" position or it 
 would be handled by EApp, EBind, or other terms. Therefore, we apply
@@ -220,7 +222,7 @@ I report an error if the situation occurs.
 >       rest <- compVars ds 
 >       compBody name letBody $ \t -> do
 >         return (mkMiddle (Bind name t) <*> rest)
->     compBody :: Var -> Either (String, [Type]) Expr -> (Var -> ProgM O C) -> ProgM O C
+>     compBody :: Var -> Either (String, [Type]) Expr -> (Tail -> CompM (ProgM O O)) -> CompM (ProgM O O)
 >     compBody name (Right body) ctx = withFree (const (return $ free body)) $ \lfvs -> do
 >       -- Determine free variables
 >       -- Create a block taking all free variables
@@ -230,8 +232,10 @@ I report an error if the situation occurs.
 >       letDest <- blockDefn (mkName "letBody" name) lfvs (\ln ll ->
 >                    compileStmt body (return . mkLast . Done ln ll))
 >       ctx (Goto letDest lfvs)
->     compBody name (Left (prim, typs)) ctx = 
->       compileStmt (EPrim prim (error "evaluated type") (error "evaluated types")) ctx
+>     compBody name (Left (prim, typs)) ctx = do
+>       dest <- getDestOfName prim
+>       when (isNothing dest) (error $ "primitive " ++ prim ++ " not defined.")
+>       ctx (Goto (fromJust dest) [])
 
 > compileStmt (ENat n) ctx
 >   = ctx (LitM n)

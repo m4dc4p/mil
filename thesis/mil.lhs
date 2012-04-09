@@ -5,7 +5,6 @@
 %include subst.fmt
 \begin{document}
 \input{document.preamble}
-
 \chapter{A Monadic Intermediate Language}
 \label{ref_chapter_mil}
 
@@ -140,15 +139,15 @@ programs such that all operations specify at most two operands and a
 single destination. Three-address code hides details of memory
 management by assuming that infinitely many storage locations can be
 named and updated. For example, the expression:
-
-\begin{singlespace}\correctspaceskip
+%
+\begin{singlespace}
   \begin{equation*}
     \frac{(b * c + d)}{2},
   \end{equation*}
 \end{singlespace}
-
+%
 \noindent could be expressed in three-address code as:
-
+%
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
     \vbinds t_1<-mul b c;
@@ -156,7 +155,7 @@ named and updated. For example, the expression:
     \vbinds t_3<-div t_2 2;
   \end{AVerb}
 \end{singlespace}
-
+%
 \noindent where \var t_1/, \var t_2/ and \var t_3/ represent temporary
 storage locations and \var mul/, \var add/, and \var div/ represent
 the corresponding arithmetic operation.
@@ -508,46 +507,35 @@ invoked before the computation will produce a result.
 
 \intent{Show how \mil thunks are used.}  To illustrate, consider the
 \lamC functions in Figure~\ref{mil_fig_hello_a}.\footnote{Again, some
-  syntactic liberties are taken.} Part~\subref{mil_fig_hello_b} shows
-the corresponding \mil code for each. On
-Line~\ref{mil_fig_thunk_hello}, \lab echoMon/ returns a thunk pointing
-to \lab echo/. Like a closure, the thunk captures the environment of
-the computation. In this case, \lab echoMon/ captures |a|, the sole
-argument to |echo|. The block \lab echo/ represents the body of
-|echo|; it calls the primitive \primlab print/. The \lab main/ block,
-however, shows how we invoke the thunk returned by \lab echoMon/. On
-Line~\ref{mil_fig_get_hello1}, \lab echoMon/ is called, and the thunk
-returned is bound to the variable \var t1/. On the next line, the
-thunk is invoked. Invoking the thunk causes the block \lab echo/ to
-execute. Lines~\ref{mil_fig_get_hello2} and
-\ref{mil_fig_invoke_hello2} show the same operation again (though with
-the \var b/ argument this time). 
+  syntactic liberties are taken.} The |echo| function prints its
+argument to the screen. The \hsdo keyword shows that |echo| is a monadic
+program. The |main| function uses a \hslet statment to assign |m| the value
+|echo a|. Notice this does \emph{not} evaulate |echo a|; instead, |m| is a thunk
+that points to the |echo| function and that captures the value of |x|. 
 
 \begin{myfig}
   \begin{tabular}{cc}
-    \begin{minipage}[t]{\widthof{|hello = print "hello"|}}
+    \begin{minipage}[t]{2in}\elimdisplayskip%
 > echo a = do
 >   print a
-    \end{minipage} &     
-    \begin{minipage}[t]{\widthof{\ \ \binds \_ <- \invoke v207/;}}
-      \begin{AVerb}[gobble=8,numbers=left]
-        \block echoMon(a): \mkthunk[echo:a] \label{mil_fig_thunk_hello}
-        \block echo(a):
-          \prim print(a)
-      \end{AVerb} 
-    \end{minipage} \\
-    \begin{minipage}[t]{\widthof{|hello = print "hello"|}}
-> main a b = do
->   echo a
->   echo b
     \end{minipage} &
-    \begin{minipage}[t]{\widthof{\ \ \binds \_ <- \invoke v207/;}}
+    \begin{minipage}[t]{2in}\elimdisplayskip
+      \begin{AVerb}[gobble=8,numbers=left]
+        \block echo(a): \prim print(a) \label{mil_fig_echo}
+      \end{AVerb}
+    \end{minipage} \\\\
+    \begin{minipage}[t]{2in}\elimdisplayskip%
+> main x = do
+>   let m = echo x
+>   m
+>   m
+    \end{minipage} &     
+    \begin{minipage}[t]{2in}\elimdisplayskip
       \begin{AVerb}[gobble=8,numbers=left,firstnumber=last]
-        \block main(a, b): 
-          \vbinds t1 <- \goto echoMon(a); \label{mil_fig_get_hello1}
-          \vbinds \_ <- \invoke t1/; \label{mil_fig_invoke_hello1}
-          \vbinds t2 <- \goto echoMon(b); \label{mil_fig_get_hello2}
-          \vbinds \_ <- \invoke t2/; \label{mil_fig_invoke_hello2}
+        \block main(x): 
+          \vbinds m <- \mkthunk[echo:x]; \label{mil_fig_mkthunk}
+          \vbinds \_ <- \invoke m/; \label{mil_fig_invoke1}
+          \vbinds \_ <- \invoke /; \label{mil_fig_invoke2}
       \end{AVerb}
     \end{minipage} \\
     \scap{mil_fig_hello_a} & \scap{mil_fig_hello_b}
@@ -558,29 +546,37 @@ the \var b/ argument this time).
   \label{mil_fig_hello}
 \end{myfig}
 
-\Mil executes all \lamC monadic expressions using the same pattern:
-first, a monadic thunk is created; second, the thunk is
-invoked. Though we did not illustrate it in our example, a monadic
-thunk is a first class value. \Mil programs do not always create and
-then immediately invoke thunks.
+Part~\subref{mil_fig_hello_b} shows the corresponding \mil code for
+|echo| and |main|. The \lab echo/ block on Line~\ref{mil_fig_echo}
+merely executes the primitive \primlab print/. The \lab main/ block,
+however, shows how we allocate and invoke a
+thunk. Line~\ref{mil_fig_mkthunk} allocates the thunk referring to
+\lab echo/ and capturing \var x/. The thunk is bound to \var
+m/. Lines~\ref{mil_fig_invoke1} and \ref{mil_fig_invoke2} invoke the
+thunk causing \lab echo/ to execute twice. Notice we do not allocate
+the thunk again --- only one allocation occurs, but we run the \app
+\lab echo/ * x/ ``program'' twice.
 
 \section{Compiling \lamC to \mil}
 \label{mil_sec4}
 
-\intent{Explain why we don't show the whole compiler.}  The compiler
-we implemented followed the style used by Kennedy \citep{KennedyCont},
-and in most cases it does not differ much from numerous other
-compilers translating the \lamA to a given intermediate form. However,
-we will highlight some nuances of our translation.
+\intent{Explain why we don't show the whole compiler.}  We implemented
+a simple compiler from \lamC to \Mil in order to implement and test
+the optimizations discussed later in this work. The compiler's implementation follows
+the style used by Kennedy \citep{KennedyCont}, and in most cases it
+does not differ much from numerous other compilers translating the
+\lamA to a given intermediate form. However, we will highlight some
+nuances of our translation.
 
 \intent{Show how $\lambda$-abstractions are translated.}  Consider
 again the definition of |compose| in Figure~\ref{mil_fig1a} on
 Page~\pageref{mil_fig1}. Our compiler translates each $\lambda$,
-except the last, to a block that returns a closure. The final
-$\lambda$ translates to a block that immediately jumps to the the
-implementation of the function. This gives the sequence of blocks
-shown in Figure~\ref{mil_fig2} on Page~\pageref{mil_fig2} (excepting
-\lab main/, of course), and allows \mil to support partial application.
+except the innermost (\lcabs x.\dots/), to a block that returns a
+closure. The innermost $\lambda$ translates to a block that immediately
+jumps to an implementation of the body of |compose|. This gives the
+sequence of blocks shown in Figure~\ref{mil_fig2} on
+Page~\pageref{mil_fig2} (excepting \lab main/, of course), and allows
+\mil to support partial application.
 
 \intent{Point out how we rely on uncurrying to make this code
   performant.}  While general, this strategy produces code that does a
@@ -590,7 +586,7 @@ blocks, and potentially copy arguments between closures numerous
 times. Our uncurrying optimization
 (Chapter~\ref{ref_chapter_uncurrying}) can collapse this work to one
 closure, one jump and no argument copying in many cases. Therefore,
-generating simple (and easy to analyze) code seemed a reasonable
+generating simple (and easy to analyze) code is a reasonable
 tradeoff.
 
 \intent{Explain how we know when to create a thunk versus executing
@@ -601,59 +597,70 @@ monadic expression, it generates a block that returns a thunk. The
 block pointed to by the thunk executes the monadic expression. 
 
 \intent{Show where a thunk is created in |kleisli|.}  The code shown
-for |kleisli| in Figure~\ref{mil_fig_kleisli_b} on
-Page~\pageref{mil_fig_kleisli} illustrates this strategy. Block \lab
-m205/ executes the body of |kleisli|. However, nothing calls \lab
-m205/ directly. Instead, block \lab b204/ returns a thunk that points
-to \lab m205/. \lab b204/ only executes after all arguments for
-|kleisli| are collected; \lab m205/ can only execute by invoking the
-thunk returned by \lab b204/.
-
-\intent{Explain how compiler changes strategy when translating a
-  monadic expression.}  While the compiler follows the strategy above
-when it first encountes a monadic expresssion, it changes strategy
-when compiling the body of that expression. The compiler assumes a
-monadic expression consists of a sequence of ``monadic-valued''
-statements.  In |x <- e|, |e| produces a monadic value. Any other
-expression (such as ``|f g|'' or ``|case e of {-"\dots"-}|'') should
-also evaluate to a monadic value.
+for |kleisli| in Figure~\ref{mil_fig_kleisli} illustrates this
+strategy. The |kleisli| function in Part~\ref{mil_fig_kleisli_a}
+implements \emph{monadic} composition, where |f| and |g| produce
+monadic results. Part~\ref{mil_fig_kleisli_a} shows a \mil
+implementation of |kleisli|. Block \lab m205/ on
+Line~\ref{mil_fig_kleisli_m205} executes the body of
+|kleisli|. However, no blocks call \lab m205/ directly. Instead, block
+\lab b204/ on Line~\ref{mil_fig_kleisli_b204} returns a thunk that
+points to \lab m205/ and captures all the arguments to \lab m205/
+(\var g/, \var f/, and \var x/). \lab b204/ only executes after all
+arguments for |kleisli| are collected; \lab m205/ can only execute by
+invoking the thunk returned by \lab b204/.
 
 \begin{myfig}
-  \begin{tabular}{c}
-    \begin{minipage}[t]{\widthof{\ \ \binds v1 <- \invoke v207/;}}
+  \begin{tabular}{cc}
+    \begin{minipage}[t]{2in}\disableoverfull\elimdisplayskip
+> kleisli f g x = do
+>   v <- g x
+>   f v
+    \end{minipage} &
+    \begin{minipage}[t]{2in}\disableoverfull\elimdisplayskip
       \begin{AVerb}[gobble=8,numbers=left]
-        \block m205(g, x, f):
+       \block kleisli(): \mkclo[k201:]
+       \ccblock k201()f: \mkclo[k202:f]
+       \ccblock k202(f)g: \mkclo[k203:g, f]
+       \ccblock k203(g, f)x: \goto b204(g, x, f)
+       \block b204(g, x, f): \mkthunk[m205:g, x, f] \label{mil_fig_kleisli_b204}
+
+       \block m205(g, x, f): \label{mil_fig_kleisli_m205}
           \vbinds v207 <- \app g*x/;
           \vbinds v1 <- \invoke v207/;
           \vbinds v206 <- \app f*v1/; \label{mil_fig_kleisli_f_app}
           \invoke v206/ \label{mil_fig_kleisli_result}
-      \end{AVerb}
-    \end{minipage}
+      \end{AVerb} 
+    \end{minipage} \\
+      \scap{mil_fig_kleisli_a} & \scap{mil_fig_kleisli_b}
   \end{tabular}
-  \caption{The \mil implemention of the |kleisli| function from
-    Figure~\ref{mil_fig_kleisli_a}. Here, we only show the main body
-    of the function; the other blocks are shown in
-    Figure~\ref{mil_fig_kleisli_b}.}
-  \label{mil_fig_kleisli_body}
+  \caption{Part~\subref{mil_fig_kleisli_a} shows a \lamC implementation
+    of the monadic composition function (sometimes called ``Kleisli 
+    composition''). Part~\subref{mil_fig_kleisli_b} shows a \mil 
+    implementation of the same function.}
+  \label{mil_fig_kleisli}
 \end{myfig}
 
-\intent{Show how the compiler translates a non-bind expression using
-  |f v| in |kleisli|.}  The body of the |kleisli| fucntion shown in
-Figure~\ref{mil_fig_kleisli_body} illustrates this principle. |kleisli|
-ends with |f v|, an application that must produce a monadic result. We also
-expect that result to be evaluated.\footnote{Imagine if |f| were
-  |print| -- then ``|print x|'' should print!} The statements on
-Lines~\ref{mil_fig_kleisli_f_app} and \ref{mil_fig_kleisli_result}
-evaluate the application, assign the thunk returned to \var v206/, and
-then execute that thunk. In essence, the compiler translates |kleisli|
-as if it ended with a bind followed by a |return|:
+\intent{Explain how compiler changes strategy when translating a
+  monadic expression.}  While the compiler follows the strategy above
+when it first encountes a monadic expresssion, it changes strategy
+when compiling binding statements that follow the initial monadic
+expression. Instead of generating code that returns a suspended
+computation, the compiler switches to generating code the invokes all
+subsequent monadic values.
 
-\begin{singlespace}
-> kleisli f g x = do
->   y <- g x
->   t <- f y
->   return t
-\end{singlespace}
+\intent{Show how the compiler translates a non-bind expression using
+  |f v| in |kleisli|.}  The block \lab m205/ in
+Figure~\ref{mil_fig_kleisli_b} (representing the body of the |kleisli|
+function) illustrates this principle. Though |kleisli| ends with a
+monadic expression (|f v|), it does not return a suspended computation
+representing |f v|; it returns the result of executing |f v|. The
+statement on Line~\ref{mil_fig_kleisli_f_app} evaluate \app f * v1/
+and assigns the result to \var v206/. Crucially, the next line invokes
+the thunk, immediately executing the program returned by \app f *
+v1/. This is a case where the compiler generates code to execute a
+sequence of monadic values, rather than code which returns a suspended
+computation.
 
 \section{Executing \mil Programs}
 \label{mil_sec5}

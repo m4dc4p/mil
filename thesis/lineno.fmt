@@ -47,7 +47,7 @@
     \ifthenelse{\value{linestep}<\linenumstep}{}{%
       \formatlinenum{\thelinenum}%
       \setcounter{linestep}{0}}}}
-\newcommand*{\formatlinenum}[1]{\makebox[\linenumwidth][\linenumalign]{\ \,{\rmfamily\tiny #1}\ \,}}
+\newcommand*{\formatlinenum}[1]{\makebox[\linenumwidth][\linenumalign]{\ \,{\rmfamily\scriptsize\ensuremath{#1}}\ \,}}
 \newcommand*{\numberwidth}[1]{\def\linenumwidth{#1}}
 \numberwidth{0pt}
 \newcommand*{\numberstep}[1]{\def\linenumstep{#1}}
