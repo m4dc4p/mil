@@ -207,16 +207,20 @@ I report an error if the situation occurs.
 >   when (isNothing dest) (error $ "primitive " ++ p ++ " not defined.")
 >   ctx (Goto (fromJust dest) [])
 
-> compileStmt (ELet (Decls defs) outerBody) ctx = compVars (getDefns defs)
+> compileStmt (ELet (Decls defs) outerBody) ctx = do
+>     rest <- compileStmt outerBody ctx
+>     binds <- compVars (getDefns defs)
+>     return (binds <*> rest)
 >   where
+>     compVars :: [Defn] -> CompM (ProgM O O)
 >     compVars [Defn (Ident name _) _ letBody] = 
 >       compBody name letBody $ \t -> do
->         rest <- compileStmt outerBody ctx
->         return (mkMiddle (Bind name t) <*> rest)
+>         return (mkMiddle (Bind name t))
 >     compVars (Defn (Ident name _) _ letBody : ds) = do
 >       rest <- compVars ds 
 >       compBody name letBody $ \t -> do
 >         return (mkMiddle (Bind name t) <*> rest)
+>     compBody :: Var -> Either (String, [Type]) Expr -> (Var -> ProgM O C) -> ProgM O C
 >     compBody name (Right body) ctx = withFree (const (return $ free body)) $ \lfvs -> do
 >       -- Determine free variables
 >       -- Create a block taking all free variables

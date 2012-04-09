@@ -469,26 +469,26 @@ another sense, also described in Wadler's \citeyear{Wadler1990} paper,
 a monadic value represents a \emph{computation}. Where a pure function
 evaluates to a ``pure'' value that is immediately available, a monadic
 function gives back a suspended computation that we need to execute
-before we can get to the value ``inside'' the computation.
+before we can get to the value ``inside'' the computation. We can also
+execute the same computation multiple times, potentially producing a different
+value each time.
 
 \intent{Contrast pure and monadic values.}  Consider the \lamC
 functions in Figure~\ref{mil_fig_monadic}.\footnote{Some syntactic
   liberties have been taken here. \lamC only supports monadic binding,
-  so ``|print 0|'' really represents ``|_ <- print 0|.'' Integers are not
-  directly part of the language, either.} Neither takes any arguments
-and they ostensibly produce the same number. Of course, the value
-produced by the pure function in
+  so ``|print a|'' really represents ``|_ <- print 0|.''} Neither
+takes any arguments and they ostensibly produce the same number. Of
+course, the value produced by the pure function in
 Part~\subref{mil_fig_monadic_pure} differs markedly from that produced
-by the impure function in
-Part~\subref{mil_fig_monadic_comp}. 
+by the impure function in Part~\subref{mil_fig_monadic_comp}.
 
 \begin{myfig}
   \begin{tabular}{cc}
-    |f = 1| & 
+    |id a = a| & 
     \begin{minipage}{1.5in}\disableoverfull
-> m = do 
->   print 0
->   return 1
+> printId a = do 
+>   print a
+>   return a
     \end{minipage} \\
     \scap{mil_fig_monadic_pure} & \scap{mil_fig_monadic_comp}
   \end{tabular}
@@ -498,55 +498,55 @@ Part~\subref{mil_fig_monadic_comp}.
   \label{mil_fig_monadic}
 \end{myfig}
 
-\intent{Introduce monadic thunks.}  Intuitively, |f| returns an
-integer, but |m| returns a \emph{computation}. We call this
-computation a \emph{monadic thunk}, as coined in the Habit Compiler
-Report \citep{HabitComp2010}. Traditionally, thunks represent
-\emph{suspended} computation. We use it in the same sense here, in
-that |m| evaluates to a program that we can invoke; moreover,
-evaluating |m| alone will \emph{not} invoke the computation --- |m|
-must be evaluated and then invoked before the computation will produce
-a result. 
+\intent{Introduce monadic thunks.}  Intuitively, |id| returns |a|, but
+|printId| returns a \emph{computation}. We call this computation a
+\emph{monadic thunk}. Traditionally, thunks represent \emph{suspended}
+computation. We use it in the same sense here, in that |printId| evaluates
+to a program that we can invoke; moreover, evaluating |printId| alone will
+\emph{not} invoke the computation --- |printId| must be evaluated and then
+invoked before the computation will produce a result.
 
 \intent{Show how \mil thunks are used.}  To illustrate, consider the
 \lamC functions in Figure~\ref{mil_fig_hello_a}.\footnote{Again, some
   syntactic liberties are taken.} Part~\subref{mil_fig_hello_b} shows
 the corresponding \mil code for each. On
-Line~\ref{mil_fig_thunk_hello}, \lab hello/ returns a thunk pointing to
-\lab m/. \lab m/ represents the body of |hello|; it calls
-primitives which we elide. The \lab main/ block, however, shows how we
-invoke the thunk returned by \lab hello/. On
-Line~\ref{mil_fig_get_hello1}, \lab hello/ is called, and the thunk
+Line~\ref{mil_fig_thunk_hello}, \lab echoMon/ returns a thunk pointing
+to \lab echo/. Like a closure, the thunk captures the environment of
+the computation. In this case, \lab echoMon/ captures |a|, the sole
+argument to |echo|. The block \lab echo/ represents the body of
+|echo|; it calls the primitive \primlab print/. The \lab main/ block,
+however, shows how we invoke the thunk returned by \lab echoMon/. On
+Line~\ref{mil_fig_get_hello1}, \lab echoMon/ is called, and the thunk
 returned is bound to the variable \var t1/. On the next line, the
-thunk is invoked. Lines~\ref{mil_fig_get_hello2} and
-\ref{mil_fig_invoke_hello2} show the same operation again. In other
-words, \lab main/ executes the \lab hello/ function twice, producing
-an effect each time.
+thunk is invoked. Invoking the thunk causes the block \lab echo/ to
+execute. Lines~\ref{mil_fig_get_hello2} and
+\ref{mil_fig_invoke_hello2} show the same operation again (though with
+the \var b/ argument this time). 
 
 \begin{myfig}
   \begin{tabular}{cc}
     \begin{minipage}[t]{\widthof{|hello = print "hello"|}}
-> hello = do
->   print 0
+> echo a = do
+>   print a
     \end{minipage} &     
     \begin{minipage}[t]{\widthof{\ \ \binds \_ <- \invoke v207/;}}
       \begin{AVerb}[gobble=8,numbers=left]
-        \block hello(): \mkthunk[m:] \label{mil_fig_thunk_hello}
-        \block m():
-          \ldots
+        \block echoMon(a): \mkthunk[echo:a] \label{mil_fig_thunk_hello}
+        \block echo(a):
+          \prim print(a)
       \end{AVerb} 
     \end{minipage} \\
     \begin{minipage}[t]{\widthof{|hello = print "hello"|}}
-> main = do
->   hello
->   hello
+> main a b = do
+>   echo a
+>   echo b
     \end{minipage} &
     \begin{minipage}[t]{\widthof{\ \ \binds \_ <- \invoke v207/;}}
-      \begin{AVerb}[gobble=8,numbers=left]
-        \block main(): 
-          \vbinds t1 <- \goto hello(); \label{mil_fig_get_hello1}
+      \begin{AVerb}[gobble=8,numbers=left,firstnumber=last]
+        \block main(a, b): 
+          \vbinds t1 <- \goto echoMon(a); \label{mil_fig_get_hello1}
           \vbinds \_ <- \invoke t1/; \label{mil_fig_invoke_hello1}
-          \vbinds t2 <- \goto hello(); \label{mil_fig_get_hello2}
+          \vbinds t2 <- \goto echoMon(b); \label{mil_fig_get_hello2}
           \vbinds \_ <- \invoke t2/; \label{mil_fig_invoke_hello2}
       \end{AVerb}
     \end{minipage} \\
@@ -558,41 +558,11 @@ an effect each time.
   \label{mil_fig_hello}
 \end{myfig}
 
-\intent{Monadic thunks are like closures; but \cc blocks for thunks do
-  not exist.}  Thunks can capture variables just like closures, but
-unlike closures they are not progressively ``built up'' across
-multiple blocks. Figure~\ref{mil_fig_kleisli} illustrates this
-concept. Part~\subref{mil_fig_kleisli_a} shows the monadic, or
-``Kleisli,'' composition function. Part~\subref{mil_fig_kleisli_b}
-shows the corresponding \mil code. The blocks \lab k201/, \lab k202/,
-and \lab k203/ progressively capture the arguments to |kleisli|. \lab
-b204/ constructs the thunk for |kleisli|, but only after all arguments
-have been captured. The block \lab m205/ implements the body of
-|kleisli| and is shown in Figure~\ref{mil_fig_kleisli_body} rather
-than here.
-
-\begin{myfig}
-  \begin{tabular}{cc}
-    \begin{minipage}[t]{2in}\disableoverfull
-> kleisli f g x = do
->   v <- g x
->   f v
-    \end{minipage} & \begin{minipage}[t]{\widthof{\ \ \block b204 (g, x, f): \mkthunk[m205:g, x, f]}}\disableoverfull
-      \begin{AVerb}[gobble=8,numbers=left]
-        \block kleisli(): \mkclo[k201:]
-        \ccblock k201()f: \mkclo[k202:f]
-        \ccblock k202(f)g: \mkclo[k203:g, f]
-        \ccblock k203(g, f)x: \goto b204(g, x, f)
-        \block b204(g, x, f): \mkthunk[m205:g, x, f]
-      \end{AVerb}
-    \end{minipage} \\
-    \scap{mil_fig_kleisli_a} & \scap{mil_fig_kleisli_b} \\
-  \end{tabular}
-  \caption{Part~\subref{mil_fig_kleisli_a} shows a monadic composition function 
-    (also known as ``Kleisli'' composition). Part~\subref{mil_fig_kleisli_b} shows
-  a \mil program representing the same function.}
-  \label{mil_fig_kleisli}
-\end{myfig}
+\Mil executes all \lamC monadic expressions using the same pattern:
+first, a monadic thunk is created; second, the thunk is
+invoked. Though we did not illustrate it in our example, a monadic
+thunk is a first class value. \Mil programs do not always create and
+then immediately invoke thunks.
 
 \section{Compiling \lamC to \mil}
 \label{mil_sec4}

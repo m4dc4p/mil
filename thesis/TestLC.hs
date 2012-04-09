@@ -1072,6 +1072,13 @@ mil_print = [("hello", bindE "_" (mPrint `app` lit 0) $ \_ -> ret mkUnit)
                     bindE "_" (var "hello") $ \_ -> 
                     bindE "_" (var "hello") $ \_ -> ret mkUnit)]
 
+mil_print_let = [("echo", lam "a" $ \a ->
+                    bindE "_" (mPrint `app` a) $ \_ -> ret mkUnit)
+                ,("main", lam "a" $ \a -> 
+                    _let "m" (bindE "_" (var "echo" `app` a) $ \_ -> ret mkUnit) $ \m ->
+                      bindE "_" m $ \_ ->
+                      bindE "_" m $ \_ -> ret mkUnit)]
+
 mil_twice = [("twice", 
                      lam "f" $ \f ->
                      lam "x" $ \x -> 
