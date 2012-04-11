@@ -4,12 +4,11 @@
   %% The kern below makes the space between "v" and ":" look better.
   \termrule block:{\ccblock k(v_1, \dots, v_n)v\kern.07em:\ \term tail/}:Closure-Capturing Block/\\
   \termcase {\block b(v_1, \dots, v_n):\ \rlap{\begin{minipage}[t]{\widthof{\quad\term stmt_1/}}\disableparspacing;%%
-      \term stmt/\endgraf%%
+      {\binds v\ <-\ \term tail/;}\endgraf%%
       $\dots$\endgraf%%
-      \term tail/\end{minipage}}}:Basic Block/\\
+      \term end/\end{minipage}}}:Basic Block/\\
 
-  \termrule stmt:{\binds v\ <-\ \term tail/;}:Bind/ \\
-  \termcase {\begin{minipage}[t]{\widthof{\quad\case v;}}\disableparspacing;%%
+  \termrule end:{\begin{minipage}[t]{\widthof{\quad\case v;}}\disableparspacing;%%
       \case v;\endgraf%%
       \quad \term alt_1/\endgraf%%
       \quad $\dots$\endgraf%%
