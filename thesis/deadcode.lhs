@@ -144,8 +144,8 @@ eliminates it. Figure \ref{fig_dead3} shows the final program.
 As eluded to in this chapter's introduction, we can only eliminate
 bindings that do not have any side-effects (except
 allocation). Fortunately, all bindings with side-effects in MIL will
-use the |Run| statement. As long as a binding does not takes its value
-from a |Run| statement, it can be eliminated.
+use the |Invoke| statement. As long as a binding does not takes its value
+from a |Invoke| statement, it can be eliminated.
 
 \subsection*{Implementation}
 

@@ -45,7 +45,7 @@ shows how \mil treats monadic programs as suspended
 computations. Section~\ref{mil_sec4} highlights some of the subtler
 points in our translation strategy from \lamC to \mil. We sketch how
 \mil programs can be evaluated in Section~\ref{mil_sec5}. Section
-\ref{mil_sec7} shows how \hoopl influenced the AST we used to
+\ref{mil_sec7} shows how \hoopl influenced the \ast we used to
 rerpresent \mil programs. We conclude in Section~\ref{mil_sec6}.
 
 \section{Source Language: \lamC}
@@ -619,20 +619,21 @@ invoking the thunk returned by \lab b204/.
     \end{minipage} &
     \begin{minipage}[t]{2in}\disableoverfull\elimdisplayskip
       \begin{AVerb}[gobble=8,numbers=left]
-       \block kleisli(): \mkclo[k201:]
-       \ccblock k201()f: \mkclo[k202:f]
-       \ccblock k202(f)g: \mkclo[k203:g, f]
-       \ccblock k203(g, f)x: \goto b204(g, x, f)
-       \block b204(g, x, f): \mkthunk[m205:g, x, f] \label{mil_fig_kleisli_b204}
+        \block kleisli(): \mkclo[k201:]
+        \ccblock k201()f: \mkclo[k202:f]
+        \ccblock k202(f)g: \mkclo[k203:g, f]
+        \ccblock k203(g, f)x: \goto b204(g, x, f)
+        \block b204(g, x, f): \mkthunk[m205:g, x, f] \label{mil_fig_kleisli_b204}
 
-       \block m205(g, x, f): \label{mil_fig_kleisli_m205}
-          \vbinds v207 <- \app g*x/;
-          \vbinds v1 <- \invoke v207/;
-          \vbinds v206 <- \app f*v1/; \label{mil_fig_kleisli_f_app}
+        \block m205(g, x, f): \label{mil_fig_kleisli_m205}
+          \vbinds v207<- \app g*x/;
+          \vbinds v1<- \invoke v207/;
+          \vbinds v206<- \app f*v1/; \label{mil_fig_kleisli_f_app}
           \invoke v206/ \label{mil_fig_kleisli_result}
       \end{AVerb} 
+    \medskip
     \end{minipage} \\
-      \scap{mil_fig_kleisli_a} & \scap{mil_fig_kleisli_b}
+    \scap{mil_fig_kleisli_a} & \scap{mil_fig_kleisli_b}
   \end{tabular}
   \caption{Part~\subref{mil_fig_kleisli_a} shows a \lamC implementation
     of the monadic composition function (sometimes called ``Kleisli 
@@ -665,25 +666,24 @@ computation.
 \section{Executing \mil Programs}
 \label{mil_sec5}
 
-\intent{Introduce \mil execution model.}  \Mil derives its syntax and
-intention from three-address code, an intermediate form normally
-associated with imperitave, procedural programming languages such as
-C. Three-address code, like other register-transfer languages, closely
-resembles assembly language code. The execution model for \mil draws on
-its three-address code inspiration and executes like an
-assembly-language for a simple register-based computer: execution
-begins at a special designated point in the program and proceeds
-sequentially. When the first block executed in the program
-``returns,'' the program terminates.
+\intent{Introduce \mil execution model.}  As stated in
+Section~\ref{mil_sec3}, \mil's design borrows heavily from
+three-address code, an intermediate form normally associated with
+imperative programming languages that closely resembles assembly
+language code. The execution model for \mil draws on its three-address
+code inspiration and executes like an assembly-language for a simple
+register-based computer: execution begins at a special designated
+point in the program and proceeds sequentially. When the first block
+executed in the program ``returns,'' the program terminates.
 
 \intent{Describe blocks as functions; argument scope; blocks always
   ``return.''}  Unlike assembly-language, \mil blocks also act like
 functions. Each block declares arguments (\cc blocks have arguments in
 their environment) and those names are only in scope over the
-block. The value of the last statement in a given block is returned to
-the block's caller. If that statement is a goto, enter (\enter),
-\invoke/, or \milres case/ statement, then the return value of the
-called block will become the return value of the current block.
+block. Blocks always return a monadic value. Closure, thunk and data
+allocations already create monadic values. The \return/ keyword makes
+a pure value monadic. The value produced by the last statement in a
+given block is returned to the block's caller. 
 
 \intent{Describe variable scope; storage locations are local.}  Within
 each block, any number of storage locations may be named on the \lhs
@@ -693,24 +693,23 @@ affect each other. Values can only be passed from one block to another
 as arguments, in a closure, or in a monadic thunk.
 
 \intent{Describe control-flow on the \rhs of a bind.}  When an \enter,
-\invoke/, or goto expression appears on the \rhs of a bind
-statement, control-flow transfers to the appropriate block. For \enter
-and \invoke/, the label stored in the closure or thunk determines the
-block to execute. For goto, the block (or primitive) is named
-directly. When the block returns a value, it will be assigned to the
-storage location on the \lhs of the bind. The value returned must be
-monadic, and in a type-correct program it always will be.
+\invoke/, or goto expression appears on the \rhs of a bind statement,
+control-flow transfers to the appropriate block. For \enter and
+\invoke/, the label stored in the closure or thunk determines the
+block to execute. For goto, the block is named directly. The value
+returned from the block is bound to the variable on the \lhs of the
+bind statement. The value of the \rhs must be monadic.
 
-\intent{Describe our (lack of) error handling.}
-\Mil's syntax does not mention error handling or exceptions at
-all. However, errors can arise in a number of areas. For example, when
-no case aleternatives match the inspected value, or if a block is
-called with the wrong number of arguments. In these cases, and others,
-an error would be generated by the \mil runtime or interpreter and the
-program would terminate. We rely on the Habit compiler to avoid most
-of these errors; the rest we ignore in the interest of simplicity.
+\intent{Describe our (lack of) error handling.}  \Mil's syntax does
+not mention error handling or exceptions at all. However, errors can
+arise in a number of areas, such as when no case alternatives match
+the inspected value, or if a block is called with the wrong number of
+arguments. In all cases of errors, we expect an error would be
+generated by the \mil runtime or interpreter and the program would
+terminate. More robust error handling would certainly be an area for
+improvement in the future.
 
-\section{A \hoopl-friendly AST For \mil}
+\section{A \hoopl-friendly \ast For \mil}
 \label{mil_sec7}
 
 \intent{Reminder about open/closed shapes.}  As described in
@@ -718,7 +717,7 @@ Section~\ref{hoopl_sec_cfg}, \hoopl characterizes control-flow between
 nodes in a control-flow graph (\cfg) by their entry and exit
 shape. \Hoopl uses the |O| and |C| types to express the shape of the
 entry and exit points for a node. A node that is open on exit can only
-be followed a node that is open on entry. A sequence of nodes can be
+be followed by a node that is open on entry. A sequence of nodes can be
 characterized by the entry shape of the first node and the exit shape
 of the last node.
 
@@ -754,9 +753,12 @@ represents statements inside the block. The type ensures no block
 begins or ends with a |Bind|. Blocks can end with either a |CaseM| or
 |Done| statement. The |CaseM| value represents the \milres case/
 statement. |Done| does not appear explicitly in Figure~\ref{mil_fig3},
-but the AST uses it to end a block with a |Tail| expression. The
+but the \ast uses it to end a block with a |Tail| expression. The
 |Name| and |Label| arguments to |CaseM| and |Done| make it easier to
-know the basic block being analyzed when traversing the \cfg backwards.
+know the basic block being analyzed when traversing the \cfg
+backwards, because \Hoopl does not provide that information to
+backwards rewrite or transfer functions.\footnote{We discuss this
+  issue, and suggest improvements, in Section~\ref{conc_hoopl_sig}.}
 
 \begin{myfig}
   \begin{minipage}{\linewidth}\begin{withHsLabeled}{mil_stmt_ast}\numbersoff
@@ -772,22 +774,35 @@ know the basic block being analyzed when traversing the \cfg backwards.
   \label{mil_fig_stmt_ast}
 \end{myfig}
 
-\intent{Show how the AST mirrors the expected shape of a sample \mil
-  block.}  Even without describing |Tail| values, we can show how
-|Stmt| values give the correct shape to \mil blocks. Returning to our
-example of Kleisli composition in Figure~\ref{mil_fig_kleisli_body} on Page~\pageref{mil_fig_kleisli_body}, we can
-represent the block \lab m205/ with the following definition:
+\intent{Show how the \ast mirrors the expected shape of a sample \mil
+  block.}  Recall \lab m205/ from Figure~\ref{mil_fig_kleisli_b} on
+Page~\pageref{mil_fig_kleisli}, which implements the body of our
+monadic composition function:
+
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \block m205(g, x, f): 
+      \vbinds v207<- \app g*x/;
+      \vbinds v1<- \invoke v207/;
+      \vbinds v206<- \app f*v1/; 
+      \invoke v206/ 
+  \end{AVerb}
+\end{singlespace}
+
+\noindent We can show how
+|Stmt| values give the correct shape to \mil blocks. |m205| constructs
+the \ast representing \lab m205/:
 
 \begin{singlespace}
 > m205 :: Label -> Graph Stmt C C
-> m205 label = mkFirst (BlockEntry "m205" label ["g", "f", "x"]) <*>
->   mkMiddles [Bind "v207" ({-"\app g * x/"-})
->             , Bind "v1" ({-"\invoke v209/"-})
->             , Bind "v206" ({-"\app f * v1/"-})] <*>
->   mkLast (Done "m205" label ({-"\invoke v206/"-}))
+> m205 label = mkFirst (BlockEntry "m205" label ["g", "x", "f"]) <*>
+>   mkMiddles [Bind "v207" (Enter "g" "x")         -- "\app g * x/"
+>             , Bind "v1"  (Invoke "v207")         -- "\invoke v209/"
+>             , Bind "v206" (Enter "f" "v1")] <*>  -- "\app f * v1/" 
+>   mkLast (Done "m205" label (Invoke "v206"))     -- "\invoke v206/"
 \end{singlespace}
 
-|m205| defines a basic block, as shown by its |C C| type. \Hoopl
+\noindent |m205| defines a basic block, as shown by its |C C| type. \Hoopl
 provides |mkFirst|, |mkMiddles| and |mkLast|
 (Chapter~\ref{ref_chapter_hoopl}, Figure~\ref{hoopl_fig4}), for
 lifting nodes into \hoopl's monadic graph representation. The operator
@@ -798,54 +813,60 @@ program.
 Figure~\ref{mil_fig_tail_ast} shows the various |Tail| values
 that implement the \term tail/ terms in Figure~\ref{mil_fig3}. Notice
 the definition does not parameterize on shape. These expressions are not
-used to construct \cfgs and therefore did not need to be parameterized. 
+used to construct \cfgs and therefore do not need to be parameterized. 
 
-\intent{Enumerate |Tail| constructors, call out |Run| and |Constr|
+\intent{Enumerate |Tail| constructors, call out |Invoke| and |Constr|
   because they have different names than in Figure~\ref{mil_fig3}.}
 The constructors to |Tail| map directly to \term tail/
 terms. |Return|, |Enter| |Goto|, |Prim|, |Closure|, and |Thunk|
-represent the corresponding \term tail/ terms. |Run| represents
+represent the corresponding \term tail/ terms. |Invoke| represents
 \milres invoke/ and |Constr| represents a
 constructor.
 
 \begin{myfig}[tb]
-  \begin{minipage}{\linewidth}\begin{withHsLabeled}{mil_tail_ast}\numbersoff
+  \begin{minipage}{\linewidth}\begin{center}\begin{withHsLabeled}{mil_tail_ast}\numbersoff
 > data Tail = Return Name {-"\hslabel{return}"-}
->   | Enter Name Name {-"\hslabel{enter}"-}
->   | Run Name {-"\hslabel{invoke}"-}
->   | Goto Dest [Name] {-"\hslabel{goto}"-}
->   | Prim Name [Name] {-"\hslabel{prim}"-}
->   | Closure Dest [Name] {-"\hslabel{clo}"-}
->   | Thunk Dest [Name] {-"\hslabel{thunk}"-}
->   | Constr Constructor [Name] {-"\hslabel{cons}"-}
-  \end{withHsLabeled}\end{minipage}
+>           | Enter Name Name {-"\hslabel{enter}"-}
+>           | Invoke Name {-"\hslabel{invoke}"-}
+>           | Goto Dest [Name] {-"\hslabel{goto}"-}
+>           | Prim Name [Name] {-"\hslabel{prim}"-}
+>           | Closure Dest [Name] {-"\hslabel{clo}"-}
+>           | Thunk Dest [Name] {-"\hslabel{thunk}"-}
+>           | Constr Constructor [Name] {-"\hslabel{cons}"-}
+  \end{withHsLabeled}\end{center}\end{minipage}
   \caption{Haskell data type representing \mil \term tail/ expressions.}
   \label{mil_fig_tail_ast}
 \end{myfig}
 
-\intent{Show connection between \mil syntax and AST vis.\ arguments.}
+\intent{Show connection between \mil syntax and \ast vis.\ arguments.}
 All \mil \term tail/ terms that take arguments only allow variables,
 not arbitrary expressions. The |Tail| constructors implement that
 restriction by only taking |Name| arguments. Similarly, |Stmt|
-constructors do not take any argument but |Names| or |Tails|.
+constructors only define arguments that are |Names| or |Tails|.
 
 \section{Related Work}
 
-\subsection{Compiling with Continuations}
+\subsection{MLJ}
+
+\subsection{Compiling with Continuations, Continued}
+
+\subsection{Implementing Functional Programs}
 
 \intent{Describe criticisms by Kennedy against his \mil; compare to our \mil.}
 
 \section{Summary}
 \label{mil_sec6}
 
-This chapter presented our Monadic Intermediate Language (\mil). Our
-\mil resembles three-address code in several ways: infinitely many
+This chapter presented our Monadic Intermediate Language (\mil). \Mil
+resembles three-address code in several ways: arbitrarily many
 registers can be named, nested expressions are not allowed, and
 implementation details are made explicit. The \mil's unique features
 include separate representations for \emph{closure-capturing} and
-basic blocks, and the use of monadic \emph{tail} expressions. Later
-chapters will be devoted to optimizing \mil programs using
-dataflow techniques.
+basic blocks, and the use of monadic \emph{tail} expressions. Though
+we did not give the translation, our implementation of a compiler from
+\lamC to \mil gives us confidence that every \lamC program can be
+represented in \mil. Later chapters will be devoted to optimizing \mil
+programs using dataflow techniques.
 
 \standaloneBib
 

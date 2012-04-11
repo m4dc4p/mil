@@ -58,7 +58,7 @@ data TailM = Return Name
   | Thunk  -- ^ Monadic thunk - suspended computation.
     Dest   -- ^ Label of the computation's body.
     [Name] -- ^ Free variables in the body.
-  | Run  -- ^ Execute a monadic computation.
+  | Invoke  -- ^ Execute a monadic computation.
     Name  -- ^ Variable holding the thunk
   | Prim    -- ^ Execute a primitive block 
     Name    -- ^ Name of the primitive

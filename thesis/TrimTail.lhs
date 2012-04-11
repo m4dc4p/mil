@@ -106,12 +106,12 @@ final binding of |v| due to earlier bindings.
 >     uses (Goto _ vs) v = v `elem` vs
 >     uses (Constr _ vs) v = v `elem` vs
 >     uses (Thunk _ vs) v = v `elem` vs
->     uses (Run f) v = f == v
+>     uses (Invoke f) v = f == v
 >     uses (Prim _ vs) v = v `elem` vs
 >     uses _ _ = False
 >    
 >     visibleSideEffect :: Tail -> Bool
->     visibleSideEffect (Run {}) = True
+>     visibleSideEffect (Invoke {}) = True
 >     visibleSideEffect _ = False
 
 Our rewrite function will replace the final return with the tail found

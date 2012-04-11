@@ -135,7 +135,7 @@ each type of tail expression.
 >     tailVars (Constr _ vs) = Set.fromList vs
 >     tailVars (Return n) = Set.singleton n
 >     tailVars (Thunk _ vs) = Set.fromList vs
->     tailVars (Run n) = Set.singleton n
+>     tailVars (Invoke n) = Set.singleton n
 >     tailVars (Prim _ vs) = Set.fromList vs
 >     tailVars (LitM _) = Set.empty
 
@@ -230,7 +230,7 @@ statement should not be modified.
 
 For completeness, our |safe| function is below. Instructions that only
 allocate are considered safe. We do not consider |Goto| expressions
-safe, as the block called may contain a |Run| expression. |Prim| and
+safe, as the block called may contain a |Invoke| expression. |Prim| and
 |Enter| expressions are not safe, as they may have side-effects.
 
 %if False

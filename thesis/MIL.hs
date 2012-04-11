@@ -99,7 +99,7 @@ data Tail = Return Name
   | Thunk  -- ^ Monadic thunk - suspended computation.
     Dest   -- ^ Label of the computation's body.
     [Name] -- ^ Free variables in the body.
-  | Run  -- ^ Execute a monadic computation.
+  | Invoke  -- ^ Execute a monadic computation.
     Name  -- ^ Variable holding the thunk
   | Prim    -- ^ Execute a primitive block 
     Name    -- ^ Name of the primitive
@@ -127,7 +127,7 @@ printTailM (Closure dest vs) = printDest dest <+> braces (commaSep text vs)
 printTailM (Goto dest vs) = printDest dest <> parens (commaSep text vs)
 printTailM (Constr cons vs) = text cons <> text "*" <+> (hsep $ texts vs)
 printTailM (Thunk dest vs) = printDest dest <+> brackets (commaSep text vs)
-printTailM (Run v) = text "invoke" <+> text v
+printTailM (Invoke v) = text "invoke" <+> text v
 printTailM (Prim p vs) = text p <> text "*" <> parens (commaSep text vs)
 printTailM (LitM n) = text ("num " ++ show n)
 
@@ -266,7 +266,7 @@ vars (Closure _ vs) = vs
 vars (Goto _ vs) = vs
 vars (Constr _ vs) = vs
 vars (Thunk _ vs) = vs
-vars (Run v) = [v]
+vars (Invoke v) = [v]
 vars (Prim _ vs) = vs
 vars _ = []
 
@@ -534,7 +534,7 @@ renameTail r (Closure dest vs) = Closure dest (map r vs)
 renameTail r (Goto dest vs) = Goto dest (map r vs)
 renameTail r (Constr c vs) = Constr c (map r vs)
 renameTail r (Thunk dest vs) = Thunk dest (map r vs)
-renameTail r (Run v) = Run (r v)
+renameTail r (Invoke v) = Invoke (r v)
 renameTail r (Prim p vs) = Prim p (map r vs)
 renameTail r (LitM i) = LitM i
 

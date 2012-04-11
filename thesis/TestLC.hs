@@ -565,9 +565,9 @@ testBindReturn1 :: UniqueMonad m => m (ProgM C C)
 testBindReturn1 = do
   l1 <- freshLabel
   return $ mkFirst (BlockEntry "block1" l1 []) <*>
-           mkMiddle (Bind "a" (Run "m")) <*>
-           mkMiddle (Bind "a" (Run "m")) <*>
-           mkMiddle (Bind "b" (Run "m")) <*>
+           mkMiddle (Bind "a" (Invoke "m")) <*>
+           mkMiddle (Bind "a" (Invoke "m")) <*>
+           mkMiddle (Bind "b" (Invoke "m")) <*>
            mkLast (Done "block1" l1 (Return "a"))
 
 {-
@@ -591,9 +591,9 @@ testBindReturn2 :: UniqueMonad m => m (ProgM C C)
 testBindReturn2 = do
   l1 <- freshLabel
   return $ mkFirst (BlockEntry "block1" l1 []) <*>
-           mkMiddle (Bind "a" (Run "m")) <*>
-           mkMiddle (Bind "b" (Run "m")) <*>
-           mkMiddle (Bind "a" (Run "m")) <*>
+           mkMiddle (Bind "a" (Invoke "m")) <*>
+           mkMiddle (Bind "b" (Invoke "m")) <*>
+           mkMiddle (Bind "a" (Invoke "m")) <*>
            mkLast (Done "block1" l1 (Return "a"))
 
 {-
@@ -615,8 +615,8 @@ testBindReturn3 :: UniqueMonad m => m (ProgM C C)
 testBindReturn3 = do
   l1 <- freshLabel
   return $ mkFirst (BlockEntry "block1" l1 []) <*>
-           mkMiddle (Bind "a" (Run "m")) <*>
-           mkMiddle (Bind "a" (Run "m")) <*>
+           mkMiddle (Bind "a" (Invoke "m")) <*>
+           mkMiddle (Bind "a" (Invoke "m")) <*>
            mkLast (Done "block1" l1 (Return "a"))
 
 {-
@@ -637,9 +637,9 @@ testBindReturn4 :: UniqueMonad m => m (ProgM C C)
 testBindReturn4 = do
   l1 <- freshLabel
   return $ mkFirst (BlockEntry "block1" l1 []) <*>
-           mkMiddle (Bind "a" (Run "m")) <*>
-           mkMiddle (Bind "b" (Run "m")) <*>
-           mkMiddle (Bind "a" (Run "m")) <*>
+           mkMiddle (Bind "a" (Invoke "m")) <*>
+           mkMiddle (Bind "b" (Invoke "m")) <*>
+           mkMiddle (Bind "a" (Invoke "m")) <*>
            mkLast (Done "block1" l1 (Return "a"))
 
 {-
@@ -658,7 +658,7 @@ testBindReturn5 :: UniqueMonad m => m (ProgM C C)
 testBindReturn5 = do
   l1 <- freshLabel
   return $ mkFirst (BlockEntry "block1" l1 []) <*>
-           mkMiddle (Bind "a" (Run "m")) <*>
+           mkMiddle (Bind "a" (Invoke "m")) <*>
            mkMiddle (Bind "b" (Return "a")) <*>
            mkMiddle (Bind "c" (Return "b")) <*>
            mkLast (Done "block1" l1 (Return "c"))
@@ -683,7 +683,7 @@ testBindReturn6 :: UniqueMonad m => m (ProgM C C)
 testBindReturn6 = do
   l1 <- freshLabel
   return $ mkFirst (BlockEntry "block1" l1 []) <*>
-           mkMiddle (Bind "a" (Run "m")) <*>
+           mkMiddle (Bind "a" (Invoke "m")) <*>
            mkMiddle (Bind "b" (Return "a")) <*>
            mkMiddle (Bind "c" (Return "b")) <*>
            mkMiddle (Bind "x" (Closure ("block1", l1) [])) <*>

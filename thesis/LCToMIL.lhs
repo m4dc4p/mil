@@ -93,8 +93,8 @@ thunk.
 >   dest <- blockDefn "m" fvs $ \n l -> do
 >     let compM (EBind (Ident v _) _ b r) = withFree (return . delete v) $ \_ -> do
 >           rest <- compM r 
->           compResultVar b $ \n -> return (mkMiddle (v `Bind` (Run n)) <*> rest)
->         compM e = compResultVar e (\v -> return (mkLast (Done n l (Run v))))
+>           compResultVar b $ \n -> return (mkMiddle (v `Bind` (Invoke n)) <*> rest)
+>         compM e = compResultVar e (\v -> return (mkLast (Done n l (Invoke v))))
 >     compM bind 
 >   ctx (Thunk dest fvs)
 >   where

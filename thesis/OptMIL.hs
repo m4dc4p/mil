@@ -126,7 +126,7 @@ bindSubstRewrite =
         (Just (Goto d ns)) -> Just $ substNames f ns (\ns -> Goto d ns)
         (Just (Constr c ns)) -> Just $ substNames f ns (\vs -> Constr c ns)
         (Just (Thunk d ns)) -> Just $ substNames f ns (\ns -> Thunk d ns)
-        -- (Just (BindRun n)) -> Just $ substNames f [n] (\ [n] -> Run n)
+        -- (Just (BindRun n)) -> Just $ substNames f [n] (\ [n] -> Invoke n)
         (Just (Prim p vs)) -> Just $ substNames f vs (\vs -> Prim p vs)
         _ -> Nothing
 
@@ -278,7 +278,7 @@ inlineRewrite referrers prog = mkBRewrite rewriter
           changeTail env (Constr c ns) = Constr c (map (changeVar env) ns)
           changeTail env (LitM i) = LitM i
           changeTail env (Thunk dest vs) = Thunk dest (map (changeVar env) vs)
-          changeTail env (Run v) = Run (changeVar env v)
+          changeTail env (Invoke v) = Invoke (changeVar env v)
           changeTail env (Prim p vs) = Prim p (map (changeVar env) vs)
           changeVar env f = Map.findWithDefault f f env
 

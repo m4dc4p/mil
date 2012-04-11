@@ -719,6 +719,7 @@ techniques using Template Haskell may ultimately be the best approach
 here.
 
 \subsection{Restricted Signatures}
+\label{conc_hoopl_sig}
 \intent{Review of combinators for creating rewrite and transfer
   functions.} \Hoopl does not specify transfer and rewrite functions
 using simple function signatures. Instead, as detailed in
