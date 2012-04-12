@@ -128,8 +128,6 @@ like to rewrite this program so that \lab b3/ calls the primitive
 \primlab add/ directly. To do so requires that we pass \var x/ along
 the call chain from \lab b1/, through \lab b2/, into \lab b3/:
 
-
-
 \begin{myfig}
 \begin{tabular}{ccc}
 \begin{minipage}{2in}
@@ -262,11 +260,23 @@ to \lab b2/ that we do not have any information about.
 \noindent Analysis of the program in Figure~\ref{global_eg2} would compute the 
 following facts:
 $$
-  \begin{array}{rl}
-    \lab b1/ :& \{(\var x/, \bot)\} \\
-    \lab b2/ :& \{(\var a/, \bot)\} \\
-    \lab b3/ :& \{(\var v/, \bot)\}
-  \end{array}
+\begin{array}{rl}
+  \lab b1/ :& \{(\var x/, \bot)\} \\
+  \lab b2/ :& \{(\var a/, \bot)\} \\
+  \lab b3/ :& \{(\var v/, \bot)\}
+\end{array}
+$$
+
+Figure~\ref{global_eg3} shows a \mil program with a loop. \lab b2/ is called from
+both \lab b1/ and \lab b3/. In both cases, the \var v/ argument to \lab b2/ will
+contain a closure pointing to \clo[k2:]. Our analysis would compute the following
+facts for the program in Figure~\ref{global_eg3}:
+$$
+\begin{array}{rl}
+  \lab b1/ :& \{(\var x/, \bot)\} \\
+  \lab b2/ :& \{(\var v/, \clo[k2:])\} \\
+  \lab b3/ :& \{(\var v/, \clo[k2:]), (\var t/, \bot)\}
+\end{array}
 $$
 
 \begin{myfig}
@@ -295,7 +305,7 @@ $$
         
         \block b1(x):
           \vbinds v<-\mkclo[k1:v];
-          \goto b2(v)
+          \goto b2(v, x)
 
         \block b2(v, x):
           \vbinds t<-\mkclo[k2:x, 1];
@@ -339,4 +349,16 @@ $$
   \label{global_eg3}
 \end{myfig}
 
+Interestingly, after rewriting the program in Figure~\ref{global_eg3}, we could
+run the analysis again and we would see that the \var t/ argument to \lab b3/
+always contains \clo[k2:].
+$$
+\begin{array}{rl}
+  \lab b1/ :& \{(\var x/, \bot)\} \\
+  \lab b2/ :& \{(\var v/, {\clo[k2:]}), (\var x/, \clo[k2:])\} \\
+  \lab b3/ :& \{(\var v/, {\clo[k2:]}), (\var t/, \clo[k2:]), (\var x/, \bot)\}
+\end{array}
+$$
+\noindent However we cannot rewrite based on this information as \var t/
+is not used in an application in \lab b3/.
 \end{document}
