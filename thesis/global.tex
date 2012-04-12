@@ -117,5 +117,226 @@ argument with the result of the \cc block \lab k/.
 After we rewrite each block to take arguments as described above, we need to
 rewrite all calls to those blocks to pass the additional arguments. 
 
+\section*{Examples}
+
+Figure~\ref{global_eg1} demonstrates uncurrying across an intermediate
+block that does not use the closure. In \lab b1/, we create the
+closure \clo[k1:x] and bind it to \var v/. We call \lab b2/, passing
+\var v/. \lab b2/ immediately calls \lab b3/, passing along \var
+v/. \lab b3/ applies \var v/ to $1$ and returns the result. We would
+like to rewrite this program so that \lab b3/ calls the primitive
+\primlab add/ directly. To do so requires that we pass \var x/ along
+the call chain from \lab b1/, through \lab b2/, into \lab b3/:
+
+
+
+\begin{myfig}
+\begin{tabular}{ccc}
+\begin{minipage}{2in}
+  \begin{AVerb}[gobble=4]
+    \ccblock k1(x)y: \prim add(x,y)
+
+    \block b1(x):
+      \vbinds v<-\mkclo[k1:x];
+      \goto b2(v)
+
+    \block b2(v): \goto b3(v)
+
+    \block b3(v):
+      \vbinds t<-\app v*1/;
+      \return t/
+  \end{AVerb}
+\end{minipage} & 
+\begin{minipage}{2in}
+  \begin{AVerb}[gobble=4]
+    \ccblock k1(x)y: \prim add(x, y)
+
+    \block b1(x):
+      \vbinds v<-\mkclo[k1:x];
+      \goto b2(v, x)
+
+    \block b2(v, x): \goto b3(v, x)
+
+    \block b3(v, x):
+      \vbinds t<- \prim add(x, 1);
+      \return t/
+  \end{AVerb}
+\end{minipage} &
+\begin{minipage}{2in}
+  \begin{tikzpicture}[>=stealth, node distance=.75in]
+    \node[stmt] (b1) {\begin{minipage}{\widthof{\quad\binds v<-\mkclo[k1:x];}}\disableparspacing;\raggedright
+        \block b1(x):\endgraf
+        \quad\binds v<-\mkclo[k1:x];\endgraf
+        \quad\goto b2(v)\endgraf
+      \end{minipage}};
+
+    \node[stmt,
+      below of=b1] (b2) {\begin{minipage}{\widthof{\block b2(v): \goto b3(v)}}\disableparspacing;\raggedright
+        \block b2(v): \goto b3(v)
+      \end{minipage}};
+
+    \node[stmt,
+      below of=b2] (b3) {\begin{minipage}{\widthof{\quad\binds t<-\app v*1/;}}\disableparspacing;\raggedright
+        \block b3(v):\endgraf
+          \quad\binds t<-\app v*1/;\endgraf
+          \quad\return t/\endgraf
+      \end{minipage}};
+
+    \draw [->] (b1) to (b2);
+    \draw [->] (b2) to (b3);
+  \end{tikzpicture}
+\end{minipage}
+\end{tabular}
+\caption{A \mil program and a transformed version, showing how
+we rewrite across an intermediate block. Notice that \lab b3/ calls
+the primitive directly after our rewrite.}
+\label{global_eg1}
+\end{myfig}
+
+This transformation leaves a lot of undersireable code: we pass
+arguments that are no longer used, and bind values that will not be referenced. 
+However, we assume other optimizations can clean those up and we will not address
+them here.
+
+Our analysis would find the following facts for each ordinary block in
+the program in Figure~\ref{global_eg1}. Notice we omit the
+\textsc{Blocks} value it should be clear from context:
+$$
+  \begin{array}{rl}
+    \lab b1/ :& \{(\var x/, \bot)\} \\
+    \lab b2/ :& \{(\var v/, \clo[k1:])\} \\
+    \lab b3/ :& \{(\var v/, \clo[k1:])\}
+  \end{array}
+$$
+
+Figure~\ref{global_eg2} shows a program we cannot rewrite. Block \lab b1/
+jumps to \lab b3/ with the argument \var v/ set to \clo[k1:x]. However,
+\lab b2/ jumps to \lab b3/ with the argument set to \var a/, an argument
+to \lab b2/ that we do not have any information about.
+
+\begin{myfig}
+  \begin{tabular}{cc}
+    \begin{minipage}{2in}
+      \begin{AVerb}[gobble=8]
+        \ccblock k1(x)y: \mkclo[k2:x, y]
+
+        \block b1(x):
+          \vbinds v<-\mkclo[k1:x];
+          \goto b3(v)
+
+        \block b2(a): \goto b3(a)
+
+        \block b3(v):
+          \vbinds t<-\app v*1/;
+          \return t/
+      \end{AVerb}
+    \end{minipage} &
+    \begin{minipage}{2in}\begin{tikzpicture}[>=stealth, node distance=.75in]
+    \node[stmt] (b1) {\begin{minipage}{\widthof{\quad\binds v<-\mkclo[k1:x];}}\disableparspacing;\raggedright
+        \block b1(x):\endgraf
+          \quad\binds v<-\mkclo[k1:x];\endgraf
+          \quad\goto b3(v)
+      \end{minipage}};
+
+    \node[stmt,
+      right=0.5in of b1] (b2) {\begin{minipage}{\widthof{\block b2(v): \goto b3(v)}}\disableparspacing;\raggedright
+        \block b2(v): \goto b3(v)
+      \end{minipage}};
+
+    \node[stmt,
+    below=0.5in of b1] (b3) {\begin{minipage}{\widthof{\quad\binds t<-\app v*1/;}}\disableparspacing;\raggedright
+        \block b3(v):\endgraf
+          \quad\binds t<-\app v*1/;\endgraf
+          \quad\return t/
+      \end{minipage}};
+
+    \draw [->] (b1) to (b3);
+    \draw [->] (b2) to (b3);
+    \end{tikzpicture}\end{minipage}
+  \end{tabular}
+  \caption{A \mil program that we cannot rewrite. The argument to \lab
+    b3/, \var v/, does not always contain a known closure value.}
+  \label{global_eg2}
+\end{myfig}
+
+\noindent Analysis of the program in Figure~\ref{global_eg2} would compute the 
+following facts:
+$$
+  \begin{array}{rl}
+    \lab b1/ :& \{(\var x/, \bot)\} \\
+    \lab b2/ :& \{(\var a/, \bot)\} \\
+    \lab b3/ :& \{(\var v/, \bot)\}
+  \end{array}
+$$
+
+\begin{myfig}
+  \begin{tabular}{ccc}
+    \begin{minipage}{2in}
+      \begin{AVerb}[gobble=8]
+        \ccblock k1(x)y: \mkclo[k2:x, y]
+        
+        \block b1(x):
+          \vbinds v<-\mkclo[k1:v];
+          \goto b2(v)
+
+        \block b2(v):
+          \vbinds t<-\app v*1/;
+          \goto b3(v, t)
+          
+        \block b3(v, t):
+          \vbinds x<-\app v*t/;
+          \vbinds y<-\mkclo[k1:x];
+          \goto b2(y)
+      \end{AVerb}
+    \end{minipage} &
+    \begin{minipage}{2in}
+      \begin{AVerb}[gobble=8]
+        \ccblock k1(x)y: \mkclo[k2:x, y]
+        
+        \block b1(x):
+          \vbinds v<-\mkclo[k1:v];
+          \goto b2(v)
+
+        \block b2(v, x):
+          \vbinds t<-\mkclo[k2:x, 1];
+          \goto b3(v, t, x)
+          
+        \block b3(v, t, x):
+          \vbinds x<-\mkclo[k2:x, t];
+          \vbinds y<-\mkclo[k1:x];
+          \goto b2(y, x)
+      \end{AVerb}
+    \end{minipage} &
+    \begin{minipage}{2in}\begin{tikzpicture}[>=stealth, node distance=.75in]
+    \node[stmt] (b1) {\begin{minipage}{\widthof{\quad\binds v<-\mkclo[k1:v];}}\disableparspacing;\raggedright
+        \block b1(x):\endgraf
+          \quad\binds v<-\mkclo[k1:v];\endgraf
+          \quad\goto b2(v)
+      \end{minipage}};
+
+    \node[stmt,
+      below=.25in of b1] (b2) {\begin{minipage}{\widthof{\quad\binds t<-\app v*1/;}}\disableparspacing;\raggedright
+        \block b2(v):\endgraf
+          \quad\binds t<-\app v*1/;\endgraf
+          \quad\goto b3(v, t)
+      \end{minipage}};
+
+    \node[stmt,
+      below=.25in of b2] (b3) {\begin{minipage}{\widthof{\quad\binds y<-\mkclo[k1:x];}}\disableparspacing;\raggedright
+        \block b3(v, t):\endgraf
+          \quad\binds x<-\app v*t/;\endgraf
+          \quad\binds y<-\mkclo[k1:x];\endgraf
+          \quad\goto b2(y)
+      \end{minipage}};
+
+    \draw [->] (b1) to (b2);
+    \draw [->] (b2) to (b3);
+    \draw [->] (b3.west) -- ($(b3.west)-(.25in,0in)$) |- (b2.west);
+    \end{tikzpicture}\end{minipage}
+  \end{tabular}
+  \caption{A \mil program with a loop. We can rewrite \lab b2/ and \lab b3/
+    to allocate \clo[k2:] directly, as shown on the right.}
+  \label{global_eg3}
+\end{myfig}
 
 \end{document}
