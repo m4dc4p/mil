@@ -23,7 +23,7 @@ import MIL
 import Live
 import DeadBlocks
 import BindReturnElim
-import Uncurry
+import UncurryGlobal
 import InlineReturn
 
 -- From mon5.lhs
@@ -295,18 +295,19 @@ mostOpt :: [Name] -> ([Name], ProgM C C) -> ProgM C C -> ProgM C C
 mostOpt tops prelude@(prims, _) = id .
     -- deadBlocks tops . 
     -- inlineBlocks tops . 
-    deadBlocks tops .  
+    -- deadBlocks tops .  
     collapse . 
-    inlineReturn .
-    deadCode . 
-    collapse . 
-    deadCode . 
-    bindSubst . 
-    inlineReturn .
-    collapse . 
-    bindReturn . 
-    deadCode . 
-    bindSubst 
+    -- inlineReturn .
+    -- deadCode . 
+    -- collapse . 
+    -- deadCode . 
+    -- bindSubst . 
+    -- inlineReturn .
+    -- collapse . 
+    -- bindReturn . 
+    -- deadCode . 
+    -- bindSubst .
+    id
 
 -- | Converts the names given to a set of Dest values. Any
 -- names which do not have corresponding entry points in the program

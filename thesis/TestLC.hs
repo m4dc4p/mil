@@ -1042,6 +1042,52 @@ uncurry_fig_eg = do
                mkLast (Done "toInt" toInt (Prim "toInt" ["s"]))
   return $ mainP |*><*| k0P |*><*| k1P |*><*| addP |*><*| toIntP
 
+{- Demonstrates an issue with goto on the RHS of a bind and 
+   global uncurrying.
+
+k1 {} x: b3(x)
+
+k2 {} x: b3(x)
+
+b3(x): return x
+
+b1(x, y):
+ v <- k1 {}
+ w <- k2 {}
+ z <- b2(w, y)
+ b2(v, y)
+
+b2(v, y):
+ t <- v @ y
+ return t
+-}
+uncurry_global1 :: UniqueMonad m => m (ProgM C C)
+uncurry_global1 = do
+  b1L <- freshLabel
+  k1L <- freshLabel
+  k2L <- freshLabel
+  b2L <- freshLabel
+  b3L <- freshLabel
+  b4L <- freshLabel
+  let b1 = mkFirst (BlockEntry "b1" b1L ["x", "y"]) <*>
+           mkMiddles [Bind "v" (Closure ("k1", k1L) [])
+                     , Bind "w" (Closure ("k2", k2L) [])
+                     , Bind "z" (Goto ("b2", b2L) ["w", "y"])] <*>
+           mkLast (Done "b1" b1L (Goto ("b2", b2L) ["v", "y"]))
+      b2 = mkFirst (BlockEntry "b2" b2L ["v", "y"]) <*>
+           mkMiddle (Bind "t" (Enter "v" "y")) <*>
+           mkLast (Done "b2" b2L (Return "t"))
+      b3 = mkFirst (BlockEntry "b3" b3L ["x"]) <*>
+           mkLast (Done "b3" b3L (Return "x"))
+      b4 = mkFirst (BlockEntry "b4" b4L ["x"]) <*>
+           mkLast (Done "b4" b4L (Return "x"))
+      k1 = mkFirst (CloEntry "k1" k1L [] "x") <*>
+           mkLast (Done "k1" k1L (Goto ("b3", b3L) ["x"]))
+      k2 = mkFirst (CloEntry "k2" k2L [] "x") <*>
+           mkLast (Done "k2" k2L (Goto ("b4", b4L) ["x"]))
+  return $ b1 |*><*| b2 |*><*| b3 |*><*| b4 |*><*| k1 |*><*| k2
+                     
+
 mil_print = [("hello", bindE "_" (mPrint `app` lit 0) $ \_ -> ret mkUnit)
             ,("main", 
                     bindE "_" (var "hello") $ \_ -> 
