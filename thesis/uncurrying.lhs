@@ -267,7 +267,7 @@ the captured argument.
 \end{myfig}
 
 Block~\lab absBlockL209/ actually implements partial application. On
-Line~\ref{absBlockL209_call}, we call \lab compose/, resuling in a
+Line~\ref{absBlockL209_call}, we call \lab compose/, resulting in a
 closure that points to \lab absBodyL201/. On
 line~\ref{absBlockL209_enter}, we apply that value to \var f/ and
 return the result. The value returned by block~\lab absBlockL209/ is
@@ -520,13 +520,6 @@ blocks. Two of the blocks, \lab k0/ and \lab k1/, are \cc. Two others,
 primitives. The final block, \lab main/, is also a normal block but
 is treated as the entry point for the program.
 
-\intent{Signposts.}
-We present our implementation in five sections, reflecting the
-structure of our dataflow equations above. We first give the types
-used, followed by the definition of our lattice, then our transfer
-function, then our rewriting function, and finally we show the driver
-that applies the optimization to a given program.
-
 \begin{myfig}
   \begin{minipage}{\hsize}\singlespacing
     \begin{AVerb}[gobble=6]
@@ -546,6 +539,13 @@ that applies the optimization to a given program.
   \caption{Example program.}
   \label{uncurry_fig_eg}
 \end{myfig}
+
+\intent{Signposts.}
+We present our implementation in five sections, reflecting the
+structure of our dataflow equations above. We first give the types
+used, followed by the definition of our lattice, then our transfer
+function, then our rewriting function, and finally we show the driver
+that applies the optimization to a given program.
 
 \subsection{Types}
 \label{uncurry_impl_types}

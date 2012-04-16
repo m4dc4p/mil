@@ -23,7 +23,7 @@ import MIL
 import Live
 import DeadBlocks
 import BindReturnElim
-import UncurryGlobal
+import Uncurry
 import InlineReturn
 
 -- From mon5.lhs
@@ -293,13 +293,13 @@ optCollapse tops = deadCode . collapse
 
 mostOpt :: [Name] -> ([Name], ProgM C C) -> ProgM C C -> ProgM C C
 mostOpt tops prelude@(prims, _) = id .
-    -- deadBlocks tops . 
+    deadBlocks tops . 
     -- inlineBlocks tops . 
     -- deadBlocks tops .  
-    collapse . 
-    -- inlineReturn .
-    -- deadCode . 
     -- collapse . 
+    -- inlineReturn .
+    deadCode . 
+    collapse . 
     -- deadCode . 
     -- bindSubst . 
     -- inlineReturn .
