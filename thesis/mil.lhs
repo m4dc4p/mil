@@ -10,23 +10,35 @@
 
 Most compilers do not generate executable machine code directly from a
 program source file. Rather, the compiler transforms the program into
-a number of different \emph{intermediate languages}, where each
-intermediate language exposes different details about the
-implementation of the program. Each intermediate language provides
-specialized support for aspect of the analysis and transformation of
-the program performed by the compiler.
+a number of different \emph{intermediate representations}, where each
+representation exposes different details about the implementation of
+the program. In many cases, these intermediate representations are
+languages in their own right.
 
 A number of intermediate languages have been described for both
 imperative and functional languages. \emph{Three-address code}
-(described in standard textbooks, such as \cite[Chap.~6,
-  Sec.~6.2]{Aho2006}) is mostly associated with imperative languages
-and emphasizes simplicity by requiring all operations to specify at
-most two operands and one destination. Three-address code aids in
-optimizing the use of registers, typically a scarce resource on most
-processors. Administrative-Normal Form, first described by
-\citet{Flanagan1993}, is an intermediate form for functional languages
-which makes all intermediate values explicit. It is useful for showing
-the exact order of evaluation for expressions. 
+(described in standard textbooks such as \cite{Aho2006}), a language
+normally used to represent imperative languages, emphasizes simplicity
+by requiring that all operations specify, at most, two operands and one
+destination. Three-address code aids in optimizing the use of
+registers, typically a scarce resource on most
+processors. Administrative-Normal Form (\anf), first described by
+\citet{Flanagan1993} and intended for functional languages, requires
+that all intermediate values be named. \Anf's inventors proposed it as
+a replacement for continuation-passing style (\cps), a widely-employed
+intermediate representation first described by Appel
+\citeyearpar{Appel1992}. The simple structure of both \cps and \anf
+programs ease their translation to executable assembly-like languages.
+
+Monadic programming, popularized by Wadler \citeyearpar{Wadler1990},
+but first described by Moggi \citeyearpar{Moggi1991}, separates
+expressions into those that have side-effects and those that do not. A
+side-effecting expression is considered a computation, or program,
+that must execute to produce a value. Running the program multiple
+times may produce different results. Our \mil exploits monadic
+programming to segregate side-effecting operations (such as
+allocations) from pure operations, such as case discrimination or
+jumps.
 
 Our monadic intermediate language (\mil), specifically supports
 functional language features, but also follows the form of
@@ -36,24 +48,30 @@ evaluation order and separates stateful computation using a monadic
 programming style. \Mil's syntax enforces basic-block structure on
 programs, making them ideal for dataflow analysis.
 
-\intent{Signposts.}  We first describe our source language, \lamC, in
-Section~\ref{mil_src}.  The motivation and roots of \mil are given in
-Section~\ref{mil_sec3}. \Mil's complete syntax follows in
-Section~\ref{mil_syntax}.  Section~\ref{mil_monad} discusses \mil's
-treatment of allocation as a side-effect.  Section~\ref{mil_thunks}
-shows how \mil treats monadic programs as suspended
-computations. Section~\ref{mil_sec4} highlights some of the subtler
-points in our translation strategy from \lamC to \mil. We sketch how
-\mil programs can be evaluated in Section~\ref{mil_sec5}. Section
-\ref{mil_sec7} shows how \hoopl influenced the \ast we used to
-rerpresent \mil programs. We conclude in Section~\ref{mil_sec6}.
+\intent{Signposts.}  In order to write programs that we can translate
+to \mil, we use a simple variant of the \lamA, called \lamC, that
+supports a monadic programming style, case discrimination, local
+definitions, and other features of a high-level, purely functional
+language. We describe \lamC in Section~\ref{mil_src}. The motivation
+and roots of \mil are given in Section~\ref{mil_sec3}. \Mil's complete
+syntax follows in Section~\ref{mil_syntax}.  Section~\ref{mil_monad}
+discusses \mil's treatment of allocation as a side-effect.
+Section~\ref{mil_thunks} shows how \mil treats monadic programs as
+suspended computations. Section~\ref{mil_sec4} highlights some of the
+subtler points in our translation strategy from \lamC to \mil. We
+sketch how \mil programs can be evaluated in
+Section~\ref{mil_sec5}. Section \ref{mil_sec7} shows how \hoopl
+influenced the \ast we used to represent \mil programs. In
+Section~\ref{mil_sec_rel} we discuss the \mlj and \smlnet compilers,
+both of which also used a monadic intermediate
+language. We conclude in Section~\ref{mil_sec6}.
 
 \section{Source Language: \lamC}
 \label{mil_src}
 
 \intent{Introduce \lamC; where it came from, references, etc.}  Our
 source language, \lamC (pronounced ``lambda-case''), derives from the \lamA, with
-elements borrowed from the Haskell languages's
+elements borrowed from the Haskell language's
 use of \hsdo notation to represent monadic programs. Jones and
 colleagues developed \lamC as an intermediate representation for the
 Habit programming language \citep{Habit2010}. The Habit ``Compilation
@@ -72,8 +90,7 @@ with zero arguments are values and cannot be recursive; definitions
 with more than one argument are functions and can be recursive. Only
 variables can appear as arguments in definitions and case
 alternatives --- the language does not support more sophisticated
-pattern-matching. The language is untyped and does not support data
-declarations. While most elements should be recognizable
+pattern-matching. While most elements should be recognizable
 from Haskell or the \lamA, we will explain the the \emph{monadic
   bind} and \emph{primitive} terms further.
 
@@ -88,7 +105,7 @@ from Haskell or the \lamA, we will explain the the \emph{monadic
       \quad \term alt_1/\endgraf%%
       \quad $\ldots$\endgraf%%
       \quad \term alt_n/%%
-      \end{minipage}}:Case Discimination/ \\
+      \end{minipage}}:Case Discrimination/ \\
     \termcase |do { x <- t_1; t_2 }|:Monadic Bind/ \\
     \termcase {\begin{minipage}[t]{\widthof{$\mathbf{let}\ \term def_1/\quad$}}
         $\mathbf{let}\ \term def_1/$\endgraf%%
@@ -132,13 +149,12 @@ details makes the job of writing those analyses and transformations
 simpler.
 
 \intent{Relate \mil to three-address code.} \Mil's syntax and design
-borrow heavily from three-address code, an intermediate form normally
-associated with imperative languages and described in standard
-textbooks (e.g., \cite{Aho2006}). Three-address code represents
-programs such that all operations specify at most two operands and a
-single destination. Three-address code hides details of memory
-management by assuming that infinitely many storage locations can be
-named and updated. For example, the expression:
+borrow heavily from three-address code, as stated
+previously. Three-address code represents programs such that all
+operations specify, at most, two operands and a single
+destination. Three-address code hides details of memory management by
+assuming that arbitrarily many storage locations can be named and
+updated. For example, the expression:
 %
 \begin{singlespace}
   \begin{equation*}
@@ -182,19 +198,19 @@ some details while exposing those we care about.
 \section{\Mil Syntax}
 \label{mil_syntax}
 
-\intent{Introduce \mil syntax.}  Figure \ref{mil_fig3} gives the syntax
-for \mil. Where the term \var v_1/, etc. appears, only simple variables
-are allowed. This includes most terms in the language, staying true
-to the design of three-address code. Bold terms such as \lab b/, \lab
-k/, and \lab m/ represent labeled locations in the \mil program. \var
-C/ represents the name of a data constructor. Bold text such as
-\milres case/ and \milres invoke/ represent \mil keywords. A \mil
-program consists of a number of labeled blocks.
+\intent{Introduce \mil syntax.}  Figure \ref{mil_fig3} gives the
+syntax for \mil. Where the term \var v_1/, etc. appears, only simple
+variables are allowed. This includes most terms in the language,
+staying true to the design of three-address code. Bold terms such as
+\lab b/ and \lab k/ represent labeled locations in the \mil
+program. \var C/ represents the name of a data constructor. Bold text
+such as \milres case/ and \milres invoke/ represent \mil keywords. A
+\mil program consists of a number of labeled blocks.
 
 \input{mil_syntax}
 
-\intent{Describe closure-capturing blocks} \Cc blocks specify an
-environment $\left\{\parstrut\ensurett{v_1, \dots, v_n}\right\}$ and
+\intent{Describe closure-capturing blocks} \emph{\Cc blocks} specify an
+environment, $\left\{\parstrut\ensurett{v_1, \dots, v_n}\right\}$, and
 an argument, \var v/. \Cc blocks only execute when initiated by an
 \emph{enter} expression of the form \app f * x/. In \app f * x/, \var
 f/ refers to a closure that will point to a \cc block named \lab
@@ -204,59 +220,61 @@ argument \var v/ declared in the \cc block. We chose to only allow a
 single tail expression in the body of a \cc block in order to
 simplify analysis of their behavior.
 
-\intent{Describe basic blocks.} Basic blocks consist of a sequence of
-statements that execute in order without any intra-block jumps or
-conditional branches. Each basic block ends by evaluating a \term
-tail/ or a conditional branch. A block body cannot end with a bind
-statement. The arguments \ensuremath{\ensurett{(v_1, \dots, v_n)}} are
-the only variables in scope at the start of the block. The name of the
-block (\lab b/) is global to the program but it cannot be captured in
-a closure (as closures must always refer to \cc blocks). Basic blocks
-always execute as the result of a ``\emph{Goto Block}'' tail
-expression of the form \goto b(v_1, \dots, v_n).
+\intent{Describe basic blocks.} \emph{Basic blocks} consist of a sequence of
+monadic binding statements that execute in order without any
+intra-block jumps or conditional branches. The arguments to the block,
+\ensuremath{\ensurett{(v_1, \dots, v_n)}}, are the only variables in
+scope at the start of the block. The name of the block (\lab b/) is
+global to the program. Each basic block ends with either a \milres
+case/ statement or a \term tail/.
 
-\intent{Describe bind.}  The bind statement can appear multiple times
-in a block. Each binding assigns the result of the \emph{tail} on the
-\rhs to a variable on the left. If a variable is bound more than once,
-later bindings will shadow previous bindings.
+\intent{Describe bind.}  Each \emph{monadic binding} statement assigns
+the result of the \emph{tail} on the \rhs of the statement to the variable on the
+left. If a variable is bound more than once, later bindings will
+shadow previous bindings.
 
-\intent{Describe \milres case/.}  The \milres case/ statement examines
-a discriminant and selects one alternative based on the value
-found. The discriminant is always a simple variable, not an
-expression. Each alternative specifies a \emph{constructor} and
+\intent{Describe \milres case/.}  The \emph{case discrimination}
+statement examines a discriminant and selects one alternative based on
+the value found. The discriminant is always a simple variable, not an
+expression. Each \emph{case alternative} specifies a \emph{constructor} and
 variables for each value held by the constructor. No ``default''
 alternative exists --- all possible constructors need to be
 specified. Again, to simplify later analysis, we chose that
 alternatives must always jump immediately to a block --- they do not
 allow any other expression.
 
-\intent{Introduce tail expressions.} \emph{Tail} expressions represent
+\intent{Introduce tail expressions.} \emph{Tail} terms represent
 effects and always appear on the \rhs of a bind statement, at the
 end of a basic block, or as the body of a \cc block. \milres return/
 takes a variable (\emph{not} an expression) and makes its value
 monadic. The ``enter'' operator, \enter, implements function
 application, ``entering'' the closure represented by its \lhs with the
-argument on its \rhs. The \milres invoke/ operator executes the thunk
-referred to by its argument (thunks are described in
-Section~\ref{mil_thunks}).
-
+argument on its \rhs. 
 \intent{Describe goto for blocks and primitives.}  The ``\emph{goto
   block}'' and ``\emph{goto primitive}'' expressions implement labeled
 jumps with arguments. In the first case, \lab b/ represents a labeled
 block elsewhere in the program.  The primitive term, \lab p/\suptt*,
-is also bolded but does not strictly represent a labeled
-location. Rather, it is treated as a labeled location that is
-implemented outside of \mil. Otherwise, primitives are treated like
-blocks.
+also represents a labeled location, except the body of the primitive
+is not implemented in \mil. Otherwise, \emph{goto block} and
+\emph{goto primitive} are treated the same.
 
 \intent{Describe closure and thunk allocation.} Closure allocation,
-written as \mkclo[k:v_1, \dots, v_n], creates a closure pointing to the
-block labelled \lab k/, capturing the variables $\var v_1/, \dots,
-\var v_n/$. A thunk, details for which can be found in
-Section~\ref{mil_thunks}, is allocated similarly. The constructor
-expression $\ensurett{C\ v_1\ \dots\ v_n}$ creates a data value with the
-given tag, $!+C+!$, and the variables $\ensurett{v_1, \dots, v_n}$ in
-the corresponding fields.
+written as \mkclo[k:v_1, \dots, v_n], creates a closure pointing to
+the \cc block \lab k/, capturing the variables $\var v_1/, \dots,
+\var v_n/$. No other type of block can be referenced in a closure ---
+\lab k/ always refers to a \cc block. 
+
+The term \mkthunk[b:v_1, \dots, v_n] allocates a \emph{monadic
+  thunk}. The thunk stores a reference to block \lab b/ and captures
+the variables $\var v_1/, \dots, \var v_n/$. Unlike closures, thunks
+do not store references to \cc blocks. Instead, \lab b/ always refers
+to a basic block or primitive. The \milres invoke/ operator executes
+the \emph{monadic thunk} referred to by its argument. We describe
+thunks in Section~\ref{mil_thunks}.
+
+The constructor expression $\ensurett{C\ v_1\ \dots\ v_n}$ creates a
+data value with the given tag, $!+C+!$, and the values $\ensurett{v_1,
+  \dots, v_n}$ in the corresponding fields.
 
 \subsection*{\Mil Example: \lcname compose/}
 \intent{Show an LC program and its translation in \mil.}  Consider the
@@ -318,10 +336,10 @@ t2/. Thus, the \lab compose/ block returns the value of \lcapp f * (g
 \intent{Motivate why we consider allocation impure.}  Functional
 languages normally treat data allocation as a hidden operation, in
 that the program cannot directly observe any effect from an
-allocation. Of course, allocation causes effects, such as updating the
+allocation. Of course, allocation can cause effects, such as updating the
 heap or triggering a garbage collection.  For example, using the
 definition of |compose| given in Figure~\ref{mil_fig1a}, consider the sequence of
-reductions that occur when calculating |compose a b c| using
+applications that occur when calculating |compose a b c| using
 call-by-value evaluation:
 
 \begin{singlespace}\begin{math}\begin{array}{rl}
@@ -332,11 +350,12 @@ call-by-value evaluation:
 \end{array}\end{math}
 \end{singlespace}\medskip
 
-\intent{Make allocations in reductions really clear.}
-This notation hides an important detail: in a
-naive implementation of \lamC, each reduction of the form $\lcapp
-(\lcabs x. \dots) * a/$ allocates a closure representing the
-function $(\lcabs x. \dots)$ and its environment. 
+\intent{Make allocations in reductions really clear.}  \noindent This
+notation hides an important detail: each function application
+potentially allocates a closure representing the function and its
+environment. For example, $\lcapp (\lcabs g. \dots) * b/$ might
+allocate a closure referring to the function $(\lcabs g. \lcabs x. {\lcapp f * (g
+* x)/})$ and mapping the free variable $f$ to the value $a$.
 
 \intent{Rewrite |compose| to show monadic effects.}
 Figure~\ref{mil_fig_compose} shows |compose| rewritten in a monadic
@@ -363,7 +382,7 @@ will be used when that function is evaluated.
   \end{minipage}
   \caption{A rewritten version of |compose| that makes closure
     allocation explicit. \lamC does not support pattern-matching on
-    functin arguments, but use it for clarity here. }
+    function arguments, but we use it for clarity here. }
   \label{mil_fig_compose}
 \end{myfig}
 
@@ -383,8 +402,8 @@ environment. |compose| evaluates |f (g x)|; however, this expression
 also becomes monadic, as |f (g x)| may cause an allocation.
 
 \intent{Show how closures created by |compose| are used}
-Figure~\ref{mil_fig_mon_compose} shows a program that evalutes
-|compose a b c| using our rewritten, monadic |compose|. To evaluate
+Figure~\ref{mil_fig_mon_compose} shows a program that evaluates
+|compose a b c| using our monadic version of |compose|. To evaluate
 each closure, we define a monadic function |app| that takes a closure
 and an argument. |app| evaluates the function referred to by the
 closure, using the environment stored in the closure and passing the
@@ -430,15 +449,14 @@ the \lab k1/ and \lab k2/ closure-capturing blocks. In
 Figure~\ref{mil_fig_compose}, |k_2| creates a closure pointing to
 |compose|. However, in \mil a closure can only store the label of
 another \cc block. Therefore, since we cannot create a closure
-referring to \lab compose/, \lab k2/ returns a closure refering to
+referring to \lab compose/, \lab k2/ returns a closure referring to
 \lab k3/. Because the body of a \cc block must be a tail, \lab k3/
 jumps immediately to \lab compose/ when executed.
 
 \begin{myfig}[t]
   \input{lst_mil2}
-  \caption{The \mil program which computes $main =
-    \lamApp{\lamApp{\lamApp{compose}{a}}{b}}{c}$. Note that $a$, $b$,
-    and $c$ are assumed to be arguments given outside the program.}
+  \caption{The \mil program which computes \lcapp main\ a\ b\ c = compose * a *
+    b * c/.}
   \label{mil_fig2}
 \end{myfig}
 
@@ -454,7 +472,7 @@ Line~\ref{mil_t2_fig2} we apply \var t1/ to the second argument, \var
 b/. This executes \lab k2/, which expects to find one argument in its
 environment, just as we stored in \var t1/. \lab k2/ creates another
 closure, \mkclo[k3:a, b], which we assign to \var t2/. This closure
-points to \lab k3/ and holds two variables in its environent. Finally,
+points to \lab k3/ and holds two variables in its environment. Finally,
 on line \ref{mil_t3_fig2}, we apply \var t2/ to the final argument,
 \var c/. \lab k3/ executes and immediately jumps to \lab compose/ with
 our arguments. The result, assigned to \var t3/, is returned on the
@@ -509,8 +527,8 @@ invoked before the computation will produce a result.
 \lamC functions in Figure~\ref{mil_fig_hello_a}.\footnote{Again, some
   syntactic liberties are taken.} The |echo| function prints its
 argument to the screen. The \hsdo keyword shows that |echo| is a monadic
-program. The |main| function uses a \hslet statment to assign |m| the value
-|echo a|. Notice this does \emph{not} evaulate |echo a|; instead, |m| is a thunk
+program. The |main| function uses a \hslet statement to assign |m| the value
+|echo a|. Notice this does \emph{not} evaluate |echo a|; instead, |m| is a thunk
 that points to the |echo| function and that captures the value of |x|. 
 
 \begin{myfig}
@@ -533,9 +551,9 @@ that points to the |echo| function and that captures the value of |x|.
     \begin{minipage}[t]{2in}\elimdisplayskip
       \begin{AVerb}[gobble=8,numbers=left,firstnumber=last]
         \block main(x): 
-          \vbinds m <- \mkthunk[echo:x]; \label{mil_fig_mkthunk}
-          \vbinds \_ <- \invoke m/; \label{mil_fig_invoke1}
-          \vbinds \_ <- \invoke /; \label{mil_fig_invoke2}
+          \vbinds m<- \mkthunk[echo:x]; \label{mil_fig_mkthunk}
+          \vbinds \_<- \invoke m/; \label{mil_fig_invoke1}
+          \vbinds \_<- \invoke m/; \label{mil_fig_invoke2}
       \end{AVerb}
     \end{minipage} \\
     \scap{mil_fig_hello_a} & \scap{mil_fig_hello_b}
@@ -560,10 +578,10 @@ the thunk again --- only one allocation occurs, but we run the \app
 \section{Compiling \lamC to \mil}
 \label{mil_sec4}
 
-\intent{Explain why we don't show the whole compiler.}  We implemented
+\intent{Explain why we don't show the whole compiler.}  We created
 a simple compiler from \lamC to \Mil in order to implement and test
 the optimizations discussed later in this work. The compiler's implementation follows
-the style used by Kennedy \citep{KennedyCont}, and in most cases it
+the style used by Kennedy \citep{Kennedy2007}, and in most cases it
 does not differ much from numerous other compilers translating the
 \lamA to a given intermediate form. However, we will highlight some
 nuances of our translation.
@@ -571,7 +589,7 @@ nuances of our translation.
 \intent{Show how $\lambda$-abstractions are translated.}  Consider
 again the definition of |compose| in Figure~\ref{mil_fig1a} on
 Page~\pageref{mil_fig1}. Our compiler translates each $\lambda$,
-except the innermost (\lcabs x.\dots/), to a block that returns a
+except the innermost (i.e., \lcabs x.\lcapp f * (g * x)/), to a block that returns a
 closure. The innermost $\lambda$ translates to a block that immediately
 jumps to an implementation of the body of |compose|. This gives the
 sequence of blocks shown in Figure~\ref{mil_fig2} on
@@ -587,7 +605,7 @@ times. Our uncurrying optimization
 (Chapter~\ref{ref_chapter_uncurrying}) can collapse this work to one
 closure, one jump and no argument copying in many cases. Therefore,
 generating simple (and easy to analyze) code is a reasonable
-tradeoff.
+trade-off.
 
 \intent{Explain how we know when to create a thunk versus executing
   monadic code.}  Monadic code presents other challenges. Monadic
@@ -644,7 +662,7 @@ invoking the thunk returned by \lab b204/.
 
 \intent{Explain how compiler changes strategy when translating a
   monadic expression.}  While the compiler follows the strategy above
-when it first encountes a monadic expresssion, it changes strategy
+when it first encounters a monadic expression, it changes strategy
 when compiling binding statements that follow the initial monadic
 expression. Instead of generating code that returns a suspended
 computation, the compiler switches to generating code the invokes all
@@ -668,8 +686,7 @@ computation.
 
 \intent{Introduce \mil execution model.}  As stated in
 Section~\ref{mil_sec3}, \mil's design borrows heavily from
-three-address code, an intermediate form normally associated with
-imperative programming languages that closely resembles assembly
+three-address code, an intermediate form that closely resembles assembly
 language code. The execution model for \mil draws on its three-address
 code inspiration and executes like an assembly-language for a simple
 register-based computer: execution begins at a special designated
@@ -688,7 +705,7 @@ given block is returned to the block's caller.
 \intent{Describe variable scope; storage locations are local.}  Within
 each block, any number of storage locations may be named on the \lhs
 of a bind (\mbind) statement. Those names are not global storage
-locations: variables with the same name in differents blocks do not
+locations: variables with the same name in different blocks do not
 affect each other. Values can only be passed from one block to another
 as arguments, in a closure, or in a monadic thunk.
 
@@ -742,23 +759,25 @@ another.
 
 \intent{Describe the five |Stmt| constructors.}
 Figure~\ref{mil_fig_stmt_ast} shows |Stmt|, the data type defining the
-\term block/ and \term stmt/ terms from Figure~\ref{mil_fig3}. The
-|Stmt| type takes two type parameters, |e| and |x|, representing the
-entry and exit shape of the statement. |BlockEntry| and |CloEntry|
-represent the two types of blocks (basic and \cc, respectively). Their
-shape, |C O|, shows that they can only be used to begin a \mil
-block. The |Name| and |Label| arguments help \hoopl connect nodes
-together in the \cfg.  The |Bind| statement (with shape |O O|)
-represents statements inside the block. The type ensures no block
-begins or ends with a |Bind|. Blocks can end with either a |CaseM| or
-|Done| statement. The |CaseM| value represents the \milres case/
-statement. |Done| does not appear explicitly in Figure~\ref{mil_fig3},
-but the \ast uses it to end a block with a |Tail| expression. The
-|Name| and |Label| arguments to |CaseM| and |Done| make it easier to
-know the basic block being analyzed when traversing the \cfg
-backwards, because \Hoopl does not provide that information to
-backwards rewrite or transfer functions.\footnote{We discuss this
-  issue, and suggest improvements, in Section~\ref{conc_hoopl_sig}.}
+\term block/, \term bind/, and \term done/ terms from
+Figure~\ref{mil_fig3} (Page~\pageref{mil_fig3}). The |Stmt| type takes
+two type parameters, |e| and |x|, representing the entry and exit
+shape of the statement. |BlockEntry| and |CloEntry| represent the two
+types of blocks (basic and \cc, respectively). Their shape, |C O|,
+shows that they can only be used to begin a \mil block. The |Name| and
+|Label| arguments help \hoopl connect nodes together in the \cfg.  The
+|Bind| statement (with shape |O O|) represents statements inside the
+block. The type ensures no block begins or ends with a |Bind|. Blocks
+can end with either a |Case| or |Done| statement. The |Case| value
+represents the \milres case/ statement. The |[Alt Tail]| argument to
+|Case| lists each case alternative and provides a tail value to
+execute when the alternative is matched. The \ast uses |Done| to end a
+block with a |Tail| expression. The |Name| and |Label| arguments to
+|Case| and |Done| make it easier to know the basic block being
+analyzed when traversing the \cfg backwards, as \hoopl does not
+provide that information to backwards rewrite or transfer
+functions.\footnote{We discuss this issue, and suggest improvements,
+  in Section~\ref{conc_hoopl_sig}.}
 
 \begin{myfig}
   \begin{minipage}{\linewidth}\begin{withHsLabeled}{mil_stmt_ast}\numbersoff
@@ -769,10 +788,47 @@ backwards rewrite or transfer functions.\footnote{We discuss this
 >   Case :: Name -> [Alt Tail] -> Stmt O C {-"\hslabel{case}"-}
 >   Done :: Name -> Label -> Tail -> Stmt O C {-"\hslabel{done}"-}
   \end{withHsLabeled}\end{minipage}
-  \caption{Haskell data type representing \mil \term stmt/ terms. The |C| and |O|
+  \caption{Haskell data type representing \mil \term block/, \term bind/, and \term done/ terms. The |C| and |O|
   types (from \hoopl) give the ``shape'' of each statement.}
   \label{mil_fig_stmt_ast}
 \end{myfig}
+
+Figure~\ref{mil_fig_tail_ast} shows the |Tail| values that represent
+the \term tail/ terms in Figure~\ref{mil_fig3}. Notice the definition
+does not parameterize on shape. These values do not specify the
+relationship among blocks in the \cfg, as \hoopl understands it, so we
+do not give them a shape type. |Return| and |Invoke| represent the
+corresponding \term tail/ terms.  |Enter| corresponds to the \enter
+operator. |Goto| and |Prim| represent the labeled jumps \goto b(v_1,
+\dots, v_n) and \prim p(v_1, \dots, v_n). |Closure| allocates a
+closure (\mkclo[k:v_1, \dots, v_n]), |Thunk| allocates a monadic thunk
+(\mkthunk[b:v_1, \dots, v_n]), and |Constr| allocates a data
+value. The |Constructor| type names the tag used for the data
+value. The |Dest| type in |Goto|, |Closure| and |Thunk| specifies
+block. Notice that |Prim| does not specify a |Dest|, because there is
+no block (implemented in \mil) associated with a primitive function. |Prim|
+instead just specifies the name of the primitive function.
+
+\begin{myfig}[tb]
+  \begin{minipage}{\linewidth}\begin{center}\begin{withHsLabeled}{mil_tail_ast}\numbersoff
+> data Tail = Return Name {-"\hslabel{return}"-}
+>           | Enter Name Name {-"\hslabel{enter}"-}
+>           | Goto Dest [Name] {-"\hslabel{goto}"-}
+>           | Prim Name [Name] {-"\hslabel{prim}"-}
+>           | Closure Dest [Name] {-"\hslabel{clo}"-}
+>           | Thunk Dest [Name] {-"\hslabel{thunk}"-}
+>           | Invoke Name {-"\hslabel{invoke}"-}
+>           | Constr Constructor [Name] {-"\hslabel{cons}"-}
+  \end{withHsLabeled}\end{center}\end{minipage}
+  \caption{Haskell data type representing \term tail/ terms.}
+  \label{mil_fig_tail_ast}
+\end{myfig}
+
+\intent{Show connection between \mil syntax and \ast vis.\ arguments.}
+All \term tail/ terms only allow variables as arguments, not arbitrary
+expressions. The |Tail| constructors implement that restriction by
+only taking |Name| arguments. Similarly, |Stmt| constructors only
+define arguments that are |Names| or |Tails|.
 
 \intent{Show how the \ast mirrors the expected shape of a sample \mil
   block.}  Recall \lab m205/ from Figure~\ref{mil_fig_kleisli_b} on
@@ -789,17 +845,17 @@ monadic composition function:
   \end{AVerb}
 \end{singlespace}
 
-\noindent We can show how
-|Stmt| values give the correct shape to \mil blocks. |m205| constructs
-the \ast representing \lab m205/:
+\noindent We can now show the |Stmt| and |Tail| values that represent
+\lab m205/:
 
 \begin{singlespace}
 > m205 :: Label -> Graph Stmt C C
-> m205 label = mkFirst (BlockEntry "m205" label ["g", "x", "f"]) <*>
->   mkMiddles [Bind "v207" (Enter "g" "x")         -- "\app g * x/"
->             , Bind "v1"  (Invoke "v207")         -- "\invoke v209/"
->             , Bind "v206" (Enter "f" "v1")] <*>  -- "\app f * v1/" 
->   mkLast (Done "m205" label (Invoke "v206"))     -- "\invoke v206/"
+> m205 label = 
+>   mkFirst (BlockEntry "m205" label ["g", "x", "f"]) <*>  -- \block m205(g, x, f): 
+>   mkMiddles [Bind "v207" (Enter "g" "x")                 --   \quad\binds v207 <- \app g * x/;
+>             , Bind "v1"  (Invoke "v207")                 --   \quad\binds v1 <- \invoke v209/;
+>             , Bind "v206" (Enter "f" "v1")] <*>          --   \quad\binds v206 <- \app f * v1/;
+>   mkLast (Done "m205" label (Invoke "v206"))             --   \quad\invoke v206/
 \end{singlespace}
 
 \noindent |m205| defines a basic block, as shown by its |C C| type. \Hoopl
@@ -810,49 +866,79 @@ lifting nodes into \hoopl's monadic graph representation. The operator
 argument to connect this definition to other basic blocks in a larger
 program.
 
-Figure~\ref{mil_fig_tail_ast} shows the various |Tail| values
-that implement the \term tail/ terms in Figure~\ref{mil_fig3}. Notice
-the definition does not parameterize on shape. These expressions are not
-used to construct \cfgs and therefore do not need to be parameterized. 
+The |BlockEntry| value defines the block. The |label| argument will be
+used elsewhere to refer to this block when manipulating or traversing
+the \cfg built by \hoopl. In fact, the |Dest| type in
+Figure~\ref{mil_fig_tail_ast} is a tuple containing the label of a
+given block and its name. The list of variables (|["g", "x", "f"]|)
+defines the arguments in scope at the beginning of the block. The
+three |Bind| statements that make up the body of the block follow
+|BlockEntry|. The comment to the left of each statement shows the
+operation implemented by that statement. Finally, the |Done| statement
+at the end of the block shows that the result of the block will be the
+value returned when the monadic thunk \var v206/ executes.
 
-\intent{Enumerate |Tail| constructors, call out |Invoke| and |Constr|
-  because they have different names than in Figure~\ref{mil_fig3}.}
-The constructors to |Tail| map directly to \term tail/
-terms. |Return|, |Enter| |Goto|, |Prim|, |Closure|, and |Thunk|
-represent the corresponding \term tail/ terms. |Invoke| represents
-\milres invoke/ and |Constr| represents a
-constructor.
+\section{Related Work: \mlj \& \smlnet}
+\label{mil_sec_rel}
 
-\begin{myfig}[tb]
-  \begin{minipage}{\linewidth}\begin{center}\begin{withHsLabeled}{mil_tail_ast}\numbersoff
-> data Tail = Return Name {-"\hslabel{return}"-}
->           | Enter Name Name {-"\hslabel{enter}"-}
->           | Invoke Name {-"\hslabel{invoke}"-}
->           | Goto Dest [Name] {-"\hslabel{goto}"-}
->           | Prim Name [Name] {-"\hslabel{prim}"-}
->           | Closure Dest [Name] {-"\hslabel{clo}"-}
->           | Thunk Dest [Name] {-"\hslabel{thunk}"-}
->           | Constr Constructor [Name] {-"\hslabel{cons}"-}
-  \end{withHsLabeled}\end{center}\end{minipage}
-  \caption{Haskell data type representing \mil \term tail/ expressions.}
-  \label{mil_fig_tail_ast}
-\end{myfig}
+Benton, Kennedy and colleagues \citeyearpar{Benton1998} implemented
+\mlj, a compiler for Standard ML (\sml) that targeted the Java
+Virtual Machine (\jvm). Benton, Kennedy and a different group of
+co-authors later implemented \smlnet (\citeyear{Benton2004},
+\citeyear{Benton2005}), another \sml compiler that targeted
+Microsoft's Common Language Runtime (\clr). Both compilers first
+translated \sml into a typed \mil. The authors' did not publish a
+description of the \mil for \smlnet, but their 1998 paper gives
+extensive details for the \mil used by \mlj. They do not use the term,
+but we will call their intermediate language \milj, to distinguish it
+from our \mil.
 
-\intent{Show connection between \mil syntax and \ast vis.\ arguments.}
-All \mil \term tail/ terms that take arguments only allow variables,
-not arbitrary expressions. The |Tail| constructors implement that
-restriction by only taking |Name| arguments. Similarly, |Stmt|
-constructors only define arguments that are |Names| or |Tails|.
+\intent{Differences between our \mil and theirs: types.}  Benton and
+colleagues designed a sophisticated type system for \milj; our \mil
+does not use types. Their type system represents several side-effects,
+including allocations. They used type-directed optimization to
+eliminate side-effecting dead-code that only allocates; we can do the
+same over \mil blocks using dead-code analysis that determines if, in
+the binding \binds v <- \emph{tail};, \var x/ is dead and \term tail/
+is a closure, data, or thunk allocation.
 
-\section{Related Work}
+\intent{Difference between our \mil and theirs: let-cc} \Milj
+represents monadic binding as |do { x <- m_1; m_2 }|, where $m_1$ and
+$m_2$ can be any \milj expression. This representation allows nested
+monadic terms like |do { x <- do { y <- m_1; m_2 }; m_3 }|. Kennedy
+\citeyearpar{Kennedy2007} shows how these terms can be optimized by
+exploiting associativity. For example, the term above becomes |do { y
+  <- m_1; x <- m_2; m_3 }|.  However, he also shows that the
+transformation can be needed $O(n^2)$ times, where $n$ is the number
+terms (i.e., $x$) bound, depending on the order in which this
+transformation is interleaved with others.
 
-\subsection{MLJ}
+Our \mil does not express nested monadic computations as in \milj. The
+\milj program |do { x <- do { y <- m_1; m_2 }; m_3 }| becomes:
 
-\subsection{Compiling with Continuations, Continued}
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \block b(\dots):
+      \vbinds y<- \goto m1(\dots);
+      \vbinds x<- \goto m2(\dots);
+      \emph{$m_3$}
+  \end{AVerb}
+\end{singlespace}
 
-\subsection{Implementing Functional Programs}
+\noindent where \lab m1/ and \lab m2/ implement $m_1$ and $m_2$; the
+translation of $m_3$ depends on the form of $m_3$, of course, so we
+leave it unspecified. In our representation, $m_1$ and $m_2$ become
+separate \mil blocks. 
 
-\intent{Describe criticisms by Kennedy against his \mil; compare to our \mil.}
+The transformation Kennedy describes appears as
+inlining in \mil; that is, for an appropriate \lab m1/, we can inline
+the block into \lab b/. For a non-recursive set of appropriate blocks
+(we discuss this further in Section~\ref{conc_inline_monadic} on
+Page~\pageref{conc_inline_monadic}), we should be able to inline all
+blocks in $O(n)$ time, where $n$ is the number of blocks. A non-recursive
+set of blocks forms a tree; all leaves will be inlined into their 
+parents. Those parents are now leaves, so they will be inlined once into
+their parents. This occurs $n$ times, until a single block remains. 
 
 \section{Summary}
 \label{mil_sec6}
@@ -865,8 +951,7 @@ include separate representations for \emph{closure-capturing} and
 basic blocks, and the use of monadic \emph{tail} expressions. Though
 we did not give the translation, our implementation of a compiler from
 \lamC to \mil gives us confidence that every \lamC program can be
-represented in \mil. Later chapters will be devoted to optimizing \mil
-programs using dataflow techniques.
+represented in \mil. 
 
 \standaloneBib
 

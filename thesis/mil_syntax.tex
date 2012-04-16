@@ -4,11 +4,14 @@
   %% The kern below makes the space between "v" and ":" look better.
   \termrule block:{\ccblock k(v_1, \dots, v_n)v\kern.07em:\ \term tail/}:Closure-Capturing Block/\\
   \termcase {\block b(v_1, \dots, v_n):\ \rlap{\begin{minipage}[t]{\widthof{\quad\term stmt_1/}}\disableparspacing;%%
-      {\binds v\ <-\ \term tail/;}\endgraf%%
+      \term bind_1/\endgraf%%
       $\dots$\endgraf%%
-      \term end/\end{minipage}}}:Basic Block/\\
+      \term bind_n/\endgraf%%
+      \term done/\end{minipage}}}:Basic Block/\\\\
 
-  \termrule end:{\begin{minipage}[t]{\widthof{\quad\case v;}}\disableparspacing;%%
+  \termrule bind:{\binds v <- \term tail/;}:Monadic Bind/\\\\
+
+  \termrule done:{\begin{minipage}[t]{\widthof{\quad\case v;}}\disableparspacing;%%
       \case v;\endgraf%%
       \quad \term alt_1/\endgraf%%
       \quad $\dots$\endgraf%%
@@ -20,11 +23,11 @@
 
   \termrule tail:{\return v/}:Return/ \\
   \termcase \app v_1 * \ v_2/:Enter/ \\
-  \termcase \invoke v/:Execute Thunk/ \\
   \termcase \goto b(v_1, \dots, v_n):Goto Block/ \\
   \termcase \prim p(v_1, \dots, v_n):Goto Primitive/ \\
   \termcase {\mkclo[k:v_1, \dots, v_n]}:Allocate Closure/ \\
-  \termcase {\mkthunk[m:v_1, \dots, v_n]}:Allocate Monadic Thunk/ \\
+  \termcase {\mkthunk[b:v_1, \dots, v_n]}:Allocate Monadic Thunk/ \\
+  \termcase \invoke v/:Execute Thunk/ \\
   \termcase \ensurett{C\ v_1\ \dots\ v_n}:Allocate Data/ 
 \end{tabular}
 \end{centering}

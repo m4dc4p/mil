@@ -13,6 +13,9 @@
 %format k_1 = "\ensuremath{k_1}"
 %format k_2 = "\ensuremath{k_2}"
 %format k_n = "\ensuremath{k_n}"
+%format m_1 = "\ensuremath{m_1}"
+%format m_2 = "\ensuremath{m_2}"
+%format m_3 = "\ensuremath{m_3}"
 % Hoopl spaceship
 %format <*> = "\ensuremath{\mathbin{\text{<}\mkern-1.5mu\mathord{*}\mkern-1.5mu\text{>}}}"
 % Hoopl funny operator

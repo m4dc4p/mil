@@ -94,10 +94,12 @@
 \fancyhead[L]{\small\textsc{\chaptertitlename\ \thechapter}}
 \fancyhead[R]{\small\leftmark}
 \fancyfoot[C]{\small\thepage}
+\fancyfoot[R]{\small Draft of \today}
 \headheight=15pt
 \fancypagestyle{plain}{%
   \fancyhf{} % clear all header and footer fields
-  \fancyfoot[C]{\small\thepage}}
+  \fancyfoot[C]{\small\thepage}
+  \fancyfoot[R]{\small Draft of \today}}
 \renewcommand\headrulewidth{0pt}
 \renewcommand\chaptermark[1]{\markboth{#1}{}}
 \hyphenation{data-flow mo-na-dic} 
@@ -459,6 +461,17 @@
 \def\Rtls{\textsc{Rtl}s\xspace}
 \def\rtl{\textsc{rtl}\xspace}
 \def\Rtl{\textsc{Rtl}\xspace}
+\protected\def\mlj{\ifhelvet{MLj}{\textsc{ml}j}\xspace}
+\protected\def\smlnet{\ifhelvet{SML.NET}{\textsc{sml.net}}\xspace}
+\def\jvm{\textsc{jvm}\xspace}
+\def\sml{\textsc{sml}\xspace}
+\def\clr{\textsc{clr}\xspace}
+\def\milj{\textsc{mil}j\xspace}
+\def\Milj{\textsc{Mil}j\xspace}
+\def\anf{\textsc{anf}\xspace}
+\def\Anf{\textsc{Anf}\xspace}
+\def\cps{\textsc{cps}\xspace}
+
 %% Indicates the preamble has been loadd.
 \def\preambleloaded{}
 

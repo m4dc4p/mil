@@ -662,7 +662,7 @@ The |BlockEntry| and |CloEntry| cases return the facts given
 unchanged.\footnote{Note these will always be empty maps, because our
   analysis does not extend across blocks and |fact_bot| in our lattice
   is |Map.empty|.} Because we do not propagate facts between blocks,
-the |CaseM| and |Done| cases pass an empty map to each successor,
+the |Case| and |Done| cases pass an empty map to each successor,
 using the Hoopl-provided |mkFactBase| function to create a |FactBase|
 from empty facts.
 
