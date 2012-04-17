@@ -129,13 +129,12 @@ closure or jump to the block.
 > collapseTransfer blockArgs = mkFTransfer t
 >   where
 >     t :: Stmt e x -> CollapseFact -> Fact x CollapseFact
->     t (Bind v (Closure dest args)) facts = {-"\hslabel{closure}"-}
->       Map.insert v (PElem (CloDest dest args)) 
->                    (kill v facts)
+>     t (Bind v (Closure dest args)) facts = Map.insert v (PElem (CloDest dest args)) {-"\hslabel{closure}"-} 
+>                                            (kill v facts)
 >     t (Bind v _) facts = Map.insert v Top (kill v facts) {-"\hslabel{rest}"-}
->     t (Case _ alts) bound = 
->       mkFactBase collapseLattice [(dest, renameAlt bound binds (blockArgs ! dest) args) | 
->                                   (Alt _ binds (Goto (_, dest) args)) <- alts] 
+>     t (Case _ alts) bound = mkFactBase collapseLattice 
+>                             [(dest, renameAlt bound binds (blockArgs ! dest) args) | 
+>                              (Alt _ binds (Goto (_, dest) args)) <- alts] 
 >     t (Done _ _ (Goto (_, dest) args)) bound = 
 >       mapSingleton dest (renameBound args (blockArgs ! dest) bound)
 >     t (Done _ _ _) facts = mkFactBase collapseLattice []
@@ -150,16 +149,10 @@ closure or jump to the block.
 >     using var (PElem (CloDest _ vars)) = var `elem` vars
 >   
 >     renameAlt origFacts binds newNames origNames = 
->       -- Remove any facts shadowed by this alternative's bindings.
->       -- Includes facts that use a shadowed variable, as well
->       -- as facts about a shadowed variable.
->       let remainingFacts = 
->               foldr (\v f -> kill v f) 
->                 (Map.filterWithKey (\v _ -> v `elem` binds) origFacts) binds
+>       let remainingFacts = foldr (\v f -> kill v f) 
+>                            (Map.filterWithKey (\v _ -> v `elem` binds) origFacts) binds
 >       in renameBound origNames newNames remainingFacts
 >                   
->     -- Rename variables in CollapseFact according to
->     -- the names used by the destination block.
 >     renameBound :: [Name] -> [Name] -> CollapseFact -> CollapseFact
 >     renameBound origNames newNames = Map.mapKeys (rename origNames newNames) 
 >
@@ -168,10 +161,7 @@ closure or jump to the block.
 >       case arg `elemIndex` args of
 >         Just i -> blockArgs !! i -- rename to block argument
 >         _ -> arg -- don't rename
->
->     -- A candidate for renaming is a var that is not shadowed and appears
->     -- in the args list. The ignored argument just makes this easier to
->     -- use with Map.filterWithKey.
+>         
 >     candidate :: [Name] -> [Name] -> Name -> a -> Bool
 >     candidate shadows args var _ = not (var `elem` shadows) && var `elem` args
 
