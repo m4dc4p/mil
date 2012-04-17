@@ -98,6 +98,9 @@ closure or jump to the block.
 >     initial :: FactBase CollapseFact
 >     initial = mapFromList (zip labels (repeat Map.empty)) {-"\hslabel{initial}"-}
 >
+>     debugFwdT = debugFwdTransfers trace (show . printStmtM) (\_ _ -> True) fwd
+>     debugFwdJ = debugFwdJoins trace (const True) fwd
+>                     
 >     fwd :: FwdPass SimpleFuelMonad Stmt CollapseFact
 >     fwd = FwdPass { fp_lattice = collapseLattice {-"\hslabel{fwd}"-}
 >                   , fp_transfer = collapseTransfer blockArgs
@@ -132,11 +135,11 @@ closure or jump to the block.
 >     t (Bind v (Closure dest args)) facts = Map.insert v (PElem (CloDest dest args)) {-"\hslabel{closure}"-} 
 >                                            (kill v facts)
 >     t (Bind v _) facts = Map.insert v Top (kill v facts) {-"\hslabel{rest}"-}
->     t (Case _ alts) bound = mkFactBase collapseLattice 
->                             [(dest, renameAlt bound binds (blockArgs ! dest) args) | 
+>     t (Case _ alts) facts = mkFactBase collapseLattice 
+>                             [(dest, renameAlt facts binds (blockArgs ! dest) args) | 
 >                              (Alt _ binds (Goto (_, dest) args)) <- alts] 
->     t (Done _ _ (Goto (_, dest) args)) bound = 
->       mapSingleton dest (renameBound args (blockArgs ! dest) bound)
+>     t (Done _ _ (Goto (_, dest) args)) facts = 
+>       mapSingleton dest (renameBound args (blockArgs ! dest) facts)
 >     t (Done _ _ _) facts = mkFactBase collapseLattice []
 >     t (BlockEntry _ _ _) facts = facts
 >     t (CloEntry _ _ _ _) facts = facts
@@ -150,7 +153,7 @@ closure or jump to the block.
 >   
 >     renameAlt origFacts binds newNames origNames = 
 >       let remainingFacts = foldr (\v f -> kill v f) 
->                            (Map.filterWithKey (\v _ -> v `elem` binds) origFacts) binds
+>                            (Map.filterWithKey (\v _ -> not (v `elem` binds)) origFacts) binds
 >       in renameBound origNames newNames remainingFacts
 >                   
 >     renameBound :: [Name] -> [Name] -> CollapseFact -> CollapseFact

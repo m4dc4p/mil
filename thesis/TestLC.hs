@@ -22,17 +22,20 @@ import LCToMIL
 import DeadBlocks
 import LCM
 
-progM :: ([Name], ProgM C C) -> [Def] -> IO ()
-progM prelude@(prims, _) progs = do
+progM :: ([Name], ProgM C C) 
+      -> ([Name]
+          -> ProgM C C
+          -> ProgM C C) 
+      -> [Def] 
+      -> IO ()
+progM prelude@(prims, _) optProgs progs = do
   putStrLn "\n ========= LambdaCase ================="
   putStrLn (render $ vcat (map printDef progs)) 
   putStrLn "\n ========= Unoptimized MIL ============"
   putStrLn (render $ printProgM (deadBlocks tops . compile tops prelude $ progs))
 
-  let optProgs = mostOpt tops prelude . (compile tops prelude) $ progs
-
   putStrLn "\n ========= Optimized MIL =============="
-  putStrLn (render $ printProgM optProgs)
+  putStrLn (render $ printProgM (optProgs tops . compile tops prelude $ progs))
            
     where
       tops = map fst progs
@@ -59,7 +62,7 @@ milTest prog = do
   putStrLn ("============== Original ================")
   putStrLn (render . printProgM $ p)
   putStrLn ("============== Optimized ===============")
-  putStrLn (render . printProgM . mostOpt (blocks p) prelude $ p)
+  putStrLn (render . printProgM . mostOpt (blocks p) $ p)
 
 {-
    
@@ -940,6 +943,21 @@ uncurry1 = [("uncurry1",
              _case test $
                 (alt "True" [] $ \_ -> var "map" `app` f `app` xs) .
                 (alt "False" [] $ \_ -> var "map" `app` g `app` xs))] ++ myMap
+
+double1 = [("main",
+            lam "ns" $ \ns ->
+            var "map" `app` var "double" `app` ns),
+           ("double",
+            lam "x" $ \x ->
+              times (lit 2) x)] ++ myMap
+
+double2 = [("double",
+            lam "ns" $ \ns ->
+            var "map" `app` (var "mult" `app` lit 2) `app` ns),
+           ("mult",
+            lam "a" $ \a ->
+            lam "b" $ \b ->
+              times a b)] ++ myMap
 
 {- An example to demonstrate uncurrying across case statements.
    Does not work as "xs" appears as in a goto but it is not

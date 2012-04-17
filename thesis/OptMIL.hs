@@ -2,7 +2,8 @@
   , NamedFieldPuns, TypeFamilies, ScopedTypeVariables #-}
 
 module OptMIL (mostOpt, addLive, LiveFact
-              , getEntryLabel, findLive, deadCode)
+              , getEntryLabel, findLive, deadCode
+              , optCollapse)
 
 where
 
@@ -287,12 +288,12 @@ singlePred referrers dest f
   | dest `Map.member` referrers && Set.size (referrers ! dest) == 1 = Just (maybe True (True &&) f)
   | otherwise = f
 
--- | Collapse closures, then elminate dead assignments
--- in blocks.
-optCollapse tops = deadCode . collapse
+-- | Optimizations that need to run around
+-- closure collapse. 
+optCollapse tops = deadBlocks tops . deadCode . collapse . bindReturn . inlineReturn
 
-mostOpt :: [Name] -> ([Name], ProgM C C) -> ProgM C C -> ProgM C C
-mostOpt tops prelude@(prims, _) = id .
+mostOpt :: [Name] -> ProgM C C -> ProgM C C
+mostOpt tops = id .
     deadBlocks tops . 
     -- inlineBlocks tops . 
     -- deadBlocks tops .  
@@ -301,10 +302,10 @@ mostOpt tops prelude@(prims, _) = id .
     deadCode . 
     collapse . 
     -- deadCode . 
-    -- bindSubst . 
-    -- inlineReturn .
+    bindSubst . 
+    inlineReturn .
     -- collapse . 
-    -- bindReturn . 
+    bindReturn . 
     -- deadCode . 
     -- bindSubst .
     id
