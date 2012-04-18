@@ -44,6 +44,10 @@ progM prelude@(prims, _) optProgs progs = do
       -- printDef def = text (show (ppr def))
       printDef def = text (show "foo")
 
+-- | Perform no optimizations.
+noOpts :: a -> b -> b
+noOpts _ p = p
+
 m205 :: Graph Stmt C C
 m205 = mkFirst (BlockEntry undefined undefined ["g", "f", "x"]) <*>
        mkMiddles [Bind "v209" undefined {-"\ \app g * x/"-}
@@ -944,6 +948,12 @@ uncurry1 = [("uncurry1",
                 (alt "True" [] $ \_ -> var "map" `app` f `app` xs) .
                 (alt "False" [] $ \_ -> var "map" `app` g `app` xs))] ++ myMap
 
+{-
+
+main ns = map double ns
+double = times 2
+
+-}
 double1 = [("main",
             lam "ns" $ \ns ->
             var "map" `app` var "double" `app` ns),
@@ -951,6 +961,11 @@ double1 = [("main",
             lam "x" $ \x ->
               times (lit 2) x)] ++ myMap
 
+{-
+
+main ns = map (times 2) ns
+
+-}
 double2 = [("double",
             lam "ns" $ \ns ->
             var "map" `app` (var "mult" `app` lit 2) `app` ns),
@@ -1104,7 +1119,30 @@ uncurry_global1 = do
       k2 = mkFirst (CloEntry "k2" k2L [] "x") <*>
            mkLast (Done "k2" k2L (Goto ("b4", b4L) ["x"]))
   return $ b1 |*><*| b2 |*><*| b3 |*><*| b4 |*><*| k1 |*><*| k2
-                     
+
+-- Demonstrate what happens
+-- when a closure captures a variable that is immediatley
+-- bound
+uncurry_capture :: UniqueMonad m => m (ProgM C C)
+uncurry_capture = do
+  b1L <- freshLabel
+  b2L <- freshLabel
+  k1L <- freshLabel
+  k2L <- freshLabel
+  let k2 = mkFirst (CloEntry "k2" k2L ["x"] "y") <*>
+           mkLast (Done "k2" k2L (Closure ("k1", k1L) ["x", "y"]))
+      k1 = mkFirst (CloEntry "k1" k1L ["x","y"] "z") <*>
+           mkLast (Done "k1" k1L (Goto ("b2", b2L) ["x", "y", "z"]))
+      b2 = mkFirst (BlockEntry "b2" b2L ["x","y","z"]) <*>
+           mkLast (Done "b2" b2L (Prim "foo" ["x","y","z"]))
+      b1 = mkFirst (BlockEntry "b1" b1L ["x", "y"]) <*>
+           mkMiddles [Bind "v" (Closure ("k2", k2L) ["x"])
+                     ,Bind "m" (Enter "v" "y")
+                     ,Bind "v" (Closure ("k2", k2L) ["v"])
+                     ,Bind "w" (Enter "v" "y")] <*>
+           mkLast (Done "v1" b1L (Enter "w" "m"))
+  return $ b1 |*><*| k2 |*><*| k1 |*><*| b2
+    
 
 mil_print = [("hello", bindE "_" (mPrint `app` lit 0) $ \_ -> ret mkUnit)
             ,("main", 

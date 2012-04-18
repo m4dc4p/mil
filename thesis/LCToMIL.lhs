@@ -54,8 +54,8 @@ the primitive with a special, pre-determined name. |getDestOfName| looks
 up the name of a MIL block and returns a |Maybe Dest| value, indicating
 if the name exists in the current program.
 
->   dest <- getDestOfName ("mkData_" ++ cons)
->   when (isNothing dest) (error $ "Could not find '" ++ "mkData_" ++ cons ++ "' in predefined.")
+>   dest <- getDestOfName cons
+>   when (isNothing dest) (error $ "Could not find '" ++ cons ++ "' in predefined.")
 
 Assuming the name exists, compileStmt puts |Goto| instruction to
 execute the body of the primitive. Notice no arguments are given

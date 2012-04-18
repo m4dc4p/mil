@@ -125,7 +125,7 @@ printTailM (Return n) = text "return" <+> text n
 printTailM (Enter f a) = text f <+> text "@" <+> text a
 printTailM (Closure dest vs) = printDest dest <+> braces (commaSep text vs)
 printTailM (Goto dest vs) = printDest dest <> parens (commaSep text vs)
-printTailM (Constr cons vs) = text cons <> text "*" <+> (hsep $ texts vs)
+printTailM (Constr cons vs) = text cons <+> (hsep $ texts vs)
 printTailM (Thunk dest vs) = printDest dest <+> brackets (commaSep text vs)
 printTailM (Invoke v) = text "invoke" <+> text v
 printTailM (Prim p vs) = text p <> text "*" <> parens (commaSep text vs)
@@ -301,11 +301,11 @@ prims = [printPrim
         , gtePrim
         , eqPrim
         , neqPrim
-        , ("mkData_Nil", mkDataPrim "Nil" 0)
-        , ("mkData_Cons", mkDataPrim "Cons" 2)
-        , ("mkData_Nothing", mkDataPrim "Nothing" 0)
-        , ("mkData_Just", mkDataPrim "Just" 1)
-        , ("mkData_Unit", mkDataPrim "Unit" 0)
+        , ("Nil", liftM snd $ mkDataPrim "Nil" 0)
+        , ("Cons", liftM snd $ mkDataPrim "Cons" 2)
+        , ("Nothing", liftM snd $ mkDataPrim "Nothing" 0)
+        , ("Just", liftM snd $ mkDataPrim "Just" 1)
+        , ("Unit", liftM snd $ mkDataPrim "Unit" 0)
         ] ++ prioSetPrims
   where
     -- Primitives necessary to compile PrioSetLC.lhs in ..\..priosetExample
@@ -330,8 +330,8 @@ prims = [printPrim
       ,("primInitStored", liftM snd $ monadic binPrim "primInitStored")
       ,("@", liftM snd $ monadic binPrim "@")
       ,("writeRef", liftM snd $ monadic binPrim "writeRef")
-      ,("mkData_False", mkDataPrim "False" 0)
-      ,("mkData_True", mkDataPrim "True" 0)]
+      ,("False", liftM snd $ mkDataPrim "False" 0)
+      ,("True", liftM snd $ mkDataPrim "True" 0)]
 
 printPrim :: UniqueMonad m => (Name, m (ProgM C C))
 printPrim = ("print", liftM snd $ mkMonadicPrim "print" 1)
@@ -361,34 +361,6 @@ gtePrim = ("gte", liftM snd $ mkPrim "gte" 2)
 eqPrim = ("eq", liftM snd $ mkPrim "eq" 2)
 neqPrim = ("neq", liftM snd $ mkPrim "neq" 2)
 
--- | Implements primitive to create data values. The argument
--- specifies the number of values the constructor will take. The
--- function defined here always takes one more argument, which will
--- hold the tag for the value.
-mkDataPrim :: UniqueMonad m => Constructor -> Int -> m (ProgM C C)
-mkDataPrim tag numArgs = do
-  let name = "mkData_" ++ tag
-      -- Make the final closure & block for 
-      -- executing the "mkDataP" primitive with all the right arguments.
-      mkLam bName 0 vs = do
-        bLabel <- freshLabel
-        let bloConstr = mkFirst (BlockEntry bName bLabel vs) <*>
-              mkLast (Done bName bLabel (Constr tag vs))
-        return (bLabel, bloConstr)
-      mkLam cName n vs = do
-        cLabel <- freshLabel
-        let arg = "t" ++ show (length vs + 1)
-            capt = vs ++ [arg]
-            nextName = "Constr_" ++ tag ++ "_" ++ show (n - 1)
-        (nextLabel, prog) <- mkLam nextName (n - 1) capt
-        let cloConstr = mkFirst (CloEntry cName cLabel vs arg) <*>
-                        mkLast (Done cName cLabel (if n == 1 
-                                                    then Goto (nextName, nextLabel) capt
-                                                    else Closure (nextName, nextLabel) capt))
-        return (cLabel, cloConstr |*><*| prog)
-  (_, p) <- mkLam name numArgs []
-  return p
-
 monadic :: UniqueMonad m => (Name -> m (Dest, ProgM C C)) -> Name -> m (Dest, ProgM C C)
 monadic rest name  = do
   thunkLabel <- freshLabel
@@ -396,6 +368,25 @@ monadic rest name  = do
   let thunkBody = mkFirst (BlockEntry name thunkLabel []) <*>
                   mkLast (Done name thunkLabel (Thunk dest []))
   return ((name, thunkLabel), thunkBody |*><*| prog)
+
+mkDataPrim :: UniqueMonad m => Name -> Int -> m (Dest, ProgM C C)
+mkDataPrim tag numArgs 
+  | numArgs == 0 = final []
+  | otherwise = do
+    (next, rest) <- mkIntermediate final tag numArgs [] 
+    dest@(n, l) <- newDest tag
+    return (dest
+           , (mkFirst (BlockEntry n l []) <*>
+              mkLast (Done n l $ Closure next [])) |*><*| 
+            rest)
+  where
+    final args = do
+      dest1@(n1, l1) <- if(args == []) 
+                        then newDest tag
+                        else newDest (tag ++ "body")
+      return (dest1
+             , (mkFirst (BlockEntry n1 l1 args) <*>
+                mkLast (Done n1 l1 (Constr tag args))))
 
 mkPrim :: UniqueMonad m => Name -> Int -> m (Dest, ProgM C C)
 mkPrim name numArgs 
@@ -409,7 +400,9 @@ mkPrim name numArgs
             rest)
   where
     final args = do
-      dest1@(n1, l1) <- newDest (name ++ "body")
+      dest1@(n1, l1) <- if(args == []) 
+                        then newDest name
+                        else newDest (name ++ "body")
       return (dest1
              , (mkFirst (BlockEntry n1 l1 args) <*>
                 mkLast (Done n1 l1 (Prim name args))))
