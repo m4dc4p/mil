@@ -132,8 +132,7 @@ closure or jump to the block.
 > collapseTransfer blockArgs = mkFTransfer t
 >   where
 >     t :: Stmt e x -> CollapseFact -> Fact x CollapseFact
->     t (Bind v (Closure dest args)) facts = Map.insert v (PElem (CloDest dest args)) {-"\hslabel{closure}"-} 
->                                            (kill v facts)
+>     t (Bind v (Closure dest args)) facts = kill v (Map.insert v (PElem (CloDest dest args)) facts) {-"\hslabel{closure}"-} 
 >     t (Bind v _) facts = Map.insert v Top (kill v facts) {-"\hslabel{rest}"-}
 >     t (Case _ alts) facts = mkFactBase collapseLattice 
 >                             [(dest, renameAlt facts binds (blockArgs ! dest) args) | 

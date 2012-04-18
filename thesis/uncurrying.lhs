@@ -305,23 +305,27 @@ statement.
         
         F_1 \wedge F_2 &= \begin{array}{l}
           \{(\var v/, p \lub q)\ ||\ (\var v/, p) \in F_1, (\var v/, q) \in F_2\}\ \cup \\
-          \{(\var v/, \top)\ ||\ \var v/ \in \dom(F_1), \var v/ \not\in \mfun{dom}(F_2)\ \text{or} \\
+          \{(\var v/, \top)\ ||\ \var v/ \in \dom(F_1), \var v/ \not\in \mfun{dom}(F_2)\ \vee \\
           \phantom{\{(v, \top)\ ||\ } \var v/ \not\in \dom(F_1), \var v/ \in \mfun{dom}(F_2)\},
         \end{array} \labeleq{uncurry_df_meet} & \eqref{uncurry_df_meet} \\ 
         & \multicolumn{2}{l}{\phantom{=} \text{where\ } F_1, F_2 \in \setL{Fact}.}\\\\
 
         \multicolumn{3}{c}{\textit{Transfer Function}} \\
         t (F, \binds v\ <-\ \mkclo[l:v_1, \dots, v_n];) &= 
-          \{(\var v/, \mkclo[l:v_1, \dots, v_n])\} \cup (F\ \backslash\ \mfun{uses}(F, \var v/)) 
+          F\ \backslash (\mfun{uses}(F, \var v/)  \cup \{(\var v/, \mkclo[l:v_1, \dots, v_n])\}) 
           \labeleq{uncurry_df_transfer_closure} & \eqref{uncurry_df_transfer_closure} \\
         \the\widest &= \{(\var v/, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, \var v/)) \labeleq{uncurry_df_transfer_other} & \eqref{uncurry_df_transfer_other} \\
-        t (F, \goto b(v_1, \dots, v_n) &= & \eqref{uncurry_df_transfer_goto} \\
-        t \left(F, \parbox{\widthof{\case v;}}{\baselineskip=12pt\disableparspacing;%%
+        \mathllap{t \left(F, \parbox{\widthof{\quad \alt C_1(v_1 \dots)->\dots;}}{\baselineskip=12pt\disableparspacing;%%
         \case v;\endgraf%%
-        \quad $\mfun{alt}_1$\endgraf%%
+        \quad \alt C_1(v_1 \dots)->\dots;\endgraf%%
         \quad $\dots$\endgraf%%
-        \quad $\mfun{alt}_n$\endgraf%%
-        }\right) &= & \eqref{uncurry_df_transfer_case} \\
+        \quad \alt C_m(\dots v_n)->\dots;\endgraf%%
+        }\right)} &= 
+          \begin{array}{l}
+            F\ \backslash \left(\mfun{uses}(F, \var v_1/) \cup \dots \cup \mfun{uses}(F, \var v_n/)\right) \backslash \\
+            \quad \{(\var v_i/, p) ||\ (\var v_i/, p) \in F, 1 \leq i \leq n\}
+          \end{array} \labeleq{uncurry_df_transfer_case} & 
+                     \eqref{uncurry_df_transfer_case} \\
         t (F, \_) &= F, \labeleq{uncurry_df_transfer_rest} & \eqref{uncurry_df_transfer_rest} \\
         & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \in \setL{Fact}.} \\\\
 
