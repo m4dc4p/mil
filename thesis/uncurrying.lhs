@@ -74,7 +74,7 @@ applying |map1| to a single argument. For example, we can create a
 function to convert all its arguments to uppercase or one that squares
 all integers in a list:
 
-\begin{singlespace}\correctspaceskip
+\begin{singlespace}
 > upCase1 :: [Char] -> [Char]
 > upCase1 = map1 toUpper
 >
@@ -275,14 +275,14 @@ closure returned.
 \section{Dataflow Equations}
 \label{uncurry_sec_df}
 \intent{Define dataflow equations for our uncurrying optimization.}
-We implement uncurrying with a forwards dataflow analysis that
-determines if a given statement allocates a closure. Our analysis
-creates facts that indicate if a given variable refers to a known
-closure. We propogate the value of a given variable between blocks
-when that variable is passed to a successor block via a call or case
-statement. 
+We implement uncurrying with a forwards dataflow analysis. Our facts
+indicate if that determines if a given given variable refers to a
+known closure. Facts are propogated successor block when the block
+ends with a call or case statement. We combine multiple input facts
+for a given block by determining if all sets of facts agree on the
+value of a given variable.
 
-\begin{myfig}[tbp]
+xs\begin{myfig}[tbp]
   \begin{minipage}{\hsize}
     \begin{math}
       %% Below used to measure & typeset the case where we don't
@@ -468,11 +468,7 @@ here.
 
 \item[\emph{Equation~\eqref{uncurry_df_transfer_rest} --- All Other
     Statements}] For all other statements, $t$ acts like identity ---
-  $F$ is returned unchanged. This equation appears simple, but it
-  allows the transfer of facts from a given block to its
-  successors. If a block ends with a ``goto'' (e.g., \goto
-  b(v_1,\dots, v_n)),Critically, this includes ``goto'' terms at the
-  end of a block, as well as both types of block definitions.
+  $F$ is returned unchanged. 
 
 \end{description}
 
@@ -520,7 +516,7 @@ artifact of our previous name for the analysis.
 In our presentation of dataflow equations in
 Section~\ref{uncurry_sec_df}, we described this analysis by
 statements. However, our implementation works on blocks of \mil
-code. Fortunately, the net result is the same due to Hoopl's
+code. Fortunately, the net result is the same due to \hoopl's
 interleaved analysis and rewriting. Our transfer and rewrite functions
 work in tandem to rewrite \enter expressions within a block.
 
@@ -550,7 +546,8 @@ is treated as the entry point for the program.
       \block toInt(s): \prim atoi(s)
     \end{AVerb}
   \end{minipage} \\
-  \caption{Example program.}
+  \caption{A \mil program we will use to illustrate our implementation
+  of uncurrying.}
   \label{uncurry_fig_eg}
 \end{myfig}
 
@@ -637,7 +634,7 @@ the label the closure refers to, and a list of captured variables,
 
 \intent{Explain how |WithTop CloDest| and |CollapseFact| represent
   \setL{Fact}.}  We use a finite map, aliased as |CollapseFact|, to
-represent our \setL{Fact} set. Hoopl provides |WithTop|, a type that
+represent our \setL{Fact} set. \Hoopl provides |WithTop|, a type that
 adds a $\top$ value to any other type. |WithTop CloDest| then 
 represents the set $\{\top\} \cup \{\setL{Clo}\}$. In turn, |CollapseFact| 
 represents a finite map from variables to $\{\top\} \cup
@@ -649,7 +646,7 @@ Figure~\ref{uncurry_fig_lattice} shows the |DataflowLattice| structure
 defined for our analysis. We set |fact_bot| to an empty map, meaning
 we start without any information. We define |lub| over |CloDests|, just
 like \lub in Figure~\ref{uncurry_fig_df}. We use |joinMaps (toJoin
-lub)| (Hoopl provides |joinMaps|) to transform |lub| into a function
+lub)| (\hoopl provides |joinMaps|) to transform |lub| into a function
 that operates over finite maps.
 
 \begin{myfig}
@@ -658,7 +655,7 @@ that operates over finite maps.
 %include Uncurry.lhs
 %let includeLattice = False
   \end{minipage}
-  \caption{The Hoopl |DataflowLattice| declaration representing the 
+  \caption{The \hoopl |DataflowLattice| declaration representing the 
   lattice used by our analysis.}
   \label{uncurry_fig_lattice}
 \end{myfig}
@@ -668,7 +665,7 @@ that operates over finite maps.
 The definition |t| in Figure~\ref{uncurry_fig_transfer} gives the
 implementation of $t$ from Figure~\ref{uncurry_fig_df}. The top-level
 definition, |collapseTransfer|, serves to turn |t|
-into a |FwdTransfer| value.  As in all Hoopl-based forwards analysis,
+into a |FwdTransfer| value.  As in all \hoopl-based forwards analysis,
 the second argument to |t| is our facts so far. We define |t| for each
 statement type in \mil.
 
@@ -677,7 +674,7 @@ unchanged.\footnote{Note these will always be empty maps, because our
   analysis does not extend across blocks and |fact_bot| in our lattice
   is |Map.empty|.} Because we do not propagate facts between blocks,
 the |Case| and |Done| cases pass an empty map to each successor,
-using the Hoopl-provided |mkFactBase| function to create a |FactBase|
+using the \hoopl-provided |mkFactBase| function to create a |FactBase|
 from empty facts.
 
 \begin{myfig}[p]
@@ -749,9 +746,9 @@ closure or jumps immediately to another block.
 \end{myfig}
 
 On Line~\ref{uncurry_fig_rewrite_top}, |collapseRewrite| applies
-Hoopl's |iterFwdRw| and |mkFRewrite| to create a |FwdRewrite|
+\hoopl's |iterFwdRw| and |mkFRewrite| to create a |FwdRewrite|
 value. The |iterFwdRw| combinator applies |rewriter| repeatedly, until
-the |Graph| representing the program stops changing. Hoopl computes
+the |Graph| representing the program stops changing. \Hoopl computes
 new facts (using |collapseTransfer|) after each rewrite. This ensures
 that a ``chain'' of closure allocations get collapsed into a single
 allocation, if possible.
@@ -833,7 +830,7 @@ associating \var v1/ with \mkclo[k1:n]. |rewriter| transforms \binds v2
 because \var v1/ refers to \lab k1/ and |blocks| tells us that \lab
 k1/ jumps immediately to \lab add/. No changes occur after the third
 iteration because no statements remain that can be rewritten, and
-Hoopl stops applying |rewriter|.
+\hoopl stops applying |rewriter|.
 
 Figure~\ref{uncurry_fig_rewrite_impl} shows the functions that
 implement our uncurrying optimization.\footnote{Note that these
@@ -911,12 +908,12 @@ Figure~\ref{uncurry_fig_collapse} presents |collapse|, which applies
 the uncurrying dataflow analysis and rewrite to the \mil program
 represented by the argument
 |program|. Line~\ref{uncurry_fig_collapse_analyze} analyzes and
-transforms |program| by passing appropriate arguments to Hoopl's
-|analyzeAndRewriteFwd| function. On Line~\ref{uncurry_fig_collapse_run} we evaluate Hoopl's
+transforms |program| by passing appropriate arguments to \hoopl's
+|analyzeAndRewriteFwd| function. On Line~\ref{uncurry_fig_collapse_run} we evaluate \hoopl's
 monadic program using |runSimple|. |runSimple| provides a monad with
 infinite optimization fuel.
 
-\begin{myfig}
+\begin{myfig}[p]
   \begin{minipage}{\hsize}\begin{withHsLabeled}{uncurry_fig_collapse}\disableoverfull
 %let includeCollapse = True
 %include Uncurry.lhs
@@ -935,8 +932,8 @@ Half of Figure~\ref{uncurry_fig_collapse} creates arguments for
   rewrite definitions we described in
   Sections~\ref{uncurry_impl_lattice}, \ref{uncurry_impl_transfer},
   and \ref{uncurry_impl_rewrite}.
-\item[|JustC labels|] --- We must give Hoopl all entry points for the
-  program analyzed. These labels tell Hoopl where to start
+\item[|JustC labels|] --- We must give \hoopl all entry points for the
+  program analyzed. These labels tell \hoopl where to start
   traversing the program graph. Because our analysis does not extend
   across blocks we give all labels, so all blocks in |program| will be
   analyzed. This argument's type is |MaybeC C [Label]|, which requires
@@ -956,6 +953,101 @@ create the |blocks| argument passed to |collapseRewrite|. The
 \cc blocks. |destOf| determines the behavior of each \cc block and
 creates the appropriate |Jump| or |Capture| value. The result of
 |destinations| becomes the |blocks| argument for |collapseRewrite|.
+
+\subsection{Two Bugs}
+
+Our implementation of uncurrying suffers from two separate bugs. In
+the first case, we can introduce free variables into a block. In the
+second case, we can propogate incorrect facts to certain blocks. We
+discuss these bugs and possible solutions below.
+
+Our implementation of uncurrying replaces \enter expression with
+closure allocations if possible. When |collapseTransfer| sees
+a binding to a closure value, it records not only the label that
+the closure refers to, but also all variables captured in the
+closure. These facts are propogated to successor blocks. If those
+blocks subsequently are rewritten to use the closure allocated directly,
+the variables in the closure may be ``unpacked'' into the block,
+introducing free variables into the block.
+
+For example, consider the following \mil program. In \lab b1/,
+\var v/ is bound to \mkclo[k1:x]. The closure allocated is passed
+to \lab b2/ and then \lab b3/. \lab b3/ applies the closure to 
+to \var y/ and returns the result:
+
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \ccblock k1(x)y: \goto p1(x, y)
+
+    \block p1(x,y): \prim add(x, y)
+
+    \block b1(x, y):
+      \vbinds v<-\mkclo[k1:x];
+      \goto b2(v, y)
+
+    \block b2(v), y: \goto b3(v, y)
+
+    \block b3(v, y):
+      \vbinds t<-\app v*y/;
+      \return t/
+  \end{AVerb}
+\end{singlespace}
+
+Our analysis create the fact $\{\var v/, \mkclo[k1:x]\}$
+when analyzing \lab b1/ and then will propogate it to \lab b3/. In
+\lab b3/, our rewriter would determine that the expression \app v * y/
+in \lab b3/ could be rewritten as \goto p1(x, y), as \lab k1/ immediately 
+jumps to \lab p1/, producing:
+
+\begin{singlespace}\correctspaceskip
+  \begin{AVerb}[gobble=4]
+    \block b3(v, y):
+      \vbinds t<-\goto p1(x, y)
+      \return t/
+  \end{AVerb}
+\end{singlespace}
+
+\noindent But this is clearly wrong! \var x/ is not an argument \lab b3/, 
+and therefore this program would fail. 
+
+This problem could be solved with another dataflow analysis. In the
+first, we rewrite the entire program so all variable names are
+unique. After uncurrying, we determine the free variables in each
+block (a backwards dataflow analysis). We then use propagate free
+variables from the block in which they are first bound to the blocks
+where they are used.
+
+The second bug does not account for calls to blocks on the \rhs of a
+bind statement, such as \binds v <- \goto b(\dots)/. Our analysis only
+considers calls at the end of blocks. If the values passed to the
+block \lab b/ on the \rhs of a \bind differ from those passed
+at the end of a block, then our analysis will propogate incorrect 
+facts.
+
+For example, in the following program \lab b1/ allocates two closures,
+\mkclo[k1:] and \mkclo[k2:]. It passes \mkclo[k2:] to \lab b2/
+on Line~\ref{mil_bug2_b2}. On the next line, the other closure
+is passed to \lab b2/. In \lab b2/, the closure is applied to an
+argument and the result returned.
+
+\begin{singlespace}
+  \begin{AVerb}[gobble=4,numbers=left]
+    \ccblock k1()x: b3(x)
+    \ccblock k2()x: b4(x)
+
+    \block b1 (x, y):
+      \vbinds v<- \mkclo[k1:];
+      \vbinds w<- \mkclo[k2:];
+      \vbinds z<- \goto b2(w, y);\label{mil_bug2_b2}
+      \goto b2(v, y)
+
+    \block b2 (v, y):
+      \vbinds t<- \app v*y;
+      \return t
+    \block b3 (x): return x
+    \block b4 (x): return x  
+  \end{AVerb}
+\end{singlespace}
 
 \section{Related Work}
 

@@ -878,6 +878,54 @@ operation implemented by that statement. Finally, the |Done| statement
 at the end of the block shows that the result of the block will be the
 value returned when the monadic thunk \var v206/ executes.
 
+\section{\Mil \cfgs with \hoopl}
+\label{mil_hoopl_cfg}
+
+As discussed in Section~\ref{hoopl_sec_cfg}, \hoopl uses the
+|NonLocal| typeclass to define the successor and predecessor
+relationships among nodes in a \cfg. Figure~\ref{mil_fig_nonlocal}
+gives the |NonLocal| instance for \mil. The |entryLabel| definitions
+show that the |Label| argument to |BlockEntry| and |CloEntry| serve
+to index \mil blocks in the \cfg. That is, \hoopl uses |Label| values
+to find a given block.
+
+\begin{myfig}
+  \begin{minipage}{\hsize}
+> instance NonLocal Stmt where
+>   entryLabel (BlockEntry _ l _) = l
+>   entryLabel (CloEntry _ l _ _) = l
+>   successors (Case _ alts) = [l | (Alt _ _ (Goto (_, l) _)) <- alts]
+>   successors (Done _ _ (Goto (_, l) _)) = [l]
+>   successors _ = []
+  \end{minipage}
+  \caption{\Mil's instance definition for |NonLocal|.}
+  \label{mil_fig_nonlocal}
+\end{myfig}
+
+The |successors| definition shows that we only consider the last
+statement in a block when specifying successors. Recall that
+each |Case| alternative will immediately jump to some block; when
+a block ends with a |Case|, we consider all those blocks successors.
+When a block ends with a |Goto|, we specify the destination block
+as the sole successor to the block. The block will have 
+no successors for all other |Tail| values.
+
+Crucially, we do \emph{not} consider any \mil blocks mentioned in
+|Goto| expressions on the \rhs of a |Bind| statement as
+successors. This choice makes our use of \hoopl less effective,
+because certain control-flow facts are not apparent to the
+framework. However, we choose this representation for practical
+reasons. 
+
+\Hoopl only allows |successors| to be defined for ``|e C|'' types
+(such as |Done| and |Case|). We would need to make |Goto| a |Stmt
+O C| type to define a |successors| instance for it, which would require
+that |Goto| only appears at the end of a block. Requiring |Goto| to
+appear at the end of a block would break the \emph{Right-Unit} monad
+law (discussed in Section~\ref{conc_inline_monadic} on
+Page~\pageref{conc_inline_monadic}), which would limit our ability
+to inline \mil blocks. 
+
 \section{Related Work: \mlj \& \smlnet}
 \label{mil_sec_rel}
 

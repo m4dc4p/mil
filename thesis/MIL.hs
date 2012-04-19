@@ -145,16 +145,9 @@ printBlockM = p . blockToNodeList'
 instance NonLocal Stmt where
   entryLabel (BlockEntry _ l _) = l
   entryLabel (CloEntry _ l _ _) = l
-  successors = stmtSuccessors
-                        
-stmtSuccessors :: Stmt e C -> [Label]
-stmtSuccessors (Case _ alts) = [l | (Alt _ _ (Goto (_, l) _)) <- alts]
-stmtSuccessors (Done _ _ (Goto (_, l) _)) = [l]
-stmtSuccessors _ = []
-
-tailSuccessors :: Tail -> [Dest]
-tailSuccessors (Goto dest _) = [dest]
-tailSuccessors _ = []
+  successors (Case _ alts) = [l | (Alt _ _ (Goto (_, l) _)) <- alts]
+  successors (Done _ _ (Goto (_, l) _)) = [l]
+  successors _ = []
 
 tailDest :: Tail -> [Dest]
 tailDest (Closure dest _) = [dest]
