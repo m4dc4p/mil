@@ -853,7 +853,7 @@ monadic composition function:
 > m205 label = 
 >   mkFirst (BlockEntry "m205" label ["g", "x", "f"]) <*>  -- \block m205(g, x, f): 
 >   mkMiddles [Bind "v207" (Enter "g" "x")                 --   \quad\binds v207 <- \app g * x/;
->             , Bind "v1"  (Invoke "v207")                 --   \quad\binds v1 <- \invoke v209/;
+>             , Bind "v1"  (Invoke "v207")                 --   \quad\binds v1 <- \invoke v207/;
 >             , Bind "v206" (Enter "f" "v1")] <*>          --   \quad\binds v206 <- \app f * v1/;
 >   mkLast (Done "m205" label (Invoke "v206"))             --   \quad\invoke v206/
 \end{singlespace}
