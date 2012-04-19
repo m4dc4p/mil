@@ -312,25 +312,40 @@ statement.
 
         \multicolumn{3}{c}{\textit{Transfer Function}} \\
         t (F, \binds v\ <-\ \mkclo[l:v_1, \dots, v_n];) &= 
-          F\ \backslash (\mfun{uses}(F, \var v/)  \cup \{(\var v/, \mkclo[l:v_1, \dots, v_n])\}) 
+          F\ \backslash \mfun{uses}(F \cup \{(\var v/, \mkclo[l:v_1, \dots, v_n])\}, \var v/)
           \labeleq{uncurry_df_transfer_closure} & \eqref{uncurry_df_transfer_closure} \\
         \the\widest &= \{(\var v/, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, \var v/)) \labeleq{uncurry_df_transfer_other} & \eqref{uncurry_df_transfer_other} \\
-        \mathllap{t \left(F, \parbox{\widthof{\quad \alt C_1(v_1 \dots)->\dots;}}{\baselineskip=12pt\disableparspacing;%%
-        \case v;\endgraf%%
-        \quad \alt C_1(v_1 \dots)->\dots;\endgraf%%
-        \quad $\dots$\endgraf%%
-        \quad \alt C_m(\dots v_n)->\dots;\endgraf%%
+        \mathllap{t \left(F, \parbox{\widthof{\quad \alt C_m(v_{m+1} \dots v_n)->\goto b$!+_q+!$(v_{n+1}, \dots, v_p);}}{\baselineskip=12pt\disableparspacing;%%
+            \case v;\endgraf%%
+            \quad \alt C_1(v_1 \dots v_k)->\goto b$!+_1+!$(v_{k+1}, \dots, v_m);\endgraf%%
+            \quad $\dots$\endgraf%%
+            \quad \alt C_m(v_{m+1} \dots v_n)->\goto b$!+_q+!$(v_{n+1}, \dots, v_p);\endgraf%%
         }\right)} &= 
           \begin{array}{l}
-            F\ \backslash \left(\mfun{uses}(F, \var v_1/) \cup \dots \cup \mfun{uses}(F, \var v_n/)\right) \backslash \\
-            \quad \{(\var v_i/, p) ||\ (\var v_i/, p) \in F, 1 \leq i \leq n\}
+            F'\ \backslash\ \mfun{users}(F', \mfun{alts}) \text{, where}  \\
+            \quad\begin{array}{rl}
+            F' &= \begin{array}{l}\mfun{curr}(F, \mfun{args}) \wedge \mfun{tops}(\mfun{alts}) \end{array} \\
+            \mathit{args} &= \begin{array}{l}\{\var v_{k+1}/, \dots, \var v_m/, \var v_{n+1}/, \dots, \var v_p/\} \end{array} \\
+            \mathit{alts} &= \begin{array}{l}
+              \{\var v_i/\ ||\ \var v_i/ \in \mfun{args},  \\
+              \phantom{\{\var v_i/\ ||\ }\var v_i/ \in \{\var v_1/, \dots, \var v_k/,\var v_{m+1}/ \dots \var v_n/\}\} 
+            \end{array}
+            \end{array}
           \end{array} \labeleq{uncurry_df_transfer_case} & 
                      \eqref{uncurry_df_transfer_case} \\
         t (F, \_) &= F, \labeleq{uncurry_df_transfer_rest} & \eqref{uncurry_df_transfer_rest} \\
         & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \in \setL{Fact}.} \\\\
 
-        \mfun{uses}(F, \var v/) &= \{(\var u/, p)\ ||\ (\var u/, p) \in F, p = \clo[l:\dots v \dots] \},
-        \labeleq{uncurry_df_uses} & \eqref{uncurry_df_uses} \\
+        \mfun{uses}(F, \var v/) &= \begin{array}{l}
+          \{(\var u/, p)\ ||\ (\var u/, p) \in F, p = \mkclo[l:v_1, \dots, v_n], \\
+          \quad \var v/ \in \{\var v_1/, \dots, \var v_n/\} \}
+        \end{array} \labeleq{uncurry_df_uses} & \eqref{uncurry_df_uses} \\
+        \mfun{tops}(\{\var v_1/, \dots, \var v_n/\}) &= \begin{array}{l}\{(\var v_i/, \top)\}\end{array}
+        \labeleq{uncurry_df_tops} & \eqref{uncurry_df_tops} \\
+        \mfun{curr}(F, \{\var v_1/, \dots, \var v_n/\}) &= \begin{array}{l}\{(\var v_i/, p)\ ||\ (\var v_i/, p) \in F\}\end{array}
+        \labeleq{uncurry_df_curr} & \eqref{uncurry_df_curr} \\
+        \mfun{users}(F, \{\var v_1/, \dots, \var v_n/\}) &= \begin{array}{l}\mfun{uses}(F, \var v_1/) \cup \dots \cup \mfun{uses}(F, \var v_n/),\end{array}
+        \labeleq{uncurry_df_users} & \eqref{uncurry_df_users} \\
         & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \in \setL{Fact}, \var v/ \in \setL{Var}.}
       \end{array}
     \end{math}
@@ -364,7 +379,7 @@ two associated \setL{Clo} values using the \lub operator defined in
 Equation~\eqref{uncurry_df_lub}. The resulting pair has the same
 variable but a (possibly) new \setL{Clo} value. Together, \setL{Fact}
 and $\wedge$ form a lattice as described in
-Chapter~\ref{ref_chapter_background}, Section~\ref{back_subsec_facts}.
+Section~\ref{back_subsec_facts} on Page~\pageref{back_subsec_facts}.
 
 \intent{Illustrate $\wedge$ with an example.}  For example, if $F_1 =
 \{(\var v/, \mkclo[l:a]), (\var w/, \mkclo[l:b])\}$ and $F_2 = \{(\var u/,
@@ -373,39 +388,93 @@ $F_1 \wedge F_2$ would be $\{(\var u/, \top), (\var v/, \mkclo[l:a]),
 (\var w/, \top)\}$. Because \var u/ only appears in one set, we cannot
 assume it will always refer to \mkclo[l:a], so we add the pair $(\var
 u/, \top)$ to the result. The variable \var v/ appears in both sets with the same
-closure we add $(\var v/, \mkclo[l:a] \lub \mkclo[l:a])$, or $(\var v/,
+closure, so we add $(\var v/, \mkclo[l:a] \lub \mkclo[l:a])$, or $(\var v/,
 \mkclo[l:a])$, to the result set. Finally, \var w/ appears in both
 sets, but the closure associated with it in each differs: \mkclo[l:b] in
 $F_1$ and \mkclo[l:a] in $F_2$. Therefore, we add $(\var w/, \top)$ to
 the result set. 
 
 \intent{Explain in detail how $t$ works.}  Our transfer function, $t$,
-takes a statement and a set of \setL{Fact} values, $F$, as arguments.
+takes a statement and a set of \setL{Fact} values as arguments.
 It returns a \setL{Fact} set containing new facts based on the
-statement given. We define $t$ by cases for each type of \mil statement.
+statement given. We define $t$ by cases over \mil statements.
 
-Equation~\eqref{uncurry_df_transfer_closure} applies when the \rhs of
-a \mbind statement creates a closure, as in \binds v <- \mkclo[l: v_1,
-  \dots, v_n];. Because \var v/ has been redefined, we must invalidate
-any facts that refer to \var v/, as they do not refer to the new value
-of \var v/. The \mfun{uses} function in
-Equation~\eqref{uncurry_df_uses} finds the facts in $F$ that represent
-a closure capturing the variable \var v/. We remove any facts in $F$
-that refer to \var v/ by subtracting the results of the \mfun{uses}
-function from $F$.  We combine this set with a new fact associating
-\var v/ with the \setL{Clo} value \mkclo[l:v_1, \dots, v_n]. Our result
-set shows that \var v/ now refers to the closure \mkclo[l:v_1, \dots,
-  v_n], and does not include any previous facts that referred to \var
-v/.
 
-Equation~\eqref{uncurry_df_transfer_other} applies when the \rhs of a
-\mbind statement does not allocate a closure. We create a new fact
-associating \var v/ with $\top$, indicating we know \var v/ does not
-refer to a closure. We also remove any existing uses of \var v/ from
-$F$. Our new fact and new set are combined to form our result.
+\begin{description}
+\item[\emph{Equation~\eqref{uncurry_df_transfer_closure} --- Bind To
+    Closure}] When the \rhs of a \mbind statement creates a closure,
+  as in \binds v <- \mkclo[l: v_1, \dots, v_n];, we create a new fact
+  $(\var v/, \mkclo[l: v_1, \dots, v_n])$.  Because \var v/ has been
+  redefined, we must invalidate any previous facts that refer to \var
+  v/, as they do not refer to the new value of \var v/. Additionally,
+  \var v/ may appear in $\{\var v_1/, \dots, \var v_n/\}$ (as in
+  \binds v <- \mkclo[k1:];!+;+! \binds v <- mkclo[k2: v];). To ensure
+  we remove all references to \var v/, we apply \mfun{uses} to the
+  combined set $F \cup \{(\var v/, \mkclo[l:v_1, \dots, v_n])\}$. We
+  subtract the result from $F$, thereby removing any facts that refer
+  to $\var v/$.
 
-In all other cases, Equation~\eqref{uncurry_df_transfer_rest}
-applies, and $t$ acts like identity --- $F$ is returned unchanged.
+\item[\emph{Equation~\eqref{uncurry_df_transfer_other} --- Any Other
+    Bind}] Any other binding, \binds v <- \dots;, that does not create
+  a closure invalidates any facts about \var v/. Therefore, we first
+  remove all facts referring to \var v/ in $F$ with the \mfun{uses}
+  function. We then create a new fact associating \var v/ with $\top$,
+  indicating we know \var v/ does not refer to a closure. Finally, we
+  combine the new set and new fact and return the combined set.
+
+\item[\emph{Equation~\eqref{uncurry_df_transfer_case} --- Case
+    Statement}] A case statement requires a number of steps. If any of
+  the variables declared in a case alternative shadow an existing
+  binding, then we need to remove facts about and related to those
+  variables. Finally, we only pass on facts that refer to the
+  variables given as arguments to the blocks \lab b$!+_1+!$/, \ldots, 
+  \lab b$!+_q+!$/ from each case alternative.
+
+We use a number of auxilary definitions for this statement. The
+\mfun{args} set contains all variables that appear as arguments to a
+block in a case alternative. The \mfun{alts} set contains all
+variables that are bound by a case alternative which also appear in
+\mfun{args}. Note that \var v_i/ refers to the position of an argument
+in a case alternative or call; some \var v_i/ and \var v_k/ may
+represent the same variable, just in different positions. The
+\mfun{curr} function returns only those facts in the set that are
+about one of the variables given. The \mfun{tops} function creates a
+set of facts associating $\top$ with each variable given. Finally, the
+\mfun{users} function applies \mfun{uses} to each variable given and
+combines all the resulting sets.
+
+We use \mfun{curr} to narrow $F$ to only those facts mentioning
+variables in \mfun{args}. Then we use \mfun{tops} to define a set of
+facts associating each variable in \mfun{alts} with $\top$. We use the
+meet operator, $\wedge$, to combine these two sets and call the result
+$F'$. This set will only contain facts about variables in \mfun{args};
+moreover, any variable shadowed by a case alternative will be
+associated with $\top$.  We apply the \mfun{users} function to $F'$ and
+\mfun{alts} to find all facts in $F'$ that mention a shadowed
+variable. We subtract those facts from $F'$ and return the
+result. This process ensures we only pass along facts about variables
+mentioned in one of the case alternatives ``goto'' statements, and
+that those facts reflect any shadowing caused by new bindings in 
+each case alternative.
+
+Notice that this equation is quite conservative --- we invalidate
+facts in all successor statements, even when those facts may be valid
+in some successors.  In our implementation of the transfer function
+(Section~\ref{uncurry_impl_transfer},
+Page~\pageref{uncurry_impl_transfer}), we take a more fine-grained
+approach.  Traditional dataflow equations, however, do not account for
+differences among successors, so we show the more conservative version
+here.
+
+\item[\emph{Equation~\eqref{uncurry_df_transfer_rest} --- All Other
+    Statements}] For all other statements, $t$ acts like identity ---
+  $F$ is returned unchanged. This equation appears simple, but it
+  allows the transfer of facts from a given block to its
+  successors. If a block ends with a ``goto'' (e.g., \goto
+  b(v_1,\dots, v_n)),Critically, this includes ``goto'' terms at the
+  end of a block, as well as both types of block definitions.
+
+\end{description}
 
 \section{Rewriting}
 \label{uncurry_sec_rewriting}

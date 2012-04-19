@@ -11,7 +11,7 @@
 %% Footnotes with old style caps hard to read - this helps.
 \renewcommand\@makefnmark{\mbox{\textsuperscript{%
       \normalfont\ensuremath{\@thefnmark}}}}
-
+\usepackage{etoolbox}
 \usepackage{calc}
 \usepackage[osf,sc]{mathpazo}
 \renewcommand\ttdefault{lmtt}
@@ -477,4 +477,7 @@
 
 %% All of lhs2tex's included definitions.
 \input{lhs2tex}
+%% Remove indent that lhs2tex forces on 
+%% displayed haskell code
+\AtBeginEnvironment{hscode}{\mathindent=0pt}
 \makeatother
