@@ -85,7 +85,7 @@ all integers in a list:
 \noindent We cannot do the same as easily with |map2|. At best we can define
 a function that ignores one of its arguments:
 
-\begin{singlespace}\correctspaceskip
+\begin{singlespace}
 > upCase2 :: (a, [Char]) -> [Char]
 > upCase2 (_, xs) = map2 (toUpper, xs)
 >
@@ -357,55 +357,77 @@ statement given. We define $t$ by cases over \mil statements.
   function. We then create a new fact associating \var v/ with $\top$,
   indicating we know \var v/ does not refer to a closure. Finally, we
   combine the new set and new fact and return the combined set.
+\end{description}
+
+Unlike traditional three-address code, \mil blocks that end with a
+\milres case/ statement can have multiple successors. Dataflow
+analysis does not usually specify that different facts go to different
+successors, but we do so here. The notation \ensuremath{\{\lab
+  b$!+_1+!$/\ :~F_1, \lab b$!+_2+!$/\ :~F_2\}} used in
+Equations~\eqref{uncurry_df_transfer_goto} and
+\eqref{uncurry_df_transfer_goto} means we transfer the set of facts
+$F_1$ to the successor block \lab b$!+_1+!$/, and the set of facts
+$F_2$ to the successor block \lab b$!+_2+!$/.
+
+\Mil blocks also specify formal parameters, and the names of those
+parameters usually differ from the actual variables used in a given
+``goto'' expressions. Within a block, we collect facts using the names
+local to that block. Those facts will have no meaning in successor
+blocks (or worse, the wrong meaning) because the variable names will
+differ. Equation~\ref{uncurry_df_rename} defines \mfun{rename}, which
+takes a set of facts, $F$, and two variables, $\var u/$ and $\var v/$. If a fact
+about $\var v/$ exists in $F$, it will be removed and replaced with a fact
+about $\var u/$.  Combined with the \mfun{args} function, which retrieves
+the list of formal parameters for a block, \mfun{rename} can update a
+set of facts from one block so it makes sense in a successor block.
+
+The next two equations describe how we transfer facts between blocks
+using the functions given above. In this presentation, we only show one
+variable, but the equations can be easily extended to a multiple
+variables. We also use a number of auxilary definitions, besides those
+mentioned above. The \mfun{trim} function applies the \mfun{uses} and
+\mfun{delete} functions to remove all facts from $F$ that refer to or
+are about \var v/. The \mfun{delete} function removes any facts about
+\var v/ from $F$. Conversely, the \mfun{restrict} function filters 
+all facts from $F$ except those about \var v/.
+
+\begin{description}
+\item[\emph{Equation~\eqref{uncurry_df_transfer_goto} --- Goto Block}]
+  When a ``goto'' expression, such as \goto b(v), appears at the end
+  of a block, we transfer the facts collected so far to the successor
+  block. We use the \mfun{restrict} function to remove all facts form
+  $F$ except those about \var v/. We then rename the facts to match
+  the successor block \lab b/, and pass those facts along to \lab b/.
 
 \item[\emph{Equation~\eqref{uncurry_df_transfer_case} --- Case
-    Statement}] A case statement requires a number of steps. If any of
-  the variables declared in a case alternative shadow an existing
-  binding, then we need to remove facts about and related to those
-  variables. Finally, we only pass on facts that refer to the
-  variables given as arguments to the blocks \lab b$!+_1+!$/, \ldots, 
-  \lab b$!+_q+!$/ from each case alternative.
+    Statement}] A case statement requires careful treatment. Recall
+  that each alternative arm jumps immediately to another block (\lab
+  b$!+_1+!$/, etc. in the equation). We pass separate sets of facts to
+  each successor, tailored to the arguments each block
+  declares. Additionally, the alternative can bind new variables,
+  shadowing previous bindings. Any of our existing facts that are
+  about or which refer to shadowed variables must be removed from
+  our facts before we pass them to successor blocks.
+  
+  For each successor block \lab b$!+_i+!$/, we first restrict our
+  facts to only those variables passed to the block (i.e., \var
+  w_i/). From that restricted set, we trim any facts that mention a
+  binding from the case alternative (i.e., \var v_i/). Finally, we
+  rename those facts according the formal arguments of the successor
+  block \lab b$!+_i+!$/.  We stress that, while these equations only
+  mention one variable in the alternative and in the call to \lab
+  b$!+_i+!$/, making an operation like \mfun{trim} trivial, they can
+  easily be extended to multiple variables, making these operations
+  much more meaningful.
 
-We use a number of auxilary definitions for this statement. The
-\mfun{args} set contains all variables that appear as arguments to a
-block in a case alternative. The \mfun{alts} set contains all
-variables that are bound by a case alternative which also appear in
-\mfun{args}. Note that \var v_i/ refers to the position of an argument
-in a case alternative or call; some \var v_i/ and \var v_k/ may
-represent the same variable, just in different positions. The
-\mfun{curr} function returns only those facts in the set that are
-about one of the variables given. The \mfun{tops} function creates a
-set of facts associating $\top$ with each variable given. Finally, the
-\mfun{users} function applies \mfun{uses} to each variable given and
-combines all the resulting sets.
-
-We use \mfun{curr} to narrow $F$ to only those facts mentioning
-variables in \mfun{args}. Then we use \mfun{tops} to define a set of
-facts associating each variable in \mfun{alts} with $\top$. We use the
-meet operator, $\wedge$, to combine these two sets and call the result
-$F'$. This set will only contain facts about variables in \mfun{args};
-moreover, any variable shadowed by a case alternative will be
-associated with $\top$.  We apply the \mfun{users} function to $F'$ and
-\mfun{alts} to find all facts in $F'$ that mention a shadowed
-variable. We subtract those facts from $F'$ and return the
-result. This process ensures we only pass along facts about variables
-mentioned in one of the case alternatives ``goto'' statements, and
-that those facts reflect any shadowing caused by new bindings in 
-each case alternative.
-
-Notice that this equation is quite conservative --- we invalidate
-facts in all successor statements, even when those facts may be valid
-in some successors.  In our implementation of the transfer function
-(Section~\ref{uncurry_impl_transfer},
-Page~\pageref{uncurry_impl_transfer}), we take a more fine-grained
-approach.  Traditional dataflow equations, however, do not account for
-differences among successors, so we show the more conservative version
-here.
 
 \item[\emph{Equation~\eqref{uncurry_df_transfer_rest} --- All Other
-    Statements}] For all other statements, $t$ acts like identity ---
-  $F$ is returned unchanged. 
-
+    Statements}] Our final equation covers all other types of
+  expressions that can appear at the end of a block, such as a
+  function application or allocation. None of these expressions
+  specify a successor block, so in a sense it does not matter
+  what they return as that value will be ignored. For clarity,
+  we just return the empty set in this final case.
 \end{description}
 
 \section{Rewriting}
@@ -414,14 +436,19 @@ here.
 gathered by $t$ allow us to replace \enter expressions with closure
 allocations if we know the value that the expression results in. For
 example, let $F$ be the facts computed so far and \binds v <- \app f *
-x/; the statement we are considering. If $(\var f/, p) \in F$ and $p =
-\mkclo[l: v_1, \dots, v_n]$, then we know \var f/ represents the closure
-\mkclo[l:v_1, \dots, v_n]. If \lab l/ is also a closure-capturing block
-that returns \mkclo[m:c_1, \dots, c_m], we can then eliminate the \enter
-operation and rewrite the statement to \binds v <- \mkclo[m: v_1,
-  \dots, v_n, x];.  Notice we needed to add the \var x/ argument to
-the resulting closure as the block \lab l/ would do the same if we had
-entered it.
+y/; the statement we are considering. If $(\var f/, \mkclo[k0: x]) \in
+F$, then we know \var f/ represents the closure \mkclo[k0: x]. If \lab
+k0/ is a normal block, we do not rewrite, as we rely on the simple
+structure of \cc blocks to rewrite these expressions.\footnote{There
+  is the potential to inline, however.} If \lab k0/ is a \cc block, we
+can rewrite the expression. If \lab k0/ returns \mkclo[k1:x, y], then
+we can rewrite the statement to \binds v <- \mkclo[k1: x, y];.
+Alternatively, if \lab k0/ is a \cc block that immediately calls \goto
+b0(x, y), we can rewrite the statement to \binds v <- \goto(x, y);. In
+both cases it is likely that the formal arguments to \lab k2/ differ
+from those either in the closure \mkclo[k0:x] or the expression \app f
+* y/, and we will need to rename our facts. However, as explained
+previously when discussing $t$, that is a straightforward operation.
 
 \intent{Point out we don't inline closures from |Goto| expressions.}
 The example we discussed in Section~\ref{uncurry_sec_mil} does not
@@ -453,8 +480,7 @@ In our presentation of dataflow equations in
 Section~\ref{uncurry_sec_df}, we described this analysis by
 statements. However, our implementation works on blocks of \mil
 code. Fortunately, the net result is the same due to \hoopl's
-interleaved analysis and rewriting. Our transfer and rewrite functions
-work in tandem to rewrite \enter expressions within a block.
+interleaved analysis and rewriting. 
 
 \intent{Introduce example used throughout this section.}
 Figure~\ref{uncurry_fig_eg} gives an example program we will use

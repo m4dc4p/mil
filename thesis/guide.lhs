@@ -58,7 +58,8 @@ or case alternatives always indent two spaces from their parent:
 \end{AVerb}
 \end{singlespace}
 
-\lamC programs are also always single-spaced. They are also indented a paragraph indent:
+\lamC programs are also always single-spaced. They are not indented
+when used as display equations or in figures:
 
 \begin{singlespace}
 > main x = do
