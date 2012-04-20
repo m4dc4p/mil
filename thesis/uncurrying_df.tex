@@ -1,0 +1,80 @@
+\begin{math}
+  \begin{array}{rlr}
+    \multicolumn{3}{c}{\textit{Facts}} \\
+    \setL{Labels} &= \text{Set of all program labels.} \\
+    \setL{Vars} &= \text{Set of all variables.} \\
+    \setL{Clo} &= \{\mkclo[b:v_1, \dots, v_n]\ |\ \lab b/ \in \setL{Labels}, \var v_i/ \in \setL{Var}, n \geq 0\}.\\
+    \setL{Fact} &= \setL{Vars} \times (\{\top\} \cup \setL{Clo}). \\\\
+
+    \multicolumn{3}{c}{\textit{Meet}} \\
+    
+    p \lub q &= \begin{cases}
+      p & \text{when}\ p = q \\
+      \top & \text{when}\ p \neq q,
+    \end{cases} \labeleq{uncurry_df_lub} & \eqref{uncurry_df_lub} \\
+    & \multicolumn{2}{l}{\phantom{=} \text{where\ } p, q \in \setL{Clo}.}\\\\
+    
+    F_1 \wedge F_2 &= \begin{array}{l}
+      \{(\var v/, p \lub q)\ |\ (\var v/, p) \in F_1, (\var v/, q) \in F_2\}\ \cup \\
+      \{(\var v/, \top)\ |\ \var v/ \in \dom(F_1), \var v/ \not\in \mfun{dom}(F_2)\ \vee \\
+      \phantom{\{(v, \top)\ |\ } \var v/ \not\in \dom(F_1), \var v/ \in \mfun{dom}(F_2)\},
+    \end{array} \labeleq{uncurry_df_meet} & \eqref{uncurry_df_meet} \\ 
+    & \multicolumn{2}{l}{\phantom{=} \text{where\ } F_1, F_2 \in \setL{Fact}.}\\\\
+
+    \multicolumn{3}{c}{\textit{Transfer Function}} \\
+    t (F, \binds v\ <-\ \mkclo[b:v_1];) &= 
+    (F \cup \{(\var v/, \mkclo[b:v_1])\})\ \backslash\ \mfun{uses}(F \cup \{(\var v/, \mkclo[b:v_1])\}, \var v/)
+    \labeleq{uncurry_df_transfer_closure} & \eqref{uncurry_df_transfer_closure} \\
+
+    \mathllap{t (F, \binds v\ <-\ \ldots;)} &= \{(\var v/, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, \var v/)) \labeleq{uncurry_df_transfer_other} & \eqref{uncurry_df_transfer_other} \\
+
+    t (F, \goto b(v)) &= \left\{\lab b/\ :\ \mfun{rename}(\mfun{args}(\lab b/), \var v/, \mfun{restrict}(F, \var v/))\right\}
+    \labeleq{uncurry_df_transfer_goto} & \eqref{uncurry_df_transfer_goto} \\
+
+    \mathllap{t \left(F, \parbox{\widthof{\quad \alt C_m(v_1)->\goto b$!+_q+!$(v_2);}}{\baselineskip=12pt\disableparspacing;%%
+        \case v;\endgraf%%
+        \quad \alt C_1(v_1)->\goto b$!+_1+!$(w_1);\endgraf%%
+        \quad \dots\endgraf%%
+        \quad \alt C_n(v_n)->\goto b$!+_q+!$(w_n);\endgraf%%
+      }\right)} &= 
+    \left\{\begin{array}{@{}r@{\;}c@{\;}l@{}}
+    \lab b$!+_1+!$/ &:& \mfun{rename}(\mfun{args}(\lab b$!+_1+!$/), \var w_1/, 
+      \mfun{trim}(\mfun{restrict}(F, \var w_1/), \var v_1/)) \\
+    \multicolumn{3}{c}{\vdots} \\
+    \lab b$!+_n+!$/ &:& \mfun{rename}(\mfun{args}(\lab b$!+_n+!$/), \var w_n/, 
+      \mfun{trim}(\mfun{restrict}(F, \var w_n/), \var v_1/)) 
+    \end{array}\right\}
+    \labeleq{uncurry_df_transfer_case} & 
+    \eqref{uncurry_df_transfer_case} \\
+
+    t (F, \_) &= F, \labeleq{uncurry_df_transfer_rest} & \eqref{uncurry_df_transfer_rest} \\
+    & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \in \setL{Fact}.} \\\\
+
+    \mfun{uses}(F, \var v/) &= \begin{array}{l}
+      \{(\var u/, p)\ |\ (\var u/, p) \in F, p = \mkclo[l:v_1, \dots, v_n], \\
+      \quad \var v/ \in \{\var v_1/, \dots, \var v_n/\} \}
+    \end{array} \labeleq{uncurry_df_uses} & \eqref{uncurry_df_uses} \\
+
+    \mfun{trim}(F, \var v/) &= \begin{array}{l}
+      \mfun{delete}(F\ \backslash\ \mfun{uses}(F, \var v/), \var v/)
+    \end{array} \labeleq{uncurry_df_trim} & \eqref{uncurry_df_trim} \\
+
+    \mfun{delete}(F, \var v/) &= \begin{array}{l}
+      \{(\var u/, p)\ |\ (\var u/, p) \in F, \var u/ \neq \var v/\}
+    \end{array} \labeleq{uncurry_df_delete} & \eqref{uncurry_df_delete} \\
+
+    \mfun{rename}(\var u/, \var v/, F) &= \begin{array}{l}
+      \{(\var u/, p)\ |\ (\var v/, p) \in F\}
+    \end{array} \labeleq{uncurry_df_rename} & \eqref{uncurry_df_rename} \\
+
+    \mfun{args}(\lab b/) &= \begin{array}{l}
+      \text{\dots\it set of formal parameters to \lab b/\dots}
+    \end{array} \labeleq{uncurry_df_args} & \eqref{uncurry_df_args} \\
+
+    \mfun{restrict}(F, \var v/) &= \begin{array}{l}
+      \{(\var v/, p)\ |\ (\var v/, p) \in F\} 
+    \end{array} \labeleq{uncurry_df_restrict} & \eqref{uncurry_df_restrict} \\
+
+    & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \in \setL{Fact}, \var v/ \in \setL{Var}.}
+  \end{array}
+\end{math}

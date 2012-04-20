@@ -282,73 +282,9 @@ ends with a call or case statement. We combine multiple input facts
 for a given block by determining if all sets of facts agree on the
 value of a given variable.
 
-xs\begin{myfig}[tbp]
+\begin{myfig}[tbp]
   \begin{minipage}{\hsize}
-    \begin{math}
-      %% Below used to measure & typeset the case where we don't
-      %% see a binding.
-      \newtoks\widest \widest={t (F, \binds v\ <-\ \ldots;)} %%
-      \begin{array}{rlr}
-        \multicolumn{3}{c}{\textit{Facts}} \\
-        \setL{Labels} &= \text{Set of all program labels.} \\
-        \setL{Vars} &= \text{Set of all variables.} \\
-        \setL{Clo} &= \{\mkclo[l:v_1, \dots, v_n]\ ||\ \lab l/ \in \setL{Labels}, \var v_i/ \in \setL{Var}, n \geq 0\}.\\
-        \setL{Fact} &= \setL{Vars} \times (\{\top\} \cup \setL{Clo}). \\\\
-
-        \multicolumn{3}{c}{\textit{Meet}} \\
-        
-        p \lub q &= \begin{cases}
-          p & \text{when}\ p = q \\
-          \top & \text{when}\ p \neq q,
-        \end{cases} \labeleq{uncurry_df_lub} & \eqref{uncurry_df_lub} \\
-        & \multicolumn{2}{l}{\phantom{=} \text{where\ } p, q \in \setL{Clo}.}\\\\
-        
-        F_1 \wedge F_2 &= \begin{array}{l}
-          \{(\var v/, p \lub q)\ ||\ (\var v/, p) \in F_1, (\var v/, q) \in F_2\}\ \cup \\
-          \{(\var v/, \top)\ ||\ \var v/ \in \dom(F_1), \var v/ \not\in \mfun{dom}(F_2)\ \vee \\
-          \phantom{\{(v, \top)\ ||\ } \var v/ \not\in \dom(F_1), \var v/ \in \mfun{dom}(F_2)\},
-        \end{array} \labeleq{uncurry_df_meet} & \eqref{uncurry_df_meet} \\ 
-        & \multicolumn{2}{l}{\phantom{=} \text{where\ } F_1, F_2 \in \setL{Fact}.}\\\\
-
-        \multicolumn{3}{c}{\textit{Transfer Function}} \\
-        t (F, \binds v\ <-\ \mkclo[l:v_1, \dots, v_n];) &= 
-          F\ \backslash \mfun{uses}(F \cup \{(\var v/, \mkclo[l:v_1, \dots, v_n])\}, \var v/)
-          \labeleq{uncurry_df_transfer_closure} & \eqref{uncurry_df_transfer_closure} \\
-        \the\widest &= \{(\var v/, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, \var v/)) \labeleq{uncurry_df_transfer_other} & \eqref{uncurry_df_transfer_other} \\
-        \mathllap{t \left(F, \parbox{\widthof{\quad \alt C_m(v_{m+1} \dots v_n)->\goto b$!+_q+!$(v_{n+1}, \dots, v_p);}}{\baselineskip=12pt\disableparspacing;%%
-            \case v;\endgraf%%
-            \quad \alt C_1(v_1 \dots v_k)->\goto b$!+_1+!$(v_{k+1}, \dots, v_m);\endgraf%%
-            \quad $\dots$\endgraf%%
-            \quad \alt C_m(v_{m+1} \dots v_n)->\goto b$!+_q+!$(v_{n+1}, \dots, v_p);\endgraf%%
-        }\right)} &= 
-          \begin{array}{l}
-            F'\ \backslash\ \mfun{users}(F', \mfun{alts}) \text{, where}  \\
-            \quad\begin{array}{rl}
-            F' &= \begin{array}{l}\mfun{curr}(F, \mfun{args}) \wedge \mfun{tops}(\mfun{alts}) \end{array} \\
-            \mathit{args} &= \begin{array}{l}\{\var v_{k+1}/, \dots, \var v_m/, \var v_{n+1}/, \dots, \var v_p/\} \end{array} \\
-            \mathit{alts} &= \begin{array}{l}
-              \{\var v_i/\ ||\ \var v_i/ \in \mfun{args},  \\
-              \phantom{\{\var v_i/\ ||\ }\var v_i/ \in \{\var v_1/, \dots, \var v_k/,\var v_{m+1}/ \dots \var v_n/\}\} 
-            \end{array}
-            \end{array}
-          \end{array} \labeleq{uncurry_df_transfer_case} & 
-                     \eqref{uncurry_df_transfer_case} \\
-        t (F, \_) &= F, \labeleq{uncurry_df_transfer_rest} & \eqref{uncurry_df_transfer_rest} \\
-        & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \in \setL{Fact}.} \\\\
-
-        \mfun{uses}(F, \var v/) &= \begin{array}{l}
-          \{(\var u/, p)\ ||\ (\var u/, p) \in F, p = \mkclo[l:v_1, \dots, v_n], \\
-          \quad \var v/ \in \{\var v_1/, \dots, \var v_n/\} \}
-        \end{array} \labeleq{uncurry_df_uses} & \eqref{uncurry_df_uses} \\
-        \mfun{tops}(\{\var v_1/, \dots, \var v_n/\}) &= \begin{array}{l}\{(\var v_i/, \top)\}\end{array}
-        \labeleq{uncurry_df_tops} & \eqref{uncurry_df_tops} \\
-        \mfun{curr}(F, \{\var v_1/, \dots, \var v_n/\}) &= \begin{array}{l}\{(\var v_i/, p)\ ||\ (\var v_i/, p) \in F\}\end{array}
-        \labeleq{uncurry_df_curr} & \eqref{uncurry_df_curr} \\
-        \mfun{users}(F, \{\var v_1/, \dots, \var v_n/\}) &= \begin{array}{l}\mfun{uses}(F, \var v_1/) \cup \dots \cup \mfun{uses}(F, \var v_n/),\end{array}
-        \labeleq{uncurry_df_users} & \eqref{uncurry_df_users} \\
-        & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \in \setL{Fact}, \var v/ \in \setL{Var}.}
-      \end{array}
-    \end{math}
+    \input{uncurrying_df}
   \end{minipage}
   \caption{Dataflow facts and equations for our uncurrying transformation.}
   \label{uncurry_fig_df}
@@ -985,7 +921,7 @@ to \var y/ and returns the result:
       \vbinds v<-\mkclo[k1:x];
       \goto b2(v, y)
 
-    \block b2(v), y: \goto b3(v, y)
+    \block b2(v, y): \goto b3(v, y)
 
     \block b3(v, y):
       \vbinds t<-\app v*y/;
@@ -1002,7 +938,7 @@ jumps to \lab p1/, producing:
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
     \block b3(v, y):
-      \vbinds t<-\goto p1(x, y)
+      \vbinds t<-\goto p1(x, y);
       \return t/
   \end{AVerb}
 \end{singlespace}
@@ -1018,9 +954,9 @@ variables from the block in which they are first bound to the blocks
 where they are used.
 
 The second bug does not account for calls to blocks on the \rhs of a
-bind statement, such as \binds v <- \goto b(\dots)/. Our analysis only
+bind statement, such as \binds v <- \goto b(\dots);. Our analysis only
 considers calls at the end of blocks. If the values passed to the
-block \lab b/ on the \rhs of a \bind differ from those passed
+block \lab b/ on the \rhs of a \mbind differ from those passed
 at the end of a block, then our analysis will propogate incorrect 
 facts.
 
@@ -1032,8 +968,8 @@ argument and the result returned.
 
 \begin{singlespace}
   \begin{AVerb}[gobble=4,numbers=left]
-    \ccblock k1()x: b3(x)
-    \ccblock k2()x: b4(x)
+    \ccblock k1()x: \goto b3(x)
+    \ccblock k2()x: \goto b4(x)
 
     \block b1 (x, y):
       \vbinds v<- \mkclo[k1:];
@@ -1042,10 +978,10 @@ argument and the result returned.
       \goto b2(v, y)
 
     \block b2 (v, y):
-      \vbinds t<- \app v*y;
-      \return t
-    \block b3 (x): return x
-    \block b4 (x): return x  
+      \vbinds t<- \app v*y/;
+      \return t/
+    \block b3 (x): \return x/
+    \block b4 (x): \return x/
   \end{AVerb}
 \end{singlespace}
 
