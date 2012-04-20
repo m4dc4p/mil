@@ -23,7 +23,10 @@
 
     \multicolumn{3}{c}{\textit{Transfer Function}} \\
     t (F, \binds v\ <-\ \mkclo[b:v_1];) &= 
-    (F \cup \{(\var v/, \mkclo[b:v_1])\})\ \backslash\ \mfun{uses}(F \cup \{(\var v/, \mkclo[b:v_1])\}, \var v/)
+    \begin{cases}
+      (F \cup \{(\var v/, \mkclo[b:v_1])\})\ \backslash\ \mfun{uses}(F, \var v/)& \text{when}\ \var v/ \neq \var v_1/ \\
+      \mfun{delete}(F, \var v/) & \text{when}\ \var v/ = \var v_1/ 
+    \end{cases}
     \labeleq{uncurry_df_transfer_closure} & \eqref{uncurry_df_transfer_closure} \\
 
     \mathllap{t (F, \binds v\ <-\ \ldots;)} &= \{(\var v/, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, \var v/)) \labeleq{uncurry_df_transfer_other} & \eqref{uncurry_df_transfer_other} \\
@@ -51,29 +54,30 @@
     & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \in \setL{Fact}.} \\\\
 
     \mfun{uses}(F, \var v/) &= \begin{array}{l}
-      \{(\var u/, p)\ |\ (\var u/, p) \in F, p = \mkclo[l:v_1, \dots, v_n], \\
+      \{(\var u/, \mkclo[l:v_1, \dots, v_n])\ |\ (\var u/, \mkclo[l:v_1, \dots, v_n]) \in F, \\
       \quad \var v/ \in \{\var v_1/, \dots, \var v_n/\} \}
     \end{array} \labeleq{uncurry_df_uses} & \eqref{uncurry_df_uses} \\
+
+    \mfun{rename}(\var u/, \var v/, F) &= \begin{array}{l}
+      \{(\var u/, p)\ |\ (\var v'/, p) \in F, \var v/ = \var v'/\}\ \cup \\
+      \quad\{(\var v'/, p)\ |\ (\var v'/, p) \in F, \var v/ \neq \var v'/\}
+    \end{array} \labeleq{uncurry_df_rename} & \eqref{uncurry_df_rename} \\
+    \mfun{delete}(F, \var v/) &= \begin{array}{l}
+      \{(\var u/, p)\ |\ (\var u/, p) \in F, \var u/ \neq \var v/\}
+    \end{array} \labeleq{uncurry_df_delete} & \eqref{uncurry_df_delete} \\
+
+    \mfun{restrict}(F, \var v/) &= \begin{array}{l}
+      \{(\var v'/, p)\ |\ (\var v'/, p) \in F, \var v/ = \var v'/\} 
+    \end{array} \labeleq{uncurry_df_restrict} & \eqref{uncurry_df_restrict} \\
 
     \mfun{trim}(F, \var v/) &= \begin{array}{l}
       \mfun{delete}(F\ \backslash\ \mfun{uses}(F, \var v/), \var v/)
     \end{array} \labeleq{uncurry_df_trim} & \eqref{uncurry_df_trim} \\
 
-    \mfun{delete}(F, \var v/) &= \begin{array}{l}
-      \{(\var u/, p)\ |\ (\var u/, p) \in F, \var u/ \neq \var v/\}
-    \end{array} \labeleq{uncurry_df_delete} & \eqref{uncurry_df_delete} \\
-
-    \mfun{rename}(\var u/, \var v/, F) &= \begin{array}{l}
-      \{(\var u/, p)\ |\ (\var v/, p) \in F\}
-    \end{array} \labeleq{uncurry_df_rename} & \eqref{uncurry_df_rename} \\
-
     \mfun{args}(\lab b/) &= \begin{array}{l}
-      \text{\dots\it set of formal parameters to \lab b/\dots}
+      \text{\dots\it set of parameters declared by \lab b/\dots,}
     \end{array} \labeleq{uncurry_df_args} & \eqref{uncurry_df_args} \\
 
-    \mfun{restrict}(F, \var v/) &= \begin{array}{l}
-      \{(\var v/, p)\ |\ (\var v/, p) \in F\} 
-    \end{array} \labeleq{uncurry_df_restrict} & \eqref{uncurry_df_restrict} \\
 
     & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \in \setL{Fact}, \var v/ \in \setL{Var}.}
   \end{array}

@@ -14,10 +14,11 @@
 > import Data.Set (Set)
 > import qualified Data.Set as Set
 > import Debug.Trace
->   
-> import Compiler.Hoopl
+>    
+> import Compiler.Hoopl hiding (Label, Fact)
+> import qualified Compiler.Hoopl as Hoopl (Label, Fact)
 > 
-> import Util
+> import Util hiding (Var)
 > import MIL
 > import Live
 
@@ -40,44 +41,39 @@ argument to a closure will be stored, if it is used. For goto,
 we store the variables passed as positions from teh arguments
 given to the block. 
 
+> type Label = Dest
+> type Var = Name
+
 %endif
 
 %if includeAll || includeTypes
 
-> data DestOf = Jump Dest [Int] | Capture Dest Bool
+< data Clo = Clo Label [Var]
+< type Label = (String, Hoopl.Label)
+< type Var = String
+< data DestOf = Jump Label [Int] | Capture Label Bool
+< type Fact = Map Var (WithTop Clo)
 
 %endif
 %if False
 
+> data DestOf = Jump Label [Int] | Capture Label Bool
 >               deriving (Eq, Show)
 
 Stores destination and arguments for a 
 closure value. Mostly to remove annoying
 GADT type variables.
 
-%endif
-%if includeAll || includeTypes
-
-> data CloDest = CloDest Dest [Name]
-
-%endif
-%if False
-
+> data Clo = Clo Label [Var]
 >             deriving (Eq, Show)
+
 
 Indicates if the given name holds an allocated
 closure or an unknown value.
 
-%endif
-%if includeAll || includeTypes
-
-> type CollapseFact = Map Name (WithTop CloDest)
-
-%endif
-%if False
+> type Fact = Map Var (WithTop Clo)
 
 Need to track variables stored in a closure as well
-
  
 Collapse closure allocations - when we can tell a variable holds
 a closure, and that closure only allocates another closure or jumps
@@ -92,28 +88,28 @@ closure or jump to the block.
 >       (p, _, _) <- analyzeAndRewriteFwd fwd (JustC labels) program initial {-"\hslabel{analyze}"-}
 >       return p
 >   where
->     labels :: [Label]
+>     labels :: [Hoopl.Label]
 >     labels = entryLabels program {-"\hslabel{labels}"-}
 >
->     initial :: FactBase CollapseFact
+>     initial :: FactBase Fact
 >     initial = mapFromList (zip labels (repeat Map.empty)) {-"\hslabel{initial}"-}
 >
 >     debugFwdT = debugFwdTransfers trace (show . printStmtM) (\_ _ -> True) fwd
 >     debugFwdJ = debugFwdJoins trace (const True) fwd
 >                     
->     fwd :: FwdPass SimpleFuelMonad Stmt CollapseFact
+>     fwd :: FwdPass SimpleFuelMonad Stmt Fact
 >     fwd = FwdPass { fp_lattice = collapseLattice {-"\hslabel{fwd}"-}
 >                   , fp_transfer = collapseTransfer blockArgs
 >                   , fp_rewrite = collapseRewrite (destinations labels) }
 >     
->     blockArgs :: Map Label [Name]
+>     blockArgs :: Map Hoopl.Label [Var]
 >     blockArgs = Map.fromList [(l, args) | (_, BlockEntry _ l args) <- entryPoints program]
 >
->     destinations :: [Label] -> Map Label DestOf
+>     destinations :: [Hoopl.Label] -> Map Hoopl.Label DestOf
 >     destinations = Map.fromList . catMaybes . {-"\hslabel{destinations}"-}
 >                    map (uncurry destOf) . catMaybes .  map (blockOfLabel program)
 >
->     destOf :: Dest -> Block Stmt C C -> Maybe (Label, DestOf)
+>     destOf :: Label -> Block Stmt C C -> Maybe (Hoopl.Label, DestOf)
 >     destOf (_, l)  block = {-"\hslabel{destOf}"-}
 >       case blockToNodeList' block of
 >         (JustC (CloEntry _ _ args arg), _, JustC (Done _ _ (Goto d uses))) -> 
@@ -128,50 +124,48 @@ closure or jump to the block.
 %endif
 %if includeAll || includeTransfer
 
-> collapseTransfer :: Map Label [Name] -> FwdTransfer Stmt CollapseFact
-> collapseTransfer blockArgs = mkFTransfer t
+> collapseTransfer :: Map Hoopl.Label [Name] -> FwdTransfer Stmt Fact
+> collapseTransfer blockParams = mkFTransfer transfer
 >   where
->     t :: Stmt e x -> CollapseFact -> Fact x CollapseFact
->     t (Bind v (Closure dest args)) facts = kill v (Map.insert v (PElem (CloDest dest args)) facts) {-"\hslabel{closure}"-} 
->     t (Bind v _) facts = Map.insert v Top (kill v facts) {-"\hslabel{rest}"-}
->     t (Case _ alts) facts = mkFactBase collapseLattice 
->                             [(dest, renameAlt facts binds (blockArgs ! dest) args) | 
->                              (Alt _ binds (Goto (_, dest) args)) <- alts] 
->     t (Done _ _ (Goto (_, dest) args)) facts = 
->       mapSingleton dest (renameBound args (blockArgs ! dest) facts)
->     t (Done _ _ _) facts = mkFactBase collapseLattice []
->     t (BlockEntry _ _ _) facts = facts
->     t (CloEntry _ _ _ _) facts = facts
+>     transfer :: Stmt e x -> Fact -> Hoopl.Fact x Fact
+>     transfer (Bind v (Closure dest args)) facts 
+>       | v `elem` args = Map.delete v facts' {-"\hslabel{closure1}"-}
+>       | otherwise = Map.insert v (PElem (Clo dest args)) facts' {-"\hslabel{closure2}"-}
+>       where facts' = kill v facts {-"\hslabel{closure_kill}"-}
+>     transfer (Bind v _) facts = Map.insert v Top (kill v facts) {-"\hslabel{rest}"-}
+>     transfer (Done _ _ (Goto (_, dest) args)) facts = mapSingleton dest facts' {-"\hslabel{goto1}"-}
+>       where facts' = rename args (blockParams ! dest) (restrict facts args) {-"\hslabel{goto2}"-}
+>     transfer (Case _ alts) facts = mkFactBase collapseLattice fact'
+>       where fact' =  [(dest, rename args params trimmed) | 
+>                         (Alt _ binds (Goto (_, dest) args)) <- alts,
+>                         let  trimmed = trim (restrict facts args) binds
+>                              params = blockParams ! dest]
+>     transfer (Done _ _ _) facts = mkFactBase collapseLattice []
+>     transfer (BlockEntry _ _ _) facts = facts
+>     transfer (CloEntry _ _ _ _) facts = facts
 >   
->     kill :: Name -> Map Name (WithTop CloDest) -> Map Name (WithTop CloDest)
->     kill v = Map.filter (not . using v) 
+>     kill :: Name -> Fact -> Fact {-"\hslabel{kill}"-}
+>     kill = Map.filter . keep
 >
->     using :: Name -> WithTop CloDest -> Bool
->     using _ Top = False
->     using var (PElem (CloDest _ vars)) = var `elem` vars
->   
->     renameAlt origFacts binds newNames origNames = 
->       let remainingFacts = foldr (\v f -> kill v f) 
->                            (Map.filterWithKey (\v _ -> not (v `elem` binds)) origFacts) binds
->       in renameBound origNames newNames remainingFacts
->                   
->     renameBound :: [Name] -> [Name] -> CollapseFact -> CollapseFact
->     renameBound origNames newNames = Map.mapKeys (rename origNames newNames) 
+>     keep :: Name -> WithTop Clo -> Bool
+>     keep _ Top = True
+>     keep v (PElem (Clo _ vs)) = not (v `elem` vs)
 >
->     rename :: [Name] -> [Name] -> Name -> Name
->     rename args blockArgs arg  = 
->       case arg `elemIndex` args of
->         Just i -> blockArgs !! i -- rename to block argument
->         _ -> arg -- don't rename
->         
->     candidate :: [Name] -> [Name] -> Name -> a -> Bool
->     candidate shadows args var _ = not (var `elem` shadows) && var `elem` args
+>     restrict :: Fact -> [Var] -> Fact
+>     restrict fact vs = Map.filterWithKey (\v _ -> v `elem` vs) fact
+>                        
+>     trim :: Fact -> [Var] -> Fact
+>     trim fact vs = foldr Map.delete (foldr kill fact vs) vs
+>                       
+>     rename :: [Name] -> [Name] -> Fact -> Fact
+>     rename args params = Map.mapKeys renameKey 
+>       where renameKey v = maybe v (params !!) (v `elemIndex` args)
 
 %endif
 %if includeRewrite || includeAll 
 
-> collapseRewrite :: FuelMonad m => Map Label DestOf 
->                    -> FwdRewrite m Stmt CollapseFact
+> collapseRewrite :: FuelMonad m => Map Hoopl.Label DestOf 
+>                    -> FwdRewrite m Stmt Fact
 > collapseRewrite blocks = iterFwdRw (mkFRewrite rewriter) {-"\hslabel{top}"-}
 
 %endif
@@ -182,16 +176,16 @@ closure or jump to the block.
 %endif
 %if includeRewriteImpl || includeAll
 
->     rewriter :: FuelMonad m => forall e x. Stmt e x -> CollapseFact 
+>     rewriter :: FuelMonad m => forall e x. Stmt e x -> Fact 
 >                 -> m (Maybe (ProgM e x))
 >     rewriter (Done n l (Enter f x)) facts = done n l (collapse facts f x) {-"\hslabel{done}"-}
 >     rewriter (Bind v (Enter f x)) facts = bind v (collapse facts f x) {-"\hslabel{bind}"-}
 >     rewriter _ _ = return Nothing {-"\hslabel{rest}"-}
 >                    
->     collapse :: CollapseFact -> Name -> Name -> Maybe Tail
+>     collapse :: Fact -> Name -> Name -> Maybe Tail
 >     collapse facts f x =       
 >       case Map.lookup f facts of
->         Just (PElem (CloDest dest@(_, l) vs)) -> {-"\hslabel{collapse_clo}"-}
+>         Just (PElem (Clo dest@(_, l) vs)) -> {-"\hslabel{collapse_clo}"-}
 >           case Map.lookup l blocks of
 >             Just (Jump dest uses) -> {-"\hslabel{collapse_jump}"-}
 >               Just (Goto dest (fromUses uses (vs ++ [x])))
@@ -215,18 +209,16 @@ the positions given.
 %endif
 %if includeAll || includeLattice
 
-> collapseLattice :: DataflowLattice CollapseFact
+> collapseLattice :: DataflowLattice Fact
 > collapseLattice = DataflowLattice { fact_name = "Closure collapse"
 >                                   , fact_bot = Map.empty
 >                                   , fact_join = joinMaps (toJoin lub) }
 >
 > toJoin :: (a -> a -> (ChangeFlag, a)) 
->        -> (Label -> OldFact a -> NewFact a -> (ChangeFlag, a))
-> toJoin f = 
->   let f' _ (OldFact o) (NewFact n) = f o n
->   in f' 
+>        -> (Hoopl.Label -> OldFact a -> NewFact a -> (ChangeFlag, a))
+> toJoin f = \ _ (OldFact o) (NewFact n) -> f o n 
 
-> lub :: WithTop CloDest -> WithTop CloDest -> (ChangeFlag, WithTop CloDest)
+> lub :: WithTop Clo -> WithTop Clo -> (ChangeFlag, WithTop Clo)
 > lub old new = 
 >   if old == new 
 >    then (NoChange, new)

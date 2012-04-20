@@ -291,7 +291,7 @@ value of a given variable.
 \end{myfig}
 
 \intent{Describe fundamental sets used by our dataflow equations:
-  |Labels|, |Vars|, |Clo| and |Facts|.}  Figure~\ref{uncurry_fig_df}
+  |Labels|, |Names|, |Clo| and |Facts|.}  Figure~\ref{uncurry_fig_df}
 shows the dataflow equations used for our analysis. The sets
 \setL{Labels} and \setL{Vars} contain all labels and all variables in
 the program, respectively.  The \setL{Clo} set associates some label
@@ -468,19 +468,12 @@ closure returned by \goto compose().
 \label{uncurry_sec_impl}
 
 \intent{Provide a bridge to the four subsections below.}  Originally,
-we called this transformation ``closure-collapse,'' because it
+we called this transformation ``closure-collapse'' because it
 ``collapsed'' the construction of multiple closures into the
 construction of a single closure. Later, we learned this optimization
 is known as ``uncurrying,'' but at the point the code had already been
-written. The ``collapse'' prefix in the code shown is merely an
+written. The ``collapse'' prefix in the code shown is an
 artifact of our previous name for the analysis.
-
-\intent{Explain why the code doesn't match the equations.}
-In our presentation of dataflow equations in
-Section~\ref{uncurry_sec_df}, we described this analysis by
-statements. However, our implementation works on blocks of \mil
-code. Fortunately, the net result is the same due to \hoopl's
-interleaved analysis and rewriting. 
 
 \intent{Introduce example used throughout this section.}
 Figure~\ref{uncurry_fig_eg} gives an example program we will use
@@ -525,10 +518,13 @@ that applies the optimization to a given program.
 \intent{Describe types used; give details on managing names; point out
   it other differences.}  Figure~\ref{uncurry_fig_types} shows the
 types used by our implementation to represent the sets given in
-Figure~\ref{uncurry_fig_df}. |CloDest| represents \setL{Clo} and
-|CollapseFact| represents \setL{Fact}. |Dest| and |Name|, whose
-definitions are not shown, correspond to \setL{Label} and \setL{Var},
-respectively.
+Figure~\ref{uncurry_fig_df}. The |Clo| type represents
+\setL{Clo}. |Label| and |Var| correspond to \setL{Label} and
+\setL{Var}, respectively. For documentation, the |Label| type pairs a
+string with \hoopl's |Label| type. |Clo| stores a |Label| value,
+giving the block that the closure refers to, and a list of captured
+variables, |[Var]|, representing the environment captured by the
+closure.
 
 \begin{myfig}
   \begin{minipage}{\hsize}\disableoverfull
@@ -537,41 +533,41 @@ respectively.
 %let includeTypes = False
   \end{minipage}
   \caption{The types for our analysis. Referring to the sets defined
-    in Figure~\ref{uncurry_fig_df}, |CloDest| represents \setL{Clo} and
-    |CollapseFact| represents \setL{Fact}. |DestOf| is not represented
-    in our dataflow equations; it describes the behavior of each \mil block that
-    we may use while rewriting.}
+    in Figure~\ref{uncurry_fig_df}, |Clo| represents \setL{Clo} and
+    |Fact| represents \setL{Fact}. |DestOf| is not represented in our
+    dataflow equations; it describes the behavior of each \mil block
+    that we may use while rewriting.}
   \label{uncurry_fig_types}
 \end{myfig}
 
-\intent{Explain |DestOf| values.}  When rewriting, we need to know the
-result of every \cc block in the program. Specifically, we need to
-know if a given block resturns a closure or if it jumps directly to
-another block. The |DestOf| type, which does not appear in
-Figure~\ref{uncurry_fig_df} but is defined in
-Figure~\ref{uncurry_fig_types}, uses the |Capture| and |Jump|
-constructors to represent the first and second case, respectively. The
-|Dest| value in both is a destination: either the label stored in the
-closure returned, or the block that the closure jumps to
-immediately. 
+\intent{Explain |DestOf| values.}  The |DestOf| type captures the
+behavior of a given \cc block. Recall that we limit \cc blocks to
+containing a single \term tail/ expression. The |DestOf| type uses the
+|Capture| and |Jump| constructors to represent if the block returns a
+closure or if it jumps to a normal block, respectively. The |Label|
+value in both is a destination: either the label stored in the closure
+returned, or the block that the closure jumps to. We use these values
+to determine how we rewrite a given ``enter'' expression.
 
-\intent{Details on |Capture| value.}  A \cc block receives a closure
-and an argument. The flag in the |Capture| constructor indicates how
-the \cc block treats its argument. If |True|, the argument will be
-included in the closure returned. Otherwise, the argument will be
-ignored.
+\intent{Details on |Capture| value.}  The |Capture| value represents a
+block with the form ``\ccblock k0(v_1, \dots, v_n)x:
+\mkclo[k1:\dots],'' The flag in the |Capture| constructor indicates if
+\mkclo[k1:\dots] includes the \var x/ argument or not. If |True|, the
+argument is included in the closure returned. Otherwise, the
+argument is ignored.
 
-\intent{Details on |Jump| value.} A |Jump| block always has the form
-``\ccblock k(v_1, \dots, v_n)x: \goto b(\ldots)'' where the arguments
-to \lab b/ are not necessarily in the same order as in the closure
-\mkclo[k:v_1, \dots, v_n] received by \lab k/. Each integer in the list
-given to |Jump| indicates the position of a variable in the closure
-received by the block \lab k/. The arguments to the block \lab b/ are
-built by traversing the list, putting the variable indicated by each
-index into the corresponding argument for the block. \footnote{This
-  situation can also apply to |Capture| blocks and we would need to
-  update our implementation our compiler's code generation strategy
-  changed or if we began writing \mil programs directly.}
+\intent{Details on |Jump| value.} The |Jump| value represents a block
+with the form ``\ccblock k(v_1, \dots, v_n)x: \goto b(\ldots)'' The
+arguments to \lab b/ are not necessarily in the same order as the
+parameters for the \cc block \lab k/. Each integer in the list given
+to |Jump| corresponds to one of \lab k/'s parameters. The value of the
+integer gives the position of that parameter in the call to \lab
+b/. The arguments in the call to \lab b/ are built by traversing the
+list, putting the variable indicated by each index into the
+corresponding argument for the block.\footnote{This situation can
+  also apply to |Capture| blocks and we would need to update our
+  implementation our compiler's code generation strategy changed or if
+  we began writing \mil programs directly.}
 
 For example, in the following the variables in the closure received
 by \lab c/ do not appear in the same order as expected by block \lab l/:
@@ -589,27 +585,21 @@ We represent \lab c/ using |Jump {-"\lab
   b] and the argument \var x/ must be given to \lab l/ in the order
 $!+(x, a, b)+!$.
 
-\intent{Details on |CloDest| values.}  We use |CloDest| to represent
-all \setL{Clo} values. |CloDest| stores a |Dest| value, representing
-the label the closure refers to, and a list of captured variables,
-|[Name]|.
+\intent{Explain how |WithTop Clo| and |Fact| represent \setL{Fact}.}
+|Fact| is a finite map, representing our \setL{Fact} set. \Hoopl's
+|WithTop| type adds a $\top$ value to any other type. |WithTop Clo|
+then represents the set $\{\top\} \cup \{\setL{Clo}\}$. |Fact|, then,
+associates variables with values in the set  $\{\top\} \cup \{\setL{Clo}\}$.
 
-\intent{Explain how |WithTop CloDest| and |CollapseFact| represent
-  \setL{Fact}.}  We use a finite map, aliased as |CollapseFact|, to
-represent our \setL{Fact} set. \Hoopl provides |WithTop|, a type that
-adds a $\top$ value to any other type. |WithTop CloDest| then 
-represents the set $\{\top\} \cup \{\setL{Clo}\}$. In turn, |CollapseFact| 
-represents a finite map from variables to $\{\top\} \cup
-\{\setL{Clo}\}$.
-
-\subsection{Lattice \& Meet}
+\subsection{Lattice \& Meet Operator}
 \label{uncurry_impl_lattice}
 Figure~\ref{uncurry_fig_lattice} shows the |DataflowLattice| structure
 defined for our analysis. We set |fact_bot| to an empty map, meaning
-we start without any information. We define |lub| over |CloDests|, just
-like \lub in Figure~\ref{uncurry_fig_df}. We use |joinMaps (toJoin
-lub)| (\hoopl provides |joinMaps|) to transform |lub| into a function
-that operates over finite maps.
+we start without any information. We define |lub| over |Clos|, just
+like \lub in Figure~\ref{uncurry_fig_df}. We use |joinMaps|, provided
+by \hoopl, and |toJoin| to transform |lub| into a function
+that operates over finite maps and which has the signature required by
+\hoopl's |fact_join| definition.
 
 \begin{myfig}
   \begin{minipage}{\hsize}\disableoverfull
@@ -622,22 +612,21 @@ that operates over finite maps.
   \label{uncurry_fig_lattice}
 \end{myfig}
 
-\subsection{Transfer}
+\subsection{Transfer Function}
 \label{uncurry_impl_transfer}
-The definition |t| in Figure~\ref{uncurry_fig_transfer} gives the
-implementation of $t$ from Figure~\ref{uncurry_fig_df}. The top-level
-definition, |collapseTransfer|, serves to turn |t|
-into a |FwdTransfer| value.  As in all \hoopl-based forwards analysis,
-the second argument to |t| is our facts so far. We define |t| for each
-statement type in \mil.
-
-The |BlockEntry| and |CloEntry| cases return the facts given
-unchanged.\footnote{Note these will always be empty maps, because our
-  analysis does not extend across blocks and |fact_bot| in our lattice
-  is |Map.empty|.} Because we do not propagate facts between blocks,
-the |Case| and |Done| cases pass an empty map to each successor,
-using the \hoopl-provided |mkFactBase| function to create a |FactBase|
-from empty facts.
+The definition of |transfer| in Figure~\ref{uncurry_fig_transfer}
+gives the implementation of $t$ from Figure~\ref{uncurry_fig_df}. The
+top-level definition, |collapseTransfer|, serves to turn |transfer|
+into a |FwdTransfer| value.  The |blockParams| argument to
+|collapseTransfer| gives the list of parameters for every ordinary
+block in the program, and will be used during renaming operations. The
+first argument to |transfer| is the statement we are analyzing, and
+the second is our facts to far. |transfer| depends on a number of
+auxillary functions: |kill|, |using|, etc. We will describe each
+function as they are first encountered when describing |transfer|. We
+define |transfer| by cases, analagous to the cases given in
+Equations~\eqref{uncurry_df_transfer_closure} through
+\eqref{uncurry_df_transfer_rest}.
 
 \begin{myfig}[p]
   \begin{minipage}{\hsize}\begin{withHsLabeled}{uncurry_fig_transfer}\disableoverfull
@@ -646,22 +635,60 @@ from empty facts.
 %let includeTransfer = False
     \end{withHsLabeled}
   \end{minipage}
-  \caption{The Haskell implementation of our transfer function $t$
+  \caption{The implementation of our transfer function $t$
     from Figure~\ref{uncurry_fig_df}.}
   \label{uncurry_fig_transfer}
 \end{myfig}
 
-|Bind| statments are handled based on the \rhs of the statement. In
-both cases, we use the |kill| function to create a new set of facts
-that does not contain any closures from the existing fact set which
-refered to |v|, the variable bound. If the statement does not directly
-create a closure (Line~\ref{uncurry_fig_transfer_rest}), we create a
-fact associating |v| with |Top|, just as in
-Equation~\eqref{uncurry_df_transfer_other}. If the expression creates
-a closure (Line~\ref{uncurry_fig_transfer_rest}), we create a new fact
-with the closure's destination and captured variables, corresponding
-to Equation~\eqref{uncurry_df_transfer_closure}. We add the new fact
-to the set returned by |kill| and return the result.
+\begin{description}
+  \item[|Bind v (Closure dest args)| --- ] This case corresponds to
+    Equation~\ref{uncurry_df_transfer_closure}, representing a bind
+    statement that allocates a closure on its \rhs. Binding a variable
+    invalidates any facts previously collected about that
+    variable. The local definition of |fact'| on
+    Line~\ref{uncurry_fig_transfer_closure_kill} uses the |kill|
+    function to remove all facts from |fact| that mention |v|. The
+    |kill| function, defined on Line~\ref{uncurry_fig_transfer_kill},
+    keeps all facts that do \emph{not} mention |v|. If |v| appears in
+    |args| then the closure mentions the variable being bound. If that
+    is the case, then we do not want to create a new fact, and we want
+    to remove any existing facts about
+    |v|. Line~\ref{uncurry_fig_transfer_closure1} accomplishes both
+    tasks by first deleting any facts about |v| from |fact'| and then
+    returning the updated map. Otherwise, on
+    Line~\ref{uncurry_fig_transfer_closure2} we create a new fact
+    describing the closure (using \hoopl's |PElem| constructor),
+    insert it into |facts'|, and return the result.
+
+  \item[|Bind v _| --- ] This case implements
+    Equation~\ref{uncurry_df_transfer_other}. It removes any facts
+    mentioning |v| and inserts a new fact associating |v| with |Top|,
+    meaning we do not know what value |v| may have. 
+  
+  \item[|Done _ _ (Goto (_, dest) args)| --- ] On
+    Line~\ref{uncurry_fig_transfer_goto1}, we implement
+    Equation~\ref{uncurry_df_transfer_goto}. Recall that we must
+    filter our facts to those about variables in |args|, and that we
+    must rename those facts to match the parameters declared by
+    |dest|. The definition of |facts'|
+    (Line~\ref{uncurry_fig_transfer_goto2}) uses the |restrict|
+    function for filtering, and the |rename| function for
+    renaming. We use \hoopl's |mapSingleton| function to
+    create a set of facts associated with the block given
+    by |dest|, analagous to the $\{\lab b/\ :\ \dots\}$
+    notation used in Equation~\ref{uncurry_df_transfer_goto}.
+    
+  \item[|Case _ alts| --- ] 
+
+  \item[|BlockEntry|, |CloEntry| ---] These two cases receive facts
+    from predecessor blocks. In both cases they return the facts
+    unchanged. Because we
+    do not propagate facts between blocks, the |Case| and |Done| cases
+    pass an empty map to each successor, using the \hoopl-provided
+    |mkFactBase| function to create a |FactBase| from empty facts.
+
+\end{description}
+
 
 \begin{myfig}
   \begin{tabular}{lcccc}
@@ -681,7 +708,7 @@ Figure~\ref{uncurry_fig_impl_transfer} shows the facts gathered for
 each variable in the \lab main/ block of our sample program. The
 variables \var n/, \var v1/, and \var v2/ are assigned $\top$ because
 the \rhs of the \mbind statement for each does not directly create a
-closure. Only \var v0/ is assigned a |CloDest| value (\mkclo[k0:])
+closure. Only \var v0/ is assigned a |Clo| value (\mkclo[k0:])
 because the \rhs of its \mbind statement is in the right form. We will
 see in the next section how these facts evolve as the program is
 rewritten.

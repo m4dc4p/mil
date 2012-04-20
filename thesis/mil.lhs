@@ -86,8 +86,8 @@ Figure~\ref{mil_fig_lam_syntax} gives the full syntax of \lamC. In the
 figure, \term x/, \term x_1/, etc.\ represent simple variables, while
 \term t/, \term t_1/, etc.\ represent arbitrary terms. All \term def/
 terms are global to the program in which they are defined. Definitions
-with zero arguments are values and cannot be recursive; definitions
-with more than one argument are functions and can be recursive. Only
+with zero parameters are values and cannot be recursive; definitions
+with more than one parameter are functions and can be recursive. Only
 variables can appear as arguments in definitions and case
 alternatives --- the language does not support more sophisticated
 pattern-matching. While most elements should be recognizable
@@ -222,7 +222,7 @@ simplify analysis of their behavior.
 
 \intent{Describe basic blocks.} \emph{Basic blocks} consist of a sequence of
 monadic binding statements that execute in order without any
-intra-block jumps or conditional branches. The arguments to the block,
+intra-block jumps or conditional branches. The parameters to the block,
 \ensuremath{\ensurett{(v_1, \dots, v_n)}}, are the only variables in
 scope at the start of the block. The name of the block (\lab b/) is
 global to the program. Each basic block ends with either a \milres
@@ -289,7 +289,7 @@ captured, and immediately jumps to \lab compose/, the block
 implementing the body of \term compose/.
 
 The basic block defined on Line~\ref{mil_block_decl_fig1b} gives the
-name of the block (\lab compose/) and arguments that will be passed in
+name of the block (\lab compose/) and its parameters 
 (\var f/, \var g/, and \var x/). Line~\ref{mil_gofx_fig1b} applies
 \var g/ to \var x/ and assigns the result to \var t1/. The ``enter''
 operator (\enter), implements function application.
@@ -695,12 +695,11 @@ executed in the program ``returns,'' the program terminates.
 
 \intent{Describe blocks as functions; argument scope; blocks always
   ``return.''}  Unlike assembly-language, \mil blocks also act like
-functions. Each block declares arguments (\cc blocks have arguments in
-their environment) and those names are only in scope over the
-block. Blocks always return a monadic value. Closure, thunk and data
-allocations already create monadic values. The \return/ keyword makes
-a pure value monadic. The value produced by the last statement in a
-given block is returned to the block's caller. 
+functions. Each block declares parameters and those names are only in
+scope over the block. Blocks always return a monadic value. Closure,
+thunk and data allocations already create monadic values. The \return/
+keyword makes a pure value monadic. The value produced by the last
+statement in a given block is returned to the block's caller.
 
 \intent{Describe variable scope; storage locations are local.}  Within
 each block, any number of storage locations may be named on the \lhs
