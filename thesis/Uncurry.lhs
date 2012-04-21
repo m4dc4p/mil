@@ -93,14 +93,11 @@ closure or jump to the block.
 >
 >     initial :: FactBase Fact
 >     initial = mapFromList (zip labels (repeat Map.empty)) {-"\hslabel{initial}"-}
->
->     debugFwdT = debugFwdTransfers trace (show . printStmtM) (\ _ _ -> True) fwd
->     debugFwdJ = debugFwdJoins trace (const True) fwd
->                     
 >     fwd :: FwdPass SimpleFuelMonad Stmt Fact
 >     fwd = FwdPass { fp_lattice = collapseLattice {-"\hslabel{fwd}"-}
 >                   , fp_transfer = collapseTransfer blockArgs
->                   , fp_rewrite = collapseRewrite (destinations labels) }
+>                   , fp_rewrite = collapseRewrite (destinations labels) -- noFwdRewrite 
+>                     }
 >     
 >     blockArgs :: Map Hoopl.Label [Var]
 >     blockArgs = Map.fromList [(l, args) | (_, BlockEntry _ l args) <- entryPoints program]
@@ -120,6 +117,15 @@ closure or jump to the block.
 >     
 >     mapUses :: [Name] -> [Name] -> [Int]
 >     mapUses uses args = catMaybes (map (`elemIndex` args) uses) {-"\hslabel{mapUses}"-}
+
+%if False
+
+>
+>     debugFwdT = debugFwdTransfers trace (show . printStmtM) (\ _ _ -> True) fwd
+>     debugFwdJ = debugFwdJoins trace (const True) fwd
+>     
+                
+%endif
 
 %endif
 %if includeAll || includeTransfer
@@ -219,9 +225,10 @@ the positions given.
 > toJoin f = \ _ (OldFact o) (NewFact n) -> f o n 
 
 > lub :: WithTop Clo -> WithTop Clo -> (ChangeFlag, WithTop Clo)
-> lub old new = 
->   if old == new 
->    then (NoChange, new)
->    else (SomeChange, Top)
+> lub (PElem (Clo l _)) new@(PElem (Clo l' _))
+>   | l == l' = (NoChange, new)
+>   | otherwise = (SomeChange, Top)
+> lub Top _ = (NoChange, Top)
+> lub _ _ = (SomeChange, Top)
 
 %endif

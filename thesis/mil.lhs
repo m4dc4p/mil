@@ -26,7 +26,7 @@ processors. Administrative-Normal Form (\anf), first described by
 \citet{Flanagan1993} and intended for functional languages, requires
 that all intermediate values be named. \Anf's inventors proposed it as
 a replacement for continuation-passing style (\cps), a widely-employed
-intermediate representation first described by Appel
+intermediate representation most completely described by Appel
 \citeyearpar{Appel1992}. The simple structure of both \cps and \anf
 programs ease their translation to executable assembly-like languages.
 

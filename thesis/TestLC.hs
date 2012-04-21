@@ -59,14 +59,15 @@ m205 = mkFirst (BlockEntry undefined undefined ["g", "f", "x"]) <*>
        mkLast (Done undefined undefined undefined {-"\ \invoke v207/"-})
 
 -- Optimize a hand-writen MIL program.
-milTest :: SimpleUniqueMonad (ProgM C C) -> IO ()
-milTest prog = do
+milTest :: ([Name] -> ProgM C C -> ProgM C C) 
+        -> SimpleUniqueMonad (ProgM C C) -> IO ()
+milTest opt prog = do
   let p = runSimpleUniqueMonad prog
       blocks = map (fst . fst) . allBlocks  
   putStrLn ("============== Original ================")
   putStrLn (render . printProgM $ p)
   putStrLn ("============== Optimized ===============")
-  putStrLn (render . printProgM . mostOpt (blocks p) $ p)
+  putStrLn (render . printProgM . opt (blocks p) $ p)
 
 {-
    
@@ -956,8 +957,8 @@ double = times 2
 -}
 double1 = [("main",
             lam "ns" $ \ns ->
-            var "map" `app` var "double" `app` ns),
-           ("double",
+            var "map" `app` var "toList" `app` ns),
+           ("toList",
             lam "x" $ \x ->
               mkCons `app` x `app` mkNil)] ++ myMap
 
@@ -1143,6 +1144,54 @@ uncurry_capture = do
            mkLast (Done "v1" b1L (Enter "w" "m"))
   return $ b1 |*><*| k2 |*><*| k1 |*><*| b2
     
+{-
+
+b1:
+  f <- k1 {}
+  g <- k3 {}
+  goto b2(f, g)
+
+b2(f, g):
+  t <- f @ g
+  u <- g @ t
+  b3(t, u, f)
+
+b3(t, u, f):
+  v <- f @ u
+  w <- k4 {v}
+  b2(f, w)
+
+k1 {} x: k2 {x}
+k2 {} y: Left y
+
+k3 {} x: k4 {x}
+k4 {x} y: Right y
+-}
+
+uncurry_loop :: UniqueMonad m => m (ProgM C C)
+uncurry_loop = do
+  [b1L, b2L, b3L, k1L, k2L, k3L, k4L] <- sequence (replicate 7 freshLabel)
+  let b1 = mkFirst (BlockEntry "b1" b1L []) <*>
+           mkMiddles [Bind "f" (Closure ("k1", k1L) [])
+                     , Bind "g" (Closure ("k3", k3L) [])] <*>
+           mkLast (Done "b1" b2L (Goto ("b2", b2L) ["f", "g"]))
+      b2 = mkFirst (BlockEntry "b2" b2L ["f", "g"]) <*>
+           mkMiddles [Bind "t" (Enter "f" "g")
+                     , Bind "u" (Enter "g" "t")] <*>
+           mkLast (Done "b2" b2L (Goto ("b3", b3L) ["t", "u", "f"]))
+      b3 = mkFirst (BlockEntry "b3" b3L ["t", "u", "f"]) <*>
+           mkMiddles [Bind "v" (Enter "f" "t")
+                     ,Bind "w" (Closure ("k4", k4L) ["v"])] <*>
+           mkLast (Done "b3" b3L (Goto ("b2", b2L) ["f", "w"]))
+      k1 = mkFirst (CloEntry "k1" k1L [] "x") <*>
+           mkLast (Done "k1" k1L (Closure ("k2", k2L) ["x"]))
+      k2 = mkFirst (CloEntry "k2" k2L ["x"] "y") <*>
+           mkLast (Done "k2" k2L (Constr "Left" ["y"]))
+      k3 = mkFirst (CloEntry "k3" k3L [] "x") <*>
+           mkLast (Done "k4" k4L (Closure ("k4", k4L) ["x"]))
+      k4 = mkFirst (CloEntry "k4" k4L ["x"] "y") <*>
+           mkLast (Done "k4" k4L (Constr "Right" ["y"]))
+  return $ b1 |*><*| b2 |*><*| b3 |*><*| k1 |*><*| k2 |*><*| k3 |*><*| k4
 
 mil_print = [("hello", bindE "_" (mPrint `app` lit 0) $ \_ -> ret mkUnit)
             ,("main", 

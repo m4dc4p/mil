@@ -3,7 +3,7 @@
 
 module OptMIL (mostOpt, addLive, LiveFact
               , getEntryLabel, findLive, deadCode
-              , optCollapse)
+              , optCollapse, prepCollapse)
 
 where
 
@@ -288,9 +288,12 @@ singlePred referrers dest f
   | dest `Map.member` referrers && Set.size (referrers ! dest) == 1 = Just (maybe True (True &&) f)
   | otherwise = f
 
+-- | Does all optimizations prior to uncurrying.
+prepCollapse tops = deadBlocks tops . bindReturn . inlineReturn
+
 -- | Optimizations that need to run around
 -- closure collapse. 
-optCollapse tops = deadBlocks tops . deadCode . collapse . bindReturn . inlineReturn
+optCollapse tops = deadBlocks tops . deadCode . collapse . prepCollapse tops
 
 mostOpt :: [Name] -> ProgM C C -> ProgM C C
 mostOpt tops = id .

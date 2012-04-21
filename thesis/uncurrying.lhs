@@ -181,7 +181,7 @@ executes when all of the arguments to |compose| are available.
         \ccblock k2(f)g: \mkclo[k3:f, g] \label{mil_k2_fig2}
         \ccblock k3(f, g)x: \goto compose(f, g, x) \label{mil_k3_fig2}
         
-        \block compose(f, g, x): \dots {\rm\emph{as in Figure \ref{mil_fig1b} on Page~\pageref{mil_fig1b}}} \dots 
+        \block compose(f, g, x): {\rm\emph{\dots as in Figure \ref{mil_fig1b} on Page \pageref{mil_fig1b}}\dots} 
       \end{AVerb}
     \end{minipage} \\\\
     \hss\scap{uncurry_fig_compose_b}\hss
@@ -923,7 +923,7 @@ took arguments in opposite order, \lab k1/ and \lab add/ would look
 like:
 
 \begin{singlespace}\correctspaceskip
-  \begin{AVerb}
+  \begin{AVerb}[gobble=4]
     \ccblock k1(a)b: \goto add(b, a)
     \block add(x, y): \ldots
   \end{AVerb}
@@ -994,92 +994,133 @@ creates the appropriate |Jump| or |Capture| value. The result of
 
 \section{Example: Uncurrying Across Blocks}
 
+The example shown in the previous section demonstrated that we can
+eliminate unnecessary \enter expressions within a block. As we will
+demonstrate with the next two examples, the dataflow algorithm enables
+us to do the same across multiple blocks, even in the presence of
+conditional control flow and loops.
+
+Our first example demonstrates uncurrying across blocks with
+conditional control-flow. Figure~\ref{uncurry_global_a} shows a simple
+\lamC program that turns a list into a list of lists.
+Part~\subref{uncurry_global_b} shows the \mil translation of
+Part~\subref{uncurry_global_a}. The listing is rather verbose as it
+represents the output of our \lamC to \mil compiler. 
+
 \begin{myfig}
-  \begin{tabular}{lr}
-  \begin{minipage}[t]{.55\hsize}
+  \begin{tabular}{c}
+    \begin{minipage}{\hsize}\begin{centering}
+> main ns = map toList ns
+> map f xs = case xs of
+>   Cons x xs' -> Cons (f x) (map f xs')
+>   Nil -> Nil 
+> toList n = Cons n Nil
+    \end{centering}\end{minipage} \\
+    \scap{uncurry_global_a} \\
+    \begin{tabular}{lr}\begin{minipage}[t]{.55\hsize}
     \begin{AVerb}[gobble=6,numbers=left]
-      \block main(): \mkclo[k225:]
-      \ccblock k225()ns: \goto b226(ns)
-      \block b226(ns):
-        \vbinds v227<-\goto map();
-        \vbinds v228<-\goto double();
-        \vbinds v229<-\app v227*v228/;
-        \app v229 * ns/
-      \block double(): \mkclo[k219:]
-      \ccblock k219()x: \goto b220(x)
-      \block b220(x):
-        \vbinds v221<-\goto Cons();
-        \vbinds v222<-\app v221*x/;
-        \vbinds v223<-\goto Nil();
-        \app v222 * v223/
-      \block Consbody(a2, a1): \app Cons * a2 * a1/
-      \ccblock Consclo1(a2)a1: \goto Consbody(a2, a1)
-      \ccblock Consclo2()a2: \mkclo[Consclo1:a2]
-      \block Cons(): \mkclo[Consclo2:]
-      \block Nil(): Nil
+      \block main(): k225 ()\label{uncurry_global_main_start}
+      k225 () ns: b226(ns)
+      \block b226(ns): \label{uncurry_global_main_body}
+        v227 <- k203 ()
+        v228 <- k219 ()
+        v229 <- v227 * v228 
+        v229 * ns \label{uncurry_global_main_end}
+      k219 () x: b220(x)
+      \block b220(x):\label{uncurry_global_toList_body}
+        v221 <- Consclo2 ()
+        v222 <- v221 * x
+        v223 <- Nil
+        v222 * v223 \label{uncurry_global_toList_body_end}
+      Consclo2 () a2: Consclo1 (a2)
+      \block Consclo1(a2) a1: Cons a2 a1
     \end{AVerb}
   \end{minipage} &
-  \begin{minipage}[t]{.6\hsize}
+  \begin{minipage}[t]{.4\hsize}
     \begin{AVerb}[gobble=6,numbers=left,firstnumber=last]
-      \block map(): \mkclo[k203:]
-      \ccblock k203()f: \mkclo[k204:f]
-      \ccblock k204(f)xs: \goto b205(xs, f)
-      \block b205(xs, f):
-        \vbinds result217<-\goto caseEval216(xs, f);
-        \return result217/
-      \block caseEval216(xs, f):
-        \case xs;
-          \valt Nil()->\goto altNil206();
-          \valt Cons(x xs)->\goto altCons208(f, x, xs);
-      \block altNil206():
-        \vbinds v207<-\goto Nil();
-        \return v207/
-      \block altCons208(f, x, xs):
-        \vbinds v209<-\goto Cons();
-        \vbinds v210<-\app f*x/;
-        \vbinds v211<-\app v209*v210/;
-        \vbinds v212<-\goto map();
-        \vbinds v213<-\app v212*f/;
-        \vbinds v214<-\app v213*xs/;
-        \vbinds v215<-\app v211*v214/;
-        \return v215/
+      k203 () f: k204 (f)
+      k204 (f) xs: b205(xs, f)
+      \block b205(xs, f): caseEval216(xs, f) \label{uncurry_global_map_body}
+      \block caseEval216(xs, f): 
+        case xs of
+          Nil -> altNil206()
+          Cons x xs -> altCons208(f, x, xs)
+      \block altNil206(): Nil \label{uncurry_global_map_nil}
+      \block altCons208(f, x, xs): \label{uncurry_global_map_cons}
+        v209 <- Consclo2 ()
+        v210 <- f * x \label{uncurry_global_map_cons_fx}
+        v211 <- v209 * v210
+        v212 <- k203 () \label{uncurry_global_map_cons_map_start}
+        v213 <- v212 * f
+        v214 <- v213 * xs \label{uncurry_global_map_cons_map_end}
+        v211 * v214 \label{uncurry_global_map_cons_end}
     \end{AVerb}
-  \end{minipage}
+  \end{minipage}\end{tabular} \\
+  \scap{uncurry_global_b} \\
   \end{tabular}
   \caption{}
   \label{uncurry_globabl}
 \end{myfig}
 
+In this program, |main| applies |toList| to each element in |ns| using
+the |map| function. Per the definition of |map|, the |Cons| arm
+applies |f| to an element |x|, and then recursively calls |map| to
+apply |f| to the rest of the
+list. Lines~\ref{uncurry_global_map_cons}--\ref{uncurry_global_map_cons_end}
+in Part~\subref{uncurry_global_b} implement the |Cons| arm of
+|map|. On Line~\ref{uncurry_global_map_cons_fx}, \var f/ is applied to
+the element \var
+x/. Lines~\ref{uncurry_global_map_cons_map_start}--\ref{uncurry_global_map_cons_map_end}
+recursively call |map| with the remainder of the
+list. Line~\ref{uncurry_global_map_cons_end} returns the updated list. 
+
+In the body of \lab altCons208/, there are two opportunities to
+eliminate \enter expressions. \var f/ always represents the |toList|
+function, which is implemented by \lab b220/ on
+Lines~\ref{uncurry_global_toList_body}--\ref{uncurry_global_toList_body_end}. We
+should be able to replace \var f * x/ on
+Line~\ref{uncurry_global_map_cons_fx} with \goto b220(f, x), a direct
+jump. Similarly, the recursive call to |map| can be replaced by a
+direct call to \lab b205/, which implements the body of
+|map|.\footnote{The immediate call to \lab caseEval216/ in \lab b205/
+  is an artifact of our compilation strategy, and could be inlined to
+  eliminate one jump.}
+
+%% 1
+%% (fset 'mil_block
+%%   (lambda (&optional arg) "Keyboard macro." (interactive "p") (kmacro-exec-ring-item (quote ([92 98 108 111 99 107 32 C-right 4 1 down C-right C-left] 0 "%d")) arg)))
+
+Figure~\ref{uncurry_global_opt} shows the result of applying
+uncurrying. 
+
 \begin{myfig}
   \begin{tabular}{lr}
   \begin{minipage}[t]{\hsize}
     \begin{AVerb}[gobble=6,numbers=left]
-      \ccblock Consclo1(a2)a1: \app Cons * a2 * a1/
-      \block main(): \mkclo[k225:]
-      \block double(): \mkclo[k219:]
-      \block map(): \mkclo[k203:]
-      \ccblock k203()f: \mkclo[k204:f]
-      \ccblock k204(f)xs: \goto b205(xs, f)
+      \block Consclo1(a2) a1: Cons a2 a1
+      \block main(): k225 ()
+      k203 () f: k204 (f)
+      k204 (f) xs: b205(xs, f)
       \block b205(xs, f): caseEval216(xs, f)
       \block altNil206(): Nil
       \block altCons208(f, x, xs):
-        \vbinds v210<-\goto b220(x);
-        \vbinds v211<-\mkclo[Consclo1:v210];
-        \vbinds v214<-\goto b205(xs, f);
-        \app v211 * v214/
+        v210 <- b220(x)
+        v211 <- Consclo1 (v210)
+        v214 <- b205(xs, f)
+        v211 * v214
       \block caseEval216(xs, f):
-        \case xs;
-          \valt Nil()->\goto altNil206();
-          \valt Cons(x xs)->\goto altCons208(f, x, xs);
-      \ccblock k219()x: b220(x)
+        case xs of
+          Nil -> altNil206()
+          Cons x xs -> altCons208(f, x, xs)
+      k219 () x: b220(x)
       \block b220(x):
-        \vbinds v222<-\mkclo[Consclo1:x];
-        \vbinds v223<-Nil;
-        \app v222 * v223/
-      \ccblock k225()ns: \goto b226(ns)
+        v222 <- Consclo1 (x)
+        v223 <- Nil
+        v222 * v223
+      k225 () ns: b226(ns)
       \block b226(ns):
-        \vbinds v228<-\mkclo[k219:];
-        \goto b205(ns, v228)
+        v228 <- k219 ()
+        b205(ns, v228)
     \end{AVerb}
   \end{minipage}
   \end{tabular}
@@ -1087,6 +1128,53 @@ creates the appropriate |Jump| or |Capture| value. The result of
   \label{uncurry_globabl_opt}
 \end{myfig}
 
+\begin{myfig}
+  \begin{tabular}{lr}
+  \begin{minipage}{.55\hsize}
+    \begin{AVerb}[gobble=6,numbers=left]
+      \block b1():
+        f <- k1 ()
+        g <- k3 ()
+        b2(f, g)
+      b2 (f, g):
+        t <- f * g
+        u <- g * t
+        b3(t, u, f)
+      b3 (t, u, f):
+        v <- f * t
+        w <- k4 (v)
+        b2(f, w)
+      k1 () x: k2 (x)
+      k2 (x) y: Left y
+      k3 () x: k4 (x)
+      k4 (x) y: Right y
+    \end{AVerb}
+  \end{minipage} &
+  \begin{minipage}{.45\hsize}
+    \begin{AVerb}[gobble=6,numbers=left]
+      ============== Optimized ===============
+      b1 ():
+        f <- k1 ()
+        g <- k3 ()
+        b2(f, g)
+      b2 (f, g):
+        t <- k2 (g)
+        u <- g * t
+        b3(t, u, f)
+      b3 (t, u, f):
+        v <- k2 (t)
+        w <- k4 (v)
+        b2(f, w)
+      k1 () x: k2 (x)
+      k2 (x) y: Left y
+      k3 () x: k4 (x)
+      k4 (x) y: Right y
+    \end{AVerb}
+  \end{minipage}
+  \end{tabular}
+  \caption{}
+  \label{uncurry_loop}
+\end{myfig}
 
 \subsection{Complications}
 

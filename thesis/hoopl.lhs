@@ -882,8 +882,6 @@ program.
   \label{hoopl_fig13}
 \end{myfig}
 
-\section{Related Work}
-
 \section{Summary}
 \label{hoopl_sec3}
 \intent{Summarize \hoopl's features.} This chapter gave an introduction
