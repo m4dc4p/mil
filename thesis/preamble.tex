@@ -472,6 +472,11 @@
 \def\Anf{\textsc{Anf}\xspace}
 \def\cps{\textsc{cps}\xspace}
 
+\def\anchorF(#1){\begin{tikzpicture}[overlay,remember picture]
+      \node[invis,above=5pt] (#1) {};
+  \end{tikzpicture}}
+
+
 %% Indicates the preamble has been loadd.
 \def\preambleloaded{}
 

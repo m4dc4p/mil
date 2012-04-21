@@ -1019,41 +1019,39 @@ represents the output of our \lamC to \mil compiler.
     \scap{uncurry_global_a} \\
     \begin{tabular}{lr}\begin{minipage}[t]{.55\hsize}
     \begin{AVerb}[gobble=6,numbers=left]
-      \block main(): k225 ()\label{uncurry_global_main_start}
-      k225 () ns: b226(ns)
-      \block b226(ns): \label{uncurry_global_main_body}
-        v227 <- k203 ()
-        v228 <- k219 ()
-        v229 <- v227 * v228 
-        v229 * ns \label{uncurry_global_main_end}
-      k219 () x: b220(x)
+      \block main(ns): \label{uncurry_global_main_body}
+        \vbinds v227<-\mkclo[k203:];
+        \vbinds v228<-\mkclo[k219:];
+        \vbinds v229<-\app v227*v228/;
+        \app v229 * ns/ \label{uncurry_global_main_end}
+      \ccblock k219()x: \goto b220(x)
       \block b220(x):\label{uncurry_global_toList_body}
-        v221 <- Consclo2 ()
-        v222 <- v221 * x
-        v223 <- Nil
-        v222 * v223 \label{uncurry_global_toList_body_end}
-      Consclo2 () a2: Consclo1 (a2)
-      \block Consclo1(a2) a1: Cons a2 a1
+        \vbinds v221<-\mkclo[Consclo2:];
+        \vbinds v222<-\app v221*x/;
+        \vbinds v223<-Nil;
+        \app v222*v223/ \label{uncurry_global_toList_body_end}
+      \ccblock Consclo2()a2: \mkclo[Consclo1:a2]
+      \ccblock Consclo1(a2)a1: Cons a2 a1
     \end{AVerb}
   \end{minipage} &
   \begin{minipage}[t]{.4\hsize}
     \begin{AVerb}[gobble=6,numbers=left,firstnumber=last]
-      k203 () f: k204 (f)
-      k204 (f) xs: b205(xs, f)
-      \block b205(xs, f): caseEval216(xs, f) \label{uncurry_global_map_body}
+      \ccblock k203()f: \mkclo[k204:f]
+      \ccblock k204(f)xs: \goto b205(xs, f)
+      \block b205(xs, f): \goto caseEval216(xs, f) \label{uncurry_global_map_body}
       \block caseEval216(xs, f): 
-        case xs of
-          Nil -> altNil206()
-          Cons x xs -> altCons208(f, x, xs)
+        \case xs;
+          \valt Nil()->\goto altNil206();
+          \valt Cons(x xs)->\goto altCons208(f, x, xs);
       \block altNil206(): Nil \label{uncurry_global_map_nil}
       \block altCons208(f, x, xs): \label{uncurry_global_map_cons}
-        v209 <- Consclo2 ()
-        v210 <- f * x \label{uncurry_global_map_cons_fx}
-        v211 <- v209 * v210
-        v212 <- k203 () \label{uncurry_global_map_cons_map_start}
-        v213 <- v212 * f
-        v214 <- v213 * xs \label{uncurry_global_map_cons_map_end}
-        v211 * v214 \label{uncurry_global_map_cons_end}
+        v209 <- \mkclo[Consclo2:]
+        \vbinds v210<-\app f*x/; \label{uncurry_global_map_cons_fx}
+        \vbinds v211<-\app v209*v210/;
+        \vbinds v212<-\mkclo[k203:]; \label{uncurry_global_map_cons_map_start}
+        \vbinds v213<-\app v212*f/;
+        \vbinds v214<-\app v213*xs/; \label{uncurry_global_map_cons_map_end}
+        \app v211*v214/ \label{uncurry_global_map_cons_end}
     \end{AVerb}
   \end{minipage}\end{tabular} \\
   \scap{uncurry_global_b} \\
@@ -1078,7 +1076,7 @@ In the body of \lab altCons208/, there are two opportunities to
 eliminate \enter expressions. \var f/ always represents the |toList|
 function, which is implemented by \lab b220/ on
 Lines~\ref{uncurry_global_toList_body}--\ref{uncurry_global_toList_body_end}. We
-should be able to replace \var f * x/ on
+should be able to replace \var f *  x/ on
 Line~\ref{uncurry_global_map_cons_fx} with \goto b220(f, x), a direct
 jump. Similarly, the recursive call to |map| can be replaced by a
 direct call to \lab b205/, which implements the body of
@@ -1086,41 +1084,44 @@ direct call to \lab b205/, which implements the body of
   is an artifact of our compilation strategy, and could be inlined to
   eliminate one jump.}
 
-%% 1
-%% (fset 'mil_block
-%%   (lambda (&optional arg) "Keyboard macro." (interactive "p") (kmacro-exec-ring-item (quote ([92 98 108 111 99 107 32 C-right 4 1 down C-right C-left] 0 "%d")) arg)))
-
-Figure~\ref{uncurry_global_opt} shows the result of applying
-uncurrying. 
+Figure~\ref{uncurry_global_opt} shows the result of applying our
+uncurrying optimization to the program in
+Figure~\ref{uncurry_global}.\footnote{We also eliminated dead-code
+  within each block.} On Line~\ref{uncurry_global_opt_toLst}, the
+expression \app f * x/ has been replaced with \goto
+b220(x). Line~\ref{uncurry_global_opt_map} has replaced the three
+previous lines with \goto b205(xs, f), a direct recursive call. The
+first change does not save a closure allocation (because \var f/ is
+still passed in),\footnote{We could eliminate \var f/ through an
+  analysis that finds unused parameters.} but the second change saves
+two closure allocations and two \enter expressions.
 
 \begin{myfig}
   \begin{tabular}{lr}
   \begin{minipage}[t]{\hsize}
     \begin{AVerb}[gobble=6,numbers=left]
-      \block Consclo1(a2) a1: Cons a2 a1
-      \block main(): k225 ()
-      k203 () f: k204 (f)
-      k204 (f) xs: b205(xs, f)
-      \block b205(xs, f): caseEval216(xs, f)
+      \block b226(ns):
+        \vbinds v228<-\mkclo[k219:];
+        \goto b205(ns, v228)
+      \ccblock k219()x: b220(x)
+      \block b220(x):
+        \vbinds v222<-\goto Consclo1 (x);
+        \vbinds v223<-Nil;
+        \app v222 * v223/
+      \ccblock k203()f: \mkclo[k204:f]
+      \ccblock k204(f)xs: \goto b205(xs, f)
+      \block b205(xs, f): \goto caseEval216(xs, f)
+      \block caseEval216(xs, f):
+        \case xs;
+          \valt Nil ()->\goto altNil206();
+          \valt Cons(x xs)->\goto altCons208(f, x, xs);
       \block altNil206(): Nil
       \block altCons208(f, x, xs):
-        v210 <- b220(x)
-        v211 <- Consclo1 (v210)
-        v214 <- b205(xs, f)
-        v211 * v214
-      \block caseEval216(xs, f):
-        case xs of
-          Nil -> altNil206()
-          Cons x xs -> altCons208(f, x, xs)
-      k219 () x: b220(x)
-      \block b220(x):
-        v222 <- Consclo1 (x)
-        v223 <- Nil
-        v222 * v223
-      k225 () ns: b226(ns)
-      \block b226(ns):
-        v228 <- k219 ()
-        b205(ns, v228)
+        \vbinds v210<-\goto b220(x); \label{uncurry_globabl_opt_toList}
+        \vbinds v211<-\goto Consclo1 (v210);
+        \vbinds v214<-\goto b205(xs, f); \label{uncurry_globabl_opt_map}
+        \app v211 * v214/
+      \ccblock Consclo1(a2)a1: Cons a2 a1
     \end{AVerb}
   \end{minipage}
   \end{tabular}
@@ -1129,46 +1130,80 @@ uncurrying.
 \end{myfig}
 
 \begin{myfig}
+  \begin{tabular*}{\textwidth}{l}\begin{minipage}[t]{\textwidth}
+    \begin{AVerb}[gobble=6,numbers=left]
+      \block b226(ns): \label{uncurry_global_main_body}
+        \vbinds v227<-\mkclo[k203:];\anchorF(v227a)
+        \vbinds v228<-\mkclo[k219:];\anchorF(v228a)
+        \vbinds v229<-\app v227*v228/;\anchorF(v229a)
+        \app v229 * ns/ \label{uncurry_global_main_end}
+    \end{AVerb}
+    \begin{tikzpicture}[overlay,remember picture]
+      \node[fact, right=0.25in of v227a, anchor=west] (fv227a) {\{\var v227/\,:\,$\top$\}};
+      \node[fact, right=0.25in of v228a, anchor=west] (fv228a) {\{\var v227/\,:\,$\top$\}, \{\var v228/\,:\,\mkclo[k219:]\}};
+      \node[fact, right=0.25in of v229a, anchor=west] (fv229a) {\{\var v227/\,:\,$\top$\}, \{\var v228/\,:\,\mkclo[k219:]\},\{\var v229/\,:\,$\top$\}};
+      \draw [->] (fv227a) to (v227a);
+      \draw [->] (fv228a) to (v228a);
+      \draw [->] (fv229a) to (v229a);
+    \end{tikzpicture}
+  \end{minipage} \\
+  \begin{minipage}[t]{\textwidth}
+    \begin{AVerb}[gobble=6,numbers=left]
+      \block b226(ns): \label{uncurry_global_main_body}
+        \vbinds v227<-\mkclo[k203:];
+        \vbinds v228<-\mkclo[k219:];
+        \vbinds v229<-\mkclo[k204:v228];\anchorF(v229b)
+        \app v229 * ns/ \label{uncurry_global_main_end}
+    \end{AVerb}
+    \begin{tikzpicture}[overlay,remember picture]
+      \node[fact, right=0.25in of v229b, anchor=west] (fv229b) {\{\var v227/\,:\,$\top$\}, \{\var v228/\,:\,\mkclo[k219:]\},\{\var v229/\,:\,\goto b205(xs, f)\}};
+      \draw [->] (fv229b) to (v229b);
+    \end{tikzpicture}
+
+  \end{minipage}\end{tabular*}
+\end{myfig}
+
+\begin{myfig}
   \begin{tabular}{lr}
   \begin{minipage}{.55\hsize}
     \begin{AVerb}[gobble=6,numbers=left]
       \block b1():
-        f <- k1 ()
-        g <- k3 ()
-        b2(f, g)
+        \vbinds f<-\mkclo[k1:];
+        \vbinds g<-\mkclo[k3:];
+        \goto b2(f, g)
       b2 (f, g):
-        t <- f * g
-        u <- g * t
-        b3(t, u, f)
+        \vbinds t<-\app f*g/;
+        \vbinds u<-\app g*t/;
+        \goto b3(t, u, f)
       b3 (t, u, f):
-        v <- f * t
-        w <- k4 (v)
-        b2(f, w)
-      k1 () x: k2 (x)
-      k2 (x) y: Left y
-      k3 () x: k4 (x)
-      k4 (x) y: Right y
+        \vbinds v<-\app f*t/;
+        \vbinds w<-\mkclo[k4:v];
+        \goto b2(f, w)
+      \ccblock k1()x: \mkclo[k2:x]
+      \ccblock k2(x)y: Left y
+      \ccblock k3()x: \mkclo[k4:x]
+      \ccblock k4(x)y: Right y
     \end{AVerb}
   \end{minipage} &
   \begin{minipage}{.45\hsize}
     \begin{AVerb}[gobble=6,numbers=left]
       ============== Optimized ===============
-      b1 ():
-        f <- k1 ()
-        g <- k3 ()
-        b2(f, g)
-      b2 (f, g):
-        t <- k2 (g)
-        u <- g * t
-        b3(t, u, f)
-      b3 (t, u, f):
-        v <- k2 (t)
-        w <- k4 (v)
-        b2(f, w)
-      k1 () x: k2 (x)
-      k2 (x) y: Left y
-      k3 () x: k4 (x)
-      k4 (x) y: Right y
+      \block b1():
+        \vbinds f<-\mkclo[k1:];
+        \vbinds g<-\mkclo[k3:];
+        \goto b2(f, g)
+      \block b2(f, g):
+        \vbinds t<-\mkclo[k2:g];
+        \vbinds u<-\app g*t/;
+        \goto b3(t, u, f)
+      \block b3(t, u, f):
+        \vbinds v<-\mkclo[k2:t];
+        \vbinds w<-\mkclo[k4:v];
+        \goto b2(f, w)
+      \ccblock k1()x: \mkclo[k2:x]
+      \ccblock k2(x)y: Left y
+      \ccblock k3()x: \mkclo[k4:x]
+      \ccblock k4(x)y: Right y
     \end{AVerb}
   \end{minipage}
   \end{tabular}
@@ -1277,4 +1312,33 @@ argument and the result returned.
 
 \section{Reflection}
 \label{uncurry_sec_refl}
+
+%% 1
+%% (fset 'mil_block
+%%   (lambda (&optional arg) "Keyboard macro." (interactive "p") (kmacro-exec-ring-item (quote ([92 98 108 111 99 107 32 C-right 4 1 down C-right C-left] 0 "%d")) arg)))
+
+%% 2
+%% (fset 'mil_ccblock
+%%    (lambda (&optional arg) "Keyboard macro." (interactive "p") (kmacro-exec-ring-item (quote ([67108896 left right 92 98 backspace 99 99 98 108 111 99 107 32 C-right 4 19 41 right left 4 5 right C-right C-left] 0 "%d")) arg)))
+
+%% 3
+%% (fset 'mil_vbinds
+%%    (lambda (&optional arg) "Keyboard macro." (interactive "p") (kmacro-exec-ring-item (quote ([92 118 98 105 110 100 115 32 C-right C-left 19 60 left backspace right right 4 5 59 right C-right C-left] 0 "%d")) arg)))
+
+%% 4
+%% (fset 'mil_mkclo
+%%    (lambda (&optional arg) "Keyboard macro." (interactive "p") (kmacro-exec-ring-item (quote ([92 109 107 99 108 111 91 C-right 58 4 4 19 41 left right backspace 93 right C-right C-left] 0 "%d")) arg)))
+
+%% 5
+%% (fset 'mil_app
+%%    (lambda (&optional arg) "Keyboard macro." (interactive "p") (kmacro-exec-ring-item (quote ([92 97 112 112 32 19 42 left backspace right 4 C-right 47 right C-right] 0 "%d")) arg)))
+
+%% 6
+%% (fset 'mil_goto
+%%    (lambda (&optional arg) "Keyboard macro." (interactive "p") (kmacro-exec-ring-item (quote ([92 103 111 116 111 32 5 C-right C-left 1] 0 "%d")) arg)))
+
+%% 7
+%% (fset 'mil_valts
+%%    (lambda (&optional arg) "Keyboard macro." (interactive "p") (kmacro-exec-ring-item (quote ([92 118 97 108 116 32 C-right 4 40 19 45 left left 41 4 19 62 left right 4 5 59 right C-right C-left] 0 "%d")) arg)))
+
 \end{document}
