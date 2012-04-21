@@ -94,7 +94,7 @@ closure or jump to the block.
 >     initial :: FactBase Fact
 >     initial = mapFromList (zip labels (repeat Map.empty)) {-"\hslabel{initial}"-}
 >
->     debugFwdT = debugFwdTransfers trace (show . printStmtM) (\_ _ -> True) fwd
+>     debugFwdT = debugFwdTransfers trace (show . printStmtM) (\ _ _ -> True) fwd
 >     debugFwdJ = debugFwdJoins trace (const True) fwd
 >                     
 >     fwd :: FwdPass SimpleFuelMonad Stmt Fact
@@ -128,6 +128,8 @@ closure or jump to the block.
 > collapseTransfer blockParams = mkFTransfer transfer
 >   where
 >     transfer :: Stmt e x -> Fact -> Hoopl.Fact x Fact
+>     transfer (BlockEntry _ _ _) facts = facts
+>     transfer (CloEntry _ _ _ _) facts = facts
 >     transfer (Bind v (Closure dest args)) facts 
 >       | v `elem` args = Map.delete v facts' {-"\hslabel{closure1}"-}
 >       | otherwise = Map.insert v (PElem (Clo dest args)) facts' {-"\hslabel{closure2}"-}
@@ -135,14 +137,12 @@ closure or jump to the block.
 >     transfer (Bind v _) facts = Map.insert v Top (kill v facts) {-"\hslabel{rest}"-}
 >     transfer (Done _ _ (Goto (_, dest) args)) facts = mapSingleton dest facts' {-"\hslabel{goto1}"-}
 >       where facts' = rename args (blockParams ! dest) (restrict facts args) {-"\hslabel{goto2}"-}
->     transfer (Case _ alts) facts = mkFactBase collapseLattice fact'
->       where fact' =  [(dest, rename args params trimmed) | 
->                         (Alt _ binds (Goto (_, dest) args)) <- alts,
->                         let  trimmed = trim (restrict facts args) binds
->                              params = blockParams ! dest]
+>     transfer (Case _ alts) facts = mkFactBase collapseLattice facts' {-"\hslabel{case_result}"-}
+>       where facts' =  [(dest, rename args params trimmed) | {-"\hslabel{case_start}"-}
+>                         (Alt _ binds (Goto (_, dest) args)) <- alts, {-"\hslabel{case_alts}"-}
+>                         let  trimmed = trim (restrict facts args) binds {-"\hslabel{case_trimmed}"-}
+>                              params = blockParams ! dest] {-"\hslabel{case_end}"-}
 >     transfer (Done _ _ _) facts = mkFactBase collapseLattice []
->     transfer (BlockEntry _ _ _) facts = facts
->     transfer (CloEntry _ _ _ _) facts = facts
 >   
 >     kill :: Name -> Fact -> Fact {-"\hslabel{kill}"-}
 >     kill = Map.filter . keep

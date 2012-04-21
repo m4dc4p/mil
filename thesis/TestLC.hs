@@ -959,7 +959,7 @@ double1 = [("main",
             var "map" `app` var "double" `app` ns),
            ("double",
             lam "x" $ \x ->
-              times (lit 2) x)] ++ myMap
+              mkCons `app` x `app` mkNil)] ++ myMap
 
 {-
 

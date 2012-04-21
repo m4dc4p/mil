@@ -22,14 +22,15 @@
     & \multicolumn{2}{l}{\phantom{=} \text{where\ } F_1, F_2 \in \setL{Fact}.}\\\\
 
     \multicolumn{3}{c}{\textit{Transfer Function}} \\
-    t (F, \binds v\ <-\ \mkclo[b:v_1];) &= 
+    \mathllap{t (F, \block b(\dots):)} &= F;\quad t(F, \ccblock k(\dots)x:) = F  \labeleq{uncurry_df_transfer_block} \labeleq{uncurry_df_transfer_ccblock} & \mathllap{\eqref{uncurry_df_transfer_block},~\eqref{uncurry_df_transfer_ccblock}}\\
+    \mathllap{t (F, \binds v\ <-\ \mkclo[b:v_1];)} &= 
     \begin{cases}
       (F \cup \{(\var v/, \mkclo[b:v_1])\})\ \backslash\ \mfun{uses}(F, \var v/)& \text{when}\ \var v/ \neq \var v_1/ \\
       \mfun{delete}(F, \var v/) & \text{when}\ \var v/ = \var v_1/ 
     \end{cases}
     \labeleq{uncurry_df_transfer_closure} & \eqref{uncurry_df_transfer_closure} \\
 
-    \mathllap{t (F, \binds v\ <-\ \ldots;)} &= \{(\var v/, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, \var v/)) \labeleq{uncurry_df_transfer_other} & \eqref{uncurry_df_transfer_other} \\
+    t (F, \binds v\ <-\ \ldots;) &= \{(\var v/, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, \var v/)) \labeleq{uncurry_df_transfer_other} & \eqref{uncurry_df_transfer_other} \\
 
     t (F, \goto b(v)) &= \left\{\lab b/\ :\ \mfun{rename}(\mfun{args}(\lab b/), \var v/, \mfun{restrict}(F, \var v/))\right\}
     \labeleq{uncurry_df_transfer_goto} & \eqref{uncurry_df_transfer_goto} \\
@@ -54,13 +55,12 @@
     & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \in \setL{Fact}.} \\\\
 
     \mfun{uses}(F, \var v/) &= \begin{array}{l}
-      \{(\var u/, \mkclo[l:v_1, \dots, v_n])\ |\ (\var u/, \mkclo[l:v_1, \dots, v_n]) \in F, \\
-      \quad \var v/ \in \{\var v_1/, \dots, \var v_n/\} \}
+      \{(\var u/, \mkclo[l:v_1, \dots, v_n])\ |\\
+      \quad  (\var u/, \mkclo[l:v_1, \dots, v_n]) \in F, \var v/ \in \{\var v_1/, \dots, \var v_n/\} \}
     \end{array} \labeleq{uncurry_df_uses} & \eqref{uncurry_df_uses} \\
 
     \mfun{rename}(\var u/, \var v/, F) &= \begin{array}{l}
-      \{(\var u/, p)\ |\ (\var v'/, p) \in F, \var v/ = \var v'/\}\ \cup \\
-      \quad\{(\var v'/, p)\ |\ (\var v'/, p) \in F, \var v/ \neq \var v'/\}
+      \{(\var u/, p)\ |\ (\var v'/, p) \in F, \var v/ = \var v'/\}\ \cup \{(\var v'/, p)\ |\ (\var v'/, p) \in F, \var v/ \neq \var v'/\}
     \end{array} \labeleq{uncurry_df_rename} & \eqref{uncurry_df_rename} \\
     \mfun{delete}(F, \var v/) &= \begin{array}{l}
       \{(\var u/, p)\ |\ (\var u/, p) \in F, \var u/ \neq \var v/\}

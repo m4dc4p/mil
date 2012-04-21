@@ -299,7 +299,7 @@
 \protected\def\return#1/{\def\retarg{#1}%%
   \milres return/\ifx\empty\retarg\else\ensurett{\ \removespaces #1}\fi}
 %% A closure capturing block. k {v1, ..., vN} x: ...
-\protected\def\ccblock#1(#2)#3:{\lab#1/\ensuremath{\thinspace\{\ensurett{#2}\}}\ \ensurett{#3\hbox{:}}}
+\protected\def\ccblock#1(#2)#3:{\lab#1/\ensuremath{\thinspace\{\ensurett{#2}\}}\thinspace\ensurett{\ignorespaces #3\hbox{:}}}
 %% A normal block
 \protected\def\block#1(#2):{\lab #1/\ensuremath{\thinspace(\ensurett{#2})}\ensurett{:}}
 %% A goto expression

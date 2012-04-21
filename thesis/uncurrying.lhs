@@ -337,6 +337,12 @@ statement given. We define $t$ by cases over \mil statements.
 
 
 \begin{description}
+\item[\emph{Equations~\eqref{uncurry_df_transfer_block} and
+    \eqref{uncurry_df_transfer_ccblock} --- Block Entry}] These
+  equations represent the entry points for normal and \cc blocks. We
+  do not modify the facts received, but just pass them along to the
+  next statement in the block.
+
 \item[\emph{Equation~\eqref{uncurry_df_transfer_closure} --- Bind To
     Closure}] When the \rhs of a \mbind statement creates a closure,
   as in \binds v <- \mkclo[l: v_1, \dots, v_n];, we create a new fact
@@ -362,10 +368,11 @@ statement given. We define $t$ by cases over \mil statements.
 Unlike traditional three-address code, \mil blocks that end with a
 \milres case/ statement can have multiple successors. Dataflow
 analysis does not usually specify that different facts go to different
-successors, but we do so here. The notation \ensuremath{\{\lab
-  b$!+_1+!$/\ :~F_1, \lab b$!+_2+!$/\ :~F_2\}} used in
+successors, but we do so here. The notation
+\ensuremath{\{\hbox{\ensuremath{\lab b$!+_1+!$/:F_1}},
+  \hbox{\ensuremath{\lab b$!+_2+!$/:F_2}}\}} used in
 Equations~\eqref{uncurry_df_transfer_goto} and
-\eqref{uncurry_df_transfer_goto} means we transfer the set of facts
+\eqref{uncurry_df_transfer_case} means we transfer the set of facts
 $F_1$ to the successor block \lab b$!+_1+!$/, and the set of facts
 $F_2$ to the successor block \lab b$!+_2+!$/.
 
@@ -375,9 +382,9 @@ parameters usually differ from the actual variables used in a given
 local to that block. Those facts will have no meaning in successor
 blocks (or worse, the wrong meaning) because the variable names will
 differ. Equation~\ref{uncurry_df_rename} defines \mfun{rename}, which
-takes a set of facts, $F$, and two variables, $\var u/$ and $\var v/$. If a fact
-about $\var v/$ exists in $F$, it will be removed and replaced with a fact
-about $\var u/$.  Combined with the \mfun{args} function, which retrieves
+takes a set of facts, $F$, and two variables, $\var u/$ and $\var
+v/$. If a fact about $\var v/$ exists in $F$, we update it to be about
+$\var u/$.  Combined with the \mfun{args} function, which retrieves
 the list of formal parameters for a block, \mfun{rename} can update a
 set of facts from one block so it makes sense in a successor block.
 
@@ -616,16 +623,19 @@ that operates over finite maps and which has the signature required by
 \label{uncurry_impl_transfer}
 The definition of |transfer| in Figure~\ref{uncurry_fig_transfer}
 gives the implementation of $t$ from Figure~\ref{uncurry_fig_df}. The
-top-level definition, |collapseTransfer|, serves to turn |transfer|
-into a |FwdTransfer| value.  The |blockParams| argument to
-|collapseTransfer| gives the list of parameters for every ordinary
-block in the program, and will be used during renaming operations. The
-first argument to |transfer| is the statement we are analyzing, and
-the second is our facts to far. |transfer| depends on a number of
-auxillary functions: |kill|, |using|, etc. We will describe each
-function as they are first encountered when describing |transfer|. We
+top-level definition, |collapseTransfer|, packages |transfer| into the
+|FwdTransfer| value that \hoopl uses to represent forwards transfer
+functions.  The |blockParams| argument to |collapseTransfer| gives the
+list of parameters for every ordinary block in the program, which we
+use during renaming operations. The first argument to |transfer| is
+the statement we are analyzing, and the second is our facts to
+far. |transfer| depends on a number of auxilary functions: |kill|,
+|using|, etc. We will describe each function as they are first
+encountered when describing |transfer|. The |Map| prefix on some of
+the functions used by |transfer| and related definitions indicates
+they are imported from Haskell's standard |Data.Map| library. We
 define |transfer| by cases, analagous to the cases given in
-Equations~\eqref{uncurry_df_transfer_closure} through
+Equations~\eqref{uncurry_df_transfer_block} through
 \eqref{uncurry_df_transfer_rest}.
 
 \begin{myfig}[p]
@@ -635,94 +645,130 @@ Equations~\eqref{uncurry_df_transfer_closure} through
 %let includeTransfer = False
     \end{withHsLabeled}
   \end{minipage}
-  \caption{The implementation of our transfer function $t$
+  \caption{Our implementation of the transfer function $t$
     from Figure~\ref{uncurry_fig_df}.}
   \label{uncurry_fig_transfer}
 \end{myfig}
 
 \begin{description}
-  \item[|Bind v (Closure dest args)| --- ] This case corresponds to
+  \item[|BlockEntry|, |CloEntry|] These cases apply to the entry point
+    of each normal or \cc block, implementing
+    Equations~\eqref{uncurry_df_transfer_block} and
+    \eqref{uncurry_df_transfer_ccblock}. In both instances they
+    just pass the facts received onto the rest of the block.
+
+  \item[|Bind v (Closure dest args)|] This case corresponds to
     Equation~\ref{uncurry_df_transfer_closure}, representing a bind
     statement that allocates a closure on its \rhs. Binding a variable
     invalidates any facts previously collected about that
-    variable. The local definition of |fact'| on
+    variable. The local definition of |facts'| on
     Line~\ref{uncurry_fig_transfer_closure_kill} uses the |kill|
-    function to remove all facts from |fact| that mention |v|. The
-    |kill| function, defined on Line~\ref{uncurry_fig_transfer_kill},
-    keeps all facts that do \emph{not} mention |v|. If |v| appears in
-    |args| then the closure mentions the variable being bound. If that
-    is the case, then we do not want to create a new fact, and we want
-    to remove any existing facts about
+    function to remove all facts from |fact| that mention |v|. If |v|
+    appears in |args| then the closure mentions the variable being
+    bound. If that is the case, then we do not want to create a new
+    fact, and we want to remove any existing facts about
     |v|. Line~\ref{uncurry_fig_transfer_closure1} accomplishes both
-    tasks by first deleting any facts about |v| from |fact'| and then
+    tasks by first deleting any facts about |v| from |facts'| and then
     returning the updated map. Otherwise, on
     Line~\ref{uncurry_fig_transfer_closure2} we create a new fact
     describing the closure (using \hoopl's |PElem| constructor),
     insert it into |facts'|, and return the result.
 
-  \item[|Bind v _| --- ] This case implements
+  \item[|Bind v _|] This case implements
     Equation~\ref{uncurry_df_transfer_other}. It removes any facts
     mentioning |v| and inserts a new fact associating |v| with |Top|,
-    meaning we do not know what value |v| may have. 
+    indicating we do not know what value |v| may have. 
   
-  \item[|Done _ _ (Goto (_, dest) args)| --- ] On
+  \item[|Done _ _ (Goto (_, dest) args)|] On
     Line~\ref{uncurry_fig_transfer_goto1}, we implement
     Equation~\ref{uncurry_df_transfer_goto}. Recall that we must
     filter our facts to those about variables in |args|, and that we
-    must rename those facts to match the parameters declared by
-    |dest|. The definition of |facts'|
+    must rename those facts to match the parameters declared by the
+    block represented by |dest|. The definition of |facts'|
     (Line~\ref{uncurry_fig_transfer_goto2}) uses the |restrict|
-    function for filtering, and the |rename| function for
-    renaming. We use \hoopl's |mapSingleton| function to
-    create a set of facts associated with the block given
-    by |dest|, analagous to the $\{\lab b/\ :\ \dots\}$
-    notation used in Equation~\ref{uncurry_df_transfer_goto}.
+    function for filtering, and the |rename| function for renaming. We
+    use \hoopl's |mapSingleton| function to create a set of facts
+    associated with the block given by |dest|, analagous to the
+    \hbox{$\{\lab b/:\dots\}$} notation used in
+    Equation~\ref{uncurry_df_transfer_goto}.
     
-  \item[|Case _ alts| --- ] 
+  \item[|Case _ alts|] Recall that
+    Equation~\ref{uncurry_df_transfer_case} produced a map associating
+    each successor block with a set of facts. The list comprehension
+    on
+    Lines~\ref{uncurry_fig_transfer_case_start}--\ref{uncurry_fig_transfer_case_end}
+    define |facts'| as a list of |(Label, Fact)| pairs. Each pair
+    represents the facts passed to a given successor block. On
+    Line~\ref{uncurry_fig_transfer_case_result}, we apply \hoopl's
+    |mkFactBase| function to |facts'|, returning a map associating each |Label|
+    with a |Fact| set --- just as in
+    Equation~\ref{uncurry_df_transfer_case}.
 
-  \item[|BlockEntry|, |CloEntry| ---] These two cases receive facts
-    from predecessor blocks. In both cases they return the facts
-    unchanged. Because we
-    do not propagate facts between blocks, the |Case| and |Done| cases
-    pass an empty map to each successor, using the \hoopl-provided
-    |mkFactBase| function to create a |FactBase| from empty facts.
+    Line~\ref{uncurry_fig_transfer_case_alts} extracts each
+    alternative from |alts|, the list of alternatives associated with
+    the \milres case/ statement. We defined \mil such that each
+    alternative immediately jumps to a block; |dest| represents the
+    destination block for the alternative, and |args| the variables
+    passed to that block. Each alternative can introduce new bindings,
+    represented here by the |binds| list. On
+    Line~\ref{uncurry_fig_transfer_case_trimmed}, we use |restrict| to
+    filter our set of facts to those about |args|. Because new
+    bindings introduced by the alternative can invalidate existing
+    facts, we use the |trim| function to remove any facts from the
+    restricted set that are about or mention a variable in
+    |binds|. Finally, we need to rename our facts to match the
+    parameter names used by the successor block. On
+    Line~\ref{uncurry_fig_transfer_case_end}, we retrieve the
+    parameter list for the given
+    block. Line~\ref{uncurry_fig_transfer_case_start} uses the
+    |rename| function to rename all facts in |trimmed| that are about
+    variables in |args| to match the names given in |params|.
+    
+  \item[|Done _ _ _|] A block that does not end in one of the cases
+    above has no successors. Therefore, we just return an empty set of
+    facts (as in Equation~\ref{uncurry_df_transfer_rest}.). We
+    construct an empty set by passing |mkFactBase| an empty list.    
 
 \end{description}
-
 
 \begin{myfig}
   \begin{tabular}{lcccc}
     Statement & \var n/ & \var v0/ & \var v1/ & \var v2/ \\\cmidrule{2-2}\cmidrule{3-3}\cmidrule{4-4}\cmidrule{5-5}
-    \binds n <- \goto toInt(s); & $\cdot$ & $\cdot$ & $\cdot$ & $\cdot$ \\
-    \binds v0 <- \mkclo[k0:]; & $\top$ & $\cdot$ & $\cdot$ & $\cdot$ \\
-    \binds v1 <- \app v0 * n/; & $\cdot$ & \mkclo[k0:] & $\cdot$ & $\cdot$ \\
-    \binds v2 <- \app v1 * n/; & $\cdot$ & $\cdot$ & $\top$ & $\cdot$ \\
+    \binds n <- \goto toInt(s); & & & &  \\
+    \binds v0 <- \mkclo[k0:]; & $\top$ & & & \\
+    \binds v1 <- \app v0 * n/; & $\cdot$ & \mkclo[k0:] & & \\
+    \binds v2 <- \app v1 * n/; & $\cdot$ & $\cdot$ & $\top$ &  \\
     \return v2/ & $\cdot$ & $\cdot$ & $\cdot$ & $\top$ \\
   \end{tabular}
   \caption{Facts about each variable in the \lab main/ block of
-    our example program from Figure~\ref{uncurry_fig_eg}.}
+    our example program from Figure~\ref{uncurry_fig_eg}. A blank entry
+    means the variable has no facts associated with it yet. A ``$\cdot$''
+    entry means the fact remains unchanged.}
   \label{uncurry_fig_impl_transfer}
 \end{myfig}
 
 Figure~\ref{uncurry_fig_impl_transfer} shows the facts gathered for
-each variable in the \lab main/ block of our sample program. The
-variables \var n/, \var v1/, and \var v2/ are assigned $\top$ because
-the \rhs of the \mbind statement for each does not directly create a
-closure. Only \var v0/ is assigned a |Clo| value (\mkclo[k0:])
-because the \rhs of its \mbind statement is in the right form. We will
-see in the next section how these facts evolve as the program is
-rewritten.
+each variable in the \lab main/ block of our sample program, after the
+corresponding statement is analyzed. The variables \var n/, \var v1/,
+and \var v2/ are assigned $\top$ because the \rhs of the \mbind
+statement for each does not directly create a closure. Only \var v0/
+is assigned a |Clo| value, \mkclo[k0:], because the \rhs of its \mbind
+statement is in the correct form. We will see in the next section how
+these facts evolve as the program is rewritten.
 
 \subsection{Rewrite}
 \label{uncurry_impl_rewrite}
 \intent{Give an example demonstrating iterative rewriting.}
-Figure~\ref{uncurry_fig_rewrite} shows the
-top-level implementation of our rewrite function for the uncurrying
-optimization. |collapseRewrite| creates the rewriter that can 
-uncurry a \mil program. The |blocks| argument associates every \cc
-block in our program with a |DestOf| value. |DestOf|, as explained in
+Figure~\ref{uncurry_fig_rewrite} shows the top-level implementation of
+our rewrite function for the uncurrying
+optimization. |collapseRewrite| creates the rewriter that can uncurry
+a \mil program. The |blocks| argument associates every \cc block in
+our program with a |DestOf| value. |DestOf|, as explained in
 Section~\ref{uncurry_impl_types}, indicates if the block returns a
-closure or jumps immediately to another block.
+closure or jumps immediately to another block. The |rewrite| function
+actually implements the uncurrying transformation; we will describe it
+after discussing how we use \hoopl's iterative rewriting
+function, |iterFwdRw|.
 
 \begin{myfig}
   \begin{minipage}{\hsize}\begin{withHsLabeled}{uncurry_fig_rewrite}\disableoverfull
@@ -735,11 +781,11 @@ closure or jumps immediately to another block.
 \end{myfig}
 
 On Line~\ref{uncurry_fig_rewrite_top}, |collapseRewrite| applies
-\hoopl's |iterFwdRw| and |mkFRewrite| to create a |FwdRewrite|
-value. The |iterFwdRw| combinator applies |rewriter| repeatedly, until
+\hoopl's |iterFwdRw| and |mkFRewrite| functions to create a
+|FwdRewrite| value. |iterFwdRw| applies |rewriter| repeatedly, until
 the |Graph| representing the program stops changing. \Hoopl computes
 new facts (using |collapseTransfer|) after each rewrite. This ensures
-that a ``chain'' of closure allocations get collapsed into a single
+that a chain of closure allocations will be collapsed into a single
 allocation, if possible.
 
 Figure~\ref{uncurry_fig_rewrite_iterations} demonstrates this
@@ -747,7 +793,7 @@ iterative process by showing how the \lab main/ block in our example
 program changes over three iterations. The second column of each row
 shows facts computed for the program text in the first column. The
 value of |blocks| stays constant throughout, so we only show it
-once. Rewrites occur between rows.
+once. 
 
 During the first iteration, |rewriter| transforms \binds v1 <- \app v0
 * n/; to \binds v1 <- \mkclo[k1: n];, because \var v0/ holds the
@@ -757,12 +803,12 @@ pointing to \lab k1/.
 \begin{myfig}
   \begin{tabular}{clll}
     Iteration & \lab main/ & Facts & |blocks| \\
-    1 & \begin{minipage}[t]{\widthof{\binds n <- \goto toInt(s);}}    
+    $1$ & \begin{minipage}[t]{\widthof{\binds n <- \goto toInt(s);}}    
       \begin{AVerb}[gobble=8]
-        \vbinds n <- \goto toInt(s);
-        \vbinds v0 <- \mkclo[k0:];
-        \vbinds v1 <- \app v0 * n/;
-        \vbinds v2 <- \app v1 * n/;
+        \vbinds n<- \goto toInt(s);
+        \vbinds v0<- \mkclo[k0:];
+        \vbinds v1<- \app v0*n/;
+        \vbinds v2<- \app v1*n/;
         \return v2/ 
       \end{AVerb} 
     \end{minipage} & \begin{minipage}[t]{\widthof{\ \phantom{\{}(\var v2/, \goto add(n,n))\}\ }}\raggedright
@@ -772,16 +818,16 @@ pointing to \lab k1/.
       (\var v2/, $\top$)
     \end{minipage} & 
     \begin{minipage}[t]{\widthof{\phantom{\{}\lab k1/:\thinspace|Jump {-"\lab add/\ "-} [0, 1]|\}\ }}\raggedright
-      \lab k0/:\thinspace|Capture {-"\lab k1/\ "-} True|,\break
+      \lab k0/:\thinspace|Capture {-"\lab k1/\ "-} True|\break
       \lab k1/:\thinspace|Jump {-"\lab add/\ "-} [0, 1]|
     \end{minipage}
     \\\\
-    2 & \begin{minipage}[t]{\widthof{\binds n <- \goto toInt(s);}}
+    $2$ & \begin{minipage}[t]{\widthof{\binds n <- \goto toInt(s);}}
       \begin{AVerb}[gobble=8]
-        \vbinds n <- \goto toInt(s);
-        \vbinds v0 <- \mkclo[k0:];
+        \vbinds n<- \goto toInt(s);
+        \vbinds v0<- \mkclo[k0:];
         \llap{\ensuremath{\rightarrow} }\vbinds v1 <- \mkclo[k1:n]; \ensuremath{\leftarrow}
-        \vbinds v2 <- \app v1 * n/;
+        \vbinds v2 <- \app v1*n/;
         \return v2/
       \end{AVerb} 
     \end{minipage} & \begin{minipage}[t]{\widthof{\ \phantom{\{}(\var v2/, \goto add(n,n))\}\ }}\raggedright
@@ -790,12 +836,12 @@ pointing to \lab k1/.
       (\var v1/, \mkclo[k1:n]),\break
       (\var v2/, $\top$)
     \end{minipage} \\\\
-    3 & \begin{minipage}[t]{\widthof{\binds v2 <- \goto add(n, n); \ensuremath{\leftarrow}}}
+    $3$ & \begin{minipage}[t]{\widthof{\binds v2 <- \goto add(n, n); \ensuremath{\leftarrow}\ }}
       \begin{AVerb}[gobble=8]
-        \vbinds n <- \goto toInt(s);
-        \vbinds v0 <- \mkclo[k0:];
-        \vbinds v1 <- \mkclo[k1:n];
-        \llap{\ensuremath{\rightarrow} }\vbinds v2 <- \goto add(n, n); \ensuremath{\leftarrow}
+        \vbinds n<- \goto toInt(s);
+        \vbinds v0<- \mkclo[k0:];
+        \vbinds v1<- \mkclo[k1:n];
+        \llap{\ensuremath{\rightarrow} }\vbinds v2<- \goto add(n, n); \ensuremath{\leftarrow}
         \return v2/
       \end{AVerb}
     \end{minipage} & \begin{minipage}[t]{\widthof{\ \phantom{\{}(\var v2/, \goto add(n,n))\}\ }}\raggedright
@@ -819,21 +865,25 @@ associating \var v1/ with \mkclo[k1:n]. |rewriter| transforms \binds v2
 because \var v1/ refers to \lab k1/ and |blocks| tells us that \lab
 k1/ jumps immediately to \lab add/. No changes occur after the third
 iteration because no statements remain that can be rewritten, and
-\hoopl stops applying |rewriter|.
+\hoopl stops applying |rewriter|. Note, however, that we could apply
+dead-code elimination at this point to remove \var v0/ and \var v1/, because
+they are no longer referenced.
 
 Figure~\ref{uncurry_fig_rewrite_impl} shows the functions that
 implement our uncurrying optimization.\footnote{Note that these
-  definition are local to |collapseRewrite|, so the |blocks| argument remains
-  in scope.} Line
-\ref{uncurry_fig_rewrite_impl_done} of |rewriter| rewrites \app f * x/
-expressions when they occur in a \return/
-statement. Line~\ref{uncurry_fig_rewrite_impl_bind} rewrites when \app
-f * x/ appears on the \rhs of a \mbind statement.  In
-the first case, |done n l (collapse facts f x)| produces \return |e|/
-when |collapse| returns |Just e| (i.e., a rewritten
-expression). In the second case, |bind v (collapse facts f x)|
-behaves similarly, producing \binds v <- |e|; when |collapse| returns
-|Just e|.\footnote{Both |done| and |bind| are defined in a separate file, not shown.}
+  definition are local to |collapseRewrite|, so the |blocks| argument
+  remains in scope.} Line \ref{uncurry_fig_rewrite_impl_done} of
+|rewriter| rewrites \app f * x/ expressions when they occur in a
+\return/ statement. Line~\ref{uncurry_fig_rewrite_impl_bind} rewrites
+when \app f * x/ appears on the \rhs of a \mbind statement.  In the
+first case, |done n l (collapse facts f x)| produces \return |e|/ when
+|collapse| returns |Just e| (i.e., a rewritten expression). In the
+second case, |bind v (collapse facts f x)| behaves similarly,
+producing \binds v <- |e|; when |collapse| returns |Just e|. Both
+|done| and |bind| are defined in a separate file, not shown; they make
+it easier to construct |Done| and |Bind| values based the |Maybe Tail|
+value returned by |collapse|. In all other cases, no rewriting
+  occurs.
 
 \begin{myfig}
   \begin{minipage}{\hsize}\begin{withHsLabeled}{uncurry_fig_rewrite_impl}\disableoverfull
@@ -846,17 +896,17 @@ behaves similarly, producing \binds v <- |e|; when |collapse| returns
 \end{myfig}
 
 The |collapse| function takes a set of facts and two names,
-representing the left and \rhs of the expression \app f * x/. When
-\var f/ is associated with a closure value, \mkclo[k:\dots], in the
-|facts| map (Line~\ref{uncurry_fig_rewrite_impl_collapse_clo}),
-|collapse| uses the |blocks| argument to look up the behavior of the
-destination \lab
+representing the left and right-hand arguments of the expression \app
+f * x/. When \var f/ is associated with a closure value,
+\mkclo[k:\dots], in the |facts| map
+(Line~\ref{uncurry_fig_rewrite_impl_collapse_clo}), |collapse| uses
+the |blocks| argument to look up the behavior of the destination \lab
 k/. Lines~\ref{uncurry_fig_rewrite_impl_collapse_jump} and
-\ref{uncurry_fig_rewrite_impl_collapse_capt} test if \lab k/
-returns a closure or jumps immediately to
-another block. In the first case, |collapse| returns a new
-closure-creating expression (\mkclo[|dest|:\dots]). In the
-second case, |collapse| returns a new goto expression (\goto |dest|(\dots)).
+\ref{uncurry_fig_rewrite_impl_collapse_capt} test if \lab k/ returns a
+closure or jumps immediately to another block. In the first case,
+|collapse| returns a new closure-creating expression
+(\mkclo[|dest|:\dots]). In the second case, |collapse| returns a new
+goto expression (\goto |dest|(\dots)).
 
 If the destination immediately jumps to another block
 (Line~\ref{uncurry_fig_rewrite_impl_collapse_jump}) then we will
@@ -883,11 +933,10 @@ like:
 {-"\lab add/\ "-} [1, 0]|.}
 
 If the destination returns a closure
-(Line~\ref{uncurry_fig_rewrite_impl_collapse_capt}), we will rewrite
-\app f * x/ to directly allocate the closure. The boolean argument to
-|Capture| indicates if the closure ignores the argument passed, which
-|collapse| uses to determine if it should place the \var x/ argument
-in the closure that is allocated or not.
+(Line~\ref{uncurry_fig_rewrite_impl_collapse_capt}), then we rewrite
+\app f * x/ to directly allocate the closure. The boolean value
+|usesArg| indicates if the closure returned should capture the
+argument |x| or not..
 
 \subsection{Optimization Pass}
 
@@ -922,11 +971,11 @@ Half of Figure~\ref{uncurry_fig_collapse} creates arguments for
   Sections~\ref{uncurry_impl_lattice}, \ref{uncurry_impl_transfer},
   and \ref{uncurry_impl_rewrite}.
 \item[|JustC labels|] --- We must give \hoopl all entry points for the
-  program analyzed. These labels tell \hoopl where to start
-  traversing the program graph. Because our analysis does not extend
-  across blocks we give all labels, so all blocks in |program| will be
-  analyzed. This argument's type is |MaybeC C [Label]|, which requires
-  us to use the |JustC| constructor. 
+  program analyzed. These labels tell \hoopl where to start traversing
+  the program graph. \Mil does not define any particular block as an
+  entry point, so all blocks in |program| will be analyzed. This
+  argument's type is |MaybeC C [Label]|, which requires us to use the
+  |JustC| constructor.
 \item[|program|] --- This argument gives the program that will be 
   analyzed and (possibly) transformed.
 \item[|initial|] --- The final argument gives initial facts for each
@@ -943,7 +992,103 @@ create the |blocks| argument passed to |collapseRewrite|. The
 creates the appropriate |Jump| or |Capture| value. The result of
 |destinations| becomes the |blocks| argument for |collapseRewrite|.
 
-\subsection{Two Bugs}
+\section{Example: Uncurrying Across Blocks}
+
+\begin{myfig}
+  \begin{tabular}{lr}
+  \begin{minipage}[t]{.55\hsize}
+    \begin{AVerb}[gobble=6,numbers=left]
+      \block main(): \mkclo[k225:]
+      \ccblock k225()ns: \goto b226(ns)
+      \block b226(ns):
+        \vbinds v227<-\goto map();
+        \vbinds v228<-\goto double();
+        \vbinds v229<-\app v227*v228/;
+        \app v229 * ns/
+      \block double(): \mkclo[k219:]
+      \ccblock k219()x: \goto b220(x)
+      \block b220(x):
+        \vbinds v221<-\goto Cons();
+        \vbinds v222<-\app v221*x/;
+        \vbinds v223<-\goto Nil();
+        \app v222 * v223/
+      \block Consbody(a2, a1): \app Cons * a2 * a1/
+      \ccblock Consclo1(a2)a1: \goto Consbody(a2, a1)
+      \ccblock Consclo2()a2: \mkclo[Consclo1:a2]
+      \block Cons(): \mkclo[Consclo2:]
+      \block Nil(): Nil
+    \end{AVerb}
+  \end{minipage} &
+  \begin{minipage}[t]{.6\hsize}
+    \begin{AVerb}[gobble=6,numbers=left,firstnumber=last]
+      \block map(): \mkclo[k203:]
+      \ccblock k203()f: \mkclo[k204:f]
+      \ccblock k204(f)xs: \goto b205(xs, f)
+      \block b205(xs, f):
+        \vbinds result217<-\goto caseEval216(xs, f);
+        \return result217/
+      \block caseEval216(xs, f):
+        \case xs;
+          \valt Nil()->\goto altNil206();
+          \valt Cons(x xs)->\goto altCons208(f, x, xs);
+      \block altNil206():
+        \vbinds v207<-\goto Nil();
+        \return v207/
+      \block altCons208(f, x, xs):
+        \vbinds v209<-\goto Cons();
+        \vbinds v210<-\app f*x/;
+        \vbinds v211<-\app v209*v210/;
+        \vbinds v212<-\goto map();
+        \vbinds v213<-\app v212*f/;
+        \vbinds v214<-\app v213*xs/;
+        \vbinds v215<-\app v211*v214/;
+        \return v215/
+    \end{AVerb}
+  \end{minipage}
+  \end{tabular}
+  \caption{}
+  \label{uncurry_globabl}
+\end{myfig}
+
+\begin{myfig}
+  \begin{tabular}{lr}
+  \begin{minipage}[t]{\hsize}
+    \begin{AVerb}[gobble=6,numbers=left]
+      \ccblock Consclo1(a2)a1: \app Cons * a2 * a1/
+      \block main(): \mkclo[k225:]
+      \block double(): \mkclo[k219:]
+      \block map(): \mkclo[k203:]
+      \ccblock k203()f: \mkclo[k204:f]
+      \ccblock k204(f)xs: \goto b205(xs, f)
+      \block b205(xs, f): caseEval216(xs, f)
+      \block altNil206(): Nil
+      \block altCons208(f, x, xs):
+        \vbinds v210<-\goto b220(x);
+        \vbinds v211<-\mkclo[Consclo1:v210];
+        \vbinds v214<-\goto b205(xs, f);
+        \app v211 * v214/
+      \block caseEval216(xs, f):
+        \case xs;
+          \valt Nil()->\goto altNil206();
+          \valt Cons(x xs)->\goto altCons208(f, x, xs);
+      \ccblock k219()x: b220(x)
+      \block b220(x):
+        \vbinds v222<-\mkclo[Consclo1:x];
+        \vbinds v223<-Nil;
+        \app v222 * v223/
+      \ccblock k225()ns: \goto b226(ns)
+      \block b226(ns):
+        \vbinds v228<-\mkclo[k219:];
+        \goto b205(ns, v228)
+    \end{AVerb}
+  \end{minipage}
+  \end{tabular}
+  \caption{}
+  \label{uncurry_globabl_opt}
+\end{myfig}
+
+
+\subsection{Complications}
 
 Our implementation of uncurrying suffers from two separate bugs. In
 the first case, we can introduce free variables into a block. In the
