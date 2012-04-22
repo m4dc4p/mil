@@ -85,7 +85,7 @@ closure or jump to the block.
 
 > collapse :: ProgM C C -> ProgM C C
 > collapse program = runSimple $ do {-"\hslabel{run}"-}
->       (p, _, _) <- analyzeAndRewriteFwd fwd (JustC labels) program initial {-"\hslabel{analyze}"-}
+>       (p, _, _) <- analyzeAndRewriteFwd debugFwdT  (JustC labels) program initial {-"\hslabel{analyze}"-}
 >       return p
 >   where
 >     labels :: [Hoopl.Label]
@@ -121,7 +121,7 @@ closure or jump to the block.
 %if False
 
 >
->     debugFwdT = debugFwdTransfers trace (show . printStmtM) (\ _ _ -> True) fwd
+>     debugFwdT = debugFwdTransfers trace (show . printStmtM) (\ _ _ -> True) debugFwdJ
 >     debugFwdJ = debugFwdJoins trace (const True) fwd
 >     
                 
