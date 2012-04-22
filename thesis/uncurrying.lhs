@@ -826,7 +826,7 @@ pointing to \lab k1/.
       \begin{AVerb}[gobble=8]
         \vbinds n<- \goto toInt(s);
         \vbinds v0<- \mkclo[k0:];
-        \llap{\ensuremath{\rightarrow} }\vbinds v1 <- \mkclo[k1:n]; \ensuremath{\leftarrow}
+        \llap{\ensuremath{\rightarrow} }\vbinds v1 <- \mkclo[k1:n];
         \vbinds v2 <- \app v1*n/;
         \return v2/
       \end{AVerb} 
@@ -841,7 +841,7 @@ pointing to \lab k1/.
         \vbinds n<- \goto toInt(s);
         \vbinds v0<- \mkclo[k0:];
         \vbinds v1<- \mkclo[k1:n];
-        \llap{\ensuremath{\rightarrow} }\vbinds v2<- \goto add(n, n); \ensuremath{\leftarrow}
+        \llap{\ensuremath{\rightarrow} }\vbinds v2<- \goto add(n, n); 
         \return v2/
       \end{AVerb}
     \end{minipage} & \begin{minipage}[t]{\widthof{\ \phantom{\{}(\var v2/, \goto add(n,n))\}\ }}\raggedright
@@ -1100,7 +1100,7 @@ two closure allocations and two \enter expressions.
   \begin{tabular}{lr}
   \begin{minipage}[t]{\hsize}
     \begin{AVerb}[gobble=6,numbers=left]
-      \block b226(ns):
+      \block main(ns):
         \vbinds v228<-\mkclo[k219:];
         \goto b205(ns, v228)
       \ccblock k219()x: b220(x)
@@ -1132,16 +1132,16 @@ two closure allocations and two \enter expressions.
 \begin{myfig}
   \begin{tabular*}{\textwidth}{l}\begin{minipage}[t]{\textwidth}
     \begin{AVerb}[gobble=6,numbers=left]
-      \block b226(ns): \label{uncurry_global_main_body}
+      \block main(ns): \label{uncurry_global_main_body}
         \vbinds v227<-\mkclo[k203:];\anchorF(v227a)
         \vbinds v228<-\mkclo[k219:];\anchorF(v228a)
         \vbinds v229<-\app v227*v228/;\anchorF(v229a)
         \app v229 * ns/ \label{uncurry_global_main_end}
     \end{AVerb}
     \begin{tikzpicture}[overlay,remember picture]
-      \node[fact, right=0.25in of v227a, anchor=west] (fv227a) {\{\var v227/\,:\,$\top$\}};
-      \node[fact, right=0.25in of v228a, anchor=west] (fv228a) {\{\var v227/\,:\,$\top$\}, \{\var v228/\,:\,\mkclo[k219:]\}};
-      \node[fact, right=0.25in of v229a, anchor=west] (fv229a) {\{\var v227/\,:\,$\top$\}, \{\var v228/\,:\,\mkclo[k219:]\},\{\var v229/\,:\,$\top$\}};
+      \node[fact, right=0.25in of v227a, anchor=west] (fv227a) {\{\var v227/\,:\,\mkclo[k203:]\unskip\}};
+      \node[fact, right=0.25in of v228a, anchor=west] (fv228a) {\{\var v227/\,:\,\mkclo[k203:]\unskip\}, \{\var v228/\,:\,\mkclo[k219:]\unskip\}};
+      \node[fact, right=0.25in of v229a, anchor=west] (fv229a) {\{\var v227/\,:\,\mkclo[k203:]\unskip\}, \{\var v228/\,:\,\mkclo[k219:]\unskip\},\{\var v229/\,:\,$\top$\}};
       \draw [->] (fv227a) to (v227a);
       \draw [->] (fv228a) to (v228a);
       \draw [->] (fv229a) to (v229a);
@@ -1149,18 +1149,26 @@ two closure allocations and two \enter expressions.
   \end{minipage} \\
   \begin{minipage}[t]{\textwidth}
     \begin{AVerb}[gobble=6,numbers=left]
-      \block b226(ns): \label{uncurry_global_main_body}
+      \block main(ns): 
         \vbinds v227<-\mkclo[k203:];
         \vbinds v228<-\mkclo[k219:];
-        \vbinds v229<-\mkclo[k204:v228];\anchorF(v229b)
-        \app v229 * ns/ \label{uncurry_global_main_end}
+        \llap{\ensuremath{\rightarrow} }\vbinds v229<-\mkclo[k204:v228];\anchorF(v229b)
+        \app v229 * ns/ 
     \end{AVerb}
     \begin{tikzpicture}[overlay,remember picture]
-      \node[fact, right=0.25in of v229b, anchor=west] (fv229b) {\{\var v227/\,:\,$\top$\}, \{\var v228/\,:\,\mkclo[k219:]\},\{\var v229/\,:\,\goto b205(xs, f)\}};
+      \node[fact, right=0.25in of v229b, anchor=west] (fv229b) {\{\var v227/\,:\,\mkclo[k203:]\unskip\}, \{\var v228/\,:\,\mkclo[k219:]\unskip\},\{\var v229/\,:\,\goto b205(xs, f)\}};
       \draw [->] (fv229b) to (v229b);
-    \end{tikzpicture}
-
-  \end{minipage}\end{tabular*}
+    \end{tikzpicture} 
+  \end{minipage} \\
+  \begin{minipage}[t]{\textwidth}
+    \begin{AVerb}[gobble=6,numbers=left]
+      \block main(ns): 
+        \vbinds v227<-\mkclo[k203:];
+        \vbinds v228<-\mkclo[k219:];
+        \vbinds v229<-\mkclo[k204:v228];
+        \llap{\ensuremath{\rightarrow} }\goto b205(v228, ns) 
+    \end{AVerb}
+  \end{minipage} \end{tabular*}
 \end{myfig}
 
 \begin{myfig}
@@ -1213,10 +1221,10 @@ two closure allocations and two \enter expressions.
 
 \subsection{Complications}
 
-Our implementation of uncurrying suffers from two separate bugs. In
-the first case, we can introduce free variables into a block. In the
-second case, we can propogate incorrect facts to certain blocks. We
-discuss these bugs and possible solutions below.
+%% Our implementation of uncurrying suffers from two separate bugs. In
+%% the first case, we can introduce free variables into a block. In the
+%% second case, we can propogate incorrect facts to certain blocks. We
+%% discuss these bugs and possible solutions below.
 
 Our implementation of uncurrying replaces \enter expression with
 closure allocations if possible. When |collapseTransfer| sees
@@ -1274,7 +1282,7 @@ block (a backwards dataflow analysis). We then use propagate free
 variables from the block in which they are first bound to the blocks
 where they are used.
 
-The second bug does not account for calls to blocks on the \rhs of a
+The second challenge does not account for calls to blocks on the \rhs of a
 bind statement, such as \binds v <- \goto b(\dots);. Our analysis only
 considers calls at the end of blocks. If the values passed to the
 block \lab b/ on the \rhs of a \mbind differ from those passed
