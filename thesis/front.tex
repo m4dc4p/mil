@@ -17,19 +17,17 @@
 %% protusion on the first line looks odd, disable it for 
 %% this paragraph.
 %\microtypesetup{protrusion=false}%
-Our work applies the \emph{dataflow algorithm} to an area outside the
-algorithm's traditional scope: functional languages. Our approach
-relies on a \emph{monadic intermediate language} that allows us to
-represent both low-level, imperative features such as computed jumps
-and explicit allocation, as well as high-level, functional-language
-features like pattern-matching and partial application. We prototyped
-our work in Haskell, relying extensively on the \hoopl library, and
-this dissertation demonstrates many of the library's features. We
-demonstrate the efficacy of our approach by giving a novel description
-of the \emph{uncurrying} optimization in terms of the dataflow
-algorithm. We believe this document shows that dataflow analysis can
-be applied to functional languages in practical and interesting
-ways.\par}
+Our work applies the \emph{dataflow algorithm} to an area outside its
+traditional scope: functional languages. Our approach relies on
+a \emph{monadic intermediate language} that provides low-level,
+imperative features like computed jumps and explicit allocations,
+while at the same time supporting high-level, functional-language
+features like case discrimination and partial application. We
+prototyped our work in Haskell using the \hoopl library and this
+dissertation shows numerous examples demonstrating its use. We prove
+the efficacy of our approach by giving a novel description of
+the \emph{uncurrying} optimization in terms of the dataflow algorithm, as
+well as a complete implementation of the optimization using \hoopl.\par}
 \newpage
 
 \addcontentsline{toc}{section}{Acknowledgments}
