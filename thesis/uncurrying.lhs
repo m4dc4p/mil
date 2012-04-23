@@ -1440,7 +1440,115 @@ would make sure the correct facts were propagated into each block.
 
 \section{Related Work}
 \label{uncurry_sec_related}
-\intent{Describe the work of Danvy, Apel, and Tarditi; Tolmach; contrast to \mil uncurrying.}
+Appel \citeyearpar[Section~6.2]{Appel1992} describes uncurrying in the
+context of a compiler that uses continuation-passing style, though
+\cps conversion is not essential to the transformation. While we
+described uncurrying in terms of one-argument functions, Appel allows
+tuples of arguments. His approach looks for functions whose bodies only apply
+a locally defined, non-recursive function. Using our \lamC notation with
+tuples, this pattern looks like:
+
+> f (x, c) = 
+>   let g (y, k) = E
+>   in c g
+
+\noindent where |E| represents the non-recursive body of |g|. 
+
+To uncurry |f|, Appel creates a new function, |f'|, a version of |f| that
+takes all arguments at once, and he rewrites |f| to use |f'|:
+
+> f' (x, c, g, y, k) = E 
+> f (x, c) = 
+>   let g (y, k) = f'(x, c, g, y, k)
+>   in c g
+
+\noindent This transformation preserves the original |f|, as not all
+call sites of |f| may be known. Known call sites, however, can use
+the more efficient version, |f'|. Appel describes what makes |f'|
+efficient and how other optimizations can remove the unused
+arguments in |f'| and the redefined |f| above. 
+
+Like our version of uncurrying, Appel relies on other optimizations to
+clean up. Unlike our version, Appel's looks for a specific syntatic
+form to transform. Our use of dataflow analysis allows us to rewrite
+any function application that we can prove always uses the same
+closure. Appel's version appears to only apply to a very specific form
+of curried definitions, most of which are produced by the translation to
+\cps.
+
+Tarditi \citeyearpar{Tarditi96} describes an uncurrying optimization
+that extends Appel's work. In fact, Tarditi points out that Appel's
+description is only guaranteed to work for functions of two arguments;
+for more arguments, Appel's transformation must be applied in a
+specific order (which Appel did not describe). 
+
+Tarditi's approach uses four passes to uncurry functions of the form
+\lcapp (\lcabs x. \lcabs. y. \dots) * a * b/ into \lcapp (\lcabs (x,
+y). \dots) * (a, b)/, where tuples represent a multi-argument
+function.
+The first pass of Tarditi's algorithm scans all definitions in the
+program to find non-recursive, curried definitions, and records their
+arity (i.e., the number of nested $\lambda$s). The second pass looks
+for applications of curried functions to arguments. He again scans the
+program, searching for specific declarations that partially apply a
+curried function. He is also able to recognize subsequent applications
+of previous partial applications, extending the number of
+arguments associated with a given sequence of applications.  The third
+pass of his algorithm creates new, uncurried definitions of the
+curried functions found in the first pass. The fourth and final pass
+of the algorithm converts those applications found in the second pass
+that are fully applied to use the new, uncurried versions of the
+curried function they originally referred to.
+
+Tarditi's algorithm is not limited to finding curried functions of a
+certain syntatic form, and it extends correctly to functions of
+multiple arguments. His algorithm, however, only replaces fully-applied
+functions. Our analysis can replace any candidate function
+application, even if it does not result in a fully applied
+function. Tarditi claims his algorithm runs in $O(N \log N)$, where
+  $N$ is the size of the program (presumably, the number of
+  expressions in the program). We have not analyzed the asymptotic
+  complexity of our algorithm and so cannot compare his claim.
+
+Tolmach and Oliva \citeyearpar{Tolmach1998} do not specifically
+describe an uncurrying optimization; rather, they describe how
+``closure conversion,'' plus two other general optimizations, give
+them uncurrying for free in their compiler. The compiler converts a
+Standard ML program into their ``Sequentialized Intermediate
+Language,'' (\textsc{sil}) a variant of A-Normal Form.
+Closure-conversion removes all higher-order functions from the
+\textsc{sil} program, replacing them with functions that return a data
+structure representing the original closure. Applications of curried
+functions are replaced with calls to a dispatching function that uses
+case discrimination to distinguish closures of the same arity, calling
+the uncurried version of each curried function.
+
+Their compiler uses inlining and ``case
+splitting'' to ensure the program does not trade the cost of a closure
+for the cost of a data structure and dispatching function. Any
+application of the curried function will be inlined into the call
+site, as the body of the curried function just allocates a data
+structure. The call to the dispatch function will now use the data
+structure inlined from the curried function. The dispatch function
+only contains a case statement that discriminates based on the data
+structure representing each curried function. ``Case splitting''
+replaces the entire call site with the relevant arm from the dispatch
+function, thus turning an allocation, case discrimination and function
+call into just a function call.
+
+Tolmach and Oliva's approach does not depend on recognizing syntatic
+patterns at all. It should recognize any known call site of a
+partially applied function, and they claim it works for functions of
+multiple arguments as well.  Our approach is similar, in that we look
+for bindings known to refer to closure values. We even use a simple
+form of inlining, meaning we inspect the \term tail/ found in the \cc
+block referred to by a given closure and ``inline'' the tail when it
+is a direct jump or closure allocation. Our use of dataflow analysis,
+however, distinguishes our work, in that we do not depend on function
+applications to take on a particular form. Once we determine that the
+left-hand side of a given \enter expression always refers to the same
+closure, we can transform the expression by a simple rewrite using the
+body of the \cc block.
 
 \section{Conclusion}
 \label{uncurry_sec_refl}
@@ -1452,7 +1560,7 @@ library, and gave a complete and detailed presentation of that
 work. By example, we demonstrated the utility of our optimization. We
 discussed challenges in our current implementation, and offered
 suggestions for improving the algorithm in the future. Finally, we
-compare our implemenation to several other implementations of the
+compared our implementation to several other implementations of the
 uncurrying optimization in the literature.
 
 

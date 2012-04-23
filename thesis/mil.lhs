@@ -12,41 +12,42 @@ Most compilers do not generate executable machine code directly from a
 program source file. Rather, the compiler transforms the program into
 a number of different \emph{intermediate representations}, where each
 representation exposes different details about the implementation of
-the program. In many cases, these intermediate representations are
-languages in their own right.
+the program. Although not intended to be used directly, many of these
+intermediate representations are languages in their own right.
 
-A number of intermediate languages have been described for both
+A broad range of intermediate languages have been described for both
 imperative and functional languages. \emph{Three-address code}
 (described in standard textbooks such as \cite{Aho2006}), a language
 normally used to represent imperative languages, emphasizes simplicity
-by requiring that all operations specify, at most, two operands and one
-destination. Three-address code aids in optimizing the use of
-registers, typically a scarce resource on most
-processors. Administrative-Normal Form (\anf), first described by
-\citet{Flanagan1993} and intended for functional languages, requires
-that all intermediate values be named. \Anf's inventors proposed it as
-a replacement for continuation-passing style (\cps), a widely-employed
-intermediate representation most completely described by Appel
+by requiring that all operations specify, at most, two operands and
+one destination. Three-address code aids in optimizing the use of
+registers, a scarce resource on most processors. Administrative-Normal
+Form (\anf), first described by \citet{Flanagan1993} and intended for
+functional languages, requires that all intermediate values be
+named. \Anf's inventors proposed it as a replacement for
+continuation-passing style (\cps), a widely-employed intermediate
+representation most completely described by Appel
 \citeyearpar{Appel1992}. The simple structure of both \cps and \anf
-programs ease their translation to executable assembly-like languages.
+programs eases their translation to executable assembly-like languages.
 
 Monadic programming, popularized by Wadler \citeyearpar{Wadler1990},
 but first described by Moggi \citeyearpar{Moggi1991}, separates
 expressions into those that have side-effects and those that do not. A
 side-effecting expression is considered a computation, or program,
 that must execute to produce a value. Running the program multiple
-times may produce different results. Our \mil exploits monadic
+times may produce different results. 
+
+In this chapter, we describe a
+\emph{monadic intermediate language}, \mil, that exploits monadic
 programming to segregate side-effecting operations (such as
 allocations) from pure operations, such as case discrimination or
-jumps.
-
-Our monadic intermediate language (\mil), specifically supports
-functional language features, but also follows the form of
-three-address code. \Mil directly supports function application and
-abstraction. All intermediate values are named. \Mil specifies
-evaluation order and separates stateful computation using a monadic
-programming style. \Mil's syntax enforces basic-block structure on
-programs, making them ideal for dataflow analysis.
+jumps. More specifically, \mil supports functional language features,
+but also follows the form of three-address code. \Mil directly
+supports function application and abstraction. All intermediate values
+are named. \Mil specifies evaluation order and separates stateful
+computation using a monadic programming style. \Mil's syntax enforces
+basic-block structure on programs, making them ideal for dataflow
+analysis.
 
 \intent{Signposts.}  In order to write programs that we can translate
 to \mil, we use a simple variant of the \lamA, called \lamC, that
@@ -61,7 +62,7 @@ suspended computations. Section~\ref{mil_sec4} highlights some of the
 subtler points in our translation strategy from \lamC to \mil. We
 sketch how \mil programs can be evaluated in
 Section~\ref{mil_sec5}. Section \ref{mil_sec7} shows how \hoopl
-influenced the \ast we used to represent \mil programs. In
+influenced the \ast that we use to represent \mil programs. In
 Section~\ref{mil_sec_rel} we discuss the \mlj and \smlnet compilers,
 both of which also used a monadic intermediate
 language. We conclude in Section~\ref{mil_sec6}.
@@ -70,12 +71,12 @@ language. We conclude in Section~\ref{mil_sec6}.
 \label{mil_src}
 
 \intent{Introduce \lamC; where it came from, references, etc.}  Our
-source language, \lamC (pronounced ``lambda-case''), derives from the \lamA, with
-elements borrowed from the Haskell language's
-use of \hsdo notation to represent monadic programs. Jones and
-colleagues developed \lamC as an intermediate representation for the
-Habit programming language \citep{Habit2010}. The Habit ``Compilation
-Strategy'' report \citep{HabitComp2010} gives full details on
+source language, \lamC (pronounced ``lambda-case''), derives from the
+\lamA, with elements borrowed from the Haskell language's use of \hsdo
+notation to represent monadic programs. The \textsc{hasp} group
+developed \lamC as an intermediate representation for the Habit
+programming language \citeyearpar{Habit2010}. The Habit ``Compilation
+Strategy'' report \citeyearpar{HabitComp2010} gives full details on
 \lamC.\footnote{For simplicity's sake, we ignore two features of \lamC
   in this work: patterns and guards. Details on those elements can be
   found in the aforementioned report.} The report describes several
@@ -129,8 +130,8 @@ monadic computation, |t_1|, will be bound to |x| and that |t_2| will
 then be executed with |x| in scope. Note that |x| can only be a
 variable; \lamC does not support pattern-matching on the \lhs of a
 bind. When |t_2| is another monadic bind, we do not nest the \hsdo
-keyword: for brevity, we write |do { x <- t_1; y <- t_2}| rather
-than |do { x <- t_1; do { y <- t_2}}|.
+keyword: for brevity, we write |do { x <- t_1; y <- t_2; t_3}| rather
+than |do { x <- t_1; do { y <- t_2; t_3}}|.
 
 \intent{Describe primitives.}  \runin{Primitives} The primitive expression \lcprim p*
 refers to a primitive definition named $p$. Primitives refer to functionality
@@ -142,7 +143,7 @@ primitive \lcprim p* is treated like any other function value.
 
 \intent{Remark on intermediate languages and \mil's focus.} The design
 of an intermediate language typically exposes some specific
-implementation detail while hiding others in order to support certain
+implementation details while hiding others in order to support certain
 analysis and transformation goals. Exposing intermediate values gives
 us the chance to analyze and eliminate them. Hiding implementation
 details makes the job of writing those analyses and transformations
@@ -174,7 +175,7 @@ updated. For example, the expression:
 %
 \noindent where \var t_1/, \var t_2/ and \var t_3/ represent temporary
 storage locations and \var mul/, \var add/, and \var div/ represent
-the corresponding arithmetic operation.
+the corresponding arithmetic operations.
 
 \intent{Remark on Wadler \& MLj work.} \Mil seeks to expose certain
 effects that are not normally represented in functional languages. As
@@ -188,11 +189,11 @@ uses monads to treat those allocations as impure operations.
 
 \intent{Highlight focus of \mil (closure allocation).} Three-address
 code emphasizes assignments and low-level operations, features
-important to imperative languages. \Mil emphasizes allocation and
-side-effecting computations, features important to functional
-languages. Though the operations supported by \mil differ from
-traditional three-address code, the intention remains the same: hide
-some details while exposing those we care about.
+important to imperative languages. \Mil emphasizes allocation,
+higher-order functions and side-effecting computations, features
+important to functional languages. Though the operations supported by
+\mil differ from traditional three-address code, the intention remains
+the same: hide some details while exposing those that we care about.
 
 %% Syntax of MIL
 \section{\Mil Syntax}
@@ -216,7 +217,7 @@ an argument, \var v/. \Cc blocks only execute when initiated by an
 f/ refers to a closure that will point to a \cc block named \lab
 k/. The environment declared for \lab k/ corresponds to the
 environment captured by the closure. The argument \var x/ becomes the
-argument \var v/ declared in the \cc block. We chose to only allow a
+argument \var v/ declared in the \cc block. We chose to allow only a
 single tail expression in the body of a \cc block in order to
 simplify analysis of their behavior.
 
@@ -238,25 +239,26 @@ statement examines a discriminant and selects one alternative based on
 the value found. The discriminant is always a simple variable, not an
 expression. Each \emph{case alternative} specifies a \emph{constructor} and
 variables for each value held by the constructor. No ``default''
-alternative exists --- all possible constructors need to be
+alternative exists --- all possible constructors must be
 specified. Again, to simplify later analysis, we chose that
 alternatives must always jump immediately to a block --- they do not
 allow any other expression.
 
 \intent{Introduce tail expressions.} \emph{Tail} terms represent
-effects and always appear on the \rhs of a bind statement, at the
-end of a basic block, or as the body of a \cc block. \milres return/
-takes a variable (\emph{not} an expression) and makes its value
-monadic. The ``enter'' operator, \enter, implements function
+potentially effectful computations and always appear on the \rhs of a
+bind statement, at the end of a basic block, or as the body of a \cc
+block. \milres return/ takes a variable (\emph{not} an expression) and
+produces a computation that returns that value with no
+side-effects. The ``enter'' operator, \enter, implements function
 application, ``entering'' the closure represented by its \lhs with the
-argument on its \rhs. 
-\intent{Describe goto for blocks and primitives.}  The ``\emph{goto
-  block}'' and ``\emph{goto primitive}'' expressions implement labeled
-jumps with arguments. In the first case, \lab b/ represents a labeled
-block elsewhere in the program.  The primitive term, \lab p/\suptt*,
-also represents a labeled location, except the body of the primitive
-is not implemented in \mil. Otherwise, \emph{goto block} and
-\emph{goto primitive} are treated the same.
+argument on its \rhs.  \intent{Describe goto for blocks and
+  primitives.}  The ``\emph{goto block}'' and ``\emph{goto
+  primitive}'' expressions implement labeled jumps with arguments. In
+the first case, \lab b/ represents a labeled block elsewhere in the
+program.  The primitive term, \lab p/\suptt*, also represents a
+labeled location, except that the body of the primitive is not implemented
+in \mil. Otherwise, \emph{goto block} and \emph{goto primitive} are
+treated the same.
 
 \intent{Describe closure and thunk allocation.} Closure allocation,
 written as \mkclo[k:v_1, \dots, v_n], creates a closure pointing to
@@ -285,7 +287,7 @@ $\lambda$ values $(\lcabs f. \dots)$, $(\lcabs g. \dots)$, and
 $(\lcabs x. \dots)$.  Each block, except \lab k3/, captures a single
 argument and returns a new closure holding previously captured values
 plus the new argument. \lab k3/ executes when all arguments are
-captured, and immediately jumps to \lab compose/, the block
+captured and immediately jumps to \lab compose/, the block
 implementing the body of \term compose/.
 
 The basic block defined on Line~\ref{mil_block_decl_fig1b} gives the
@@ -334,13 +336,13 @@ t2/. Thus, the \lab compose/ block returns the value of \lcapp f * (g
 \label{mil_monad}
 
 \intent{Motivate why we consider allocation impure.}  Functional
-languages normally treat data allocation as a hidden operation, in
-that the program cannot directly observe any effect from an
-allocation. Of course, allocation can cause effects, such as updating the
-heap or triggering a garbage collection.  For example, using the
-definition of |compose| given in Figure~\ref{mil_fig1a}, consider the sequence of
-applications that occur when calculating |compose a b c| using
-call-by-value evaluation:
+languages normally treat data allocation as a hidden operation in that
+the program cannot directly observe any effect from an allocation. Of
+course, in practice, allocation can cause effects, such as updating
+the heap or triggering a garbage collection.  For example, using the
+definition of |compose| given in Figure~\ref{mil_fig1a}, consider the
+sequence of applications that occur when calculating |compose a b c|
+using call-by-value evaluation:
 
 \begin{singlespace}\begin{math}\begin{array}{rl}
       \lcapp compose * a * b * c/ &= \lcapp (\lcabs f. \lcabs g. \lcabs x. {\lcapp f * (g * x)/}) * a * b * c/ \\
@@ -355,18 +357,23 @@ notation hides an important detail: each function application
 potentially allocates a closure representing the function and its
 environment. For example, $\lcapp (\lcabs g. \dots) * b/$ might
 allocate a closure referring to the function $(\lcabs g. \lcabs x. {\lcapp f * (g
-* x)/})$ and mapping the free variable $f$ to the value $a$.
+* x)/})$ and mapping the free variable $f$ to the value of $a$.
 
 \intent{Rewrite |compose| to show monadic effects.}
 Figure~\ref{mil_fig_compose} shows |compose| rewritten in a monadic
-style that makes closure allocations explicit. The |closure| operation
-is a monadic function that allocates memory and stores its arguments
-for retrieval later. The first argument is the function that the
-closure points to. The second argument represents the environment that
-will be used when that function is evaluated.
+style that makes closure allocations explicit, and a program that uses
+the rewritten |compose| to evaluate |compose a b c|. The |closure|
+operation in Part~\ref{mil_fig_compose_a} is a monadic function that
+allocates memory and stores its arguments for retrieval
+later.\footnote{\lamC does not support pattern-matching on function
+  arguments, but we use them in Part~\ref{mil_fig_compose_a} for
+  clarity here.}  The first argument is the function that the closure
+points to. The second argument represents the environment that will be
+used when that function is evaluated.
 
 \begin{myfig}
-  \begin{minipage}{2in}
+  \begin{tabular}{cc}
+  \begin{minipage}[t]{2in}
 > k_0 = do
 >   t <- closure k_1 []
 >   return t
@@ -379,79 +386,74 @@ will be used when that function is evaluated.
 > compose [f, g] x = do 
 >   t <- f (g x)
 >   return t
-  \end{minipage}
-  \caption{A rewritten version of |compose| that makes closure
-    allocation explicit. \lamC does not support pattern-matching on
-    function arguments, but we use it for clarity here. }
-  \label{mil_fig_compose}
-\end{myfig}
-
-Each $\lambda$ in Figure~\ref{mil_fig1a} becomes a |k_n| definition in
-Figure~\ref{mil_fig_compose}. |k_0| corresponds to the expression
-\lcapp \lcabs f. \lcabs g. \lcabs x. f * (g * x)/, allocating a
-closure with an empty environment and pointing to |k_1|. |k_1| corresponds
-to \lcapp \lcabs g. \lcabs x. f * (g * x)/, while |k_2| corresponds
-to  \lcapp \lcabs x. f * (g * x)/. Each |k_n|
-definition (except |k_0|) takes two arguments. The first is a list of
-values representing the environment of the function, and the second a
-new value representing the argument of the original $\lambda$
-expression. |k_1| and |k_2| each allocate and return a new
-closure. The closure stores a reference to the next $k_{n+1}$
-definition and a list of values representing the current
-environment. |compose| evaluates |f (g x)|; however, this expression
-also becomes monadic, as |f (g x)| may cause an allocation.
-
-\intent{Show how closures created by |compose| are used}
-Figure~\ref{mil_fig_mon_compose} shows a program that evaluates
-|compose a b c| using our monadic version of |compose|. To evaluate
-each closure, we define a monadic function |app| that takes a closure
-and an argument. |app| evaluates the function referred to by the
-closure, using the environment stored in the closure and passing the
-additional argument supplied.
-
-\begin{myfig}
-  \begin{minipage}{2in}
+  \end{minipage} &
+  \begin{minipage}[t]{1in}
 > main a b c = do
 >   t0 <- k_0
 >   t1 <- app t0 a
 >   t2 <- app t1 b
 >   t3 <- app t2 c
 >   return t3
-  \end{minipage}
-  \caption{A program that evaluates \lcapp compose * a * b * c/ using our
-    rewritten, monadic form of |compose|.}
-  \label{mil_fig_mon_compose}
+  \end{minipage} \\
+  \scap{mil_fig_compose_a} & \scap{mil_fig_compose_b}
+  \end{tabular}
+  \caption{Part~\ref{mil_fig_compose_a} shows a rewritten version of
+    |compose| that makes closure allocation explicit;
+    Part~\ref{mil_fig_compose_b} gives a program that evaluates \lcapp
+    \mfun{compose} * a * b * c/. Note that these
+    programs produce monadic values rather than pure values.}
+  \label{mil_fig_compose}
 \end{myfig}
 
-The first line of the program in Figure~\ref{mil_fig_mon_compose} allocates an
-initial closure that serves as the entry point for |compose|. Each
-line after gathers an additional argument and ``adds'' it to the
-closure represented. The final line returns the result of |compose a b
-c|.  In our original expression, the allocation caused by each
-$\lambda$ was not clear. In |main|, each line indicates that an
-allocation will occur.
+Each $\lambda$ in Figure~\ref{mil_fig1a} becomes a |k_n| definition in
+Figure~\ref{mil_fig_compose_a}. |k_0| corresponds to the expression
+\lcapp \lcabs f. \lcabs g. \lcabs x. f * (g * x)/, allocating a
+closure with an empty environment and pointing to |k_1|. |k_1| corresponds
+to \lcapp \lcabs g. \lcabs x. f * (g * x)/, while |k_2| corresponds
+to  \lcapp \lcabs x. f * (g * x)/. Each |k_n|
+definition (except |k_0|) takes two arguments. The first is a list of
+values representing the environment of the function and the second a
+new value representing the argument of the original $\lambda$
+expression. |k_1| and |k_2| each allocate and return a new
+closure. The closure stores a reference to the next $k_{n+1}$
+definition and a list of values representing the current
+environment. |compose| evaluates |f (g x)|; however, this expression
+also becomes monadic, because |f (g x)| may cause an allocation.
+
+\intent{Show how closures created by |compose| are used}
+Figure~\ref{mil_fig_compose_b} shows a program that evaluates |compose
+a b c| using our monadic version of |compose|. To evaluate each
+closure, we define a monadic function |app| that takes a closure and
+an argument. |app| evaluates the function referred to by the closure,
+using the environment stored in the closure and passing the additional
+argument supplied.  The first line of the program in
+Figure~\ref{mil_fig_compose_b} allocates an initial closure that
+serves as the entry point for |compose|. Each line after gathers an
+additional argument and ``adds'' it to the closure represented. The
+final line returns the result of |compose a b c|.  In our original
+expression, the potential side-effect caused by each application was
+not clear. In |main|, each line makes it very clear that a side-effect
+may occur.
 
 Of course, in \lamC we do not really define the |closure| or |app|
-functions, and closure allocation is not directly visible. \Mil,
+functions and closure allocation is not directly visible. \Mil,
 however, treats allocation as an impure operation and makes it
 explicit. Figure \ref{mil_fig2} shows a complete \mil program for
 \lcdef main()= \lcapp compose * a * b * c/;. \lab main/ corresponds to
-the definition of |main| in Figure~\ref{mil_fig_mon_compose}. \lab k0/
-corresponds to |k_0| and acts as the entry point for |compose|. Notice
-that \lab k0/ is not a closure-capturing block; \lab k0/ just
-allocates the initial closure that will be used to evaluate |compose a
-b c|. The closure-capturing blocks \lab k1/ and \lab k2/ correspond to
-|k_1| and |k_2|. The second argument to each |closure| operation
-corresponds to the variables captured by the closures allocated in the
-body of \lab k1/ and \lab k2/; the list of values passed as an
-argument to |k_1| and |k_2| correspond to the environment defined for
-the \lab k1/ and \lab k2/ closure-capturing blocks. In
-Figure~\ref{mil_fig_compose}, |k_2| creates a closure pointing to
-|compose|. However, in \mil a closure can only store the label of
-another \cc block. Therefore, since we cannot create a closure
-referring to \lab compose/, \lab k2/ returns a closure referring to
-\lab k3/. Because the body of a \cc block must be a tail, \lab k3/
-jumps immediately to \lab compose/ when executed.
+the definition of |main| in Figure~\ref{mil_fig_compose_b}. \lab k0/
+corresponds to the |k_0| definition in Figure~\ref{mil_fig_compose_a}
+and acts as the entry point for |compose|. Notice that \lab k0/ is not
+a closure-capturing block; \lab k0/ just allocates the initial closure
+that will be used to evaluate |compose a b c|. The closure-capturing
+blocks \lab k1/ and \lab k2/ correspond to |k_1| and |k_2|. The second
+argument to each |closure| operation corresponds to the variables
+captured by the closures allocated in the body of \lab k1/ and \lab
+k2/; the list of values passed as an argument to |k_1| and |k_2|
+correspond to the environment defined for the \lab k1/ and \lab k2/
+closure-capturing blocks. In Figure~\ref{mil_fig_compose}, |k_2|
+creates a closure pointing to |compose|. Because \cc blocks can only
+contain a single \term tail/ term, \lab k3/ jumps immediately to \lab
+compose/, which implements the body of |compose|.
 
 \begin{myfig}[t]
   \input{lst_mil2}
@@ -461,7 +463,7 @@ jumps immediately to \lab compose/ when executed.
 \end{myfig}
 
 \intent{Point out where intermediate values are created and captured.}
-By examining \lab main/ in Figure~\ref{mil_fig2} we can see how \mil
+By examining \lab main/ in Figure~\ref{mil_fig2}, we can see how \mil
 makes explicit the intermediate closures created while evaluating
 \lcapp compose * a * b * c/. Line~\ref{mil_t0_fig2} executes the block
 \lab k0/, allocating a closure pointing to \lab k1/ and assigning it
@@ -481,19 +483,16 @@ last line of \lab main/.
 \section{Monadic Thunks}
 \label{mil_thunks}
 
-\intent{Introduce idea of monads as suspended computation.}  In
-another sense, also described in Wadler's \citeyear{Wadler1990} paper,
-a monadic value represents a \emph{computation}. Where a pure function
-evaluates to a ``pure'' value that is immediately available, a monadic
-function gives back a suspended computation that we need to execute
-before we can get to the value ``inside'' the computation. We can also
-execute the same computation multiple times, potentially producing a different
-value each time.
+\intent{Introduce idea of monads as suspended computation.}  As
+described in Wadler's \citeyear{Wadler1990} paper, a monadic value
+represents a \emph{computation}. Where a pure value evaluates without
+side-effects, a monadic value represents a suspended computation that
+may cause side-effects when evaluated. Evaluating the computation
+multiple times may even produce different side-effects each time.
 
 \intent{Contrast pure and monadic values.}  Consider the \lamC
 functions in Figure~\ref{mil_fig_monadic}.\footnote{Some syntactic
-  liberties have been taken here. \lamC only supports monadic binding,
-  so ``|print a|'' really represents ``|_ <- print 0|.''} Neither
+  liberties have been taken here.} Neither
 takes any arguments and they ostensibly produce the same number. Of
 course, the value produced by the pure function in
 Part~\subref{mil_fig_monadic_pure} differs markedly from that produced
@@ -501,27 +500,29 @@ by the impure function in Part~\subref{mil_fig_monadic_comp}.
 
 \begin{myfig}
   \begin{tabular}{cc}
-    |id a = a| & 
+    |num = 1| & 
     \begin{minipage}{1.5in}\disableoverfull
-> printId a = do 
->   print a
->   return a
+> printNum = do 
+>   print 1
+>   return 1
     \end{minipage} \\
     \scap{mil_fig_monadic_pure} & \scap{mil_fig_monadic_comp}
   \end{tabular}
   \caption{Part~\ref{mil_fig_monadic_pure} shows a \emph{pure}
-    function with no side effects. Part~\ref{mil_fig_monadic_comp}
-    shows an \emph{impure} function.}
+    value. Part~\ref{mil_fig_monadic_comp}
+    shows an \emph{impure} value.}
   \label{mil_fig_monadic}
 \end{myfig}
 
-\intent{Introduce monadic thunks.}  Intuitively, |id| returns |a|, but
-|printId| returns a \emph{computation}. We call this computation a
-\emph{monadic thunk}. Traditionally, thunks represent \emph{suspended}
-computation. We use it in the same sense here, in that |printId| evaluates
-to a program that we can invoke; moreover, evaluating |printId| alone will
-\emph{not} invoke the computation --- |printId| must be evaluated and then
-invoked before the computation will produce a result.
+\intent{Introduce monadic thunks.}  Intuitively, |num| returns $1$,
+but |printNum| returns a \emph{computation}. We call this computation
+a \emph{monadic thunk}. Traditionally, thunks represent
+\emph{suspended} computation. We use it in the same sense here in that
+|printNum| evaluates to a program that we can invoke; moreover,
+evaluating |printNum| alone (as in the expression |let x = printNum|)
+will \emph{not} invoke the computation --- |printNum| must be
+evaluated and then invoked before the computation will produce a
+result.
 
 \intent{Show how \mil thunks are used.}  To illustrate, consider the
 \lamC functions in Figure~\ref{mil_fig_hello_a}.\footnote{Again, some
@@ -553,7 +554,7 @@ that points to the |echo| function and that captures the value of |x|.
         \block main(x): 
           \vbinds m<- \mkthunk[echo:x]; \label{mil_fig_mkthunk}
           \vbinds \_<- \invoke m/; \label{mil_fig_invoke1}
-          \vbinds \_<- \invoke m/; \label{mil_fig_invoke2}
+          \invoke m/ \label{mil_fig_invoke2}
       \end{AVerb}
     \end{minipage} \\
     \scap{mil_fig_hello_a} & \scap{mil_fig_hello_b}
@@ -578,13 +579,14 @@ the thunk again --- only one allocation occurs, but we run the \app
 \section{Compiling \lamC to \mil}
 \label{mil_sec4}
 
-\intent{Explain why we don't show the whole compiler.}  We created
-a simple compiler from \lamC to \Mil in order to implement and test
-the optimizations discussed later in this work. The compiler's implementation follows
-the style used by Kennedy \citep{Kennedy2007}, and in most cases it
-does not differ much from numerous other compilers translating the
-\lamA to a given intermediate form. However, we will highlight some
-nuances of our translation.
+\intent{Explain why we don't show the whole compiler.}  We created a
+simple compiler from \lamC to \Mil in order to generate tests for the
+optimizations discussed later in this work. Our compiler
+implementation follows the style used by Kennedy
+\citeyearpar{Kennedy2007} and in most cases it does not differ much
+from numerous other compilers that translate the \lamA to a given
+intermediate form. However, we will highlight some nuances of our
+translation.
 
 \intent{Show how $\lambda$-abstractions are translated.}  Consider
 again the definition of |compose| in Figure~\ref{mil_fig1a} on
@@ -593,17 +595,17 @@ except the innermost (i.e., \lcabs x.\lcapp f * (g * x)/), to a block that retur
 closure. The innermost $\lambda$ translates to a block that immediately
 jumps to an implementation of the body of |compose|. This gives the
 sequence of blocks shown in Figure~\ref{mil_fig2} on
-Page~\pageref{mil_fig2} (excepting \lab main/, of course), and allows
+Page~\pageref{mil_fig2} (excepting \lab main/, of course) and allows
 \mil to support partial application.
 
 \intent{Point out how we rely on uncurrying to make this code
   performant.}  While general, this strategy produces code that does a
-lot of repetitive work. When fully applied, a function of $n$
-arguments will create $n - 1$ closures, perform $n - 1$ jumps between
-blocks, and potentially copy arguments between closures numerous
-times. Our uncurrying optimization
+lot of potentially unnecessary work. When fully applied, a function of
+$n$ arguments will create $n - 1$ closures, perform $n - 1$ jumps
+between blocks, and potentially copy arguments between closures each
+time. Our uncurrying optimization
 (Chapter~\ref{ref_chapter_uncurrying}) can collapse this work to one
-closure, one jump and no argument copying in many cases. Therefore,
+closure, one jump, and no argument copying in many cases. Therefore,
 generating simple (and easy to analyze) code is a reasonable
 trade-off.
 
@@ -617,7 +619,7 @@ block pointed to by the thunk executes the monadic expression.
 \intent{Show where a thunk is created in |kleisli|.}  The code shown
 for |kleisli| in Figure~\ref{mil_fig_kleisli} illustrates this
 strategy. The |kleisli| function in Part~\ref{mil_fig_kleisli_a}
-implements \emph{monadic} composition, where |f| and |g| produce
+implements \emph{monadic} composition, in which |f| and |g| produce
 monadic results. Part~\ref{mil_fig_kleisli_a} shows a \mil
 implementation of |kleisli|. Block \lab m205/ on
 Line~\ref{mil_fig_kleisli_m205} executes the body of
@@ -673,12 +675,12 @@ subsequent monadic values.
 Figure~\ref{mil_fig_kleisli_b} (representing the body of the |kleisli|
 function) illustrates this principle. Though |kleisli| ends with a
 monadic expression (|f v|), it does not return a suspended computation
-representing |f v|; it returns the result of executing |f v|. The
+representing |f v|; instead, it returns the result of executing |f v|. The
 statement on Line~\ref{mil_fig_kleisli_f_app} evaluate \app f * v1/
 and assigns the result to \var v206/. Crucially, the next line invokes
 the thunk, immediately executing the program returned by \app f *
 v1/. This is a case where the compiler generates code to execute a
-sequence of monadic values, rather than code which returns a suspended
+sequence of monadic values, rather than code that returns a suspended
 computation.
 
 \section{Executing \mil Programs}
@@ -686,20 +688,22 @@ computation.
 
 \intent{Introduce \mil execution model.}  As stated in
 Section~\ref{mil_sec3}, \mil's design borrows heavily from
-three-address code, an intermediate form that closely resembles assembly
-language code. The execution model for \mil draws on its three-address
-code inspiration and executes like an assembly-language for a simple
-register-based computer: execution begins at a special designated
-point in the program and proceeds sequentially. When the first block
-executed in the program ``returns,'' the program terminates.
+three-address code, an intermediate form that closely resembles an
+idealized assembly-language code. The execution model for \mil draws
+on its three-address code inspiration and executes like an
+assembly-language for a simple register-based computer: execution
+begins at a special designated point in the program and proceeds
+sequentially. When the first block executed in the program
+``returns,'' the program terminates.
 
 \intent{Describe blocks as functions; argument scope; blocks always
   ``return.''}  Unlike assembly-language, \mil blocks also act like
 functions. Each block declares parameters and those names are only in
 scope over the block. Blocks always return a monadic value. Closure,
-thunk and data allocations already create monadic values. The \return/
-keyword makes a pure value monadic. The value produced by the last
-statement in a given block is returned to the block's caller.
+thunk, and data allocations already create monadic values. The
+\return/ keyword creates a computation that evaluates to the given
+value. The value produced by the last statement in a given block is
+returned to the block's caller.
 
 \intent{Describe variable scope; storage locations are local.}  Within
 each block, any number of storage locations may be named on the \lhs
@@ -714,14 +718,14 @@ control-flow transfers to the appropriate block. For \enter and
 \invoke/, the label stored in the closure or thunk determines the
 block to execute. For goto, the block is named directly. The value
 returned from the block is bound to the variable on the \lhs of the
-bind statement. The value of the \rhs must be monadic.
+bind statement. 
 
 \intent{Describe our (lack of) error handling.}  \Mil's syntax does
 not mention error handling or exceptions at all. However, errors can
 arise in a number of areas, such as when no case alternatives match
 the inspected value, or if a block is called with the wrong number of
-arguments. In all cases of errors, we expect an error would be
-generated by the \mil runtime or interpreter and the program would
+arguments. In all cases of errors, we expect that an error would be
+generated by the \mil runtime or interpreter and that the program would
 terminate. More robust error handling would certainly be an area for
 improvement in the future.
 
@@ -729,32 +733,18 @@ improvement in the future.
 \label{mil_sec7}
 
 \intent{Reminder about open/closed shapes.}  As described in
-Section~\ref{hoopl_sec_cfg}, \hoopl characterizes control-flow between
-nodes in a control-flow graph (\cfg) by their entry and exit
-shape. \Hoopl uses the |O| and |C| types to express the shape of the
-entry and exit points for a node. A node that is open on exit can only
-be followed by a node that is open on entry. A sequence of nodes can be
-characterized by the entry shape of the first node and the exit shape
-of the last node.
+Section~\ref{hoopl_sec_cfg}, \hoopl uses the |O| and |C| types to
+express the shape of the entry and exit points for a node. A node that
+is open on exit can only be followed by a node that is open on
+entry. A sequence of nodes can be characterized by the entry shape of
+the first node and the exit shape of the last node.
 
 \intent{Reminder about relationship between basic blocks and shape.}
 In \hoopl terms, basic blocks (described in Section~\ref{sec_back3})
 are closed on entry and closed on exit. Due to the constraints imposed
 by the shape type, none of the nodes between the first and last will
-jump or branch to other nodes. They can only execute one after
+jump or branch to other nodes; they can only execute one after
 another.
-
-%% \intent{Enumerate the various shape combinations and connect to basic
-%%   blocks.}  An |O O| (``open/open'') node has exactly one predecessor
-%% and one successor. An |O O| node must appear in the middle of a basic
-%% block --- it cannot be the target of multiple predecessors, therefore
-%% it cannot be the target of a jump or branch. A |C O| (``closed/open'')
-%% node can have multiple predecessors but only one successor. A |C O|
-%% node can start a basic block, but it must always be followed by at
-%% least one node. An |O C| (``open/closed'') node can only have one
-%% predecessor, but many successors. An |O C| node always ends a 
-%% basic block. A |C C| (``closed/closed'') node is not very useful on
-%% its own; however, a |C C| sequence of nodes forms a basic block.
 
 \intent{Describe the five |Stmt| constructors.}
 Figure~\ref{mil_fig_stmt_ast} shows |Stmt|, the data type defining the
@@ -802,11 +792,12 @@ operator. |Goto| and |Prim| represent the labeled jumps \goto b(v_1,
 \dots, v_n) and \prim p(v_1, \dots, v_n). |Closure| allocates a
 closure (\mkclo[k:v_1, \dots, v_n]), |Thunk| allocates a monadic thunk
 (\mkthunk[b:v_1, \dots, v_n]), and |Constr| allocates a data
-value. The |Constructor| type names the tag used for the data
-value. The |Dest| type in |Goto|, |Closure| and |Thunk| specifies
-block. Notice that |Prim| does not specify a |Dest|, because there is
-no block (implemented in \mil) associated with a primitive function. |Prim|
-instead just specifies the name of the primitive function.
+value. The |Constructor| type in |Constr| names the tag used for the
+data value. The |Dest| type in |Goto|, |Closure| and |Thunk|
+identifies the block associated with the term. Notice that |Prim| does
+not specify a |Dest| because there is no block (implemented in \mil)
+associated with a primitive function. Instead, |Prim| just specifies
+the primitive's name.
 
 \begin{myfig}[tb]
   \begin{minipage}{\linewidth}\begin{center}\begin{withHsLabeled}{mil_tail_ast}\numbersoff
@@ -824,8 +815,8 @@ instead just specifies the name of the primitive function.
 \end{myfig}
 
 \intent{Show connection between \mil syntax and \ast vis.\ arguments.}
-All \term tail/ terms only allow variables as arguments, not arbitrary
-expressions. The |Tail| constructors implement that restriction by
+All \term tail/ terms allow only variables as arguments, not arbitrary
+expressions. The |Tail| constructors enforce that restriction by
 only taking |Name| arguments. Similarly, |Stmt| constructors only
 define arguments that are |Names| or |Tails|.
 
@@ -858,8 +849,8 @@ monadic composition function:
 \end{singlespace}
 
 \noindent |m205| defines a basic block, as shown by its |C C| type. \Hoopl
-provides |mkFirst|, |mkMiddles| and |mkLast|
-(Chapter~\ref{ref_chapter_hoopl}, Figure~\ref{hoopl_fig4}), for
+provides |mkFirst|, |mkMiddles|, and |mkLast|
+(Chapter~\ref{ref_chapter_hoopl}, Figure~\ref{hoopl_fig4}) for
 lifting nodes into \hoopl's monadic graph representation. The operator
 |<*>| connects pieces of the graph together. \Hoopl uses the |label|
 argument to connect this definition to other basic blocks in a larger
@@ -941,26 +932,24 @@ our own.
 \subsection{Monads \& Haskell}
 \label{mil_subsec_monads}
 
-Moggi \citeyearpar{Moggi1991} first proposed monads as a means to
-model computation in real programs; in particular, as a basis for
-proving equivalence among programs with side-effecting
-behaviors. Wadler popularized this notion as a way to structure
-functional programs; in particular, as a way to allow side-effecting
-computation in the ``purely'' functional \lamC. 
+Moggi \citeyearpar{Moggi1991} proposed monads as a means to model
+computation in real programs with side-effecting behaviors. Wadler
+popularized this notion as a way to structure functional programs; in
+particular, as a way to allow side-effecting computation in the
+``purely'' functional \lamA.
 
-Wadler's \citeyear{Wadler1990} paper, in particular, provided
-inspiration for \mil. He describes a way to translate the
-call-by-value \lamC into computations in a particular monad. His
-notation uses a superscripted `$*$' to represent the translation of a
-\lamC term to some monadic term, represented by the superscripted $M$.
+Wadler \citeyearpar{Wadler1990} described a way to translate the
+call-by-value \lamA into computations in a particular monad. His
+notation uses a `$*$' to represent the translation of a
+\lamA term to some monadic term, represented by $M$.
 For example, he represents the translation of a $\lambda$ expression
 as:
 $$
 (\lcabs x. v)^* = \left[(\lcabs x. v^*)\right]^M.
 $$ Notice the $*$ moves inside the $\lambda$ on the right, meaning the
-body of the $\lambda$ will be recursively translated. In \mil, this is
-largely equivalent to declaring a \cc block (where $v$ will be translated
-to \mil code):
+body of the $\lambda$ will be recursively translated. This scheme 
+provided a special inspiration for \mil; it essentially gives
+the translatin of $\lambda$ terms to \cc blocks:
 $$
 \lcabs x. v = \ccblock k1()x:\ \ensuremath{v}. 
 $$
@@ -1034,7 +1023,7 @@ registers can be named, nested expressions are not allowed, and
 implementation details are made explicit. The \mil's unique features
 include separate representations for \emph{closure-capturing} and
 basic blocks, and the use of monadic \emph{tail} expressions. Though
-we did not give the translation, our implementation of a compiler from
+we have not included the translation here, our implementation of a compiler from
 \lamC to \mil gives us confidence that every \lamC program can be
 represented in \mil. 
 

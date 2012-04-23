@@ -95,12 +95,14 @@
 \fancyhead[L]{\small\textsc{\chaptertitlename\ \thechapter}}
 \fancyhead[R]{\small\leftmark}
 \fancyfoot[C]{\small\thepage}
-\fancyfoot[R]{\small Draft of \today}
+%% \fancyfoot[R]{\small Draft of \today}
+\fancyfoot[R]{}
 \headheight=15pt
 \fancypagestyle{plain}{%
   \fancyhf{} % clear all header and footer fields
   \fancyfoot[C]{\small\thepage}
-  \fancyfoot[R]{\small Draft of \today}}
+  %%\fancyfoot[R]{\small Draft of \today}
+}
 \renewcommand\headrulewidth{0pt}
 \renewcommand\chaptermark[1]{\markboth{#1}{}}
 \hyphenation{data-flow mo-na-dic} 
