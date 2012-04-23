@@ -85,7 +85,7 @@ closure or jump to the block.
 
 > collapse :: ProgM C C -> ProgM C C
 > collapse program = runSimple $ do {-"\hslabel{run}"-}
->       (p, _, _) <- analyzeAndRewriteFwd debugFwdT  (JustC labels) program initial {-"\hslabel{analyze}"-}
+>       (p, _, _) <- analyzeAndRewriteFwd fwd  (JustC labels) program initial {-"\hslabel{analyze}"-}
 >       return p
 >   where
 >     labels :: [Hoopl.Label]
@@ -96,8 +96,7 @@ closure or jump to the block.
 >     fwd :: FwdPass SimpleFuelMonad Stmt Fact
 >     fwd = FwdPass { fp_lattice = collapseLattice {-"\hslabel{fwd}"-}
 >                   , fp_transfer = collapseTransfer blockArgs
->                   , fp_rewrite = collapseRewrite (destinations labels) -- noFwdRewrite 
->                     }
+>                   , fp_rewrite = collapseRewrite (destinations labels) }
 >     
 >     blockArgs :: Map Hoopl.Label [Var]
 >     blockArgs = Map.fromList [(l, args) | (_, BlockEntry _ l args) <- entryPoints program]

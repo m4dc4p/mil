@@ -42,10 +42,12 @@ Section~\ref{uncurry_sec_examples} and discuss uncurrying as applied
 to \mil in Section~\ref{uncurry_sec_mil}. We present our dataflow
 equations for uncurrying in Section~\ref{uncurry_sec_df} and our
 rewriting strategy in Section~\ref{uncurry_sec_rewriting}. We show our
-implementation in Section~\ref{uncurry_sec_impl}. We describe
-alternate (but unimplemented) strategies for our own approach in
-Section~\ref{uncurry_sec_future}. We conclude with a discussion of our
-experience in Section~\ref{uncurry_sec_refl}.
+implementation in Section~\ref{uncurry_sec_impl}. We give two extended
+examples in Section~\ref{uncurry_sec_example}, demonstrating our
+optimization's utility on more complicated \cfgs. Many other
+implementations of uncurrying have been described elsewhere; we discuss
+those in Section~\ref{uncurry_sec_related}. Section~\ref{uncurry_sec_refl}
+summarizes our contribution.
 
 \section{Partial Application}
 \label{uncurry_sec_papp}
@@ -99,7 +101,7 @@ a function that ignores one of its arguments:
 the assembly language level, function application is expensive because
 multiple operations must take place to implement it: saving registers,
 loading addresses, and finally jumping to the target location.
-Partial application exagerates all these costs by essentially creating
+Partial application exaggerates all these costs by essentially creating
 a \emph{series} of functions, each of which takes one argument and
 returns a closure that points to the next function in the chain. Only
 when all the arguments are gathered does the function do ``real work''
@@ -122,7 +124,7 @@ written ``\block b(v_1, \dots, v_n): \ldots''  A normal block is
 executed by writing ``\goto b(v_1, \dots, v_n).'' 
 
 \intent{Remind reader about \cc blocks.}
-\Cc blocks are also like labelled locations, except that they expect to
+\Cc blocks are also like labeled locations, except that they expect to
 receive a closure and an argument when called. We write \cc blocks as ''\ccblock k(v_1, \dots, v_n)x: \ldots'' A \cc block is always executed as the result of an
 expression like ``\app f * x/.''
 
@@ -176,10 +178,10 @@ executes when all of the arguments to |compose| are available.
     \hss\scap{uncurry_fig_compose_a}\hss \\
     \begin{minipage}{\hsize}
       \begin{AVerb}[numbers=left, gobble=8]
-        \block k0(): \mkclo[k1:] \label{mil_k0_fig2}
-        \ccblock k1()f: \mkclo[k2:f] \label{mil_k1_fig2}
-        \ccblock k2(f)g: \mkclo[k3:f, g] \label{mil_k2_fig2}
-        \ccblock k3(f, g)x: \goto compose(f, g, x) \label{mil_k3_fig2}
+        \block k0(): \mkclo[k1:] 
+        \ccblock k1()f: \mkclo[k2:f] 
+        \ccblock k2(f)g: \mkclo[k3:f, g] 
+        \ccblock k3(f, g)x: \goto compose(f, g, x) 
         
         \block compose(f, g, x): {\rm\emph{\dots as in Figure \ref{mil_fig1b} on Page \pageref{mil_fig1b}}\dots} 
       \end{AVerb}
@@ -277,7 +279,7 @@ closure returned.
 \intent{Define dataflow equations for our uncurrying optimization.}
 We implement uncurrying with a forwards dataflow analysis. Our facts
 indicate if that determines if a given given variable refers to a
-known closure. Facts are propogated successor block when the block
+known closure. Facts are propagated successor block when the block
 ends with a call or case statement. We combine multiple input facts
 for a given block by determining if all sets of facts agree on the
 value of a given variable.
@@ -391,7 +393,7 @@ set of facts from one block so it makes sense in a successor block.
 The next two equations describe how we transfer facts between blocks
 using the functions given above. In this presentation, we only show one
 variable, but the equations can be easily extended to a multiple
-variables. We also use a number of auxilary definitions, besides those
+variables. We also use a number of auxiliary definitions, besides those
 mentioned above. The \mfun{trim} function applies the \mfun{uses} and
 \mfun{delete} functions to remove all facts from $F$ that refer to or
 are about \var v/. The \mfun{delete} function removes any facts about
@@ -629,12 +631,12 @@ functions.  The |blockParams| argument to |collapseTransfer| gives the
 list of parameters for every ordinary block in the program, which we
 use during renaming operations. The first argument to |transfer| is
 the statement we are analyzing, and the second is our facts to
-far. |transfer| depends on a number of auxilary functions: |kill|,
+far. |transfer| depends on a number of auxiliary functions: |kill|,
 |using|, etc. We will describe each function as they are first
 encountered when describing |transfer|. The |Map| prefix on some of
 the functions used by |transfer| and related definitions indicates
 they are imported from Haskell's standard |Data.Map| library. We
-define |transfer| by cases, analagous to the cases given in
+define |transfer| by cases, analogous to the cases given in
 Equations~\eqref{uncurry_df_transfer_block} through
 \eqref{uncurry_df_transfer_rest}.
 
@@ -688,7 +690,7 @@ Equations~\eqref{uncurry_df_transfer_block} through
     (Line~\ref{uncurry_fig_transfer_goto2}) uses the |restrict|
     function for filtering, and the |rename| function for renaming. We
     use \hoopl's |mapSingleton| function to create a set of facts
-    associated with the block given by |dest|, analagous to the
+    associated with the block given by |dest|, analogous to the
     \hbox{$\{\lab b/:\dots\}$} notation used in
     Equation~\ref{uncurry_df_transfer_goto}.
     
@@ -934,7 +936,7 @@ like:
 
 If the destination returns a closure
 (Line~\ref{uncurry_fig_rewrite_impl_collapse_capt}), then we rewrite
-\app f * x/ to directly allocate the closure. The boolean value
+\app f * x/ to directly allocate the closure. The Boolean value
 |usesArg| indicates if the closure returned should capture the
 argument |x| or not..
 
@@ -993,6 +995,7 @@ creates the appropriate |Jump| or |Capture| value. The result of
 |destinations| becomes the |blocks| argument for |collapseRewrite|.
 
 \section{Example: Uncurrying Across Blocks}
+\label{uncurry_sec_example}
 
 The example shown in the previous section demonstrated that we can
 eliminate unnecessary \enter expressions within a block. As we will
@@ -1018,11 +1021,11 @@ represents the output of our \lamC to \mil compiler.
     \scap{uncurry_global_a} \\
     \begin{tabular}{lr}\begin{minipage}[t]{.55\hsize}
     \begin{AVerb}[gobble=6,numbers=left]
-      \block main(ns): \label{uncurry_global_main_body}
+      \block main(ns): 
         \vbinds v227<-\mkclo[k203:];
         \vbinds v228<-\mkclo[k219:];
         \vbinds v229<-\app v227*v228/;
-        \app v229 * ns/ \label{uncurry_global_main_end}
+        \app v229 * ns/ 
       \ccblock k219()x: \goto b220(x)
       \block b220(x):\label{uncurry_global_toList_body}
         \vbinds v221<-\mkclo[Consclo2:];
@@ -1074,7 +1077,7 @@ In the body of \lab altCons208/, there are two opportunities to
 eliminate \enter expressions. \var f/ always represents the |toList|
 function, which is implemented by \lab b220/ on
 Lines~\ref{uncurry_global_toList_body}--\ref{uncurry_global_toList_body_end}. We
-should be able to replace \var f * x/ on
+should be able to replace \app f * x/ on
 Line~\ref{uncurry_global_map_cons_fx} with \goto b220(f,
 x). Similarly, the recursive call to |map| can be replaced by a direct
 call to \lab caseEval216/, which implements the body of |map|. 
@@ -1083,17 +1086,17 @@ Though our analysis covers the entire program, we first concentrate on
 the \lab main/ block. Figure~\ref{uncurry_global_main} shows how we
 analyze and rewrite \lab main/. The Figure shows consecutive
 iterations of \hoopl's interleaved analysis and rewrite
-passes. Rewrites occur between the Parts of the figure; we highlight
+process. Rewrites occur between the Parts of the figure; we highlight
 rewritten lines with a $\rightarrow$ symbol.
 
 \begin{myfig}
   \begin{tabular*}{\textwidth}{l}\begin{minipage}[t]{\textwidth}
     \begin{AVerb}[gobble=6,numbers=left]
-      \block main(ns): \label{uncurry_global_main_body} \anchorF(nsa)
+      \block main(ns):  \anchorF(nsa)
         \vbinds v227<-\mkclo[k203:];\anchorF(v227a) \label{main_v227a}
         \vbinds v228<-\mkclo[k219:];\anchorF(v228a)
         \vbinds v229<-\app v227*v228/;\anchorF(v229a) \label{main_v229a}
-        \app v229 * ns/ \label{uncurry_global_main_end}
+        \app v229 * ns/ 
     \end{AVerb}
   \end{minipage} \\\\
     \begin{tikzpicture}[overlay,remember picture]
@@ -1151,7 +1154,7 @@ create a new fact, associating \var v229/ with \mkclo[k204:v228]. The
 caseEval216/. Therefore, on Line~\ref{main_app_b}, we can rewrite the
 expression \app v229 * ns/ to \goto caseEval(ns,
 v228). Part~\subref{uncurry_global_main_c} shows this rewrite and also
-crosses out lines with now-dead bindings that we can elminate.
+crosses out lines with now-dead bindings.
 
 After the rewrite in Figure~\ref{uncurry_global_main_c}, the \cfg for
 the program changes. \lab main/ did not originally end in a \milres
@@ -1166,7 +1169,7 @@ each block (using the parameters for each block to name the facts).
 \input{uncurry_global_blocks}
 \caption{Facts that flow between blocks in our example
   program. Part~\subref{uncurry_global_blocks_a} shows the \cfg before
-  we rewrite \lab main/; Part~\subref{uncurrying_global_blocks_b}
+  we rewrite \lab main/; Part~\subref{uncurry_global_blocks_b}
   shows the \cfg afterwards. The facts from \lab main/ only flow to
   the rest of the \cfg after rewriting.}
 \label{uncurry_global_blocks}
@@ -1176,7 +1179,7 @@ As Figure~\ref{uncurry_global_blocks_b} shows, when \lab caseEval216/
 becomes the successor of \lab main/, the fact $\{\var
 f/\,:\,\mkclo[k219:]\unskip\}$ becomes available to \lab
 altCons208/. Figure~\ref{uncurry_global_cons} shows how we iteratively
-analyse and rewrite \lab altCons208/ using our new
+analyze and rewrite \lab altCons208/ using our new
 fact. Part~\subref{uncurry_global_cons_a} shows the initial facts for
 each binding. In Part~\subref{uncurry_global_cons_b}, we replace the
 expression \app f * x/ on Line~\ref{ugb_v210b} with \goto b220(x),
@@ -1255,163 +1258,203 @@ closure allocations and two \enter expressions.
 \end{myfig}
 
 \subsection*{Uncurrying Across Loops}
-Our next example demonstrates uncurrying in the presence of loops. Our
-compiler from \lamC to \mil does not produce code with any loops, so
-we use a program written directly in \mil
-here. Figure~\ref{uncurry_loop} gives our example \mil program and its
-\cfg; the program itself does not do anything very interesting, but we
-are concerned with its structure rather than its behavior. Note that we only
-show the normal blocks (\lab b1/, \lab b2/, and \lab b3/) in the \cfg, as
-the control-flow between each pair of \cc blocks is not very relevant.
+Our next example demonstrates uncurrying in the presence of
+loops. Figure~\ref{uncurry_loop} gives our example \mil program and
+its \cfg; the program itself does not do anything very interesting,
+but we are concerned with its structure rather than its behavior. Note
+that we only show the normal blocks (\lab b1/, \lab b2/, and \lab b3/)
+in the \cfg, as the control-flow between each pair of \cc blocks is
+not very relevant.
 
 We annotated the \cfg in Figure~\ref{uncurry_loop_b} with the initial
 facts between each block. Recall that in a forwards dataflow analysis,
 the \inE facts for a block are computed using the meet of \out facts
 from predecessor blocks. As \lab b2/ has two predecessors, we
-explicitly show the \out facts for \lab b1/ and \lab b2/. Notice that
+explicitly show the \out facts for \lab b1/ and \lab b3/. Notice that
 $\out(\lab b3)/$ does not contain a fact for \var f/; because no
 binding to \var f/ occurs in \lab b3/, no fact will (yet) appear in
 $\out(\lab b3)/$.  In turn, this means $\inE(\lab b2/)$ contains the
-fact $\{\var f/\,:\,\mkclo[k1:]\unskip\}$ from $\out(\lab b1)/$. The
-same is not true for \var g/. In \lab b3/, there is a binding to \var
-w/, which becomes the parameter \var g/ to \lab b2/, so $\out(\lab
-b3/)$ contains the fact $\{\var g/\,:\,\top\}$.
-
+fact $\{\var f/\,:\,\mkclo[k1:]\unskip\}$ from $\out(\lab b1)/$. In
+\lab b3/, the statement \binds w <- \mkclo[k4:v]; ultimately creates
+the fact $\{\var g/\,:\,\mkclo[k3:]\unskip\}$ in $\out(\lab
+b3/)$. However, $\out(\lab b1/)$ contains $\{\var
+g/\,:\,\mkclo[k3:]\unskip\}$. Because these values differ, $\inE(\lab
+b2/)$ contains the fact $\{\var g/\,:\,\top\}$.
 
 \begin{myfig}
   \input{uncurry_loop}
-  \caption{}
+  \caption{A \mil program with looping control-flow.}
   \label{uncurry_loop}
 \end{myfig}
 
 The initial facts in Figure~\ref{uncurry_loop} tell us that \var f/
-refers to the \cc block \lab k1/, which let us replace the expression
+refers to the \cc block \lab k1/, which lets us replace the expression
 \app f * g/ on Line~\ref{uncurry_loop_fg} with
-\mkclo[k2:g]. Similarly, the fact about \var f/ propogates to \lab
-b3/, allowing us to rewrite the expression \app f * t/ on
-Line~\ref{uncurry_loop_ft} to
-\mkclo[k2:t]. 
+\mkclo[k2:g]. Similarly, the same fact propagates to \lab b3/,
+allowing us to rewrite the expression \app f * t/ on
+Line~\ref{uncurry_loop_ft} to \mkclo[k2:t].
 
 \begin{myfig}
   \input{uncurry_loop_r1}
-  \caption{}
+  \caption{Our rewritten \mil program, showing that we correctly uncurried
+  \app f * g/ in \lab b2/; \app g * t/ remains unchanged.}
   \label{uncurry_loop_r1}
 \end{myfig}
 
 Figure~\ref{uncurry_loop_r1} shows the rewritten program and updated
-facts. Notice, however, that due to the statement \binds w <-
-\mkclo[k4:v]; on Line~\ref{uncurry_loop_w}, $\out(\lab b3/)$ states
-that \var g/ holds the closure \mkclo[k4:v]. This contradicts the 
-fact for \var g/ in $\out(\lab b1/)$, so $\in(\lab b2/)$ continues
-to show the fact $\{\var g/\,:\,\top\}$. 
-
-After these rewrites, the fact sets reach a fixed point and the
-analysis stops, giving the optimized program shown in
-Figure~\ref{uncurry_loop_r1}. Applications of \var f/ are correctly
-replaced with direct closure allocations, but applications of \var g/
-remain as it does not always hold the same closure.
+facts. After these rewrites, the fact sets reach a fixed point and the
+analysis stops. Applications of \var f/ are correctly replaced with
+direct closure allocations, but applications of \var g/ remain as it
+does not always hold the same closure.
 
 \subsection{Complications}
-
-%% Our implementation of uncurrying suffers from two separate bugs. In
-%% the first case, we can introduce free variables into a block. In the
-%% second case, we can propogate incorrect facts to certain blocks. We
-%% discuss these bugs and possible solutions below.
 
 Our implementation of uncurrying replaces \enter expression with
 closure allocations if possible. When |collapseTransfer| sees
 a binding to a closure value, it records not only the label that
 the closure refers to, but also all variables captured in the
-closure. These facts are propogated to successor blocks. If those
+closure. These facts are propagated to successor blocks. If those
 blocks subsequently are rewritten to use the closure allocated directly,
 the variables in the closure may be ``unpacked'' into the block,
 introducing free variables into the block.
 
-For example, consider the following \mil program. In \lab b1/,
-\var v/ is bound to \mkclo[k1:x]. The closure allocated is passed
-to \lab b2/ and then \lab b3/. \lab b3/ applies the closure to 
-to \var y/ and returns the result:
+For example, consider the \mil program in Figure~\ref{unc_fv}. In
+Part~\subref{unc_fv_a}, the statement \binds v<-\mkclo[k1:x]; in \lab
+b1/ binds \var v/ to \mkclo[k1:x]. The closure is then passed to \lab
+b2/. \lab b2/ applies the closure to \var y/ and returns the
+result.
 
-\begin{singlespace}\correctspaceskip
-  \begin{AVerb}[gobble=4]
-    \ccblock k1(x)y: \goto p1(x, y)
+\begin{myfig}
+  \begin{tabular}{cc}
+  \begin{minipage}{\widthof{\ \ \ccblock k1(x)y: \goto p1(x, y)}}
+    \begin{AVerb}[gobble=6]
+      \block b1(x, y):
+        \vbinds v<-\mkclo[k1:x];
+        \goto b2(v, y)
 
-    \block p1(x,y): \prim add(x, y)
+      \block b2(v, y): 
+        \vbinds t<-\app v*y/;
+        \return t/
+      \ccblock k1(x)y: \goto p1(x, y)
+      \block p1(x,y): \dots
+    \end{AVerb}
+  \end{minipage} &
+  \begin{minipage}{\widthof{\ \ \ccblock k1(x)y: \goto p1(x, y)}}
+    \begin{AVerb}[gobble=6]
+      \block b1(x, y):
+        \vbinds v<-\mkclo[k1:x];
+        \goto b2(v, y)
 
-    \block b1(x, y):
-      \vbinds v<-\mkclo[k1:x];
-      \goto b2(v, y)
+      \block b2(v, y): 
+        \vbinds t<-\goto p1(x, y);
+        \return t/
+      \ccblock k1(x)y: \goto p1(x, y)
+      \block p1(x,y): \dots
+    \end{AVerb} 
+  \end{minipage}\\\\
+  \scap{unc_fv_a} & \scap{unc_fv_b}
+  \end{tabular}
+  \caption{A \mil program that demonstrates how free variables can
+    be accidentally introduced by uncurrying. Part~\ref{unc_fv_a} shows
+  the original program. In Part~\ref{unc_fv_b}, rewriting \lab b2/ 
+  introduced the free variable \var x/.}
+  \label{unc_fv}
+\end{myfig}
 
-    \block b2(v, y): \goto b3(v, y)
+Our analysis create the fact $\{\var v/, \mkclo[k1:x]\}$ when
+analyzing \lab b1/, which then propagates to \lab b2/. In \lab b2/, we
+would rewrite the expression \app v * y/ to \goto p1(x, y), as \lab
+k1/ immediately jumps to \lab p1/, producing the program shown in
+Part~\ref{unc_fv_b}. But this introduces a free variable, \var x/, in
+\lab b2/.
 
-    \block b3(v, y):
-      \vbinds t<-\app v*y/;
-      \return t/
-  \end{AVerb}
-\end{singlespace}
-
-Our analysis create the fact $\{\var v/, \mkclo[k1:x]\}$
-when analyzing \lab b1/ and then will propogate it to \lab b3/. In
-\lab b3/, our rewriter would determine that the expression \app v * y/
-in \lab b3/ could be rewritten as \goto p1(x, y), as \lab k1/ immediately 
-jumps to \lab p1/, producing:
-
-\begin{singlespace}\correctspaceskip
-  \begin{AVerb}[gobble=4]
-    \block b3(v, y):
-      \vbinds t<-\goto p1(x, y);
-      \return t/
-  \end{AVerb}
-\end{singlespace}
-
-\noindent But this is clearly wrong! \var x/ is not an argument \lab b3/, 
-and therefore this program would fail. 
-
-This problem could be solved with another dataflow analysis. In the
-first, we rewrite the entire program so all variable names are
-unique. After uncurrying, we determine the free variables in each
-block (a backwards dataflow analysis). We then use propagate free
-variables from the block in which they are first bound to the blocks
-where they are used.
+This problem could be solved with another dataflow analysis. After
+uncurrying, we would determine the free variables in each block (a
+backwards dataflow analysis). Our uncurrying analysis could keep track
+of where each variable in a given closure was declared.  We could use
+that information to propagate free variables from the block in which
+they are first bound to the blocks where they are used.
 
 The second challenge does not account for calls to blocks on the \rhs of a
 bind statement, such as \binds v <- \goto b(\dots);. Our analysis only
 considers calls at the end of blocks. If the values passed to the
 block \lab b/ on the \rhs of a \mbind differ from those passed
-at the end of a block, then our analysis will propogate incorrect 
+at the end of a block, then our analysis will propagate incorrect 
 facts.
 
-For example, in the following program \lab b1/ allocates two closures,
-\mkclo[k1:] and \mkclo[k2:]. It passes \mkclo[k2:] to \lab b2/
-on Line~\ref{mil_bug2_b2}. On the next line, the other closure
-is passed to \lab b2/. In \lab b2/, the closure is applied to an
-argument and the result returned.
-
-\begin{singlespace}
-  \begin{AVerb}[gobble=4,numbers=left]
-    \ccblock k1()x: \goto b3(x)
-    \ccblock k2()x: \goto b4(x)
-
-    \block b1 (x, y):
-      \vbinds v<- \mkclo[k1:];
-      \vbinds w<- \mkclo[k2:];
-      \vbinds z<- \goto b2(w, y);\label{mil_bug2_b2}
-      \goto b2(v, y)
-
-    \block b2 (v, y):
-      \vbinds t<- \app v*y/;
-      \return t/
-    \block b3 (x): \return x/
-    \block b4 (x): \return x/
+\begin{myfig}
+  \begin{tabular}{cc}
+  \begin{minipage}{\widthof{\ \ \ccblock k2()x: Right x}}
+  \begin{AVerb}[gobble=6,numbers=left]
+      \block b1 (x):
+        \vbinds v<- \mkclo[k1:];
+        \vbinds w<- \mkclo[k2:];
+        \vbinds z<- \goto b2(w, y);\label{unc_goto_z}
+        \goto b2(v, z) \label{unc_goto_callb2}
+  
+      \block b2 (v, y):
+        \vbinds t<- \app v*y/;
+        \return t/
+      \ccblock k1()x: Left x
+      \ccblock k2()x: Right x
   \end{AVerb}
-\end{singlespace}
+  \end{minipage} &
+  \begin{minipage}{\widthof{\ \ \ccblock k2()x: Right x}}
+  \begin{AVerb}[gobble=6,numbers=left]
+      \block b1 (x):
+        \vbinds v<- \mkclo[k1:];
+        \vbinds w<- \mkclo[k2:];
+        \vbinds z<- \goto b2(w, y);
+        \goto b2(v, z) 
+  
+      \block b2 (v, y):
+        \vbinds t<- \mkclo[k1:];
+        \return t/
+      \ccblock k1()x: Left x
+      \ccblock k2()x: Right x
+  \end{AVerb}
+  \end{minipage} \\\\
+  \scap{unc_goto_ a} & \scap{unc_goto_b}
+  \end{tabular}
+  \caption{A \mil program demonstrating problems with ``call'' expressions on
+  the \rhs of a bind. }
+  \label{unc_goto}
+\end{myfig}
+
+Figure~\ref{unc_goto} demonstrates this issue. Block \lab b1/
+allocates two closures, \var v/ to \mkclo[k1:] and \var w/ to
+\mkclo[k2:]. On Line~\ref{unc_goto_z}, the program calls \lab b2/ with
+\var w/; Line~\ref{unc_goto_callb2} calls \lab b2/ with \var v/. Our
+analysis would only consider the second call to \lab b2/, and would
+deduce that \var v/ is always \mkclo[k1:] in \lab
+b2/. Figure~\ref{unc_goto_b} shows the rewritten program. In \lab b2/,
+\binds t<- \app v*y/; has been incorrectly rewritten to \binds t<- \mkclo[k1:];,
+which is incorrect.
+
+A simple solution to this problem would assign $\top$ to all
+parameters of blocks called on the \rhs of a bind; then we would never
+propagate anything but $\top$ into those blocks, and no rewriting
+would occur. A better solution would make blocks called this way
+proper successors of the calling block; then our dataflow analysis
+would make sure the correct facts were propagated into each block.
 
 \section{Related Work}
+\label{uncurry_sec_related}
+\intent{Describe the work of Danvy, Apel, and Tarditi; Tolmach; contrast to \mil uncurrying.}
 
-\intent{Describe the work of Danvy, Apel, and Tarditi; contrast to \mil uncurrying.}
-
-\section{Reflection}
+\section{Conclusion}
 \label{uncurry_sec_refl}
+In this chapter, we described an uncurrying optimization for \mil
+programs in terms of the dataflow algorithm. We gave dataflow
+equations detailing the optimization, setting our algorithm on a solid
+theoretical foundation. We implemented our algorithm using the \hoopl
+library, and gave a complete and detailed presentation of that
+work. By example, we demonstrated the utility of our optimization. We
+discussed challenges in our current implementation, and offered
+suggestions for improving the algorithm in the future. Finally, we
+compare our implemenation to several other implementations of the
+uncurrying optimization in the literature.
+
 
 %% 1
 %% (fset 'mil_block

@@ -20,31 +20,30 @@ description of how to implement dataflow-based optimizations using
 and \mil to create a novel implementation of the uncurrying
 optimization. 
 
-\intent{Signposts for chapter.} Though we choose the uncurrying
-optimization to demonstrate our approach, several avenues of future
-work remain.  We explore optimizations that take advantage of the
-unique features of \mil in
+\intent{Signposts for chapter.} Section~\ref{conc_other} describes
+several optimizations we developed that are based on the monadic
+properties of \mil, rather than dataflow analysis. We discuss a number
+of extensions to our work in
 Section~\ref{conc_future_work}. Section~\ref{conc_hoopl} describes
-challenges we encountered using the \hoopl library, and give some
+challenges we encountered using the \hoopl library, and gives some
 suggestions for improvements. Section~\ref{conc_conc} offers our
 closing thoughts.
 
-\section{Future Work}
-\label{conc_future_work}
+\section{Monadic Optimizations}
+\label{conc_other}
 
-This section describes optimizations that take particular advantage of
-\mil's features. Sections~\ref{conc_inline_monadic} and
-\ref{conc_deadcode} describe transformations based on the monadic
-structure of \mil programs.  We extend uncurrying across \mil blocks
-in Section~\ref{conc_uncurrying}, and discuss how to extend the same
-optimization to thunks in Section~\ref{conc_thunks}.
-Section~\ref{conc_cases} proposes a new analysis to eliminate
-unnecessary allocations across \milres case/ statements.
+While this work focuses on \mil, \hoopl, and our uncurrying
+implementation, we also developed several optimizations that relied
+on the monadic properties of \mil. In
+Section~\ref{conc_inline_monadic} we describe an inlining optimization
+based on the \emph{monad laws}. Section~\ref{conc_deadcode} describes
+how we can safely eliminate dead-code, again using the monadic
+properties of \mil.
 
 \subsection{Inlining Monadic Code}
 \label{conc_inline_monadic}
 Figure~\ref{conc_fig_monad_laws} shows the \emph{monad laws}:
-left-Unit, Right-Unit, and Associativity.  While these laws can be
+Left-Unit, Right-Unit, and Associativity.  While these laws can be
 interpreted as specifications of behavior, they can also be
 interpreted as \emph{transformations}. 
 
@@ -174,13 +173,13 @@ the use of \var x/:
 \end{singlespace}
 
 \Mil's syntax does not allow all monadic blocks to be inlined. \Mil
-ensures that every block is also a basic block. A basic block cannot
-branch to multiple destinations. Therefore, blocks that end in \milres
-case/ statements cannot be inlined.
+only allows branching at the end of a block; therefore, blocks that
+end in \milres case/ statements cannot be inlined.
 
 However, we can still transform around blocks that end in \milres
-case/ statements. Consider the blocks \lab b1/, \lab t/ and \lab f/ in
-the following program:
+case/ statements. Note that we did not implement this particular form
+of inlining (though we did implement that givn above). Consider the
+blocks \lab b1/, \lab t/ and \lab f/ in the following program:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
@@ -249,7 +248,7 @@ observe any side-effect of allocation. Therefore we can eliminate any
 closure, thunk or constructor allocation that binds to a
 dead variable.
 
-For example, consider |compose1|, which just captures the first
+For example, consider |compose1|, which captures the first
 argument to |compose|:
 
 > compose1 f = compose f.
@@ -282,10 +281,10 @@ us:
   \end{AVerb}
 \end{singlespace}
 
-\noindent Our uncurrying optimization can now that the expression \app
-v210 * f/ evaluates to \mkclo[absBodyL202:f] (because \var v210/ holds
-the closure \mkclo[absBodyL201:]). We can replace \app v210 * f/ with
-\mkclo[absBodyL202:f]:
+\noindent Our uncurrying optimization can determine that the
+expression \app v210 * f/ evaluates to \mkclo[absBodyL202:f] (because
+\var v210/ holds the closure \mkclo[absBodyL201:]). We can replace
+\app v210 * f/ with \mkclo[absBodyL202:f]:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
@@ -306,109 +305,16 @@ binding, eliminating one allocation:
   \end{AVerb}
 \end{singlespace}
 
-\noindent This optimization extends to thunk and data allocations. 
+\noindent This optimization can be extended to thunk and data
+allocations.
 
-\subsection{Uncurrying Across Blocks}
-\label{conc_uncurrying}
+\section{Future Work}
+\label{conc_future_work}
 
-Our uncurrying optimization only works within a single \mil
-block. Extending the optimization across blocks seems obvious, but
-presents several implementation challenges, as
-Figure~\ref{conc_uncurry} illustrates. 
-
-\begin{myfig}
-  \begin{tabular}{cc}
-\begin{minipage}{3in}
-> uncurry t f y n xs = 
->   let  cap ys g v = (g v) ys
->        cap1 = cap xs
->   in case t of 
->        True -> (cap1 f) y
->        False -> (cap1 f) n
-\end{minipage} &
-\begin{minipage}{3in}
-   \begin{AVerb}[gobble=6]
-      \block uncurry(t, f, y, n, xs):
-        \vbinds cap1<- \mkclo[k203:xs];
-        \goto caseEval214(t, cap1, f, y, n)
-      \ccblock k203(ys)g: \mkclo[k204: g, ys]
-      \ccblock k204(g, ys)v: \mkclo[b205: g, v, ys]
-      \block b205(g, v, ys):
-        \vbinds v206<- \app g*v/;
-        \app v206 * ys/
-      \block altTrue208(cap1, f, y):
-        \vbinds v209<- \app cap1*f/;
-        \app v209 * y/
-      \block altFalse211(cap1, f, n):
-        \vbinds v212<- \app cap1*f/;
-        \app v212 * n/
-      \block caseEval214(t, cap1, f, y, n):
-        \case t;
-          \valt True()->\goto altTrue208(cap1, f, y);
-          \valt False()->\goto altFalse211(cap1, f, n);
-   \end{AVerb}
-\end{minipage} \\\\
-  \scap{conc_uncurry_a} & \scap{conc_uncurry_b}  
-  \end{tabular}
-  \caption{A program that illustrates challenges that occur when
-    uncurrying across blocks. Part~\subref{conc_uncurry_a} gives a
-    \lamC definition; Part~\subref{conc_uncurry_b} shows its \mil
-    equivalent. The |xs| argument to |cap| is live in each |case|
-    alternative, but it is ``hidden'' in the closure created by
-    |cap1|.}
-  \label{conc_uncurry}
-\end{myfig}
-
-In Part~\subref{conc_uncurry_a}, |cap1| partially applies |cap| and
-captures the |xs| argument to |uncurry|. Each case alternative
-ultimately applies |cap1| to two arguments, resulting in the
-evaulation of |cap|. Even though the |xs| argument to |cap| is not
-syntactically present in either case arm, it is still live.
-
-Part~\subref{conc_uncurry_b} shows how |xs| is hidden. The blocks \lab
-altTrue208/ and \lab altFalse211/ represent the two different case
-arms. The \var xs/ argument to \lab uncurry/ does not appear in either
-block. However, the \var cap1/ argument that does appear in both holds
-the closure \mkclo[k203:xs], illustrating that \var xs/ is present but
-hidden. 
-
-\lab altTrue208/ and \lab altFalse211/ both ultimately call block \lab
-b205/.  We could try to rewrite \lab altFalse211/ and
-\lab altTrue208/ to call \lab b205/ directly:
-
-\begin{singlespace}\correctspaceskip
-  \begin{AVerb}[gobble=4]
-    \block altTrue208(cap1, f, y):
-      \goto b205(f, y, ?)
-    \block altFalse211(cap1, f, n):
-      \goto b205(f, n, ?)
-  \end{AVerb}
-\end{singlespace}
-
-\noindent Unfortunately, as shown by the !+?+! symbol, \lab
-altTrue208/ and \lab altFalse211/ do not have the \var ys/ argument in
-scope that is expected by \lab b205/. That argument should be \var
-xs/, but it is hidden in the closure represented by \var cap1/. In
-order to bring \var xs/ into scope, we need to rewrite the live
-variables available to each block, starting from \lab uncurry/:
-
-\begin{singlespace}\correctspaceskip
-  \begin{AVerb}[gobble=4]
-    \block uncurry(t, f, y, n, xs):
-      \goto caseEval214(t, xs, f, y, n)
-    \block altTrue208(ys, f, y):
-      \goto b205(f, y, ys)
-    \block altFalse211(ys, f, n):
-      \goto b205(f, n, ys)
-    \block caseEval214(t, ys, f, y, n):
-      \case t;
-        \valt True()-> \goto altTrue208(ys, f, y);
-        \valt False()-> \goto altFalse211(ys, f, n);
-  \end{AVerb}
-\end{singlespace}
-
-\noindent Rewriting blocks to track live variables to support this
-optimization does not seem impossible, but it does seem tricky.
+We discuss how to extend our uncurrying optimization to thunks in
+Section~\ref{conc_thunks}.  Section~\ref{conc_cases} proposes a new
+analysis to eliminate unnecessary allocations across \milres case/
+statements.
 
 \subsection{Eliminating Thunks}
 \label{conc_thunks}
@@ -653,6 +559,7 @@ that |f| will not be applied to an index value less than $0$.
     \end{singlespace}
   \end{minipage}
   \caption{Final form of our function.}
+  \label{conc_fig_push3}
 \end{myfig}
 
 \section{\Hoopl Refinements}
@@ -679,15 +586,15 @@ desirable properties; for example, a basic block will not contain any
 nodes that can branch to more than one destination. Unfortunately,
 this design also requires that the |O| and |C| types be present on the
 client \ast. In preliminary work, we implemented an \ast without using
-\hoopl's shape types. This choice reuiqred us to write a significant
-amount of ``boilerplate'' to translate between our initial
+\hoopl's shape types. This choice required us to write a significant
+amount of boilerplate to translate between our initial
 representation and one that used \hoopl's desired types.
 
 ``Smart'' constructors could be used to reduce the boilerplate
 required when using \hoopl against an existing \ast. For example,
 consider the the \ast given in Figure~\ref{hoopl_fig3} on
-Page~\pageref{hoopl_fig3}. Instead of defining |CStmt| using gadts,
-imagine we defined |CStmtX| as a normal ADT and |CStmt| as a
+Page~\pageref{hoopl_fig3}. Instead of defining |CStmt| using \gadts,
+imagine we defined |CStmtX| as a normal \textsc{adt} and |CStmt| as a
 |newtype|:
 
 \begin{singlespace}
@@ -793,16 +700,17 @@ dataflow analysis. We intended to implement optimizations drawn from
 the literature of imperative and functional compilers, showing that
 the algorithm could be applied in both contexts.
 
-\intent{Contribution: \mil.} The monadic intermediate language
-we described builds on a large body of work on monadic programming,
-intermediate languages, and implementation techniques for functional
-languages. While the overall concept is well-known, we believe \mil
-offers some novelty. \Mil makes allocation explicit but still
+\intent{Contribution: \mil.} \Mil builds on a large body of work on
+monadic programming, intermediate languages, and implementation
+techniques for functional languages. While a monadic intermediate
+language is not new, we believe \mil's combination of low-level and
+high-level language features makes it unique. \Mil exposes the
+allocation of closures and other implementation details, but still
 offers high-level features like function application and case
 discrimination. \Mil programs, by design, consist of basic-block
-elements. Of course, many intermediate languages consist of
-basic-blocks, but \mil again combines that structure with a monadic
-programming model, giving a ``pure'' flavor to low-level operations.
+elements. Of course, many intermediate languages consist of basic
+blocks, but \mil combines that structure with a monadic programming
+model, giving a ``pure'' flavor to low-level operations.
 
 \intent{Contributions: \hoopl.} Our work made significant use of the
 \hoopl library. Without it, we may not have even pursued this
@@ -811,10 +719,18 @@ work offers a significant amount of expository material describing
 \hoopl, as well as at least one implementation of a non-trivial
 optimization that cannot be found elsewhere.
 
-\intent{Contributions: Uncurrying.} Our work contributes in several
-areas. Most importantly, we described uncurrying in terms of dataflow
-analysis. We did not find other work in this area, and so we believe
-that we are the first to implement uncurrying using dataflow analysis.
+\intent{Contributions: Uncurrying.} Finally, our work described a
+novel implemenation of uncurrying, based on dataflow analysis. We
+showed that our optimization works across multiple blocks and in the
+presence of loops. We also were able to combine uncurrying with 
+optimizations based on monadic transformations, though were not
+able to describe those as fully here. 
+
+This work provides a complete and accurate description of our \mil
+language, our uncurrying optimization, and its implementation in
+\hoopl. We hope that future readers use our work to implement their
+own dataflow-based analysis, see a standalone example of \hoopl in a
+non-trivial setting, or even implement a \mil of their own.
 
 \standaloneBib 
 

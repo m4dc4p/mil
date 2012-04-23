@@ -925,16 +925,59 @@ law (discussed in Section~\ref{conc_inline_monadic} on
 Page~\pageref{conc_inline_monadic}), which would limit our ability
 to inline \mil blocks. 
 
-\section{Related Work: \mlj \& \smlnet}
+\section{Related Work}
 \label{mil_sec_rel}
+
+\Mil builds on the large body of research and experience focused on
+monads and their use in the Haskell programming language. Our work is
+not the first to use a monadic intermediate language; previously
+published by Benton, Kennedy and others describes a monadic
+intermediate language for Standar ML (\sml). We briefly describe 
+monadic programming in Section~\ref{mil_subsec_monads}, and discuss
+its relationship to our work. In Section~\ref{mil_subsec_mlj} we 
+discuss Benton and Kennedy's work, and draw some comparisons with
+our own.
+
+\subsection{Monads \& Haskell}
+\label{mil_subsec_monads}
+
+Moggi \citeyearpar{Moggi1991} first proposed monads as a means to
+model computation in real programs; in particular, as a basis for
+proving equivalence among programs with side-effecting
+behaviors. Wadler popularized this notion as a way to structure
+functional programs; in particular, as a way to allow side-effecting
+computation in the ``purely'' functional \lamC. 
+
+Wadler's \citeyear{Wadler1990} paper, in particular, provided
+inspiration for \mil. He describes a way to translate the
+call-by-value \lamC into computations in a particular monad. His
+notation uses a superscripted `$*$' to represent the translation of a
+\lamC term to some monadic term, represented by the superscripted $M$.
+For example, he represents the translation of a $\lambda$ expression
+as:
+$$
+(\lcabs x. v)^* = \left[(\lcabs x. v^*)\right]^M.
+$$ Notice the $*$ moves inside the $\lambda$ on the right, meaning the
+body of the $\lambda$ will be recursively translated. In \mil, this is
+largely equivalent to declaring a \cc block (where $v$ will be translated
+to \mil code):
+$$
+\lcabs x. v = \ccblock k1()x:\ \ensuremath{v}. 
+$$
+\Mil differs, however, by treating the allocation of
+closures and other data structures as side-effecting computation. In
+Wadler's scheme, those operations remain pure.
+
+\subsection{\mlj \& \smlnet}
+\label{mil_subsec_mlj}
 
 Benton, Kennedy and colleagues \citeyearpar{Benton1998} implemented
 \mlj, a compiler for Standard ML (\sml) that targeted the Java
-Virtual Machine (\jvm). Benton, Kennedy and a different group of
+Virtual Machine. Benton, Kennedy, and a different group of
 co-authors later implemented \smlnet (\citeyear{Benton2004},
 \citeyear{Benton2005}), another \sml compiler that targeted
-Microsoft's Common Language Runtime (\clr). Both compilers first
-translated \sml into a typed \mil. The authors' did not publish a
+Microsoft's Common Language Runtime. Both compilers first
+translated \sml into a typed \mil. The authors did not publish a
 description of the \mil for \smlnet, but their 1998 paper gives
 extensive details for the \mil used by \mlj. They do not use the term,
 but we will call their intermediate language \milj, to distinguish it
@@ -946,7 +989,7 @@ does not use types. Their type system represents several side-effects,
 including allocations. They used type-directed optimization to
 eliminate side-effecting dead-code that only allocates; we can do the
 same over \mil blocks using dead-code analysis that determines if, in
-the binding \binds v <- \emph{tail};, \var x/ is dead and \term tail/
+the binding \binds v <- \emph{tail};, \var v/ is dead and \term tail/
 is a closure, data, or thunk allocation.
 
 \intent{Difference between our \mil and theirs: let-cc} \Milj
@@ -957,7 +1000,7 @@ monadic terms like |do { x <- do { y <- m_1; m_2 }; m_3 }|. Kennedy
 exploiting associativity. For example, the term above becomes |do { y
   <- m_1; x <- m_2; m_3 }|.  However, he also shows that the
 transformation can be needed $O(n^2)$ times, where $n$ is the number
-terms (i.e., $x$) bound, depending on the order in which this
+of terms (i.e., $x$) bound, depending on the order in which this
 transformation is interleaved with others.
 
 Our \mil does not express nested monadic computations as in \milj. The
@@ -977,15 +1020,10 @@ translation of $m_3$ depends on the form of $m_3$, of course, so we
 leave it unspecified. In our representation, $m_1$ and $m_2$ become
 separate \mil blocks. 
 
-The transformation Kennedy describes appears as
+The transformation that Kennedy describes appears as
 inlining in \mil; that is, for an appropriate \lab m1/, we can inline
-the block into \lab b/. For a non-recursive set of appropriate blocks
-(we discuss this further in Section~\ref{conc_inline_monadic} on
-Page~\pageref{conc_inline_monadic}), we should be able to inline all
-blocks in $O(n)$ time, where $n$ is the number of blocks. A non-recursive
-set of blocks forms a tree; all leaves will be inlined into their 
-parents. Those parents are now leaves, so they will be inlined once into
-their parents. This occurs $n$ times, until a single block remains. 
+the block into \lab b/. It is an open question if inlining for 
+non-recursive blocks in \mil can be achieved in better than $O(n^2)$ time.
 
 \section{Summary}
 \label{mil_sec6}
