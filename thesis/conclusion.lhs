@@ -122,10 +122,10 @@ following block:
   \end{AVerb}
 \end{singlespace}
 
-\noindent Not only does this tranformation eliminate a redundant
+\noindent Not only does this transformation eliminate a redundant
 \milres return/ statement, it may also allow further optimizations. In
 particular, if we know that the closure represented by \var f/ refers to
-block \lab b/, our uncurrying optimization will tranform \app f * y/
+block \lab b/, our uncurrying optimization will transform \app f * y/
 into either a jump or an allocation.
 
 The Associativity law provides an inlining mechanism for \mil
@@ -178,7 +178,7 @@ end in \milres case/ statements cannot be inlined.
 
 However, we can still transform around blocks that end in \milres
 case/ statements. Note that we did not implement this particular form
-of inlining (though we did implement that givn above). Consider the
+of inlining (though we did implement that given above). Consider the
 blocks \lab b1/, \lab t/ and \lab f/ in the following program:
 
 \begin{singlespace}\correctspaceskip
@@ -359,7 +359,7 @@ so it executes \lab readCharbody/ directly, instead of invoking the thunk:
   \end{AVerb}
 \end{singlespace}
 
-Of course, we can continue to apply furhter optimizations to the
+Of course, we can continue to apply further optimizations to the
 program. Dead-code elimination would find that \var v206/ is no longer
 live, letting us eliminate the allocation of the thunk:
 
@@ -695,7 +695,7 @@ dataflow analysis since then has focused on imperative programming
 languages. We set out to explore the algorithm's use within the
 context of a functional programming language; specifically, we
 hypothesized that, by compiling to a monadic intermediate language, we
-could obtain a basic-block structure that would be ameniable to
+could obtain a basic-block structure that would be amenable to
 dataflow analysis. We intended to implement optimizations drawn from
 the literature of imperative and functional compilers, showing that
 the algorithm could be applied in both contexts.
@@ -720,7 +720,7 @@ work offers a significant amount of expository material describing
 optimization that cannot be found elsewhere.
 
 \intent{Contributions: Uncurrying.} Finally, our work described a
-novel implemenation of uncurrying, based on dataflow analysis. We
+novel implementation of uncurrying, based on dataflow analysis. We
 showed that our optimization works across multiple blocks and in the
 presence of loops. We also were able to combine uncurrying with 
 optimizations based on monadic transformations, though were not

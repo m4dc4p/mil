@@ -20,7 +20,7 @@ it can only be applied to all of its arguments at once.
 
 \intent{Briefly motivate optimization.}  Partial
 application can be very convenient for programmers, but it can also be
-very inefficient. Conceptually, an uncurried function does real work
+very inefficient. Conceptually, an uncurried function can do real work
 with each application --- that is, each application executes the body
 of the function. A curried function does not do any real work until 
 given all its arguments; each in-between application essentially creates
@@ -59,40 +59,23 @@ by fixing some of the arguments to a general function.
 \begin{myfig}
 > map1 :: (a -> b) -> [a] -> [b]
 > map1 f xs = {-"\ldots"-}
->
-> map2 :: ((a -> b), [a]) -> b
-> map2 (f, xs) = {-"\ldots"-}
-  \caption{Haskell definitions in curried and uncurried style. |map1|
-    can be easily partially applied to produce specialized functions; |map2|
-    cannot.}
+  \caption{A Haskell definition in curried style. |map1|
+    can be partially applied directly to produce specialized functions.}
   \label{uncurry_fig_partapp}
 \end{myfig}
 
 For example, the Haskell code in Figure~\ref{uncurry_fig_partapp}
-defines |map1| in curried style and |map2| in uncurried
-style.\footnote{The implementation of each function is not relevant
-  here, so we elide them.} We can create specialized |maps| by
-applying |map1| to a single argument. For example, we can create a
-function to convert all its arguments to uppercase or one that squares
-all integers in a list:
+defines |map1| in curried style. We can create specialized mapping
+functions by applying |map1| to a single argument. The following
+functions convert all their arguments to uppercase or square all
+integers in a list, respectively:
 
 \begin{singlespace}
 > upCase1 :: [Char] -> [Char]
 > upCase1 = map1 toUpper
 >
 > square1 :: [Int] -> [Int]
-> square1 = map2 (^ 2)
-\end{singlespace}
-
-\noindent We cannot do the same as easily with |map2|. At best we can define
-a function that ignores one of its arguments:
-
-\begin{singlespace}
-> upCase2 :: (a, [Char]) -> [Char]
-> upCase2 (_, xs) = map2 (toUpper, xs)
->
-> square2 :: (a, [Int]) -> [Int]
-> square2 (_, xs) = map2 ((^ 2), xs)
+> square1 = map1 (^ 2)
 \end{singlespace}
 
 \section{Cost of Partial Application}
@@ -132,7 +115,7 @@ expression like ``\app f * x/.''
 definitions allow \mil to represent function application
 uniformly. For a function with $n$ arguments, $n$ \cc blocks and at
 least one basic block will be generated. The first $(n - 1)$ \cc
-blocks are defined as:
+blocks are typically of the form:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
@@ -145,10 +128,9 @@ that points to the next block (\lab k$!+_{i+1}+!$/) and contains all
 the values from the original closure as
 well as the argument \var x/ ($\{!+v_1, \dots, v_i, x+!\}$).
 
-The last block, \lab k$!+_{n-1}+!$/, does not return a new closure
-immediately. Instead, it calls a basic block, \lab b/, with all
-necessary arguments. In the general case, we write \lab k$!+_{n-1}+!$/
-as:
+The last block, \lab k$!+_{n-1}+!$/, does not immediately return a new
+closure, but instead calls a basic block, \lab b/, with all necessary
+arguments. In the general case, we write \lab k$!+_{n-1}+!$/ as:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
@@ -196,11 +178,11 @@ executes when all of the arguments to |compose| are available.
 
 Executing \lab k1/ results in a closure that captures the argument
 \var f/ and points to \lab k2/. The closure returned is equivalent to
-the expression \lcapp compose * a/, with \var a/ being the value held
+the expression \lcapp compose * a/, with |a| being the value held
 by the closure. Executing \lab k2/ returns a closure that captures two
 values, \var f/ and \var g/, and points to \lab k3/. The closure
-returned is equivalent to the expression \lcapp compose * a * b/, with \var a/
-and \var b/ being held by the closure. The values returned by these
+returned is equivalent to the expression \lcapp compose * a * b/, with |a|
+and |b| held by the closure. The values returned by these
 two blocks represent partially applied functions. The remaining \cc
 block, \lab k3/, does not return a value representing a partially
 applied function, however.\footnote{Unless, of course, |compose a b c|
@@ -263,7 +245,7 @@ rewrite \lab compose1/ one more time:
   \end{AVerb}
 \end{singlespace}
 
-\noindent Thus, by uncurrying we eliminate one call (\goto k0()),
+\noindent Thus, by uncurrying, we eliminate one call (\goto k0()),
 one enter operation (\app t0 * f/), and the creation of one closure
 (\mkclo[k1:]).
 
@@ -278,11 +260,11 @@ closure returned.
 \label{uncurry_sec_df}
 \intent{Define dataflow equations for our uncurrying optimization.}
 We implement uncurrying with a forwards dataflow analysis. Our facts
-indicate if that determines if a given given variable refers to a
-known closure. Facts are propagated successor block when the block
-ends with a call or case statement. We combine multiple input facts
-for a given block by determining if all sets of facts agree on the
-value of a given variable.
+indicate if a given variable refers to a known closure. Facts are
+propagated to successor blocks when the block ends with a call or case
+statement. We combine multiple input facts for a given block by
+determining if all sets of facts agree on the value of a given
+variable.
 
 \begin{myfig}[tbp]
   \begin{minipage}{\hsize}
@@ -352,7 +334,7 @@ statement given. We define $t$ by cases over \mil statements.
   redefined, we must invalidate any previous facts that refer to \var
   v/, as they do not refer to the new value of \var v/. Additionally,
   \var v/ may appear in $\{\var v_1/, \dots, \var v_n/\}$ (as in
-  \binds v <- \mkclo[k1:];!+;+! \binds v <- mkclo[k2: v];). To ensure
+  \binds v <- \mkclo[k1:];!+;+! \binds v <- \mkclo[k2: v];). To ensure
   we remove all references to \var v/, we apply \mfun{uses} to the
   combined set $F \cup \{(\var v/, \mkclo[l:v_1, \dots, v_n])\}$. We
   subtract the result from $F$, thereby removing any facts that refer
@@ -363,11 +345,11 @@ statement given. We define $t$ by cases over \mil statements.
   a closure invalidates any facts about \var v/. Therefore, we first
   remove all facts referring to \var v/ in $F$ with the \mfun{uses}
   function. We then create a new fact associating \var v/ with $\top$,
-  indicating we know \var v/ does not refer to a closure. Finally, we
+  indicating that we know \var v/ does not refer to a closure. Finally, we
   combine the new set and new fact and return the combined set.
 \end{description}
 
-Unlike traditional three-address code, \mil blocks that end with a
+\Mil blocks that end with a
 \milres case/ statement can have multiple successors. Dataflow
 analysis does not usually specify that different facts go to different
 successors, but we do so here. The notation
@@ -388,23 +370,24 @@ takes a set of facts, $F$, and two variables, $\var u/$ and $\var
 v/$. If a fact about $\var v/$ exists in $F$, we update it to be about
 $\var u/$.  Combined with the \mfun{args} function, which retrieves
 the list of formal parameters for a block, \mfun{rename} can update a
-set of facts from one block so it makes sense in a successor block.
+set of facts from one block so that it makes sense in a successor block.
 
-The next two equations describe how we transfer facts between blocks
-using the functions given above. In this presentation, we only show one
-variable, but the equations can be easily extended to a multiple
-variables. We also use a number of auxiliary definitions, besides those
-mentioned above. The \mfun{trim} function applies the \mfun{uses} and
-\mfun{delete} functions to remove all facts from $F$ that refer to or
-are about \var v/. The \mfun{delete} function removes any facts about
-\var v/ from $F$. Conversely, the \mfun{restrict} function filters 
-all facts from $F$ except those about \var v/.
+The two equations,\eqref{uncurry_df_transfer_goto} and
+\eqref{uncurry_df_transfer_case}, describe how we transfer facts
+between blocks using the functions given above. In this presentation,
+we only show one variable, but the equations can be easily extended to
+a multiple variables. We also use a number of auxiliary definitions,
+besides those mentioned above. The \mfun{trim} function applies the
+\mfun{uses} and \mfun{delete} functions to remove all facts from $F$
+that refer to or are about \var v/. The \mfun{delete} function removes
+any facts about \var v/ from $F$. Conversely, the \mfun{restrict}
+function filters all facts from $F$ except those about \var v/.
 
 \begin{description}
 \item[\emph{Equation~\eqref{uncurry_df_transfer_goto} --- Goto Block}]
   When a ``goto'' expression, such as \goto b(v), appears at the end
   of a block, we transfer the facts collected so far to the successor
-  block. We use the \mfun{restrict} function to remove all facts form
+  block. We use the \mfun{restrict} function to remove all facts from
   $F$ except those about \var v/. We then rename the facts to match
   the successor block \lab b/, and pass those facts along to \lab b/.
 
@@ -412,31 +395,30 @@ all facts from $F$ except those about \var v/.
     Statement}] A case statement requires careful treatment. Recall
   that each alternative arm jumps immediately to another block (\lab
   b$!+_1+!$/, etc. in the equation). We pass separate sets of facts to
-  each successor, tailored to the arguments each block
+  each successor, tailored to the arguments that each block
   declares. Additionally, the alternative can bind new variables,
   shadowing previous bindings. Any of our existing facts that are
-  about or which refer to shadowed variables must be removed from
+  about or that refer to shadowed variables must be removed from
   our facts before we pass them to successor blocks.
   
   For each successor block \lab b$!+_i+!$/, we first restrict our
-  facts to only those variables passed to the block (i.e., \var
+  facts to include only those variables passed to the block (i.e., \var
   w_i/). From that restricted set, we trim any facts that mention a
   binding from the case alternative (i.e., \var v_i/). Finally, we
   rename those facts according the formal arguments of the successor
   block \lab b$!+_i+!$/.  We stress that, while these equations only
   mention one variable in the alternative and in the call to \lab
   b$!+_i+!$/, making an operation like \mfun{trim} trivial, they can
-  easily be extended to multiple variables, making these operations
-  much more meaningful.
-
+  easily be extended to multiple variables, allowing them to be used
+  with real \mil programs.
 
 \item[\emph{Equation~\eqref{uncurry_df_transfer_rest} --- All Other
     Statements}] Our final equation covers all other types of
-  expressions that can appear at the end of a block, such as a
-  function application or allocation. None of these expressions
-  specify a successor block, so in a sense it does not matter
-  what they return as that value will be ignored. For clarity,
-  we just return the empty set in this final case.
+  expression that can appear at the end of a block, such as a function
+  application or allocation. None of these expressions specify a
+  successor block, so in a sense it does not matter what they return
+  as that value will be ignored. For completeness, however, we return
+  the empty set in this final case.
 \end{description}
 
 \section{Rewriting}
@@ -446,22 +428,19 @@ gathered by $t$ allow us to replace \enter expressions with closure
 allocations if we know the value that the expression results in. For
 example, let $F$ be the facts computed so far and \binds v <- \app f *
 y/; the statement we are considering. If $(\var f/, \mkclo[k0: x]) \in
-F$, then we know \var f/ represents the closure \mkclo[k0: x]. If \lab
-k0/ is a normal block, we do not rewrite, as we rely on the simple
-structure of \cc blocks to rewrite these expressions.\footnote{There
-  is the potential to inline, however.} If \lab k0/ is a \cc block, we
-can rewrite the expression. If \lab k0/ returns \mkclo[k1:x, y], then
-we can rewrite the statement to \binds v <- \mkclo[k1: x, y];.
-Alternatively, if \lab k0/ is a \cc block that immediately calls \goto
-b0(x, y), we can rewrite the statement to \binds v <- \goto(x, y);. In
-both cases it is likely that the formal arguments to \lab k2/ differ
-from those either in the closure \mkclo[k0:x] or the expression \app f
-* y/, and we will need to rename our facts. However, as explained
-previously when discussing $t$, that is a straightforward operation.
+F$, then we know \var f/ represents the closure \mkclo[k0: x], and we
+may be able to rewrite the expression. If \lab k0/ returns
+\mkclo[k1:x, y], then we can rewrite the statement to \binds v <-
+\mkclo[k1: x, y];.  Alternatively, if \lab k0/ immediately calls \goto b0(x, y), we can rewrite the statement to
+\binds v <- \goto b0(x, y);. In both cases it is likely that the formal
+arguments to \lab k2/ differ from those in either the closure
+\mkclo[k0:x] or the expression \app f * y/, and we will need to rename
+our facts. However, as explained previously when discussing $t$, that
+is a straightforward operation.
 
 \intent{Point out we don't inline closures from |Goto| expressions.}
 The example we discussed in Section~\ref{uncurry_sec_mil} does not
-match with the optimization just discussed on one crucial point:
+match the optimization just discussed on one crucial point:
 replacing calls to normal blocks on the \rhs of a \mbind with their
 closure result. Our implementation relies on another, more general,
 optimization that inlines simple blocks into their predecessor. We
@@ -478,14 +457,14 @@ closure returned by \goto compose().
 
 \intent{Provide a bridge to the four subsections below.}  Originally,
 we called this transformation ``closure-collapse'' because it
-``collapsed'' the construction of multiple closures into the
-construction of a single closure. Later, we learned this optimization
+``collapses'' the construction of multiple closures into the
+construction of a single closure. Later, we learned that this optimization
 is known as ``uncurrying,'' but at the point the code had already been
 written. The ``collapse'' prefix in the code shown is an
 artifact of our previous name for the analysis.
 
 \intent{Introduce example used throughout this section.}
-Figure~\ref{uncurry_fig_eg} gives an example program we will use
+Figure~\ref{uncurry_fig_eg} gives an example program that we will use
 throughout this section to illustrate our implementation. The program
 takes a string as input, converts it to an integer, doubles that
 value, and returns the result. The program consists of five
@@ -498,10 +477,10 @@ is treated as the entry point for the program.
   \begin{minipage}{\hsize}\singlespacing
     \begin{AVerb}[gobble=6]
       \block main(s):
-        \vbinds n <- \goto toInt(s);
-        \vbinds v0 <- \mkclo[k0:];
-        \vbinds v1 <- \app v0 * n/;
-        \vbinds v2 <- \app v1 * n/;
+        \vbinds n<-\goto toInt(s);
+        \vbinds v0<-\mkclo[k0:];
+        \vbinds v1<-\app v0 * n/;
+        \vbinds v2<-\app v1 * n/;
         \return v2/
 
       \ccblock k0()a: \mkclo[k1:a]
@@ -552,7 +531,7 @@ closure.
 \intent{Explain |DestOf| values.}  The |DestOf| type captures the
 behavior of a given \cc block. Recall that we limit \cc blocks to
 containing a single \term tail/ expression. The |DestOf| type uses the
-|Capture| and |Jump| constructors to represent if the block returns a
+|Capture| and |Jump| constructors to indicate if the block returns a
 closure or if it jumps to a normal block, respectively. The |Label|
 value in both is a destination: either the label stored in the closure
 returned, or the block that the closure jumps to. We use these values
@@ -578,7 +557,7 @@ corresponding argument for the block.\footnote{This situation can
   implementation our compiler's code generation strategy changed or if
   we began writing \mil programs directly.}
 
-For example, in the following the variables in the closure received
+For example, in the following, the variables in the closure received
 by \lab c/ do not appear in the same order as expected by block \lab l/:
 
 \begin{singlespace}\correctspaceskip
@@ -604,10 +583,10 @@ associates variables with values in the set  $\{\top\} \cup \{\setL{Clo}\}$.
 \label{uncurry_impl_lattice}
 Figure~\ref{uncurry_fig_lattice} shows the |DataflowLattice| structure
 defined for our analysis. We set |fact_bot| to an empty map, meaning
-we start without any information. We define |lub| over |Clos|, just
+that we start without any information. We define |lub| over |Clos|, just
 like \lub in Figure~\ref{uncurry_fig_df}. We use |joinMaps|, provided
 by \hoopl, and |toJoin| to transform |lub| into a function
-that operates over finite maps and which has the signature required by
+that operates over finite maps and that has the signature required by
 \hoopl's |fact_join| definition.
 
 \begin{myfig}
@@ -630,7 +609,7 @@ top-level definition, |collapseTransfer|, packages |transfer| into the
 functions.  The |blockParams| argument to |collapseTransfer| gives the
 list of parameters for every ordinary block in the program, which we
 use during renaming operations. The first argument to |transfer| is
-the statement we are analyzing, and the second is our facts to
+the statement we are analyzing, and the second is our facts so
 far. |transfer| depends on a number of auxiliary functions: |kill|,
 |using|, etc. We will describe each function as they are first
 encountered when describing |transfer|. The |Map| prefix on some of
@@ -653,13 +632,13 @@ Equations~\eqref{uncurry_df_transfer_block} through
 \end{myfig}
 
 \begin{description}
-  \item[|BlockEntry|, |CloEntry|] These cases apply to the entry point
+  \item[|BlockEntry|, |CloEntry| ---] These cases apply to the entry point
     of each normal or \cc block, implementing
     Equations~\eqref{uncurry_df_transfer_block} and
     \eqref{uncurry_df_transfer_ccblock}. In both instances they
-    just pass the facts received onto the rest of the block.
+    just pass the facts received on to the rest of the block.
 
-  \item[|Bind v (Closure dest args)|] This case corresponds to
+  \item[|Bind v (Closure dest args)| ---] This case corresponds to
     Equation~\ref{uncurry_df_transfer_closure}, representing a bind
     statement that allocates a closure on its \rhs. Binding a variable
     invalidates any facts previously collected about that
@@ -676,12 +655,12 @@ Equations~\eqref{uncurry_df_transfer_block} through
     describing the closure (using \hoopl's |PElem| constructor),
     insert it into |facts'|, and return the result.
 
-  \item[|Bind v _|] This case implements
+  \item[|Bind v _| ---] This case implements
     Equation~\ref{uncurry_df_transfer_other}. It removes any facts
     mentioning |v| and inserts a new fact associating |v| with |Top|,
     indicating we do not know what value |v| may have. 
   
-  \item[|Done _ _ (Goto (_, dest) args)|] On
+  \item[|Done _ _ (Goto (_, dest) args)| ---] On
     Line~\ref{uncurry_fig_transfer_goto1}, we implement
     Equation~\ref{uncurry_df_transfer_goto}. Recall that we must
     filter our facts to those about variables in |args|, and that we
@@ -694,12 +673,12 @@ Equations~\eqref{uncurry_df_transfer_block} through
     \hbox{$\{\lab b/:\dots\}$} notation used in
     Equation~\ref{uncurry_df_transfer_goto}.
     
-  \item[|Case _ alts|] Recall that
+  \item[|Case _ alts| ---] Recall that
     Equation~\ref{uncurry_df_transfer_case} produced a map associating
     each successor block with a set of facts. The list comprehension
     on
     Lines~\ref{uncurry_fig_transfer_case_start}--\ref{uncurry_fig_transfer_case_end}
-    define |facts'| as a list of |(Label, Fact)| pairs. Each pair
+    defines |facts'| as a list of |(Label, Fact)| pairs. Each pair
     represents the facts passed to a given successor block. On
     Line~\ref{uncurry_fig_transfer_case_result}, we apply \hoopl's
     |mkFactBase| function to |facts'|, returning a map associating each |Label|
@@ -726,7 +705,7 @@ Equations~\eqref{uncurry_df_transfer_block} through
     |rename| function to rename all facts in |trimmed| that are about
     variables in |args| to match the names given in |params|.
     
-  \item[|Done _ _ _|] A block that does not end in one of the cases
+  \item[|Done _ _ _| ---] A block that does not end in one of the cases
     above has no successors. Therefore, we just return an empty set of
     facts (as in Equation~\ref{uncurry_df_transfer_rest}.). We
     construct an empty set by passing |mkFactBase| an empty list.    
@@ -799,7 +778,7 @@ once.
 
 During the first iteration, |rewriter| transforms \binds v1 <- \app v0
 * n/; to \binds v1 <- \mkclo[k1: n];, because \var v0/ holds the
-closure \mkclo[k0:], and |blocks| tells us \lab k0/ returns a closure
+closure \mkclo[k0:], and |blocks| tells us that \lab k0/ returns a closure
 pointing to \lab k1/.
 
 \begin{myfig}
@@ -875,17 +854,16 @@ Figure~\ref{uncurry_fig_rewrite_impl} shows the functions that
 implement our uncurrying optimization.\footnote{Note that these
   definition are local to |collapseRewrite|, so the |blocks| argument
   remains in scope.} Line \ref{uncurry_fig_rewrite_impl_done} of
-|rewriter| rewrites \app f * x/ expressions when they occur in a
-\return/ statement. Line~\ref{uncurry_fig_rewrite_impl_bind} rewrites
-when \app f * x/ appears on the \rhs of a \mbind statement.  In the
-first case, |done n l (collapse facts f x)| produces \return |e|/ when
+|rewriter| rewrites \app f * x/ expressions when they occur at the end
+of a block. Line~\ref{uncurry_fig_rewrite_impl_bind} rewrites when
+\app f * x/ appears on the \rhs of a \mbind statement.  In the first
+case, |done n l (collapse facts f x)| produces \return |e|/ when
 |collapse| returns |Just e| (i.e., a rewritten expression). In the
 second case, |bind v (collapse facts f x)| behaves similarly,
 producing \binds v <- |e|; when |collapse| returns |Just e|. Both
 |done| and |bind| are defined in a separate file, not shown; they make
-it easier to construct |Done| and |Bind| values based the |Maybe Tail|
-value returned by |collapse|. In all other cases, no rewriting
-  occurs.
+it easier to construct |Done| and |Bind| values based on the |Maybe Tail|
+value returned by |collapse|. In all other cases, no rewriting occurs.
 
 \begin{myfig}
   \begin{minipage}{\hsize}\begin{withHsLabeled}{uncurry_fig_rewrite_impl}\disableoverfull
@@ -911,7 +889,7 @@ closure or jumps immediately to another block. In the first case,
 goto expression (\goto |dest|(\dots)).
 
 If the destination immediately jumps to another block
-(Line~\ref{uncurry_fig_rewrite_impl_collapse_jump}) then we will
+(Line~\ref{uncurry_fig_rewrite_impl_collapse_jump}), then we will
 rewrite \app f * x/ to call the block directly. The list of integers
 associated with |Jump| specifies the order in which arguments were
 taken from the closure and passed to the block. |collapse| uses the
@@ -920,9 +898,9 @@ taken from the closure and passed to the block. |collapse| uses the
 {\tolerance=1000 In Figure~\ref{uncurry_fig_rewrite_iterations}, we showed that the
 |DestOf| value associated with \lab k1/ is |Jump {-"\lab add/\ "-} [0,
   1]|. The list |[0, 1]| indicates that \lab add/ takes arguments in
-the same order as the appear in the closure. However, if \lab add/
-took arguments in opposite order, \lab k1/ and \lab add/ would look
-like:
+the same order as they appear in the closure. However, if \lab add/
+took arguments in the opposite order, \lab k1/ and \lab add/ would look
+like the following code:
 
 \begin{singlespace}\correctspaceskip
   \begin{AVerb}[gobble=4]
@@ -931,12 +909,12 @@ like:
   \end{AVerb}
 \end{singlespace}
 
-\noindent And the |DestOf| value associated with \lab k1/ would be |Jump
+\noindent and the |DestOf| value associated with \lab k1/ would be |Jump
 {-"\lab add/\ "-} [1, 0]|.}
 
 If the destination returns a closure
 (Line~\ref{uncurry_fig_rewrite_impl_collapse_capt}), then we rewrite
-\app f * x/ to directly allocate the closure. The Boolean value
+\app f * x/ to allocate the closure directly. The Boolean value
 |usesArg| indicates if the closure returned should capture the
 argument |x| or not..
 
@@ -949,8 +927,8 @@ the uncurrying dataflow analysis and rewrite to the \mil program
 represented by the argument
 |program|. Line~\ref{uncurry_fig_collapse_analyze} analyzes and
 transforms |program| by passing appropriate arguments to \hoopl's
-|analyzeAndRewriteFwd| function. On Line~\ref{uncurry_fig_collapse_run} we evaluate \hoopl's
-monadic program using |runSimple|. |runSimple| provides a monad with
+|analyzeAndRewriteFwd| function. On Line~\ref{uncurry_fig_collapse_run}, we evaluate \hoopl's
+monadic program using |runSimple|, which provides a monad with
 infinite optimization fuel.
 
 \begin{myfig}[p]
@@ -1057,7 +1035,7 @@ represents the output of our \lamC to \mil compiler.
   \end{minipage}\end{tabular} \\
   \scap{uncurry_global_b} \\
   \end{tabular}
-  \caption{}
+  \caption{A \lamC program that turns a list of elements into a list of lists and its unoptimized translation to \mil.}
   \label{uncurry_global}
 \end{myfig}
 
@@ -1084,9 +1062,9 @@ call to \lab caseEval216/, which implements the body of |map|.
 
 Though our analysis covers the entire program, we first concentrate on
 the \lab main/ block. Figure~\ref{uncurry_global_main} shows how we
-analyze and rewrite \lab main/. The Figure shows consecutive
+analyze and rewrite \lab main/. The figure shows consecutive
 iterations of \hoopl's interleaved analysis and rewrite
-process. Rewrites occur between the Parts of the figure; we highlight
+process. Rewrites occur between the parts of the figure; we highlight
 rewritten lines with a $\rightarrow$ symbol.
 
 \begin{myfig}
@@ -1312,16 +1290,16 @@ does not always hold the same closure.
 Our implementation of uncurrying replaces \enter expression with
 closure allocations if possible. When |collapseTransfer| sees
 a binding to a closure value, it records not only the label that
-the closure refers to, but also all variables captured in the
+the closure refers to, but also all of the variables captured in the
 closure. These facts are propagated to successor blocks. If those
-blocks subsequently are rewritten to use the closure allocated directly,
-the variables in the closure may be ``unpacked'' into the block,
-introducing free variables into the block.
+blocks are subsequently rewritten allocate the closure directly,
+then the variables in the closure may be ``unpacked'' into the block,
+introducing free variables that are not properly bound.
 
 For example, consider the \mil program in Figure~\ref{unc_fv}. In
 Part~\subref{unc_fv_a}, the statement \binds v<-\mkclo[k1:x]; in \lab
 b1/ binds \var v/ to \mkclo[k1:x]. The closure is then passed to \lab
-b2/. \lab b2/ applies the closure to \var y/ and returns the
+b2/,  which applies the closure to \var y/ and returns the
 result.
 
 \begin{myfig}
@@ -1375,16 +1353,16 @@ of where each variable in a given closure was declared.  We could use
 that information to propagate free variables from the block in which
 they are first bound to the blocks where they are used.
 
-The second challenge does not account for calls to blocks on the \rhs of a
-bind statement, such as \binds v <- \goto b(\dots);. Our analysis only
-considers calls at the end of blocks. If the values passed to the
-block \lab b/ on the \rhs of a \mbind differ from those passed
-at the end of a block, then our analysis will propagate incorrect 
-facts.
+A second challenge is that our approach does not account for calls to
+blocks on the \rhs of a bind statement, such as \binds v <- \goto
+b(\dots);; it only considers calls at the end of blocks. If
+the values passed to the block \lab b/ on the \rhs of a \mbind differ
+from those passed at the end of a block, then our analysis will
+propagate incorrect facts.
 
 \begin{myfig}
   \begin{tabular}{cc}
-  \begin{minipage}{\widthof{\ \ \ccblock k2()x: Right x}}
+  \begin{minipage}{\widthof{\qquad\ccblock k2()x: Right x}}
   \begin{AVerb}[gobble=6,numbers=left]
       \block b1 (x):
         \vbinds v<- \mkclo[k1:];
@@ -1399,7 +1377,7 @@ facts.
       \ccblock k2()x: Right x
   \end{AVerb}
   \end{minipage} &
-  \begin{minipage}{\widthof{\ \ \ccblock k2()x: Right x}}
+  \begin{minipage}{\widthof{\qquad\ccblock k2()x: Right x}}
   \begin{AVerb}[gobble=6,numbers=left]
       \block b1 (x):
         \vbinds v<- \mkclo[k1:];
@@ -1425,7 +1403,7 @@ Figure~\ref{unc_goto} demonstrates this issue. Block \lab b1/
 allocates two closures, \var v/ to \mkclo[k1:] and \var w/ to
 \mkclo[k2:]. On Line~\ref{unc_goto_z}, the program calls \lab b2/ with
 \var w/; Line~\ref{unc_goto_callb2} calls \lab b2/ with \var v/. Our
-analysis would only consider the second call to \lab b2/, and would
+analysis would only consider the second call to \lab b2/ and would
 deduce that \var v/ is always \mkclo[k1:] in \lab
 b2/. Figure~\ref{unc_goto_b} shows the rewritten program. In \lab b2/,
 \binds t<- \app v*y/; has been incorrectly rewritten to \binds t<- \mkclo[k1:];,
@@ -1454,8 +1432,8 @@ tuples, this pattern looks like:
 
 \noindent where |E| represents the non-recursive body of |g|. 
 
-To uncurry |f|, Appel creates a new function, |f'|, a version of |f| that
-takes all arguments at once, and he rewrites |f| to use |f'|:
+To uncurry |f|, Appel creates a new function, |f'|, that
+takes all arguments to |f| and |g| at once. He then rewrites |f| to use |f'|:
 
 > f' (x, c, g, y, k) = E 
 > f (x, c) = 
@@ -1466,10 +1444,10 @@ takes all arguments at once, and he rewrites |f| to use |f'|:
 call sites of |f| may be known. Known call sites, however, can use
 the more efficient version, |f'|. Appel describes what makes |f'|
 efficient and how other optimizations can remove the unused
-arguments in |f'| and the redefined |f| above. 
+arguments in |f'| and |f|. 
 
 Like our version of uncurrying, Appel relies on other optimizations to
-clean up. Unlike our version, Appel's looks for a specific syntatic
+clean up. Unlike our version, Appel's looks for a specific syntactic
 form to transform. Our use of dataflow analysis allows us to rewrite
 any function application that we can prove always uses the same
 closure. Appel's version appears to only apply to a very specific form
@@ -1483,7 +1461,7 @@ for more arguments, Appel's transformation must be applied in a
 specific order (which Appel did not describe). 
 
 Tarditi's approach uses four passes to uncurry functions of the form
-\lcapp (\lcabs x. \lcabs. y. \dots) * a * b/ into \lcapp (\lcabs (x,
+\lcapp (\lcabs x. \lcabs. y.\ \dots) * a * b/ into \lcapp (\lcabs (x,
 y). \dots) * (a, b)/, where tuples represent a multi-argument
 function.
 The first pass of Tarditi's algorithm scans all definitions in the
@@ -1501,31 +1479,27 @@ that are fully applied to use the new, uncurried versions of the
 curried function they originally referred to.
 
 Tarditi's algorithm is not limited to finding curried functions of a
-certain syntatic form, and it extends correctly to functions of
+certain syntactic form, and it extends correctly to functions of
 multiple arguments. His algorithm, however, only replaces fully-applied
 functions. Our analysis can replace any candidate function
 application, even if it does not result in a fully applied
-function. Tarditi claims his algorithm runs in $O(N \log N)$, where
-  $N$ is the size of the program (presumably, the number of
-  expressions in the program). We have not analyzed the asymptotic
-  complexity of our algorithm and so cannot compare his claim.
+function. 
 
 Tolmach and Oliva \citeyearpar{Tolmach1998} do not specifically
 describe an uncurrying optimization; rather, they describe how
 ``closure conversion,'' plus two other general optimizations, give
-them uncurrying for free in their compiler. The compiler converts a
-Standard ML program into their ``Sequentialized Intermediate
-Language,'' (\textsc{sil}) a variant of A-Normal Form.
-Closure-conversion removes all higher-order functions from the
-\textsc{sil} program, replacing them with functions that return a data
-structure representing the original closure. Applications of curried
-functions are replaced with calls to a dispatching function that uses
-case discrimination to distinguish closures of the same arity, calling
-the uncurried version of each curried function.
+them uncurrying for free in their compiler for Standard
+ML. Critically, their compiler uses closure-conversion to remove all
+higher-order functions from the program and replace them with
+functions that return a data structure representing the original
+closure. Applications of curried functions are replaced with calls to
+a dispatching function that uses case discrimination to distinguish
+closures of the same arity, calling the uncurried version of each
+curried function.
 
-Their compiler uses inlining and ``case
-splitting'' to ensure the program does not trade the cost of a closure
-for the cost of a data structure and dispatching function. Any
+Tolmach and Oliva's compiler uses inlining and ``case
+splitting'' to ensure the program does not trade the cost of a partial application
+for the cost of a data allocation and a call to the dispatching function. Any
 application of the curried function will be inlined into the call
 site, as the body of the curried function just allocates a data
 structure. The call to the dispatch function will now use the data
@@ -1536,7 +1510,7 @@ replaces the entire call site with the relevant arm from the dispatch
 function, thus turning an allocation, case discrimination and function
 call into just a function call.
 
-Tolmach and Oliva's approach does not depend on recognizing syntatic
+Tolmach and Oliva's approach does not depend on recognizing syntactic
 patterns at all. It should recognize any known call site of a
 partially applied function, and they claim it works for functions of
 multiple arguments as well.  Our approach is similar, in that we look

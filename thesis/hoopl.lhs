@@ -94,7 +94,7 @@ Figure~\ref{hoopl_fig1_b}.
 \intent{Provides signposts for chapter.}  This chapter provides enough
 background to understand the use of \hoopl in this work. It assumes
 the reader has prior knowledge of the Haskell programming language,
-including language extensions such as GADTs \citep{Schrijvers2009}, as
+including language extensions such as \gadts \citep{Schrijvers2009}, as
 implemented by GHC 7.2 \citep{GHC-7.2.1}. This chapter follows the
 same outline as our chapter covering dataflow analysis, presenting
 each concept in terms of \hoopl structures. Section~\ref{hoopl_sec1}
@@ -162,7 +162,7 @@ control-flow to implicitly pass to its successor. A |C O| block
 requires that control-flow passes explicitly from its
 predecessors. However, control-flow falls-through from the block to
 its successor. A |C C| block must be the target of an explicit
-control-flow transfer and must, in turn, explicity pass control-flow
+control-flow transfer and must, in turn, explicitly pass control-flow
 to a successor block. Figure~\ref{hoopl_tbl1} illustrates the four
 possible block shapes, with representative examples.
 
@@ -321,7 +321,7 @@ the caller of the function.
 > (|*><*|)  :: Graph n e C -> Graph n C x -> Graph n e x
 \end{minipage}
 \caption{Primitives provided by \hoopl for constructing |Graph|
-  values, represening \cfgs.}
+  values, representing \cfgs.}
 \label{hoopl_fig4}
 \end{myfig}
 
@@ -467,7 +467,7 @@ finite-height lattice; otherwise, the analysis may not terminate.
 \intent{Introduce meet for liveness} As stated previously, dead-code
 elimination uses \emph{liveness} analysis to find dead code. A
 variable is live at a given point if it will be used at a later
-exeuction point; otherwise the variable is dead. Liveness analysis is
+execution point; otherwise the variable is dead. Liveness analysis is
 implemented as a backwards dataflow analysis. In a backwards analysis,
 \outBa is the set of input facts to block $B$; \inBa is the set of
 output facts. All live variables from $B$'s successors may be live in

@@ -199,7 +199,7 @@ the same: hide some details while exposing those that we care about.
 \section{\Mil Syntax}
 \label{mil_syntax}
 
-\intent{Introduce \mil syntax.}  Figure \ref{mil_fig3} gives the
+\intent{Introduce \mil syntax.}  Figure~\ref{mil_fig3} gives the
 syntax for \mil. Where the term \var v_1/, etc. appears, only simple
 variables are allowed. This includes most terms in the language,
 staying true to the design of three-address code. Bold terms such as
@@ -438,7 +438,7 @@ may occur.
 Of course, in \lamC we do not really define the |closure| or |app|
 functions and closure allocation is not directly visible. \Mil,
 however, treats allocation as an impure operation and makes it
-explicit. Figure \ref{mil_fig2} shows a complete \mil program for
+explicit. Figure~\ref{mil_fig2} shows a complete \mil program for
 \lcdef main()= \lcapp compose * a * b * c/;. \lab main/ corresponds to
 the definition of |main| in Figure~\ref{mil_fig_compose_b}. \lab k0/
 corresponds to the |k_0| definition in Figure~\ref{mil_fig_compose_a}
@@ -923,7 +923,7 @@ to inline \mil blocks.
 monads and their use in the Haskell programming language. Our work is
 not the first to use a monadic intermediate language; previously
 published by Benton, Kennedy and others describes a monadic
-intermediate language for Standar ML (\sml). We briefly describe 
+intermediate language for Standard ML (\sml). We briefly describe 
 monadic programming in Section~\ref{mil_subsec_monads}, and discuss
 its relationship to our work. In Section~\ref{mil_subsec_mlj} we 
 discuss Benton and Kennedy's work, and draw some comparisons with
@@ -949,7 +949,7 @@ $$
 $$ Notice the $*$ moves inside the $\lambda$ on the right, meaning the
 body of the $\lambda$ will be recursively translated. This scheme 
 provided a special inspiration for \mil; it essentially gives
-the translatin of $\lambda$ terms to \cc blocks:
+the translation of $\lambda$ terms to \cc blocks:
 $$
 \lcabs x. v = \ccblock k1()x:\ \ensuremath{v}. 
 $$

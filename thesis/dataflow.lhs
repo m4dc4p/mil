@@ -313,7 +313,7 @@ follows that intuition and tells us that \inB{fig_back15_b3} should be
 \end{myfig}
 
 We would not make this assumption if we wished to warn the programmer
-that a potentially unitialized variable could be used. In that case,
+that a potentially uninitialized variable could be used. In that case,
 we would define \lub such that $x \lub \bot$ was $\bot$. Then, when
 the fact \factC{x}{\bot} appeared, we could warn that a variable might
 be used before being initialized. Similarly, if our language defined
@@ -442,15 +442,15 @@ we add that fact to our knowledge. When we know it is changed in a
 non-constant way, we update our knowledge to show we no longer know
 the value of the variable.
 
-Figure~\ref{fig_back9}, Part \subref{fig_back9_initial}, shows our
+Figure~\ref{fig_back9}, Part~\subref{fig_back9_initial}, shows our
 program, annotated with initial \inE and \out
-facts. Figure~\ref{fig_back9}, Part \subref{fig_back9_transfer}, shows
+facts. Figure~\ref{fig_back9}, Part~\subref{fig_back9_transfer}, shows
 the same graph with annotations updated using
 Equation~\eqref{eqn_back4}. The assignments in
 \refNode{lst_back18_assign} create the facts \factC{m}{10},
 \factC{n}{0}, and \factC{i}{0} in \outB{lst_back18_assign}. The
 assignment to $n$ in \refNode{lst_back18_mult} is a non-constant
-update so \outB{lst_back18_mult} contains \factC{n}{\top}. Similary,
+update so \outB{lst_back18_mult} contains \factC{n}{\top}. Similarly,
 the increment to $i$ in \refNode{lst_back18_incr} creates the fact
 \factC{i}{\top} in \outB{lst_back17_incr}.  
 
@@ -490,7 +490,7 @@ for all facts: everything is $\bot$, i.e., unknown. Reading from
 left-to-right gives the \inE and \out facts for a given node at each
 iteration of the analysis. The control-flow graph is reproduced in
 Part~\subref{fig_back13_cfg}. Following the control-flow between nodes
-shows which \out sets are used to calcuate \inE sets.
+shows which \out sets are used to calculate \inE sets.
 
 \begin{myfig}[tb]
   \setlength{\tabcolsep}{2pt}
