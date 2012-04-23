@@ -1,0 +1,22 @@
+\begin{tabular}{lr}
+  \begin{minipage}{.45\hsize}
+    \begin{AVerb}[gobble=6,numbers=left]
+      \block b1():
+        \vbinds f<-\mkclo[k1:];
+        \vbinds g<-\mkclo[k3:];
+        \goto b2(f, g)
+      \block b2(f, g):
+        \vbinds t<-\mkclo[k2:g];
+        \vbinds u<-\app g*t/;
+        \goto b3(t, u, f)
+      \block b3(t, u, f):
+        \vbinds v<-\mkclo[k2:t];
+        \vbinds w<-\mkclo[k4:v];
+        \goto b2(f, w)
+      \ccblock k1()x: \mkclo[k2:x]
+      \ccblock k2(x)y: Left y
+      \ccblock k3()x: \mkclo[k4:x]
+      \ccblock k4(x)y: Right y
+    \end{AVerb}
+  \end{minipage}
+\end{tabular}

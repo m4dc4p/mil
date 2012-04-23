@@ -30,3 +30,5 @@ lhs2tex.tex
 preamble.fmt
 *sublime*
 *@*
+appendix_deadcode.tex
+*.bundle
