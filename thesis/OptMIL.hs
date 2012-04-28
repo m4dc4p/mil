@@ -300,8 +300,9 @@ mostOpt tops = id .
     deadBlocks tops . 
     -- inlineBlocks tops . 
     -- deadBlocks tops .  
-    -- collapse . 
-    -- inlineReturn .
+    deadCode . 
+    collapse . 
+    inlineReturn .
     deadCode . 
     collapse . 
     -- deadCode . 

@@ -1244,6 +1244,51 @@ safeDecM = [("dec",
                      (alt "Nothing" [] $ \_ -> f `app` (lit 0))) $ \t -> ret t)]
 
 
+-- An example from Appel, to demonstrate
+-- uncurrying.
+{-
+  f x = g x
+  g x y = x + y
+  main a b = f a b
+-}
+--
+-- Each cc-block eliminated requires one round of
+-- inlineReturn and collapse.
+appel1 = [("f", lam "x" $ \x -> var "g" `app` x),
+          ("g", lam "x" $ \x ->
+           lam "y" $ \y -> x `plus` y),
+          ("main", var "f" `app` var "a" `app` var "b")]
+      
+-- Same example as above, with a local
+-- definition.       
+appel2 = [("f", lam "x" $ \x -> 
+             _let "g" (lam "y" $ \y -> x `plus` y) $ \g ->
+               g),
+          ("main", var "f" `app` var "a" `app` var "b")]
+
+-- An example from Tarditi.
+{-
+g x y z = x + y + z
+main = g (s  t) (t + u)  (t + t)
+-}
+tarditi1 = [("g", lam "x" $ \x ->
+               lam "y" $ \y ->
+               lam "z" $ \z -> x `plus` y `plus` z),
+            ("main", var "g" `app` (var "s" `plus` var "t") `app`
+                   (var "t" `plus` var "u") `app`
+                   (var "t" `plus` var "t"))]
+                         
+-- Multi argument function 
+{-
+g x y z = x + y + z
+main = g a b c
+-}
+tarditi2 = [("f", lam "a" $ \a ->
+               lam "b" $ \b ->
+               lam "c" $ \c -> lit 1),
+            ("main", var "f" `app` var "s" `app`
+                   var "t" `app` var "u")]
+
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
 
