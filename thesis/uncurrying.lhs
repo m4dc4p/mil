@@ -1009,7 +1009,7 @@ represents the output of our \lamC to \mil compiler.
         \vbinds v221<-\mkclo[Consclo2:];
         \vbinds v222<-\app v221*x/;
         \vbinds v223<-Nil;
-        \app v222*v223/ \label{uncurry_global_toList_body_end}
+        \app v222 * v223/ \label{uncurry_global_toList_body_end}
       \ccblock Consclo2()a2: \mkclo[Consclo1:a2]
       \ccblock Consclo1(a2)a1: Cons a2 a1
     \end{AVerb}
@@ -1030,7 +1030,7 @@ represents the output of our \lamC to \mil compiler.
         \vbinds v212<-\mkclo[k203:]; \label{uncurry_global_map_cons_map_start}
         \vbinds v213<-\app v212*f/;
         \vbinds v214<-\app v213*xs/; \label{uncurry_global_map_cons_map_end}
-        \app v211*v214/ \label{uncurry_global_map_cons_end}
+        \app v211 * v214/ \label{uncurry_global_map_cons_end}
     \end{AVerb}
   \end{minipage}\end{tabular} \\
   \scap{uncurry_global_b} \\
