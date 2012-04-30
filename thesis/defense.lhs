@@ -1,5 +1,5 @@
 %&preamble
-\input{nodocclass}\dodocclass
+\input{nodocclass}\dodocclassx beamer/
 \usepackage{beamer}
 \usetheme{Warsaw}
 %include polycode.fmt
@@ -50,4 +50,39 @@
     \end{itemize}
   \end{itemize}
 \end{itemize}
+\begin{frame}{Uncurrying |map|}
+  \begin{tikzpicture}
+    \node[stmt] (main) {\block main(ns):};
+    
+    \node[stmt,below=.3in of main] (caseEval216) {\block caseEval216(xs, f):};
+    
+    \node[stmt,below left=.3in and -0.5in of caseEval216] (altNil206) {\block altNil206():};
+    
+    \node[stmt,below right=.3in and -0.7in of caseEval216] (altCons208) {\block altCons208(f, x, xs):};
+
+    \node[overlay,invis,below left=.05in and -.2in of caseEval216] () {$\emptyset$};
+
+    \node[overlay,invis,below right=.05in and -.2in of caseEval216] () {$\{\var f/\,:\,\top\}, \{\var x/\,:\,\top\}, \{\var xs/\,:\,\top\}$};
+
+    \draw [->] (caseEval216) to (altNil206);
+    \draw [->] (caseEval216) to (altCons208);
+  \end{tikzpicture} \\\\
+  \scap{uncurry_global_blocks_a}\\
+  \begin{tikzpicture}
+    \node[stmt] (main) {\block main(ns):};
+    \node[stmt,below=.3in of main] (caseEval216) {\block caseEval216(xs, f):};
+
+    \node[stmt,below left=.3in and -0.5in of caseEval216] (altNil206) {\block altNil206():};
+
+    \node[stmt,below right=.3in and -0.7in of caseEval216] (altCons208) {\block altCons208(f, x, xs):};
+
+    \node[overlay,invis,below right=.07in and -.2in of main] () { $\{\var xs/\,:\,\top\}, \{\var f/\,:\,\mkclo[k219:]\unskip\}$};
+    \node[overlay,invis,below left=.05in and -.2in of caseEval216] () {$\emptyset$};
+    \node[overlay,invis,below right=.05in and -.2in of caseEval216] () {$\{\var f/\,:\,\mkclo[k219:]\unskip\}, \{\var x/\,:\,\top\}, \{\var xs/\,:\,\top\}$};
+
+    \draw [->] (main) to (caseEval216);
+    \draw [->] (caseEval216) to (altNil206);
+    \draw [->] (caseEval216) to (altCons208);
+  \end{tikzpicture}
+\end{frame}
 \end{document}
