@@ -1,0 +1,37 @@
+%&PDFLATEX
+\documentclass[t]{beamer}
+\usepackage[T1]{fontenc}
+\usepackage{helvet}
+\usepackage{mathpazo}
+\usetheme{Malmoe}
+\usefonttheme[stillsansserifsmall]{serif}
+%\useinnertheme{default}
+%\useoutertheme{infolines}
+%% Footnotes with old style caps hard to read - this helps.
+\usepackage{etoolbox}
+\usepackage{calc}
+\renewcommand\ttdefault{lmtt}
+\usepackage{xspace}
+\usepackage{url}
+\usepackage{fancyvrb}
+%% Make sure line numbers are printed with math numerals,
+%% not old-style numbers
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{ifthen}
+\usepackage{stmaryrd}
+\usepackage{longtable}
+\usepackage{afterpage}
+\usepackage{xifthen}
+\usepackage{mathtools}
+\usepackage[natbib=true,style=authoryear,backend=bibtex8]{biblatex}
+\setlength{\bibitemsep}{\bigskipamount}
+\addbibresource{thesis.bib}
+\usepackage{microtype}
+\usepackage[normalem]{ulem}
+\usepackage{array}
+\input{tikz.preamble}
+\makeatletter\input{common}\makeatother
+\input{lhs2tex}
+%% Indicates the preamble has been loadd.
+\def\preambleloaded{}

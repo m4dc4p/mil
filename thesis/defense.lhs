@@ -1,79 +1,83 @@
-\documentclass[t]{beamer}
-\usepackage[T1]{fontenc}
-\usetheme{Warsaw}
+%&pre_defense
+\makeatletter%
+\@@ifundefined{preambleloaded}
+             {\input{pre_defense}}
+             {}\makeatother%%
 %include polycode.fmt
 %include lineno.fmt
 %include subst.fmt
-%% Footnotes with old style caps hard to read - this helps.
-\usepackage{etoolbox}
-\usepackage{calc}
-\usepackage[osf,sc]{mathpazo}
-\renewcommand\ttdefault{lmtt}
-\usepackage{helvet}
-\usepackage{xspace}
-\usepackage{url}
-\usepackage{fancyvrb}
-%% Make sure line numbers are printed with math numerals,
-%% not old-style numbers
-\usepackage{amsmath}
-\usepackage{booktabs}
-\usepackage{ifthen}
-\usepackage{stmaryrd}
-\usepackage{longtable}
-\usepackage{afterpage}
-\usepackage{xifthen}
-\usepackage{mathtools}
-\usepackage[natbib=true,style=authoryear,backend=bibtex8]{biblatex}
-\setlength{\bibitemsep}{\bigskipamount}
-\addbibresource{thesis.bib}
-\usepackage{microtype}
-\usepackage[normalem]{ulem}
-\usepackage{array}
-\input{tikz.preamble}
-\makeatletter\input{common}\makeatother
-\begin{document}\nomd
-\numbersoff
-%%\begin{itemize}
-%%\item Introduction
-%% \item Dataflow Analysis
-%%   \begin{itemize}
-%%   \item Control-Flow Graphs
-%%   \item Basic Blocks
-%%   \item Example Program \& Constant Propagation
-%%   \item Facts and the Transfer Function
-%%   \end{itemize}
-%% \item \mil
-%%   \begin{itemize}
-%%   \item Three-Address Code
-%%   \item Closures
-%%     \begin{itemize}
-%%     \item Environments --- Example of a function that captures a
-%%       variable.
-%%     \end{itemize}
-%%   \item Monads
-%%   \item Allocation in \mil; partial application
-%%   \end{itemize}
-%% \item Hoopl
-%%   \begin{itemize}
-%%   \item Used in GHC
-%%   \item Interleaved Analysis \& Rewriting
-%%   \end{itemize}
-%% \item Uncurrying
-%%   \begin{itemize}
-%%   \item Partial Application
-%%   \item Uncurrying within a block (\lab toInt/ example)
-%%     \begin{itemize}
-%%     \item Facts
-%%     \item Step-by-step Transformation of \lab main/ 
-%%     \end{itemize}
-%%   \item Aside: use of multiple optimizations (dead code, inlining)
-%%   \item Uncurrying |map|
-%%     \begin{itemize}
-%%     \item Original \cfg
-%%     \item Development of facts \& the \cfg
-%%     \end{itemize}
-%%   \end{itemize}
-%%\end{itemize}
+\def\balt#1#2#3{\alt<#1>{#2}{#3}}
+\author{Justin Bailey (\texttt{jgbailey@@gmail.com})}
+\institute{Portland State University}
+\date{\today}
+\begin{document}\nomd\numbersoff
+
+\section{Introduction}
+\begin{frame}
+\end{frame}
+
+\section{MIL}
+\subsection{Compilation}
+\begin{frame}{Compiling |map|}
+  \begin{itemize}
+  \item Definition of |map|
+  \item Evaluating |map| using call-by-value: |map toList [1,2,3]|
+  \item Closures
+  \end{itemize}
+\end{frame}
+\subsection{Translating |map| to MIL}
+
+\begin{frame}
+  \begin{itemize}
+  \item Three-Address Code
+  \item Closures
+    \begin{itemize}
+    \item Environments --- Example of a function that captures a
+      variable.
+    \end{itemize}
+  \item Monads
+  \item Allocation in \mil; partial application
+  \end{itemize}
+\end{frame}
+
+\section{Dataflow Analysis}
+\begin{frame}{Dataflow Analysis}
+  \begin{itemize}
+  \item Control-Flow Graphs
+  \item Basic Blocks
+  \item Example Program \& Constant Propagation
+  \item Facts and the Transfer Function
+  \end{itemize}
+  
+  \begin{itemize}
+  \item Hoopl
+  \item Used in GHC
+  \item Interleaved Analysis \& Rewriting
+  \end{itemize}
+
+\end{frame}
+
+\section{Uncurrying}
+\begin{frame}{Uncurrying}
+  \begin{itemize}
+  \item Uncurrying
+    \begin{itemize}
+    \item Partial Application
+    \item Uncurrying within a block (\lab toInt/ example)
+      \begin{itemize}
+      \item Facts
+      \item Step-by-step Transformation of \lab main/ 
+      \end{itemize}
+    \item Aside: use of multiple optimizations (dead code, inlining)
+    \item Uncurrying |map|
+      \begin{itemize}
+      \item Original \cfg
+      \item Development of facts \& the \cfg
+      \end{itemize}
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
 \begin{frame}{Uncurrying |map|}
   \begin{tikzpicture}
     \node[stmt] (main) {\block main(ns):};
@@ -88,26 +92,22 @@
 \begin{frame}[fragile]{Uncurrying |map|}
   \begin{AVerb}[gobble=4,numbers=left]
     \block main(ns):  \anchorF(nsa)
-      \vbinds v227<-\mkclo[k203:];\anchorF(v227a) \label{main_v227a}
+      \vbinds v227<-\mkclo[k203:];\anchorF(v227a) 
       \vbinds v228<-\mkclo[k219:];\anchorF(v228a)
-      \vbinds v229<-\app v227*v228/;\anchorF(v229a) \label{main_v229a}
+      v229 <- \balt{3-}{{\color{red}v227} @@ {\color{red}v228}}{v227 @@ v228}\anchorF(v229a) 
       \app v229 * ns/ 
   \end{AVerb}
-  \begin{onlyenv}<2->\begin{tikzpicture}[overlay,remember picture]
-    \node[fact, anchor=west, right=1in of nsa] (fvnsa) {$\{\var ns/\,:\,\top\}$};
-    \draw [->] (fvnsa) to (nsa);
+  \begin{onlyenv}<2>\begin{tikzpicture}[overlay,remember picture]
+    \node[fact, right=0.25in of v227a, anchor=west] (fv227a3) {$\{\var v227/\,:\,\mkclo[k203:]\unskip\}$};
+    \node[fact, right=0.25in of v228a, anchor=west] (fv228a3) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
+    \draw [->] (fv227a3) to (v227a);
+    \draw [->] (fv228a3) to (v228a);
   \end{tikzpicture}\end{onlyenv}%%
   \begin{onlyenv}<3->\begin{tikzpicture}[overlay,remember picture]
-    \node[fact] (fv227a3) at ($(fvnsa) + (1in, 0in)$) {$\{\var v227/\,:\,\mkclo[k203:]\unskip\}$};
-    \draw [->] (fv227a3) to (v227a);
-  \end{tikzpicture}\end{onlyenv}%%
-  \begin{onlyenv}<4->\begin{tikzpicture}[overlay,remember picture]
-    \node[fact, right=0.25in of v228a, anchor=west] (fv228a4) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
+    \node[fact, right=0.25in of v227a, anchor=west] (fv227a4) {$\{{\color{red}\var v227/}\,:\,\mkclo[k203:]\unskip\}$};
+    \node[fact, right=0.25in of v228a, anchor=west] (fv228a4) {$\{{\color{red}\var v228/}\,:\,\mkclo[k219:]\unskip\}$};
     \draw [->] (fv228a4) to (v228a);
-  \end{tikzpicture}\end{onlyenv}%%
-  \begin{onlyenv}<5->\begin{tikzpicture}[overlay,remember picture]
-    \node[fact, right=0.25in of v229a, anchor=west] (fv229a5) {$\{\var v229/\,:\,\top\}$};
-    \draw [->] (fv229a5) to (v229a);
+    \draw [->] (fv227a4) to (v227a);
   \end{tikzpicture}\end{onlyenv}%%
 \end{frame}
 
