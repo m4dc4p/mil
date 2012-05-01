@@ -18,11 +18,10 @@
 %% is present or not.
 %%
 \makeatletter%
-\def\dodocclass{\dodocclassx report/}
-\def\dodocclassx#1/{\@ifundefined{preambledocclass}{%%
+\def\dodocclass{\@ifundefined{preambledocclass}{%%
     %% This code executes when preamble.fmt does NOT
     %% exist.
-  \documentclass[12pt]{#1}%%
+  \documentclass[12pt]{report}%%
   \input{tikz.preamble}%%
   \input{preamble}}{%%
     %% This code executes when preamble.fmt exists.
@@ -35,4 +34,4 @@
     %% evaluated in sub-file.
     \expandafter\@firstofone%%
  \fi%%
- {\documentclass[class=#1]{standalone}}}}\makeatother%%
+ {\documentclass[class=report]{standalone}}}}\makeatother%%

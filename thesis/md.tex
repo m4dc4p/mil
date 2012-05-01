@@ -1,6 +1,4 @@
 %% This stuff makes !+<text>+! write <text> in typewriter font.  
-
-\makeatletter
 \let\mdplus=+\let\mdbang=!      %% Preserve meaning of + and ! so we can put them into document.
 %% Turn off mark down for everyone
 \outer\def\nomd{\catcode`!=12\catcode`+=12}
@@ -85,4 +83,3 @@
   \the\ensuretoks}%%
 \afterassignment\ensurettB\let\next= }%%
 \catcode`!=12\catcode`+=12
-\makeatother
