@@ -10,6 +10,8 @@
 \author{Justin Bailey (\texttt{jgbailey@@gmail.com})}
 \institute{Portland State University}
 \date{\today}
+\newbox\consbox
+\setbeameroption{show notes}
 \begin{document}\nomd\numbersoff
 
 \section{Introduction}
@@ -18,7 +20,6 @@
   \item Our Monadic Intermediate Language
     \begin{itemize}
     \item Compiling Functional Languages
-
     \end{itemize}
   \item Dataflow Analysis
   \item Uncurrying
@@ -26,9 +27,79 @@
 \end{frame}
 
 \section{MIL}
+\subsection{Blocks}
+\begin{frame}[fragile]
+\note[item]<1>{This sequence will connect a simple definition with a block of
+\mil code. I will illustrate closure-capturing and ordinary blocks.}
+\begin{onlyenv}<1>
+Haskell-like definition.
+
+> toList :: a -> [a]
+> toList x = [x] {-"\phantom{\fbox{\ensuremath{"-}Cons x Nil{-"}}}"-}
+\end{onlyenv}
+
+\note[item]<1>{I start by removing the syntactic sugar to
+show the real constructors.}
+
+\begin{onlyenv}<2,3>
+Haskell-like definition.
+
+> toList :: a -> [a]
+> toList x = {-"\mathrlap{"-}Cons x Nil{-"}"-}{-"\phantom{\fbox{\ensuremath{"-}Cons x Nil{-"}}}"-}
+\end{onlyenv}
+
+\note[item]<2>{Now I transform |toList| into a \mil block. I leave
+both bits of code on the slide, so I can talk about the correspondances.
+
+On the succeeding slides I connect each expression (Nil and Cons x Nil) to
+the corresponding statement in the block.
+}
+\begin{onlyenv}<4>
+Haskell-like definition.
+
+> toList :: a -> [a]
+> toList x = Cons x {-"\fbox{\ensuremath{"-}Nil{-"}}"-}{-"\anchorF(toListNil)"-}
+\end{onlyenv}
+
+\begin{onlyenv}<5>
+Haskell-like definition.
+
+> toList :: a -> [a]
+> toList x = {-"\fbox{\ensuremath{"-}Cons x Nil{-"}}"-}{-"\anchorF(toListCons)"-}
+\end{onlyenv}
+
+\begin{onlyenv}<3->
+\Mil definition.
+
+  \begin{AVerb}[gobble=4,numbers=left]
+    \block toList(x):  
+      \vbinds nil<- \prim Nil();\anchorF(milNil)
+      \vbinds cons<- \prim Cons(x,nil);\anchorF(milCons)
+      \return cons/
+  \end{AVerb}
+\end{onlyenv}
+
+\begin{onlyenv}<4>
+  \begin{tikzpicture}[overlay,remember picture]
+    \draw [->] (milNil) -|| (toListNil);
+  \end{tikzpicture}
+\end{onlyenv}
+
+\begin{onlyenv}<5>
+  \begin{tikzpicture}[overlay,remember picture]
+    \draw [->] (milCons) ||- (toListCons);
+  \end{tikzpicture}
+\end{onlyenv}
+\end{frame}
+\end{document}
+
+\subsection{Monadic Effects}
+
+\subsection{Tails}
+
 \subsection{Compilation}
 %   \item Definition of |map|
-\begin{frame}{Definition of |map|}
+\begin{frame}
 > map :: (a -> b) -> [a] -> [b]
 > map f xs = case xs of
 >   (x:xs') -> map (f x) xs'
