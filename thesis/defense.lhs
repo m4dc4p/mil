@@ -14,18 +14,123 @@
 
 \section{Introduction}
 \begin{frame}
+  \begin{itemize}
+  \item Our Monadic Intermediate Language
+    \begin{itemize}
+    \item Compiling Functional Languages
+
+    \end{itemize}
+  \item Dataflow Analysis
+  \item Uncurrying
+  \end{itemize}
 \end{frame}
 
 \section{MIL}
 \subsection{Compilation}
-\begin{frame}{Compiling |map|}
-  \begin{itemize}
-  \item Definition of |map|
-  \item Evaluating |map| using call-by-value: |map toList [1,2,3]|
-  \item Closures
-  \end{itemize}
+%   \item Definition of |map|
+\begin{frame}{Definition of |map|}
+> map :: (a -> b) -> [a] -> [b]
+> map f xs = case xs of
+>   (x:xs') -> map (f x) xs'
+>   [] -> []
+>
+> toList :: a -> [a]
+> toList x = [x]
 \end{frame}
-\subsection{Translating |map| to MIL}
+
+\begin{frame}{Evaluating |map| (call-by-value)}
+  %  \item Evaluating |map| using call-by-value: |map toList [1,2,3]|
+  \begin{onlyenv}<1>
+> map toList [1,2] = case [1,2] of {-"\hfill\text{\it Definition of \mfun{map}.}"-}
+>   (x:xs') -> toList x : map f xs'
+>   [] -> []
+  \end{onlyenv}
+
+  \begin{onlyenv}<2>
+> {-"\dots"-} = toList 1 : map f [2] {-"\hfill\text{\it ``Cons'' arm of \mfun{map}.}"-}
+  \end{onlyenv}
+
+  \begin{onlyenv}<3>
+> {-"\dots"-} = [1] : map f [2] {-"\hfill\text{\it Definition of \mfun{toList}.}"-}
+  \end{onlyenv}
+
+  \begin{onlyenv}<4>
+> {-"\dots"-} = [1] : case [2] of {-"\hfill\text{\it Definition of \mfun{map}.}"-}
+>   (x:xs') -> toList x : map f xs'
+>   [] -> []
+  \end{onlyenv}
+
+  \begin{onlyenv}<5>
+> {-"\dots"-} = [1] : toList 2 : map f [] {-"\hfill\text{\it ``Cons'' arm of \mfun{map}.}"-}
+  \end{onlyenv}
+
+  \begin{onlyenv}<6>
+> {-"\dots"-} = [1] : [2] : map f [] {-"\hfill\text{\it Definition of \mfun{toList}.}"-}
+  \end{onlyenv}
+
+
+  \begin{onlyenv}<7>
+> {-"\dots"-} = [1] : [2] : case [] of {-"\hfill\text{\it Definition of \mfun{map}.}"-}
+>   (x:xs') -> toList x : map f xs'
+>   [] -> []
+  \end{onlyenv}
+
+  \begin{onlyenv}<8>
+> {-"\dots"-} = [1] : [2] : [] {-"\hfill\text{\it ``Nil'' arm of \mfun{map}.}"-}
+  \end{onlyenv}
+
+
+  \begin{onlyenv}<9>
+> {-"\dots"-} = [[1],[2]] {-"\hfill\text{\it Syntatic sugar.}"-}
+  \end{onlyenv}
+
+  %% \begin{itemize}
+  %% \item Closures
+  %% \end{itemize}
+\end{frame}
+
+\subsection{Hidden Effects in |toList|}
+\begin{frame}
+  \frametitle<1>{Definition of |toList|}
+  \begin{onlyenv}<1>
+> toList :: a -> [a]
+> toList x = [x] {-"\vphantom{\fbox{\mfun{Cons}}}"-}
+  \end{onlyenv}
+
+  \frametitle<2>{Removing Syntatic Sugar \ldots}
+  \begin{onlyenv}<2>
+> toList :: a -> [a]
+> toList x = Cons x Nil {-"\vphantom{\fbox{\mfun{Cons}}}"-}
+  \end{onlyenv}
+
+  \frametitle<3>{Allocation!}
+  \begin{onlyenv}<3>
+> toList :: a -> [a]
+> toList x = {-"\fbox{\ensuremath{"-}Cons x Nil{-"}}"-}
+  \end{onlyenv}
+
+  \frametitle<4>{Allocation!}
+  \begin{onlyenv}<4>
+> toList :: a -> [a]{-"\mathllap{\xout{\phantom{"-}[a]{-"}}}"-}
+> toList x = {-"\fbox{\ensuremath{"-}Cons x Nil{-"}}"-}
+  \end{onlyenv}
+
+  \frametitle<5>{The real type of |toList|.}
+  \begin{onlyenv}<5>
+> toList :: a -> M [a]
+> toList x = {-"\dots\phantom{\fbox{\ensuremath{"-}Cons x Nil{-"}}}"-}
+  \end{onlyenv}
+
+  \frametitle<6>{A monadic |toList|}
+  \begin{onlyenv}<6>
+> toList :: a -> M [a]
+> toList x = do {-"\phantom{\fbox{\ensuremath{"-}Cons x Nil{-"}}}"-}
+>   nil <- mkData Nil
+>   cons <- mkData Cons x nil
+>   return cons
+  \end{onlyenv}
+  
+\end{frame}
 
 \begin{frame}
   \begin{itemize}
