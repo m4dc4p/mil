@@ -10,7 +10,7 @@
 \def\bonly#1{\only<#1>}
 \def\buncover#1{\uncover<#1>}
 \def\labF#1;{\lab #1/}
-\author{Justin Bailey (\texttt{jgbailey@@gmail.com})}
+\author{Justin Bailey}
 \institute{Portland State University}
 \date{\today}
 \newbox\consbox
@@ -18,7 +18,7 @@
 \begin{document}\nomd\numbersoff
 
 \section{Introduction}
-\begin{frame}
+\begin{frame}{Introduction}\vspace{12pt}
   \begin{itemize}
   \item Monadic Intermediate Language (\mil)
     \begin{itemize}
@@ -39,47 +39,37 @@
   \end{itemize}
 \end{frame}
 
-\section{MIL}
+\section{\Mil}
 \subsection{Blocks}
-\begin{frame}[fragile]
+\begin{frame}[fragile]{\Mil: Blocks}
+\vspace{12pt}
 \note[item]<1>{This sequence will connect a simple definition with a block of
-\mil code. I will first illustrate ordinary blocks.}
+\mil code. I will first illustrate ordinary blocks.
 
-\begin{onlyenv}<1>
-\begin{tabular*}{\hsize}{ll}
-\begin{minipage}{.45\hsize}
-> toList :: a -> [a]
-> toList x = [x] {-"\setbox\consbox=\hbox{\fbox{\ensuremath{"-}Cons x Nil{-"}}}\phantom{\copy\consbox}"-}
-\end{minipage}
-\end{tabular*}
-\end{onlyenv}
-
-\note[item]<1>{I start by removing the syntactic sugar to
+I start by removing the syntactic sugar to
 show the real constructors.}
 
 \begin{tabular*}{\hsize}{ll}
-\begin{minipage}{.45\hsize}
-\begin{onlyenv}<2,3>
+\begin{minipage}{.45\hsize}\elimdisplayskip\begin{onlyenv}<1>
 > toList :: a -> [a]
-> toList x = Cons x Nil
+> toList x = [x] {-"\strut"-}
+\end{onlyenv}\begin{onlyenv}<2,3>
+> toList :: a -> [a]
+> toList x = Cons x Nil{-"\strut"-}
 \end{onlyenv}\begin{onlyenv}<4>
-> toList :: a -> [a]
+> toList :: a -> [a]{-"\phantom{(}"-}
 > toList x = Cons x {-"\uline{"-}Nil{-"}"-}
 \end{onlyenv}\begin{onlyenv}<5>
-> toList :: a -> [a]
+> toList :: a -> [a]{-"\phantom{(}"-}
 > toList x = {-"\uline{"-}Cons x Nil{-"}"-}
-\end{onlyenv} 
-\end{minipage} &
-\begin{onlyenv}<3->
-\begin{minipage}{.45\hsize}
+\end{onlyenv}\end{minipage} & \begin{minipage}{.45\hsize}\begin{uncoverenv}<3->
   \begin{AVerb}[gobble=4,numbers=left]
     \block toList(x):  
       \vbinds nil<- \balt{4}{\uline{\smash{\prim Nil()}}}{\prim Nil()};
       \vbinds cons<- \balt{5}{\uline{\smash{\prim Cons(x,nil)}}}{\prim Cons(x,nil)};
       \return cons/
   \end{AVerb}
-\end{minipage}
-\end{onlyenv}
+\end{uncoverenv}\end{minipage}
 \end{tabular*}
 
 \note[item]<2>{Now I transform |toList| into a \mil block. I leave
@@ -95,7 +85,7 @@ the corresponding statement in the block.}
 
   To explain closures, I use a local definition of the composition
   function, applied to three arguments.}
-\begin{frame}
+\begin{frame}\vspace{12pt}
 \begin{onlyenv}<1>
 > (\f -> \g -> \x -> f (g x)) a b c
 > (\g -> \x -> a (g x)) b c
@@ -113,6 +103,7 @@ the corresponding statement in the block.}
 I start by showing a function that applies |map| to arguments, so I
 can show how closures are built up and entered.}
 \begin{frame}[fragile]
+\vspace{12pt}
 \begin{onlyenv}<1>
 > main xs = map toList xs
 \end{onlyenv}
@@ -151,19 +142,19 @@ a lot of detail about the \mil code shown (yet).}
     \block map(f, xs): \ldots
   \end{AVerb}
 \end{minipage} &
-\begin{onlyenv}<2>\begin{minipage}[t]{.45\hsize}
-> main xs = map toList xs
+\begin{onlyenv}<2>\begin{minipage}[t]{.45\hsize}\elimdisplayskip
+> main xs = map toList xs{-"\phantom{(}"-}
 \end{minipage}
-\end{onlyenv}\begin{onlyenv}<3>\begin{minipage}[t]{.45\hsize}
-> main xs = (map toList) xs
+\end{onlyenv}\begin{onlyenv}<3>\begin{minipage}[t]{.45\hsize}\elimdisplayskip
+> main xs = (map toList) xs{-"\phantom{(}"-}
 \end{minipage}
-\end{onlyenv}\begin{onlyenv}<4>\begin{minipage}[t]{.45\hsize}
-> main xs = (map {-"\uline{"-}toList{-"}"-}) xs
+\end{onlyenv}\begin{onlyenv}<4>\begin{minipage}[t]{.45\hsize}\elimdisplayskip
+> main xs = (map {-"\uline{"-}toList{-"}"-}) xs{-"\phantom{(}"-}
 \end{minipage}
-\end{onlyenv}\begin{onlyenv}<5>\begin{minipage}[t]{.45\hsize}
-> main xs = ({-"\uline{"-}map{-"}"-} toList) xs
+\end{onlyenv}\begin{onlyenv}<5>\begin{minipage}[t]{.45\hsize}\elimdisplayskip
+> main xs = ({-"\uline{"-}map{-"}"-} toList) xs{-"\phantom{(}"-}
 \end{minipage}
-\end{onlyenv}\begin{onlyenv}<6>\begin{minipage}[t]{.45\hsize}
+\end{onlyenv}\begin{onlyenv}<6>\begin{minipage}[t]{.45\hsize}\elimdisplayskip
 > main xs = ({-"\uline{"-}map toList{-"}"-}) xs
 \end{minipage}
 \end{onlyenv}
@@ -211,11 +202,11 @@ the syntax of \cc blocks, connecting line 3 to line 7. }
     \block map(f, xs): \ldots
   \end{AVerb}
 \end{minipage} &
-\begin{onlyenv}<7-10>\begin{minipage}[t]{.45\hsize}
-> main xs = ({-"\uline{"-}map toList{-"}"-}) xs
+\begin{onlyenv}<7-10>\begin{minipage}[t]{.45\hsize}\elimdisplayskip
+> main xs = ({-"\uline{"-}map toList{-"}"-}) xs{-"\phantom{(}"-}
 \end{minipage}
-\end{onlyenv}\begin{onlyenv}<11,12>\begin{minipage}[t]{.45\hsize}
-> main xs = {-"\uline{"-}(map toList) xs{-"}"-}
+\end{onlyenv}\begin{onlyenv}<11,12>\begin{minipage}[t]{.45\hsize}\elimdisplayskip
+> main xs = {-"\uline{"-}(map toList) xs{-"}"-}{-"\phantom{(}"-}
 \end{minipage}
 \end{onlyenv}
 \end{tabular*}
@@ -233,7 +224,7 @@ any variables. However, they work together on Line 4, causing \lab mapK1/ to exe
 and return the value \mkclo[mapK2:f].}
 
 \begin{frame}[fragile]
-
+\vspace{12pt}
 \note<1>{After Line 1 executes, \var t1/ is bound to the closure \mkclo[toListK1:]}
 \begin{minipage}{.45\hsize}
   \begin{AVerb}[gobble=4,numbers=left]
@@ -284,12 +275,61 @@ and return the value \mkclo[mapK2:f].}
 
 \subsection{Side-Effects}
 \begin{frame}
-  
+\vspace{12pt}  
 \end{frame}
 \subsection{Syntax}
 \begin{frame}
-  
+\vspace{12pt}
 \end{frame}
+
+\section{Dataflow Analysis}
+\begin{frame}\vspace{12pt}
+\end{frame}
+\subsection{Control-Flow Graphs \& Basic Blocks}
+\begin{frame}\vspace{12pt}
+\end{frame}
+\subsection{Facts \& Lattices}
+\begin{frame}\vspace{12pt}
+\end{frame}
+\subsection{Rewriting}
+\begin{frame}\vspace{12pt}
+\end{frame}
+\subsection{\Hoopl}
+\begin{frame}\vspace{12pt}
+\end{frame}
+
+\section{Uncurrying}
+\begin{frame}\vspace{12pt}
+\end{frame}
+\subsection{Motivation}
+\begin{frame}\vspace{12pt}
+\end{frame}
+\subsection{Facts, Lattice, Transfer Function}
+\begin{frame}\vspace{12pt}
+\end{frame}
+\subsection{Example: Uncurrying in a Block}
+\begin{frame}\vspace{12pt}
+\end{frame}
+\subsection{Example: Uncurrying |map|}
+\begin{frame}\vspace{12pt}
+\end{frame}
+\subsection{Example: Uncurrying a loop}
+\begin{frame}\vspace{12pt}
+\end{frame}
+\subsection{Related Work: Appel, Tarditi, Tolmach \& Oliva}
+\begin{frame}\vspace{12pt}
+\end{frame}
+
+\section{Conclusion}
+\begin{frame}\vspace{12pt}
+\end{frame}
+\subsection{Monadic  Optimizations}
+\begin{frame}\vspace{12pt}
+\end{frame}
+\subsection{Future Work}
+\begin{frame}\vspace{12pt}
+\end{frame}
+
 \end{document}
 
 \subsection{Monadic Effects}
@@ -298,17 +338,19 @@ and return the value \mkclo[mapK2:f].}
 
 \subsection{Compilation}
 %   \item Definition of |map|
-\begin{frame}
-> map :: (a -> b) -> [a] -> [b]
+\begin{frame}\vspace{12pt}
+\begin{minipage}[t]{\hsize}\elimdisplayskip
+> map :: (a -> b) -> [a] -> [b]{-"\phantom{(}"-}
 > map f xs = case xs of
 >   (x:xs') -> map (f x) xs'
 >   [] -> []
 >
 > toList :: a -> [a]
 > toList x = [x]
+\end{minipage}
 \end{frame}
 
-\begin{frame}{Evaluating |map| (call-by-value)}
+\begin{frame}{Evaluating |map| (call-by-value)}\vspace{12pt}
   %  \item Evaluating |map| using call-by-value: |map toList [1,2,3]|
   \begin{onlyenv}<1>
 > map toList [1,2] = case [1,2] of {-"\hfill\text{\it Definition of \mfun{map}.}"-}
@@ -360,7 +402,7 @@ and return the value \mkclo[mapK2:f].}
 \end{frame}
 
 \subsection{Hidden Effects in |toList|}
-\begin{frame}
+\begin{frame}\vspace{12pt}
   \frametitle<1>{Definition of |toList|}
   \begin{onlyenv}<1>
 > toList :: a -> [a]
@@ -402,7 +444,7 @@ and return the value \mkclo[mapK2:f].}
   
 \end{frame}
 
-\begin{frame}
+\begin{frame}\vspace{12pt}
   \begin{itemize}
   \item Three-Address Code
   \item Closures
@@ -416,7 +458,7 @@ and return the value \mkclo[mapK2:f].}
 \end{frame}
 
 \section{Dataflow Analysis}
-\begin{frame}{Dataflow Analysis}
+\begin{frame}{Dataflow Analysis}\vspace{12pt}
   \begin{itemize}
   \item Control-Flow Graphs
   \item Basic Blocks
@@ -433,7 +475,7 @@ and return the value \mkclo[mapK2:f].}
 \end{frame}
 
 \section{Uncurrying}
-\begin{frame}{Uncurrying}
+\begin{frame}{Uncurrying}\vspace{12pt}
   \begin{itemize}
   \item Uncurrying
     \begin{itemize}
@@ -453,7 +495,7 @@ and return the value \mkclo[mapK2:f].}
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Uncurrying |map|}
+\begin{frame}{Uncurrying |map|}\vspace{12pt}
   \begin{tikzpicture}
     \node[stmt] (main) {\block main(ns):};
     \node[stmt,below=.3in of main] (caseEval216) {\block caseEval216(xs, f):};
@@ -464,7 +506,7 @@ and return the value \mkclo[mapK2:f].}
   \end{tikzpicture}
 \end{frame}
 
-\begin{frame}[fragile]{Uncurrying |map|}
+\begin{frame}[fragile]{Uncurrying |map|}\vspace{12pt}
   \begin{AVerb}[gobble=4,numbers=left]
     \block main(ns):  \anchorF(nsa)
       \vbinds v227<-\mkclo[k203:];\anchorF(v227a) 
@@ -486,7 +528,7 @@ and return the value \mkclo[mapK2:f].}
   \end{tikzpicture}\end{onlyenv}%%
 \end{frame}
 
-\begin{frame}[fragile]{Uncurrying |map|}
+\begin{frame}[fragile]{Uncurrying |map|}\vspace{12pt}
   \begin{onlyenv}<1>
     \begin{AVerb}[gobble=6,numbers=left]
       \block main(ns): 
@@ -516,7 +558,7 @@ and return the value \mkclo[mapK2:f].}
   \end{onlyenv}
 \end{frame}
 
-\begin{frame}{Uncurrying |map|}
+\begin{frame}{Uncurrying |map|}\vspace{12pt}
   \begin{onlyenv}<1>\begin{tikzpicture}
     \node[stmt] (main) {\block main(ns):};
     
