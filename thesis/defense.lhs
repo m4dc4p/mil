@@ -14,7 +14,7 @@
 \institute{Portland State University}
 \date{\today}
 \newbox\consbox
-\setbeameroption{show notes}
+%%\setbeameroption{show notes}
 \begin{document}\nomd\numbersoff
 
 \section{Introduction}
@@ -78,22 +78,103 @@ both bits of code on the slide, so I can talk about the correspondances.
 On the succeeding slides I connect each expression (Nil and Cons x Nil) to
 the corresponding statement in the block.}
 \end{frame}
+
 \subsection{Closures \& Function Application}
 \note{I define closures as a data structure with two properties: a
   pointer to some body of code and an environment -- a
   map that associates variables with values.
 
-  To explain closures, I use a local definition of the composition
-  function, applied to three arguments.}
-\begin{frame}\vspace{12pt}
-\begin{onlyenv}<1>
-> (\f -> \g -> \x -> f (g x)) a b c
-> (\g -> \x -> a (g x)) b c
-> (\x -> a (b x)) c
-> (a (b c))
+  To explain closures, I start by explaining free variables
+  and environments. The first slide shows an expression with
+  a free variable, |name|. I explain that the value of
+  name must come from the environment, because it is 
+  not given as an argument to any function shown.}
+
+\begin{frame}[fragile]\vspace{12pt}
+\begin{tabular*}{\hsize}{l}
+\begin{minipage}{\hsize}\elimdisplayskip\begin{onlyenv}<1>
+> putStrLn ("Hello, " ++ {-"\uline{"-}name{-"}"-} ++ "!"{-"\anchorF(nameVar)"-})
+\end{onlyenv}\begin{onlyenv}<2>
+> main {-"\uline{"-}name{-"}\strut"-} = 
+>   putStrLn ("Hello, " ++ {-"\uline{"-}name{-"}"-}++ "!")
+\end{onlyenv}\begin{onlyenv}<3-5>
+> main {-"\uline{"-}name{-"}\strut"-} = do
+>   let msg greeting = greeting ++ ", " ++ {-"\uline{"-}name{-"}"-} ++ "!"
+>   {-"\anchorF(hello)"-}putStrLn (msg "Hello")
+>   {-"\anchorF(nice)"-}putStrLn (msg "Nice to meet you")
+\end{onlyenv}\begin{onlyenv}<6-9>
+> main name{-"\strut"-} = do
+>   let{-"\anchorF(msgDef)"-} msg greeting = greeting ++ ", " ++ name ++ "!"
+>   {-"\anchorF(mapMsg)"-}mapM_ (putStrLn . msg{-"\anchorF(msgClo)"-} ) [{-"\anchorF(msg1)"-}"Hello",{-"\anchorF(msg2)"-}"Nice to meet you"] 
+\end{onlyenv}\end{minipage}
+\end{tabular*}
+
+\note<1>{I explain that the value of |name| must be declared in some
+  outer scope (at least, if we want the program to run). I now show
+  |main|, which takes |name| as an argument. In this case, the environment
+  contains |name| because it is argument to |main|.}
+
+\note<2>{Now I define a local function, |msg|, explaining that I want
+  to print different greetings. |msg| takes one argument, |greeting|, but |name|
+  is free in |msg|.}
+
+\note<3>{The next two slides show the environment for each invocation
+  of |msg|. We assume |main| is invoked with the argument |"Justin"|, as shown
+  on the right.}
+
+\begin{onlyenv}<4>
+\begin{tikzpicture}[remember picture,overlay]
+  \path let \p1=(hello.west) in node[stmt, anchor=west] (ep1) at ($(\p1) + (0in, -1in)$) {\mfun{name}: |"Justin"|, \mfun{greeting}: |"Hello"|};
+  \draw [->] (ep1.west) to ($(ep1.west) + (-.25in,0in)$) ||- (hello.west);
+\end{tikzpicture}
 \end{onlyenv}
 
-\note<1>{}
+\begin{onlyenv}<5>
+\begin{tikzpicture}[remember picture, overlay]
+  \path let \p1=(hello.west) in node[stmt, anchor=west] (ep2) at ($(\p1) + (0in, -1in)$) {\mfun{name}: |"Justin"|, \mfun{greeting}: |"Nice to meet you"|};
+  \draw [->] (ep2.west) to ($(ep2.west) + (-.25in,0in)$) ||- (nice.west);
+\end{tikzpicture}
+\end{onlyenv}
+
+\note<5>{Now I explain that I have talked about environments, I move
+  to the second half: a pointer to some body of code. I rewrite the
+  program to use |mapM_|. I explain that while previously we could
+  think of |msg| as executing right away and building a string, we
+  really can't anymore. Instead, it represents a delayed or suspended
+  value that we need to supply more arguments to to get our string
+  out.}
+
+\note<6>{I now show the closure represented by |msg|. The ``hole''
+  points to the function defintion; |name| exists in the environment
+  (and does not change); |greeting| is shown to indicate that we don't
+  have all the arguments yet.}
+
+\begin{onlyenv}<7>
+\begin{tikzpicture}[remember picture, overlay,node distance=0in]
+  \path let \p1=(mapMsg.west) in node[stmt, anchor=west] (msgHole1) at ($(\p1) + (0in, -1in)$) {\strut\phantom{\textbullet}};
+  \node[stmt, right=0in of msgHole1.east, anchor=west] (ep31) {\mfun{name}: |"Justin"|, \mfun{greeting}: ?};
+  \draw [->] ($(msgClo.south) + (-.1in,-.1in)$) to (ep31.north);
+  \draw [*->] (msgHole1.base) to ($(msgHole1.base) + (-.25in,0in)$) ||- ($(msgDef.base) + (-.25in,0in)$);
+\end{tikzpicture}
+\end{onlyenv}
+
+\begin{onlyenv}<8>
+\begin{tikzpicture}[remember picture, overlay,node distance=0in]
+  \path let \p1=(mapMsg.west) in node[stmt, anchor=west] (msgHole2) at ($(\p1) + (0in, -1in)$) {\strut\phantom{\textbullet}};
+  \node[stmt, right=0in of msgHole2.east, anchor=west] (ep32) {\mfun{name}: |"Justin"|, \mfun{greeting}: |"Hello"|};
+  \draw [->] ($(msg1.south) + (.2in,-.1in)$) to (ep32.north);
+  \draw [*->] (msgHole2.base) to ($(msgHole2.base) + (-.25in,0in)$) ||- ($(msgDef.base) + (-.25in,0in)$);
+\end{tikzpicture}
+\end{onlyenv}
+
+\begin{onlyenv}<9>
+\begin{tikzpicture}[remember picture, overlay,node distance=0in]
+  \path let \p1=(mapMsg.west) in node[stmt, anchor=west] (msgHole3) at ($(\p1) + (0in, -1in)$) {\strut\phantom{\textbullet}};
+  \node[stmt, right=0in of msgHole3.east, anchor=west] (ep33) {\mfun{name}: |"Justin"|, \mfun{greeting}: |"Nice to ..."|};
+  \draw [->] ($(msg2.south) + (.5in,-.1in)$) to (ep33.north);
+  \draw [*->] (msgHole3.base) to ($(msgHole3.base) + (-.25in,0in)$) ||- ($(msgDef.base) + (-.25in,0in)$);
+\end{tikzpicture}
+\end{onlyenv}
 
 \end{frame}
 
@@ -275,62 +356,60 @@ and return the value \mkclo[mapK2:f].}
 
 \subsection{Side-Effects}
 \begin{frame}
-\vspace{12pt}  
+\vspace{12pt} \ldots 
 \end{frame}
 \subsection{Syntax}
 \begin{frame}
-\vspace{12pt}
+\vspace{12pt} \ldots
 \end{frame}
 
 \section{Dataflow Analysis}
-\begin{frame}\vspace{12pt}
+\begin{frame}\vspace{12pt} \ldots
 \end{frame}
 \subsection{Control-Flow Graphs \& Basic Blocks}
-\begin{frame}\vspace{12pt}
+\begin{frame}\vspace{12pt} \ldots
 \end{frame}
 \subsection{Facts \& Lattices}
-\begin{frame}\vspace{12pt}
+\begin{frame}\vspace{12pt} \ldots
 \end{frame}
 \subsection{Rewriting}
-\begin{frame}\vspace{12pt}
+\begin{frame}\vspace{12pt} \ldots
 \end{frame}
 \subsection{\Hoopl}
-\begin{frame}\vspace{12pt}
+\begin{frame}\vspace{12pt} \ldots
 \end{frame}
 
 \section{Uncurrying}
-\begin{frame}\vspace{12pt}
+\begin{frame}\vspace{12pt} \ldots
 \end{frame}
 \subsection{Motivation}
-\begin{frame}\vspace{12pt}
+\begin{frame}\vspace{12pt} \ldots
 \end{frame}
 \subsection{Facts, Lattice, Transfer Function}
-\begin{frame}\vspace{12pt}
+\begin{frame}\vspace{12pt} \ldots
 \end{frame}
 \subsection{Example: Uncurrying in a Block}
-\begin{frame}\vspace{12pt}
+\begin{frame}\vspace{12pt} \ldots
 \end{frame}
 \subsection{Example: Uncurrying |map|}
-\begin{frame}\vspace{12pt}
+\begin{frame}\vspace{12pt} \ldots
 \end{frame}
 \subsection{Example: Uncurrying a loop}
-\begin{frame}\vspace{12pt}
+\begin{frame}\vspace{12pt} \ldots
 \end{frame}
 \subsection{Related Work: Appel, Tarditi, Tolmach \& Oliva}
-\begin{frame}\vspace{12pt}
+\begin{frame}\vspace{12pt} \ldots
 \end{frame}
 
 \section{Conclusion}
-\begin{frame}\vspace{12pt}
+\begin{frame}\vspace{12pt} \ldots
 \end{frame}
 \subsection{Monadic  Optimizations}
-\begin{frame}\vspace{12pt}
+\begin{frame}\vspace{12pt} \ldots
 \end{frame}
 \subsection{Future Work}
-\begin{frame}\vspace{12pt}
+\begin{frame}\vspace{12pt} \ldots
 \end{frame}
-
-\end{document}
 
 \subsection{Monadic Effects}
 
