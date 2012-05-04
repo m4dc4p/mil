@@ -13,17 +13,24 @@
 \author{Justin Bailey}
 \institute{Portland State University}
 \date{\today}
-\newbox\consbox
-%%\setbeameroption{show notes}
+\setbeameroption{show notes}
+\setbeamertemplate{navigation symbols}{}
+\setbeamersize{text margin left=1.5em}
+\usepackage{verbatim}
 \begin{document}\nomd\numbersoff
 
 \section{Introduction}
 \begin{frame}{Introduction}\vspace{12pt}
   \begin{itemize}
+  \item Overview
+    \begin{itemize}
+    \item Optimizing Functional Languages
+    \item Dataflow Analysis
+    \item Monadic Intermediate Language
+    \end{itemize}
   \item Monadic Intermediate Language (\mil)
     \begin{itemize}
     \item \Mil: blocks.
-    \item: Defining Closures
     \item \Mil: closures and function application.
     \item \Mil: side-effects.
     \item \Mil syntax
@@ -39,6 +46,7 @@
   \end{itemize}
 \end{frame}
 
+\begin{comment}
 \section{\Mil}
 \subsection{Blocks}
 \begin{frame}[fragile]{\Mil: Blocks}
@@ -48,8 +56,7 @@
 
 I start by removing the syntactic sugar to
 show the real constructors.}
-
-\begin{tabular*}{\hsize}{ll}
+\begin{tabular*}{\hsize}{@@{}ll}
 \begin{minipage}{.45\hsize}\elimdisplayskip\begin{onlyenv}<1>
 > toList :: a -> [a]
 > toList x = [x] {-"\strut"-}
@@ -72,6 +79,7 @@ show the real constructors.}
 \end{uncoverenv}\end{minipage}
 \end{tabular*}
 
+
 \note[item]<2>{Now I transform |toList| into a \mil block. I leave
 both bits of code on the slide, so I can talk about the correspondances.
 
@@ -91,7 +99,7 @@ the corresponding statement in the block.}
   not given as an argument to any function shown.}
 
 \begin{frame}[fragile]\vspace{12pt}
-\begin{tabular*}{\hsize}{l}
+\begin{tabular*}{\hsize}{@@{}l}
 \begin{minipage}{\hsize}\elimdisplayskip\begin{onlyenv}<1>
 > putStrLn ("Hello, " ++ {-"\uline{"-}name{-"}"-} ++ "!"{-"\anchorF(nameVar)"-})
 \end{onlyenv}\begin{onlyenv}<2>
@@ -208,7 +216,7 @@ a lot of detail about the \mil code shown (yet).}
   explained later.}
 
 \begin{onlyenv}<2-6>
-\begin{tabular*}{\hsize}{ll}
+\begin{tabular*}{\hsize}{@@{}ll}
 \begin{minipage}[t]{.45\hsize}
   \begin{AVerb}[gobble=4,numbers=left]
     \block main(xs):
@@ -269,7 +277,7 @@ the syntax of \cc blocks, connecting line 3 to line 7. }
   block. The result of \lab map/ gets bound to \var t4/ and returned.}
 
 \begin{onlyenv}<7->
-\begin{tabular*}{\hsize}{ll}
+\begin{tabular*}{\hsize}{@@{}ll}
 \begin{minipage}[t]{.45\hsize}
   \begin{AVerb}[gobble=4,numbers=left]
     \block main(xs):
@@ -378,6 +386,7 @@ and return the value \mkclo[mapK2:f].}
 \subsection{\Hoopl}
 \begin{frame}\vspace{12pt} \ldots
 \end{frame}
+\end{comment}
 
 \section{Uncurrying}
 \begin{frame}\vspace{12pt} \ldots
@@ -392,199 +401,143 @@ and return the value \mkclo[mapK2:f].}
 \begin{frame}\vspace{12pt} \ldots
 \end{frame}
 \subsection{Example: Uncurrying |map|}
-\begin{frame}\vspace{12pt} \ldots
-\end{frame}
-\subsection{Example: Uncurrying a loop}
-\begin{frame}\vspace{12pt} \ldots
-\end{frame}
-\subsection{Related Work: Appel, Tarditi, Tolmach \& Oliva}
-\begin{frame}\vspace{12pt} \ldots
-\end{frame}
+%% \begin{frame}{Uncurrying}\vspace{12pt}
+%%   \begin{itemize}
+%%   \item Uncurrying
+%%     \begin{itemize}
+%%     \item Partial Application
+%%     \item Uncurrying within a block (\lab toInt/ example)
+%%       \begin{itemize}
+%%       \item Facts
+%%       \item Step-by-step Transformation of \lab main/ 
+%%       \end{itemize}
+%%     \item Aside: use of multiple optimizations (dead code, inlining)
+%%     \item Uncurrying |map|
+%%       \begin{itemize}
+%%       \item Original \cfg
+%%       \item Development of facts \& the \cfg
+%%       \end{itemize}
+%%     \end{itemize}
+%%   \end{itemize}
+%% \end{frame}
 
-\section{Conclusion}
-\begin{frame}\vspace{12pt} \ldots
-\end{frame}
-\subsection{Monadic  Optimizations}
-\begin{frame}\vspace{12pt} \ldots
-\end{frame}
-\subsection{Future Work}
-\begin{frame}\vspace{12pt} \ldots
-\end{frame}
-
-\subsection{Monadic Effects}
-
-\subsection{Tails}
-
-\subsection{Compilation}
-%   \item Definition of |map|
-\begin{frame}\vspace{12pt}
-\begin{minipage}[t]{\hsize}\elimdisplayskip
-> map :: (a -> b) -> [a] -> [b]{-"\phantom{(}"-}
+\begin{comment}
+\begin{frame}[fragile]{Uncurrying |map|}\vspace{12pt}
+  \begin{tabular}{@@{}c}
+    \begin{minipage}{\hsize}\begin{centering}
+> main ns = map toList ns
 > map f xs = case xs of
->   (x:xs') -> map (f x) xs'
->   [] -> []
->
-> toList :: a -> [a]
-> toList x = [x]
-\end{minipage}
+>   Cons x xs' -> Cons (f x) (map f xs')
+>   Nil -> Nil 
+> toList n = Cons n Nil
+    \end{centering}\end{minipage} \\
+    \begin{tabular}{@@{}lr}\begin{minipage}[t]{.55\hsize}
+    \begin{AVerb}[gobble=6,numbers=left]
+      \block main(ns): 
+        \vbinds v227<-\mkclo[k203:];
+        \vbinds v228<-\mkclo[k219:];
+        \vbinds v229<-\app v227*v228/;
+        \app v229 * ns/ 
+      \ccblock k219()x: \goto b220(x)
+      \block b220(x):\label{uncurry_global_toList_body}
+        \vbinds v221<-\mkclo[Consclo2:];
+        \vbinds v222<-\app v221*x/;
+        \vbinds v223<-Nil;
+        \app v222 * v223/ \label{uncurry_global_toList_body_end}
+    \end{AVerb}
+  \end{minipage} &
+  \begin{minipage}[t]{.4\hsize}
+    \begin{AVerb}[gobble=6,numbers=left,firstnumber=last]
+      \ccblock k203()f: \mkclo[k204:f]
+      \ccblock k204(f)xs: \goto caseEval216(xs, f)
+      \block caseEval216(xs, f): \label{uncurry_global_map_body}
+        \case xs;
+          \valt Nil()->\goto altNil206();
+          \valt Cons(x xs)->\goto altCons208(f, x, xs);
+      \block altNil206(): Nil \label{uncurry_global_map_nil}
+      \block altCons208(f, x, xs): \label{uncurry_global_map_cons}
+        v209 <- \mkclo[Consclo2:]
+        \vbinds v210<-\app f*x/; \label{uncurry_global_map_cons_fx}
+        \vbinds v211<-\app v209*v210/;
+        \vbinds v212<-\mkclo[k203:]; \label{uncurry_global_map_cons_map_start}
+        \vbinds v213<-\app v212*f/;
+        \vbinds v214<-\app v213*xs/; \label{uncurry_global_map_cons_map_end}
+        \app v211 * v214/ \label{uncurry_global_map_cons_end}
+    \end{AVerb}
+  \end{minipage}\end{tabular} \\
+  \end{tabular}
 \end{frame}
+\end{comment}
 
-\begin{frame}{Evaluating |map| (call-by-value)}\vspace{12pt}
-  %  \item Evaluating |map| using call-by-value: |map toList [1,2,3]|
-  \begin{onlyenv}<1>
-> map toList [1,2] = case [1,2] of {-"\hfill\text{\it Definition of \mfun{map}.}"-}
->   (x:xs') -> toList x : map f xs'
->   [] -> []
-  \end{onlyenv}
+\note{This example illustrates uncurrying across blocks, but not across loops. I want
+  to emphasize that this example alters the \cfg in interesting ways as the analysis
+  proceeds.}
 
-  \begin{onlyenv}<2>
-> {-"\dots"-} = toList 1 : map f [2] {-"\hfill\text{\it ``Cons'' arm of \mfun{map}.}"-}
-  \end{onlyenv}
-
-  \begin{onlyenv}<3>
-> {-"\dots"-} = [1] : map f [2] {-"\hfill\text{\it Definition of \mfun{toList}.}"-}
-  \end{onlyenv}
-
-  \begin{onlyenv}<4>
-> {-"\dots"-} = [1] : case [2] of {-"\hfill\text{\it Definition of \mfun{map}.}"-}
->   (x:xs') -> toList x : map f xs'
->   [] -> []
-  \end{onlyenv}
-
-  \begin{onlyenv}<5>
-> {-"\dots"-} = [1] : toList 2 : map f [] {-"\hfill\text{\it ``Cons'' arm of \mfun{map}.}"-}
-  \end{onlyenv}
-
-  \begin{onlyenv}<6>
-> {-"\dots"-} = [1] : [2] : map f [] {-"\hfill\text{\it Definition of \mfun{toList}.}"-}
-  \end{onlyenv}
-
-
-  \begin{onlyenv}<7>
-> {-"\dots"-} = [1] : [2] : case [] of {-"\hfill\text{\it Definition of \mfun{map}.}"-}
->   (x:xs') -> toList x : map f xs'
->   [] -> []
-  \end{onlyenv}
-
-  \begin{onlyenv}<8>
-> {-"\dots"-} = [1] : [2] : [] {-"\hfill\text{\it ``Nil'' arm of \mfun{map}.}"-}
-  \end{onlyenv}
-
-
-  \begin{onlyenv}<9>
-> {-"\dots"-} = [[1],[2]] {-"\hfill\text{\it Syntatic sugar.}"-}
-  \end{onlyenv}
-
-  %% \begin{itemize}
-  %% \item Closures
-  %% \end{itemize}
-\end{frame}
-
-\subsection{Hidden Effects in |toList|}
-\begin{frame}\vspace{12pt}
-  \frametitle<1>{Definition of |toList|}
-  \begin{onlyenv}<1>
-> toList :: a -> [a]
-> toList x = [x] {-"\vphantom{\fbox{\mfun{Cons}}}"-}
-  \end{onlyenv}
-
-  \frametitle<2>{Removing Syntatic Sugar \ldots}
-  \begin{onlyenv}<2>
-> toList :: a -> [a]
-> toList x = Cons x Nil {-"\vphantom{\fbox{\mfun{Cons}}}"-}
-  \end{onlyenv}
-
-  \frametitle<3>{Allocation!}
-  \begin{onlyenv}<3>
-> toList :: a -> [a]
-> toList x = {-"\fbox{\ensuremath{"-}Cons x Nil{-"}}"-}
-  \end{onlyenv}
-
-  \frametitle<4>{Allocation!}
-  \begin{onlyenv}<4>
-> toList :: a -> [a]{-"\mathllap{\xout{\phantom{"-}[a]{-"}}}"-}
-> toList x = {-"\fbox{\ensuremath{"-}Cons x Nil{-"}}"-}
-  \end{onlyenv}
-
-  \frametitle<5>{The real type of |toList|.}
-  \begin{onlyenv}<5>
-> toList :: a -> M [a]
-> toList x = {-"\dots\phantom{\fbox{\ensuremath{"-}Cons x Nil{-"}}}"-}
-  \end{onlyenv}
-
-  \frametitle<6>{A monadic |toList|}
-  \begin{onlyenv}<6>
-> toList :: a -> M [a]
-> toList x = do {-"\phantom{\fbox{\ensuremath{"-}Cons x Nil{-"}}}"-}
->   nil <- mkData Nil
->   cons <- mkData Cons x nil
->   return cons
-  \end{onlyenv}
-  
-\end{frame}
-
-\begin{frame}\vspace{12pt}
-  \begin{itemize}
-  \item Three-Address Code
-  \item Closures
-    \begin{itemize}
-    \item Environments --- Example of a function that captures a
-      variable.
-    \end{itemize}
-  \item Monads
-  \item Allocation in \mil; partial application
-  \end{itemize}
-\end{frame}
-
-\section{Dataflow Analysis}
-\begin{frame}{Dataflow Analysis}\vspace{12pt}
-  \begin{itemize}
-  \item Control-Flow Graphs
-  \item Basic Blocks
-  \item Example Program \& Constant Propagation
-  \item Facts and the Transfer Function
-  \end{itemize}
-  
-  \begin{itemize}
-  \item Hoopl
-  \item Used in GHC
-  \item Interleaved Analysis \& Rewriting
-  \end{itemize}
-
-\end{frame}
-
-\section{Uncurrying}
-\begin{frame}{Uncurrying}\vspace{12pt}
-  \begin{itemize}
-  \item Uncurrying
-    \begin{itemize}
-    \item Partial Application
-    \item Uncurrying within a block (\lab toInt/ example)
-      \begin{itemize}
-      \item Facts
-      \item Step-by-step Transformation of \lab main/ 
-      \end{itemize}
-    \item Aside: use of multiple optimizations (dead code, inlining)
-    \item Uncurrying |map|
-      \begin{itemize}
-      \item Original \cfg
-      \item Development of facts \& the \cfg
-      \end{itemize}
-    \end{itemize}
-  \end{itemize}
-\end{frame}
-
-\begin{frame}{Uncurrying |map|}\vspace{12pt}
-  \begin{tikzpicture}
+\begin{frame}[fragile]
+\begin{comment}
+  \begin{onlyenv}<1,4->\begin{tikzpicture}[remember picture]
     \node[stmt] (main) {\block main(ns):};
     \node[stmt,below=.3in of main] (caseEval216) {\block caseEval216(xs, f):};
-    \node[stmt,below left=.3in and -0.5in of caseEval216] (altNil206) {\block altNil206():};
-    \node[stmt,below right=.3in and -0.7in of caseEval216] (altCons208) {\block altCons208(f, x, xs):};
+    \node[stmt,below left=.6in and -0.5in of caseEval216] (altNil206) {\block altNil206():};
+    \node[stmt,below right=.6in and -0.7in of caseEval216] (altCons208) {\block altCons208(f, x, xs):};
+    \node[stmt, below=.6in of altCons208] (b220) {\block b220(x):};
+
     \draw [->] (caseEval216) to (altNil206);
     \draw [->] (caseEval216) to (altCons208);
-  \end{tikzpicture}
+  \end{tikzpicture}\end{onlyenv}
+
+  \begin{onlyenv}<4->\begin{tikzpicture}[remember picture, overlay]
+    \node[overlay,invis,below left=.15in and -.3in of caseEval216] () {$\emptyset$};
+  \end{tikzpicture}\end{onlyenv}
+\end{comment}
+
+  \begin{onlyenv}<2->
+    \begin{tikzpicture}
+      \node[stmt] (caseEval216) {\block caseEval216(xs, f):};
+      \node[stmt,below left=.6in and -0.5in of caseEval216] (altNil206) {\block altNil206():};
+      \node[stmt,below right=.6in and -0.7in of caseEval216] (altCons208) {\block altCons208(f, x, xs):};
+      \draw [->] (caseEval216) to (altNil206);
+      \draw [->] (caseEval216) to (altCons208);
+    \end{tikzpicture}
+  \end{onlyenv}
+
+  \begin{onlyenv}<2>
+    \begin{AVerb}[gobble=6,numbers=left]
+      \block caseEval216(xs, f): 
+        \case xs;
+          \valt Nil()->\goto altNil206();
+          \valt Cons(x xs)->\goto altCons208(f, x, xs);
+    \end{AVerb}
+  \end{onlyenv}
+
+  \begin{onlyenv}<3>
+    \begin{AVerb}[gobble=6,numbers=left]
+      \block caseEval216(\uline{xs}, \uline{f}): 
+        \case xs;
+          \valt Nil()->\goto altNil206();
+          \valt Cons(x xs)->\goto altCons208(f, x, xs);
+    \end{AVerb}
+  \end{onlyenv}
+
+\begin{comment}
+  \begin{onlyenv}<4>\begin{tikzpicture}[remember picture, overlay]
+    \node[overlay,invis,below right=.05in and -.1in of caseEval216] () {$\begin{array}{@@{}l}
+        \{\var f/\,:\,\top\}, \{\var x/\,:\,\top\},\\
+        \{\var xs/\,:\,\top\}\end{array}$};
+  \end{tikzpicture}\end{onlyenv}
+
+  \begin{onlyenv}<5>\begin{tikzpicture}[remember picture, overlay]
+    \node[overlay,invis,below right=.07in and -.2in of main] () { $\{\var xs/\,:\,\top\}, \{\var f/\,:\,\mkclo[k219:]\unskip\}$};
+    \node[overlay,invis,below right=.05in and -.1in of caseEval216] () {$\begin{array}{@@{}l}
+        \{\var f/\,:\,\mkclo[k219:]\unskip\}, \{\var x/\,:\,\top\}, \\
+        \{\var xs/\,:\,\top\}\end{array}$};
+
+    \draw [->] (main) to (caseEval216);
+  \end{tikzpicture}\end{onlyenv}
+\end{comment}
 \end{frame}
 
+\begin{comment}
 \begin{frame}[fragile]{Uncurrying |map|}\vspace{12pt}
   \begin{AVerb}[gobble=4,numbers=left]
     \block main(ns):  \anchorF(nsa)
@@ -605,9 +558,7 @@ and return the value \mkclo[mapK2:f].}
     \draw [->] (fv228a4) to (v228a);
     \draw [->] (fv227a4) to (v227a);
   \end{tikzpicture}\end{onlyenv}%%
-\end{frame}
 
-\begin{frame}[fragile]{Uncurrying |map|}\vspace{12pt}
   \begin{onlyenv}<1>
     \begin{AVerb}[gobble=6,numbers=left]
       \block main(ns): 
@@ -636,42 +587,171 @@ and return the value \mkclo[mapK2:f].}
   \end{tikzpicture}%%
   \end{onlyenv}
 \end{frame}
+\end{comment}
 
-\begin{frame}{Uncurrying |map|}\vspace{12pt}
-  \begin{onlyenv}<1>\begin{tikzpicture}
-    \node[stmt] (main) {\block main(ns):};
-    
-    \node[stmt,below=.3in of main] (caseEval216) {\block caseEval216(xs, f):};
-    
-    \node[stmt,below left=.3in and -0.5in of caseEval216] (altNil206) {\block altNil206():};
-    
-    \node[stmt,below right=.3in and -0.7in of caseEval216] (altCons208) {\block altCons208(f, x, xs):};
-
-    \node[overlay,invis,below left=.05in and -.2in of caseEval216] () {$\emptyset$};
-
-    \node[overlay,invis,below right=.05in and -.2in of caseEval216] () {$\{\var f/\,:\,\top\}, \{\var x/\,:\,\top\}, \{\var xs/\,:\,\top\}$};
-
-    \draw [->] (caseEval216) to (altNil206);
-    \draw [->] (caseEval216) to (altCons208);
-  \end{tikzpicture}
-  \end{onlyenv}
-
-  \begin{onlyenv}<2>\begin{tikzpicture}
-    \node[stmt] (main) {\block main(ns):};
-    \node[stmt,below=.3in of main] (caseEval216) {\block caseEval216(xs, f):};
-
-    \node[stmt,below left=.3in and -0.5in of caseEval216] (altNil206) {\block altNil206():};
-
-    \node[stmt,below right=.3in and -0.7in of caseEval216] (altCons208) {\block altCons208(f, x, xs):};
-
-    \node[overlay,invis,below right=.07in and -.2in of main] () { $\{\var xs/\,:\,\top\}, \{\var f/\,:\,\mkclo[k219:]\unskip\}$};
-    \node[overlay,invis,below left=.05in and -.2in of caseEval216] () {$\emptyset$};
-    \node[overlay,invis,below right=.05in and -.2in of caseEval216] () {$\{\var f/\,:\,\mkclo[k219:]\unskip\}, \{\var x/\,:\,\top\}, \{\var xs/\,:\,\top\}$};
-
-    \draw [->] (main) to (caseEval216);
-    \draw [->] (caseEval216) to (altNil206);
-    \draw [->] (caseEval216) to (altCons208);
-  \end{tikzpicture}
-  \end{onlyenv}
+\begin{frame}\vspace{12pt} \ldots
 \end{frame}
+\subsection{Example: Uncurrying a loop}
+\begin{frame}\vspace{12pt} \ldots
+\end{frame}
+\subsection{Related Work: Appel, Tarditi, Tolmach \& Oliva}
+\begin{frame}\vspace{12pt} \ldots
+\end{frame}
+
+\begin{comment}
+
+  \section{Conclusion}
+  \begin{frame}\vspace{12pt} \ldots
+  \end{frame}
+  \subsection{Monadic  Optimizations}
+  \begin{frame}\vspace{12pt} \ldots
+  \end{frame}
+  \subsection{Future Work}
+  \begin{frame}\vspace{12pt} \ldots
+  \end{frame}
+
+\end{comment}
+
+%% \subsection{Monadic Effects}
+
+%% \subsection{Tails}
+
+%% \subsection{Compilation}
+%% %   \item Definition of |map|
+%% \begin{frame}\vspace{12pt}
+%% \begin{minipage}[t]{\hsize}\elimdisplayskip
+%% > map :: (a -> b) -> [a] -> [b]{-"\phantom{(}"-}
+%% > map f xs = case xs of
+%% >   (x:xs') -> map (f x) xs'
+%% >   [] -> []
+%% >
+%% > toList :: a -> [a]
+%% > toList x = [x]
+%% \end{minipage}
+%% \end{frame}
+
+%% \begin{frame}{Evaluating |map| (call-by-value)}\vspace{12pt}
+%%   %  \item Evaluating |map| using call-by-value: |map toList [1,2,3]|
+%%   \begin{onlyenv}<1>
+%% > map toList [1,2] = case [1,2] of {-"\hfill\text{\it Definition of \mfun{map}.}"-}
+%% >   (x:xs') -> toList x : map f xs'
+%% >   [] -> []
+%%   \end{onlyenv}
+
+%%   \begin{onlyenv}<2>
+%% > {-"\dots"-} = toList 1 : map f [2] {-"\hfill\text{\it ``Cons'' arm of \mfun{map}.}"-}
+%%   \end{onlyenv}
+
+%%   \begin{onlyenv}<3>
+%% > {-"\dots"-} = [1] : map f [2] {-"\hfill\text{\it Definition of \mfun{toList}.}"-}
+%%   \end{onlyenv}
+
+%%   \begin{onlyenv}<4>
+%% > {-"\dots"-} = [1] : case [2] of {-"\hfill\text{\it Definition of \mfun{map}.}"-}
+%% >   (x:xs') -> toList x : map f xs'
+%% >   [] -> []
+%%   \end{onlyenv}
+
+%%   \begin{onlyenv}<5>
+%% > {-"\dots"-} = [1] : toList 2 : map f [] {-"\hfill\text{\it ``Cons'' arm of \mfun{map}.}"-}
+%%   \end{onlyenv}
+
+%%   \begin{onlyenv}<6>
+%% > {-"\dots"-} = [1] : [2] : map f [] {-"\hfill\text{\it Definition of \mfun{toList}.}"-}
+%%   \end{onlyenv}
+
+
+%%   \begin{onlyenv}<7>
+%% > {-"\dots"-} = [1] : [2] : case [] of {-"\hfill\text{\it Definition of \mfun{map}.}"-}
+%% >   (x:xs') -> toList x : map f xs'
+%% >   [] -> []
+%%   \end{onlyenv}
+
+%%   \begin{onlyenv}<8>
+%% > {-"\dots"-} = [1] : [2] : [] {-"\hfill\text{\it ``Nil'' arm of \mfun{map}.}"-}
+%%   \end{onlyenv}
+
+
+%%   \begin{onlyenv}<9>
+%% > {-"\dots"-} = [[1],[2]] {-"\hfill\text{\it Syntatic sugar.}"-}
+%%   \end{onlyenv}
+
+%%   %% \begin{itemize}
+%%   %% \item Closures
+%%   %% \end{itemize}
+%% \end{frame}
+
+%% \subsection{Hidden Effects in |toList|}
+%% \begin{frame}\vspace{12pt}
+%%   \frametitle<1>{Definition of |toList|}
+%%   \begin{onlyenv}<1>
+%% > toList :: a -> [a]
+%% > toList x = [x] {-"\vphantom{\fbox{\mfun{Cons}}}"-}
+%%   \end{onlyenv}
+
+%%   \frametitle<2>{Removing Syntatic Sugar \ldots}
+%%   \begin{onlyenv}<2>
+%% > toList :: a -> [a]
+%% > toList x = Cons x Nil {-"\vphantom{\fbox{\mfun{Cons}}}"-}
+%%   \end{onlyenv}
+
+%%   \frametitle<3>{Allocation!}
+%%   \begin{onlyenv}<3>
+%% > toList :: a -> [a]
+%% > toList x = {-"\fbox{\ensuremath{"-}Cons x Nil{-"}}"-}
+%%   \end{onlyenv}
+
+%%   \frametitle<4>{Allocation!}
+%%   \begin{onlyenv}<4>
+%% > toList :: a -> [a]{-"\mathllap{\xout{\phantom{"-}[a]{-"}}}"-}
+%% > toList x = {-"\fbox{\ensuremath{"-}Cons x Nil{-"}}"-}
+%%   \end{onlyenv}
+
+%%   \frametitle<5>{The real type of |toList|.}
+%%   \begin{onlyenv}<5>
+%% > toList :: a -> M [a]
+%% > toList x = {-"\dots\phantom{\fbox{\ensuremath{"-}Cons x Nil{-"}}}"-}
+%%   \end{onlyenv}
+
+%%   \frametitle<6>{A monadic |toList|}
+%%   \begin{onlyenv}<6>
+%% > toList :: a -> M [a]
+%% > toList x = do {-"\phantom{\fbox{\ensuremath{"-}Cons x Nil{-"}}}"-}
+%% >   nil <- mkData Nil
+%% >   cons <- mkData Cons x nil
+%% >   return cons
+%%   \end{onlyenv}
+  
+%% \end{frame}
+
+%% \begin{frame}\vspace{12pt}
+%%   \begin{itemize}
+%%   \item Three-Address Code
+%%   \item Closures
+%%     \begin{itemize}
+%%     \item Environments --- Example of a function that captures a
+%%       variable.
+%%     \end{itemize}
+%%   \item Monads
+%%   \item Allocation in \mil; partial application
+%%   \end{itemize}
+%% \end{frame}
+
+%% \section{Dataflow Analysis}
+%% \begin{frame}{Dataflow Analysis}\vspace{12pt}
+%%   \begin{itemize}
+%%   \item Control-Flow Graphs
+%%   \item Basic Blocks
+%%   \item Example Program \& Constant Propagation
+%%   \item Facts and the Transfer Function
+%%   \end{itemize}
+  
+%%   \begin{itemize}
+%%   \item Hoopl
+%%   \item Used in GHC
+%%   \item Interleaved Analysis \& Rewriting
+%%   \end{itemize}
+
+%% \end{frame}
+
 \end{document}
