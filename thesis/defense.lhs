@@ -15,10 +15,21 @@
 \date{\today}
 \setbeameroption{show notes}
 \setbeamertemplate{navigation symbols}{}
-\setbeamersize{text margin left=1.5em}
+%\setbeamersize{text margin left=1.5em}
 \usepackage{verbatim}
+\AtBeginEnvironment{hscode}{\abovedisplayshortskip=0in%
+  \abovedisplayskip=0in%
+  \belowdisplayshortskip=0in%
+  \belowdisplayskip=0in%
+  \parskip=0pt}
+\renewcommand{\hsnewpar}[1]{\parskip=0pt\parindent=0pt\par\noindent}
+\def\hsline#1{\uline{\smash{#1}}}
+\def\altline<#1>#2{\alt<#1>{\hsline{#2}}{#2}}
+\let\elimdisplayskip\relax
+\newtoks\hstoks
 \begin{document}\nomd\numbersoff
 
+\begin{comment}
 \section{Introduction}
 \begin{frame}{Introduction}\vspace{12pt}
   \begin{itemize}
@@ -46,7 +57,6 @@
   \end{itemize}
 \end{frame}
 
-\begin{comment}
 \section{\Mil}
 \subsection{Blocks}
 \begin{frame}[fragile]{\Mil: Blocks}
@@ -422,104 +432,424 @@ and return the value \mkclo[mapK2:f].}
 %% \end{frame}
 
 \begin{comment}
-\begin{frame}[fragile]{Uncurrying |map|}\vspace{12pt}
-  \begin{tabular}{@@{}c}
-    \begin{minipage}{\hsize}\begin{centering}
-> main ns = map toList ns
+\note{The following sequence illustrates how I can turn a recursive
+  call into a loop. I start by showing the definition of the program,
+  then talk through the translation of each block. I want to build up
+  the \cfg in pieces. The first slide shows the entire program. The next
+shows the \mil block for \lab main/. }
+
+\begin{frame}[fragile]{Uncurrying |map|}
+
+\begin{onlyenv}<1-3>\begin{uncoverenv}<3>\begin{tikzpicture}
+  \node[stmt] (main1) {\block main(ns):};
+\end{tikzpicture}\end{uncoverenv}\end{onlyenv}
+
+\note<2>{I point out that \lab main/ doesn't call any blocks, so
+  therefore its \cfg node doesn't connect to anything.}
+
+\begin{onlyenv}<1-3>
+\begin{tabular*}{\hsize}{@@{}ll}
+\begin{minipage}[t]{.5\hsize}
+> {-"\altline<2,3>{"-}main ns{-"}"-} = map toList ns
 > map f xs = case xs of
->   Cons x xs' -> Cons (f x) (map f xs')
+>   Cons x xs' -> 
+>     Cons (f x) (map f xs')
 >   Nil -> Nil 
 > toList n = Cons n Nil
-    \end{centering}\end{minipage} \\
-    \begin{tabular}{@@{}lr}\begin{minipage}[t]{.55\hsize}
+\end{minipage} & \begin{uncoverenv}<2-3>\begin{minipage}[t]{.4\hsize}
     \begin{AVerb}[gobble=6,numbers=left]
       \block main(ns): 
         \vbinds v227<-\mkclo[k203:];
         \vbinds v228<-\mkclo[k219:];
         \vbinds v229<-\app v227*v228/;
         \app v229 * ns/ 
-      \ccblock k219()x: \goto b220(x)
-      \block b220(x):\label{uncurry_global_toList_body}
+    \end{AVerb}
+  \end{minipage}\end{uncoverenv}
+\end{tabular*}
+\end{onlyenv}
+
+\note<3>{I do the same for \lab toList/.}
+
+\begin{onlyenv}<4,5>\begin{uncoverenv}<5>\begin{tikzpicture}
+  \node[stmt] (toList1) {\block toList(x):};
+\end{tikzpicture}\end{uncoverenv}\end{onlyenv}
+
+\begin{onlyenv}<4,5>
+\begin{tabular*}{\hsize}{@@{}ll}
+\begin{minipage}[t]{.5\hsize}
+> main ns = map toList ns
+> map f xs = case xs of
+>   Cons x xs' -> 
+>     Cons (f x) (map f xs')
+>   Nil -> Nil 
+> {-"\hsline{"-}toList n{-"}"-} = Cons n Nil
+\end{minipage}& \begin{minipage}[t]{.4\hsize}
+    \begin{AVerb}[gobble=6,numbers=left]
+      \block toList(x):
         \vbinds v221<-\mkclo[Consclo2:];
         \vbinds v222<-\app v221*x/;
         \vbinds v223<-Nil;
-        \app v222 * v223/ \label{uncurry_global_toList_body_end}
+        \app v222 * v223/ 
     \end{AVerb}
-  \end{minipage} &
-  \begin{minipage}[t]{.4\hsize}
-    \begin{AVerb}[gobble=6,numbers=left,firstnumber=last]
-      \ccblock k203()f: \mkclo[k204:f]
-      \ccblock k204(f)xs: \goto caseEval216(xs, f)
-      \block caseEval216(xs, f): \label{uncurry_global_map_body}
+  \end{minipage}
+\end{tabular*}
+\end{onlyenv} 
+
+\note<5>{Since \lab map/ is pretty complicated, I reveal it
+  in pieces. I start by looking at \lab map/ and showing that
+  it calls two blocks, \lab nil/ and \lab cons/.}
+
+\begin{onlyenv}<6-9>\begin{uncoverenv}<7-9>\begin{tikzpicture}
+  \node[stmt] (map1) {\block map(f,xs):};
+  \node[stmt,right=.3in of map1] (cons1) {\block cons(f, x, xs):};
+  \node[stmt,left=.3in of map1] (nil1) {\block nil():};
+  \draw [->] (map1) to (nil1);
+  \draw [->] (map1) to (cons1);
+\end{tikzpicture}\end{uncoverenv}\end{onlyenv}
+
+\note<7>{\lab cons/ and \lab nil/ don't have any successors, so I 
+go through them pretty quickly.}
+
+\note<9>{Now I reveal the (initial) \cfg for the entire program. I note that
+our compiler produces pretty bad code that doesn't take advantage of
+obvious connectinos, such as between \lab cons/ and \lab map/, or between
+\lab cons/ and \lab toList/.}
+
+\begin{onlyenv}<6-9>
+\begin{tabular*}{\hsize}{@@{}ll}
+\begin{minipage}[t]{.5\hsize}
+> main ns = map toList ns
+> {-"\altline<6,7>{"-}map f xs{-"}"-} = case xs of
+>   Cons x xs' -> 
+>     {-"\altline<8>{"-}Cons (f x) (map f xs'){-"}"-}
+>   Nil -> {-"\altline<9>{"-}Nil{-"}"-}
+> toList n = Cons n Nil
+\end{minipage} & \begin{onlyenv}<6,7>\begin{minipage}[t]{.4\hsize}
+  \begin{AVerb}[gobble=6,numbers=left]
+      \block map(f,xs): 
         \case xs;
-          \valt Nil()->\goto altNil206();
-          \valt Cons(x xs)->\goto altCons208(f, x, xs);
-      \block altNil206(): Nil \label{uncurry_global_map_nil}
-      \block altCons208(f, x, xs): \label{uncurry_global_map_cons}
-        v209 <- \mkclo[Consclo2:]
-        \vbinds v210<-\app f*x/; \label{uncurry_global_map_cons_fx}
-        \vbinds v211<-\app v209*v210/;
-        \vbinds v212<-\mkclo[k203:]; \label{uncurry_global_map_cons_map_start}
-        \vbinds v213<-\app v212*f/;
-        \vbinds v214<-\app v213*xs/; \label{uncurry_global_map_cons_map_end}
-        \app v211 * v214/ \label{uncurry_global_map_cons_end}
+          \valt Nil()->\goto nil();
+          Cons x xs -> 
+            \goto cons(f, x, xs)
     \end{AVerb}
-  \end{minipage}\end{tabular} \\
-  \end{tabular}
+\end{minipage}\end{onlyenv}\begin{onlyenv}<8>\begin{minipage}[t]{.4\hsize}
+  \begin{AVerb}[gobble=6,numbers=left]
+      \block cons(f, x, xs): 
+        v209 <- \mkclo[Consclo2:]
+        \vbinds v210<-\app f*x/; 
+        \vbinds v211<-\app v209*v210/;
+        \vbinds v212<-\mkclo[k203:]; 
+        \vbinds v213<-\app v212*f/;
+        \vbinds v214<-\app v213*xs/; 
+        \app v211 * v214/ 
+    \end{AVerb}
+\end{minipage}\end{onlyenv}\begin{onlyenv}<9>\begin{minipage}[t]{.4\hsize}
+    \begin{AVerb}[gobble=6,numbers=left]
+      \block nil(): Nil 
+    \end{AVerb}
+\end{minipage}\end{onlyenv}
+\end{tabular*}
+\end{onlyenv}
+
+\begin{onlyenv}<10>\begin{centering}\begin{tikzpicture}
+  \node[stmt] (main2) {\block main(ns):};
+  \node[stmt,below=.3in of main2] (map2) {\block map(f,xs):};
+  \node[stmt,right=.3in of map2] (cons2) {\block cons(f, x, xs):};
+  \node[stmt,left=.3in of map2] (nil2) {\block nil():};
+  \node[stmt,above=.3in of cons2] (toList2) {\block toList(x):};
+  \draw [->] (map2) to (nil2);
+  \draw [->] (map2) to (cons2);
+\end{tikzpicture}
+
+> main ns = map toList ns
+> map f xs = case xs of
+>   Cons x xs' -> Cons (f x) (map f xs')
+>   Nil -> Nil 
+> toList n = Cons n Nil
+\end{centering}\end{onlyenv}
+\end{frame}
+
+\note{Now that I have shown the initial \cfg, I want to populate it
+ with initial facts. Since only \lab map/ has a successor, we focus
+ on \lab map/ first. I'ts pretty simple --- only everything is $\top$.}
+
+\begin{frame}
+\ldots
+\end{frame}
+
+\note{To proceed, I need to connect \lab main/ to \lab map/. I will go through
+  uncurrying within \lab main/.}
+
+\begin{frame}[fragile]{Uncurrying |map|}
+  \begin{tikzpicture}[remember picture]
+    \node[stmt] (main3) {\block main(ns):};
+    \node[stmt,below=.3in of main3] (map3) {\block map(f,xs):};
+    \node[stmt,right=.3in of map3] (cons3) {\block cons(f, x, xs):};
+    \node[stmt,left=.3in of map3] (nil3) {\block nil():};
+    \node[stmt,above=.3in of cons3] (toList3) {\block toList(x):};
+    \draw [->] (map3) to (nil3);
+    \draw [->] (map3) to (cons3);
+  \end{tikzpicture}
+
+  \begin{onlyenv}<1-3>\begin{AVerb}[gobble=4,numbers=left,xleftmargin=1.5em]
+    \block main(ns):  \anchorF(nsa)
+      \vbinds v227<-\mkclo[k203:];\anchorF(v227a) 
+      \vbinds v228<-\mkclo[k219:];\anchorF(v228a)
+      \vbinds v229<- \app \balt{3-}{{\color{red}v227}}{v227}*v228/;\anchorF(v229a) 
+      \app v229 * ns/ 
+    \ccblock k203()f: \mkclo[k204:f]
+    \ccblock k204(f)xs: \goto map(f,xs)
+    \ccblock k219()x: \goto toList(x)
+  \end{AVerb}
+  \end{onlyenv}
+
+  \note<1>{Our first pass through \lab main/ produces facts about \var v227/,
+    \var v228/ and \var v229/.}
+
+  \begin{onlyenv}<2>\begin{tikzpicture}[overlay,remember picture]
+    \node[fact, right=0.25in of nsa, anchor=west] (fvnsa3) {$\{\var ns/\,:\,\top\}$};
+    \draw [->] (fvnsa3) to (nsa);
+    \node[fact, right=0.25in of v227a, anchor=west] (fv227a3) {$\{\var v227/\,:\,\mkclo[k203:]\unskip\}$};
+    \node[fact, right=0.25in of v228a, anchor=west] (fv228a3) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
+    \node[fact, right=0.25in of v229a, anchor=west] (fv229a3) {$\{\var v229/\,:\,\top\}$};
+    \draw [->] (fv227a3) to (v227a);
+    \draw [->] (fv228a3) to (v228a);
+    \draw [->] (fv229a3) to (v229a);
+  \end{tikzpicture}\end{onlyenv}%%
+
+  \note<2>{I point out that \var v229/ is $\top$, but
+    we can rewrite \app v227 * v228/ based on the facts gathered. This sequence connects
+  the fact we have about \var v227/ with the result returned by the \cc block.}
+
+  \begin{onlyenv}<3>\begin{tikzpicture}[overlay, remember picture]
+    \node[fact, right=0.25in of nsa, anchor=west] (fvnsa4) {$\{\var ns/\,:\,\top\}$};
+    \draw [->] (fvnsa4) to (nsa);
+    \node[fact, right=0.25in of v227a, anchor=west] (fv227a4) {$\{{\color{red}\var v227/}\,:\,\mkclo[k203:]\unskip\}$};
+    \node[fact, right=0.25in of v228a, anchor=west] (fv228a4) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
+    \node[fact, right=0.25in of v229a, anchor=west] (fv229a4) {$\{\var v229/\,:\,\top\}$};
+    \draw [->] (fv228a4) to (v228a);
+    \draw [->] (fv227a4) to (v227a);
+    \draw [->] (fv229a4) to (v229a);
+  \end{tikzpicture}\end{onlyenv}%%
+
+  \begin{onlyenv}<4-6>\begin{AVerb}[gobble=4,numbers=left,xleftmargin=1.5em]
+    \block main(ns): \anchorF(nsb)
+      \vbinds v227<-\mkclo[k203:];\anchorF(v227b) 
+      \vbinds v228<-\mkclo[k219:];\anchorF(v228b) 
+      \llap{\ensuremath{\rightarrow} }\balt{4,5}{\vbinds v229<-\app {\color{red}{\mkclo[k203:]}}*v228/;}{\vbinds v229<-\color{red}{\mkclo[k204:v228]};}\anchorF(v229b) 
+      \app v229 * ns/
+    \balt{5}{\color{red}\ccblock k203()f:}{\ccblock k203()f:} \balt{6}{\color{red}\mkclo[k204:f]}{\mkclo[k204:f]}
+    \ccblock k204(f)xs: \goto map(f,xs)
+    \ccblock k219()x: \goto toList(x)
+  \end{AVerb}
+  \end{onlyenv}
+
+  \begin{onlyenv}<4-6>\begin{tikzpicture}[overlay, remember picture]
+    \node[fact, right=0.25in of nsb, anchor=west] (fvnsa4) {$\{\var ns/\,:\,\top\}$};
+    \draw [->] (fvnsa4) to (nsb);
+    \node[fact, right=0.25in of v227b, anchor=west] (fv227a5) {$\{\balt{4}{{\color{red}\var v227/}}{\var v227/}\,:\,\mkclo[k203:]\unskip\}$};
+    \node[fact, right=0.25in of v228b, anchor=west] (fv228a5) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
+    \draw [->] (fv228a5) to (v228b);
+    \draw [->] (fv227a5) to (v227b);
+  \end{tikzpicture}\end{onlyenv}
+
+  \note<6>{When I rewrite line 4, I get a new fact --- \var v229/
+    holds \mkclo[k204:v228]. I now step through the same sequence as before,
+    using the new fact to rewrite line 5.}
+  \begin{onlyenv}<7,8>\begin{AVerb}[gobble=4,numbers=left,xleftmargin=1.5em]
+    \block main(ns): \anchorF(nsc)
+      \vbinds v227<-\mkclo[k203:];\anchorF(v227c)
+      \vbinds v228<-\mkclo[k219:];\anchorF(v228c)
+      \vbinds v229<-\mkclo[k204:v228];\anchorF(v229c)
+      \app \balt{8}{{\color{red}v229}}{v229} * ns/
+    \ccblock k203()f: \mkclo[k204:f]
+    \ccblock k204(f)xs: \goto map(f,xs)
+    \ccblock k219()x: \goto toList(x)
+  \end{AVerb}
+  \end{onlyenv}
+
+  \begin{onlyenv}<7>\begin{tikzpicture}[overlay, remember picture]
+    \node[fact, right=0.25in of nsc, anchor=west] (fvnsa6) {$\{\var ns/\,:\,\top\}$};
+    \draw [->] (fvnsa6) to (nsc);
+    \node[fact, right=0.25in of v227c, anchor=west] (fv227a6) {$\{\var v227/\,:\,\mkclo[k203:]\unskip\}$};
+    \node[fact, right=0.25in of v228c, anchor=west] (fv228a6) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
+    \node[fact, right=0.25in of v229c, anchor=west] (fv229a6) {$\{\var v229/\,:\,\mkclo[k204:v228]\unskip\}$};
+    \draw [->] (fv227a6) to (v227c);
+    \draw [->] (fv228a6) to (v228c);
+    \draw [->] (fv229a6) to (v229c);
+  \end{tikzpicture}\end{onlyenv}
+
+  \begin{onlyenv}<8>\begin{tikzpicture}[overlay, remember picture]
+    \node[fact, right=0.25in of nsc, anchor=west] (fvnsa7) {$\{\var ns/\,:\,\top\}$};
+    \draw [->] (fvnsa7) to (nsc);
+    \node[fact, right=0.25in of v227c, anchor=west] (fv227a7) {$\{\var v227/\,:\,\mkclo[k203:]\unskip\}$};
+    \node[fact, right=0.25in of v228c, anchor=west] (fv228a7) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
+    \node[fact, right=0.25in of v229c, anchor=west] (fv229a7) {$\{{\color{red}\var v229/}\,:\,\mkclo[k204:v228]\unskip\}$};
+    \draw [->] (fv227a7) to (v227c);
+    \draw [->] (fv228a7) to (v228c);
+    \draw [->] (fv229a7) to (v229c);
+  \end{tikzpicture}\end{onlyenv}
+
+  \begin{onlyenv}<9,10>\begin{AVerb}[gobble=4,numbers=left,xleftmargin=1.5em]
+    \block main(ns): \anchorF(nsd)
+      \vbinds v227<-\mkclo[k203:];\anchorF(v227d)
+      \vbinds v228<-\mkclo[k219:];\anchorF(v228d)
+      \vbinds v229<-\mkclo[k204:v228];\anchorF(v229d)
+      \app {\color{red}\mkclo[k204:v228]} * ns/
+    \ccblock k203()f: \mkclo[k204:f]
+    \balt{10}{{\color{red}\ccblock k204(f)xs: \goto map(f,xs)}}{\ccblock k204(f)xs: \goto map(f,xs)}
+    \ccblock k219()x: \goto toList(x)
+  \end{AVerb}
+  \end{onlyenv}
+
+  \begin{onlyenv}<9,10>\begin{tikzpicture}[overlay, remember picture]
+    \node[fact, right=0.25in of nsd, anchor=west] (fvnsa11) {$\{\var ns/\,:\,\top\}$};
+    \draw [->] (fvnsa11) to (nsd);
+    \node[fact, right=0.25in of v227d, anchor=west] (fv227a11) {$\{\var v227/\,:\,\mkclo[k203:]\unskip\}$};
+    \node[fact, right=0.25in of v228d, anchor=west] (fv228a11) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
+    \node[fact, right=0.25in of v229d, anchor=west] (fv229a11) {$\{\var v229/\,:\,\mkclo[k204:v228]\unskip\}$};
+    \draw [->] (fv227a11) to (v227d);
+    \draw [->] (fv228a11) to (v228d);
+    \draw [->] (fv229a11) to (v229d);
+  \end{tikzpicture}\end{onlyenv}
+
+  \note<11>{With line 5 rewritten, the \cfg for the program changes.  \lab main/
+    now connects to \lab map/. 
+
+    Before moving on, I also point out that lines 2 and 4 are now
+    dead, because \var 227/ and \var 229/ are no longer referenced and
+    we can delete them. I explain that dead-code elimination is really
+    a separate pass in the implementation, but the net result is the
+    same.}
+  \begin{onlyenv}<11-13>\begin{AVerb}[gobble=4,numbers=left,xleftmargin=1.5em]
+    \block main(ns): \anchorF(nse)
+      \balt{13}{\xout{\vbinds v227<-\mkclo[k203:];}}{\vbinds v227<-\mkclo[k203:];}\anchorF(v227e)
+      \vbinds v228<-\mkclo[k219:];\anchorF(v228e)
+      \balt{13}{\xout{\vbinds v229<-\mkclo[k204:v228];}}{\vbinds v229<-\mkclo[k204:v228];}\anchorF(v229e)
+      \balt{11}{\color{red}\goto map(v228, ns)}{\goto map(v228, ns)}
+    \ccblock k203()f: \mkclo[k204:f]
+    \ccblock k204(f)xs: \balt{11}{\color{red}\goto map(f,xs)}{\goto map(f,xs)}
+    \ccblock k219()x: \goto toList(x)
+  \end{AVerb}
+  \end{onlyenv}
+
+  \begin{onlyenv}<11,12>\begin{tikzpicture}[overlay, remember picture]
+    \node[fact, right=0.25in of nse, anchor=west] (fvnsa8) {$\{\var ns/\,:\,\top\}$};
+    \draw [->] (fvnsa8) to (nse);
+    \node[fact, right=0.25in of v227e, anchor=west] (fv227a8) {$\{\var v227/\,:\,\mkclo[k203:]\unskip\}$};
+    \node[fact, right=0.25in of v228e, anchor=west] (fv228a8) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
+    \node[fact, right=0.25in of v229e, anchor=west] (fv229a8) {$\{\var v229/\,:\,\mkclo[k204:v228]\unskip\}$};
+    \draw [->] (fv227a8) to (v227e);
+    \draw [->] (fv228a8) to (v228e);
+    \draw [->] (fv229a8) to (v229e);
+  \end{tikzpicture}\end{onlyenv}
+
+  \begin{onlyenv}<12>\begin{tikzpicture}[overlay, remember picture]
+    \draw[color=red] [->] (main3) to (map3);
+  \end{tikzpicture}\end{onlyenv}
+
+  \begin{onlyenv}<13>\begin{tikzpicture}[overlay, remember picture]
+    \node[fact, right=0.25in of nse, anchor=west] (fvnsa9) {$\{\var ns/\,:\,\top\}$};
+    \draw [->] (fvnsa9) to (nse);
+    \node[fact, right=0.25in of v228e, anchor=west] (fv228a9) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
+    \draw [->] (fv228a9) to (v228e);
+    \draw [->] (main3) to (map3);
+  \end{tikzpicture}\end{onlyenv}
+
+  \begin{onlyenv}<14>
+    \begin{AVerb}[gobble=6,numbers=left,xleftmargin=1.5em]
+      \block main(ns): \anchorF(nsf)
+        \vbinds v228<-\mkclo[k219:];\anchorF(v228f)
+        \goto map(v228, ns)
+    \ccblock k203()f: \mkclo[k204:f]
+    \ccblock k204(f)xs: \goto map(f,xs)
+    \ccblock k219()x: \goto toList(x)
+    \end{AVerb}
+  \end{onlyenv}
+
+  \begin{onlyenv}<14>\begin{tikzpicture}[overlay,remember picture]
+    \node[fact, right=0.25in of nsf, anchor=west] (fvnsa10) {$\{\var ns/\,:\,\top\}$};
+    \draw [->] (fvnsa10) to (nsf);
+    \node[fact, right=0.25in of v228f, anchor=west] (fv228a10) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
+    \draw [->] (fv228a10) to (v228f);
+    \draw [->] (main3) to (map3);
+  \end{tikzpicture}
+  \end{onlyenv}
 \end{frame}
 \end{comment}
 
-\note{This example illustrates uncurrying across blocks, but not across loops. I want
-  to emphasize that this example alters the \cfg in interesting ways as the analysis
-  proceeds.}
+\note{I return to the \cfg, keeping \lab main/ on the screen, and show
+  updated facts.}
 
-\begin{frame}[fragile]
-\begin{comment}
-  \begin{onlyenv}<1,4->\begin{tikzpicture}[remember picture]
-    \node[stmt] (main) {\block main(ns):};
-    \node[stmt,below=.3in of main] (caseEval216) {\block caseEval216(xs, f):};
-    \node[stmt,below left=.6in and -0.5in of caseEval216] (altNil206) {\block altNil206():};
-    \node[stmt,below right=.6in and -0.7in of caseEval216] (altCons208) {\block altCons208(f, x, xs):};
-    \node[stmt, below=.6in of altCons208] (b220) {\block b220(x):};
+\begin{frame}[fragile]{Uncurrying |map|}
+  \begin{tikzpicture}[remember picture]
+    \node[stmt] (main4) {\block main(ns):};
+    \node[stmt,below=.3in of main4] (map4) {\block map(f,xs):};
+    \node[stmt,right=.3in of map4] (cons4) {\block cons(f, x, xs):};
+    \node[stmt,left=.3in of map4] (nil4) {\block nil():};
+    \node[stmt,above=.3in of cons4] (toList3) {\block toList(x):};
 
-    \draw [->] (caseEval216) to (altNil206);
-    \draw [->] (caseEval216) to (altCons208);
-  \end{tikzpicture}\end{onlyenv}
+    \node[overlay,invis,below right=.07in and -.2in of main4] () {\mfun{in}(\lab map/): $\{\var f/\,:\,\mkclo[k219:]\unskip\}, \{\var xs/\,:\,\top\}$};
 
-  \begin{onlyenv}<4->\begin{tikzpicture}[remember picture, overlay]
-    \node[overlay,invis,below left=.15in and -.3in of caseEval216] () {$\emptyset$};
-  \end{tikzpicture}\end{onlyenv}
-\end{comment}
+    \draw [->] (map4) to (nil4);
+    \draw [->] (map4) to (cons4);
+    \draw [->] (main4) to (map4);
+  \end{tikzpicture}
 
+  \begin{onlyenv}<1>
+    \begin{AVerb}[gobble=6,numbers=left,xleftmargin=1.5em]
+      \block main(ns): \anchorF(nsb1)
+        \vbinds v228<-\mkclo[k219:]; \anchorF(v228b1)
+        \goto map(v228, ns)
+      \ccblock k203()f: \mkclo[k204:f]
+      \ccblock k204(f)xs: \goto map(f,xs)
+      \ccblock k219()x: \goto toList(x)
+    \end{AVerb}
+  \end{onlyenv}
+
+  \note<2>{Now I show \lab map/. I annotate the two locations that
+    generate facts --- the arguments to the block, and the 
+    case statement.}
   \begin{onlyenv}<2->
-    \begin{tikzpicture}
-      \node[stmt] (caseEval216) {\block caseEval216(xs, f):};
-      \node[stmt,below left=.6in and -0.5in of caseEval216] (altNil206) {\block altNil206():};
-      \node[stmt,below right=.6in and -0.7in of caseEval216] (altCons208) {\block altCons208(f, x, xs):};
-      \draw [->] (caseEval216) to (altNil206);
-      \draw [->] (caseEval216) to (altCons208);
-    \end{tikzpicture}
+    \begin{AVerb}[gobble=6,numbers=left,xleftmargin=1.5em]
+      \block map(f,xs): \anchorF(mapb1)
+        \case xs;
+          \valt Nil()->\goto nil(); 
+          \valt Cons(\uline{x \anchorF(xb1)xs})->\goto cons(f, x, xs); 
+    \end{AVerb}
   \end{onlyenv}
 
   \begin{onlyenv}<2>
-    \begin{AVerb}[gobble=6,numbers=left]
-      \block caseEval216(xs, f): 
-        \case xs;
-          \valt Nil()->\goto altNil206();
-          \valt Cons(x xs)->\goto altCons208(f, x, xs);
-    \end{AVerb}
+    \begin{tikzpicture}[remember picture,overlay]
+      \node[fact, right=0.25in of mapb1, anchor=west] (fvmapb1) {$\{\var f/\,:\,\mkclo[k219:]\unskip\}, \{\var xs/\,:\,\top\}$};
+      \node[fact, below=0.4in of xb1] (fvxb1) {$\{\var x/\,:\,\top\}, \{\var xs/\,:\,\top\}$};
+      \draw [->] (fvmapb1) to (mapb1);
+      \draw [->] (fvxb1) to ($(xb1) -(0in,0.1in)$);
+    \end{tikzpicture}
   \end{onlyenv}
 
-  \begin{onlyenv}<3>
-    \begin{AVerb}[gobble=6,numbers=left]
-      \block caseEval216(\uline{xs}, \uline{f}): 
-        \case xs;
-          \valt Nil()->\goto altNil206();
-          \valt Cons(x xs)->\goto altCons208(f, x, xs);
-    \end{AVerb}
-  \end{onlyenv}
+  \begin{onlyenv}<3->\begin{tikzpicture}{remember picture}
+      \node[below=0.1in of cons4] (fvcons4b2) {\mfun{in}(\lab cons/):$\begin{array}{@@{}l}
+        \{\var f/\,:\,\top\}, \{\var x/\,:\,\top\},\\
+        \{\var xs/\,:\,\top\}\end{array}$};
+  \end{tikzpicture}\end{onlyenv}
+  
+\end{frame}
 
 \begin{comment}
+    %% \node[overlay,invis,below=.05in of cons4] () {\mfun{in}(\lab cons/):$\begin{array}{@@{}l}
+    %%     \{\var f/\,:\,\top\}, \{\var x/\,:\,\top\},\\
+    %%     \{\var xs/\,:\,\top\}\end{array}$};
+
+  %% \begin{onlyenv}<1->\begin{tikzpicture}[overlay,remember picture]
+  %%   \node[fact, right=0.25in of nsb1, anchor=west] (fvnsb1) {$\{\var ns/\,:\,\top\}$};
+  %%   \draw [->] (fvnsb1) to (nsb);
+  %%   \node[fact, right=0.25in of v228b1, anchor=west] (fv228b1) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
+  %%   \draw [->] (fv228b1) to (v228b1);
+  %% \end{tikzpicture}
+  \begin{onlyenv}<4->\begin{tikzpicture}[remember picture, overlay]
+    \node[overlay,invis,below left=.15in and -.3in of caseEval216] () {$\emptyset$};
+  \end{tikzpicture}\end{onlyenv}
   \begin{onlyenv}<4>\begin{tikzpicture}[remember picture, overlay]
     \node[overlay,invis,below right=.05in and -.1in of caseEval216] () {$\begin{array}{@@{}l}
         \{\var f/\,:\,\top\}, \{\var x/\,:\,\top\},\\
@@ -534,61 +864,44 @@ and return the value \mkclo[mapK2:f].}
 
     \draw [->] (main) to (caseEval216);
   \end{tikzpicture}\end{onlyenv}
-\end{comment}
-\end{frame}
 
-\begin{comment}
-\begin{frame}[fragile]{Uncurrying |map|}\vspace{12pt}
-  \begin{AVerb}[gobble=4,numbers=left]
-    \block main(ns):  \anchorF(nsa)
-      \vbinds v227<-\mkclo[k203:];\anchorF(v227a) 
-      \vbinds v228<-\mkclo[k219:];\anchorF(v228a)
-      v229 <- \balt{3-}{{\color{red}v227} @@ {\color{red}v228}}{v227 @@ v228}\anchorF(v229a) 
-      \app v229 * ns/ 
-  \end{AVerb}
-  \begin{onlyenv}<2>\begin{tikzpicture}[overlay,remember picture]
-    \node[fact, right=0.25in of v227a, anchor=west] (fv227a3) {$\{\var v227/\,:\,\mkclo[k203:]\unskip\}$};
-    \node[fact, right=0.25in of v228a, anchor=west] (fv228a3) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
-    \draw [->] (fv227a3) to (v227a);
-    \draw [->] (fv228a3) to (v228a);
-  \end{tikzpicture}\end{onlyenv}%%
-  \begin{onlyenv}<3->\begin{tikzpicture}[overlay,remember picture]
-    \node[fact, right=0.25in of v227a, anchor=west] (fv227a4) {$\{{\color{red}\var v227/}\,:\,\mkclo[k203:]\unskip\}$};
-    \node[fact, right=0.25in of v228a, anchor=west] (fv228a4) {$\{{\color{red}\var v228/}\,:\,\mkclo[k219:]\unskip\}$};
-    \draw [->] (fv228a4) to (v228a);
-    \draw [->] (fv227a4) to (v227a);
-  \end{tikzpicture}\end{onlyenv}%%
 
-  \begin{onlyenv}<1>
     \begin{AVerb}[gobble=6,numbers=left]
       \block main(ns): 
         \vbinds v227<-\mkclo[k203:];
         \vbinds v228<-\mkclo[k219:];
-        \llap{\ensuremath{\rightarrow} }\vbinds v229<-\mkclo[k204:v228];\anchorF(v229b) \label{main_v229b}
-        \app v229 * ns/\label{main_app_b}
+        \vbinds v229<-\app v227*v228/;
+        \app v229 * ns/ 
+      \ccblock k219()x: \goto toList(x)
+      \block toList(x):
+        \vbinds v221<-\mkclo[Consclo2:];
+        \vbinds v222<-\app v221*x/;
+        \vbinds v223<-Nil;
+        \app v222 * v223/ 
     \end{AVerb}
-  \begin{tikzpicture}[overlay,remember picture]
-    \node[fact, right=0.25in of v229b, anchor=west] (fv229b) {$\{\var v229/\,:\,\{\mkclo[k204:v228]\unskip\}$};
-    \draw [->] (fv229b) to (v229b);
-  \end{tikzpicture}%%
-  \end{onlyenv}
-
-  \begin{onlyenv}<2>
-    \begin{AVerb}[gobble=6,numbers=left]
-      \block main(ns): 
-        \xout{\vbinds v227<-\mkclo[k203:];}
-        \vbinds v228<-\mkclo[k219:];
-        \xout{\vbinds v229<-\mkclo[k204:v228];}
-        \llap{\ensuremath{\rightarrow} }\goto caseEval216(ns, v228) \anchorF(gotoCaseEval216a)
+  \end{minipage} &
+  \begin{minipage}[t]{.4\hsize}
+    \begin{AVerb}[gobble=6,numbers=left,firstnumber=last]
+      \ccblock k203()f: \mkclo[k204:f]
+      \ccblock k204(f)xs: \goto map(f,xs)
+      \block map(f,xs): 
+        \case xs;
+          \valt Nil()->\goto nil();
+          \valt Cons(x xs)->\goto cons(f, x, xs);
+      \block nil(): Nil 
+      \block cons(f, x, xs): 
+        v209 <- \mkclo[Consclo2:]
+        \vbinds v210<-\app f*x/; 
+        \vbinds v211<-\app v209*v210/;
+        \vbinds v212<-\mkclo[k203:]; 
+        \vbinds v213<-\app v212*f/;
+        \vbinds v214<-\app v213*xs/; 
+        \app v211 * v214/ 
     \end{AVerb}
-  \begin{tikzpicture}[overlay,remember picture]
-    \node[fact, right=0.25in of gotoCaseEval216a, anchor=west] (fvGotoCaseEval216a) {$\{\var ns/\,:\,\top\}, \{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
-    \draw [->] (fvGotoCaseEval216a) to (gotoCaseEval216a);
-  \end{tikzpicture}%%
-  \end{onlyenv}
-\end{frame}
 \end{comment}
 
+
+\begin{comment}
 \begin{frame}\vspace{12pt} \ldots
 \end{frame}
 \subsection{Example: Uncurrying a loop}
@@ -598,20 +911,16 @@ and return the value \mkclo[mapK2:f].}
 \begin{frame}\vspace{12pt} \ldots
 \end{frame}
 
-\begin{comment}
-
-  \section{Conclusion}
-  \begin{frame}\vspace{12pt} \ldots
-  \end{frame}
-  \subsection{Monadic  Optimizations}
-  \begin{frame}\vspace{12pt} \ldots
-  \end{frame}
-  \subsection{Future Work}
-  \begin{frame}\vspace{12pt} \ldots
-  \end{frame}
-
+\section{Conclusion}
+\begin{frame}\vspace{12pt} \ldots
+\end{frame}
+\subsection{Monadic  Optimizations}
+\begin{frame}\vspace{12pt} \ldots
+\end{frame}
+\subsection{Future Work}
+\begin{frame}\vspace{12pt} \ldots
+\end{frame}
 \end{comment}
-
 %% \subsection{Monadic Effects}
 
 %% \subsection{Tails}
