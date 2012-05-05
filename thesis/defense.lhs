@@ -25,6 +25,10 @@
 \renewcommand{\hsnewpar}[1]{\parskip=0pt\parindent=0pt\par\noindent}
 \def\hsline#1{\uline{\smash{#1}}}
 \def\altline<#1>#2{\alt<#1>{\hsline{#2}}{#2}}
+\def\inred{\color{red}}
+\def\inL(#1){\ensuremath{\mfun{in}(\lab #1/)}}
+\def\outL(#1){\ensuremath{\mfun{out}(\lab #1/)}}
+\def\fct(#1:#2){\ensuremath{\{\var #1/\text{\,:\,}#2\unskip\}}}
 \let\elimdisplayskip\relax
 \newtoks\hstoks
 \begin{document}\nomd\numbersoff
@@ -576,6 +580,7 @@ obvious connectinos, such as between \lab cons/ and \lab map/, or between
 \begin{frame}
 \ldots
 \end{frame}
+\end{comment}
 
 \note{To proceed, I need to connect \lab main/ to \lab map/. I will go through
   uncurrying within \lab main/.}
@@ -592,10 +597,10 @@ obvious connectinos, such as between \lab cons/ and \lab map/, or between
   \end{tikzpicture}
 
   \begin{onlyenv}<1-3>\begin{AVerb}[gobble=4,numbers=left,xleftmargin=1.5em]
-    \block main(ns):  \anchorF(nsa)
+    \block main(ns): \anchorF(nsa)
       \vbinds v227<-\mkclo[k203:];\anchorF(v227a) 
       \vbinds v228<-\mkclo[k219:];\anchorF(v228a)
-      \vbinds v229<- \app \balt{3-}{{\color{red}v227}}{v227}*v228/;\anchorF(v229a) 
+      \vbinds v229<-\app\balt{3-}{{\inred{v227}}}{v227}*v228/;\anchorF(v229a) 
       \app v229 * ns/ 
     \ccblock k203()f: \mkclo[k204:f]
     \ccblock k204(f)xs: \goto map(f,xs)
@@ -607,11 +612,15 @@ obvious connectinos, such as between \lab cons/ and \lab map/, or between
     \var v228/ and \var v229/.}
 
   \begin{onlyenv}<2>\begin{tikzpicture}[overlay,remember picture]
-    \node[fact, right=0.25in of nsa, anchor=west] (fvnsa3) {$\{\var ns/\,:\,\top\}$};
+    \node[fact, invis, right=0.25in of nsa, anchor=west] (fvnsa3) 
+         {\fct(ns:\top)};
     \draw [->] (fvnsa3) to (nsa);
-    \node[fact, right=0.25in of v227a, anchor=west] (fv227a3) {$\{\var v227/\,:\,\mkclo[k203:]\unskip\}$};
-    \node[fact, right=0.25in of v228a, anchor=west] (fv228a3) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
-    \node[fact, right=0.25in of v229a, anchor=west] (fv229a3) {$\{\var v229/\,:\,\top\}$};
+    \node[fact, invis, right=0.25in of v227a, anchor=west] (fv227a3) 
+         {\fct(v227:{\mkclo[k203:]})};
+    \node[fact, invis, right=0.25in of v228a, anchor=west] (fv228a3) 
+         {\fct(v228:{\mkclo[k219:]})};
+    \node[fact, invis, right=0.25in of v229a, anchor=west] (fv229a3) 
+         {\fct(v229:\top)};
     \draw [->] (fv227a3) to (v227a);
     \draw [->] (fv228a3) to (v228a);
     \draw [->] (fv229a3) to (v229a);
@@ -622,11 +631,15 @@ obvious connectinos, such as between \lab cons/ and \lab map/, or between
   the fact we have about \var v227/ with the result returned by the \cc block.}
 
   \begin{onlyenv}<3>\begin{tikzpicture}[overlay, remember picture]
-    \node[fact, right=0.25in of nsa, anchor=west] (fvnsa4) {$\{\var ns/\,:\,\top\}$};
+    \node[fact, invis, right=0.25in of nsa, anchor=west] (fvnsa4) 
+         {\fct(ns:\top)};
     \draw [->] (fvnsa4) to (nsa);
-    \node[fact, right=0.25in of v227a, anchor=west] (fv227a4) {$\{{\color{red}\var v227/}\,:\,\mkclo[k203:]\unskip\}$};
-    \node[fact, right=0.25in of v228a, anchor=west] (fv228a4) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
-    \node[fact, right=0.25in of v229a, anchor=west] (fv229a4) {$\{\var v229/\,:\,\top\}$};
+    \node[fact, invis, right=0.25in of v227a, anchor=west] (fv227a4) 
+         {\fct(\inred v227:{\mkclo[k203:]})};
+    \node[fact, invis, right=0.25in of v228a, anchor=west] (fv228a4) 
+         {\fct(v228:{\mkclo[k219:]})};
+    \node[fact, invis, right=0.25in of v229a, anchor=west] (fv229a4) 
+         {\fct(v229:\top)};
     \draw [->] (fv228a4) to (v228a);
     \draw [->] (fv227a4) to (v227a);
     \draw [->] (fv229a4) to (v229a);
@@ -636,19 +649,22 @@ obvious connectinos, such as between \lab cons/ and \lab map/, or between
     \block main(ns): \anchorF(nsb)
       \vbinds v227<-\mkclo[k203:];\anchorF(v227b) 
       \vbinds v228<-\mkclo[k219:];\anchorF(v228b) 
-      \llap{\ensuremath{\rightarrow} }\balt{4,5}{\vbinds v229<-\app {\color{red}{\mkclo[k203:]}}*v228/;}{\vbinds v229<-\color{red}{\mkclo[k204:v228]};}\anchorF(v229b) 
+      \llap{\ensuremath{\rightarrow} }\balt{4,5}{\vbinds v229<-\app {\inred{\mkclo[k203:]}}*v228/;}{\vbinds v229<-\inred{\mkclo[k204:v228]};}\anchorF(v229b) 
       \app v229 * ns/
-    \balt{5}{\color{red}\ccblock k203()f:}{\ccblock k203()f:} \balt{6}{\color{red}\mkclo[k204:f]}{\mkclo[k204:f]}
+    \balt{5}{\inred\ccblock k203()f:}{\ccblock k203()f:} \balt{6}{\inred\mkclo[k204:f]}{\mkclo[k204:f]}
     \ccblock k204(f)xs: \goto map(f,xs)
     \ccblock k219()x: \goto toList(x)
   \end{AVerb}
   \end{onlyenv}
 
   \begin{onlyenv}<4-6>\begin{tikzpicture}[overlay, remember picture]
-    \node[fact, right=0.25in of nsb, anchor=west] (fvnsa4) {$\{\var ns/\,:\,\top\}$};
+    \node[fact, invis, right=0.25in of nsb, anchor=west] (fvnsa4) 
+         {\fct(ns:\top)};
     \draw [->] (fvnsa4) to (nsb);
-    \node[fact, right=0.25in of v227b, anchor=west] (fv227a5) {$\{\balt{4}{{\color{red}\var v227/}}{\var v227/}\,:\,\mkclo[k203:]\unskip\}$};
-    \node[fact, right=0.25in of v228b, anchor=west] (fv228a5) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
+    \node[fact, invis, right=0.25in of v227b, anchor=west] (fv227a5) 
+         {\balt{4}{\fct(\inred v227:{\mkclo[k203:]})}{\fct(v227:{\mkclo[k203:]})}};
+    \node[fact, invis, right=0.25in of v228b, anchor=west] (fv228a5) 
+         {\fct(v228:{\mkclo[k219:]})};
     \draw [->] (fv228a5) to (v228b);
     \draw [->] (fv227a5) to (v227b);
   \end{tikzpicture}\end{onlyenv}
@@ -661,7 +677,7 @@ obvious connectinos, such as between \lab cons/ and \lab map/, or between
       \vbinds v227<-\mkclo[k203:];\anchorF(v227c)
       \vbinds v228<-\mkclo[k219:];\anchorF(v228c)
       \vbinds v229<-\mkclo[k204:v228];\anchorF(v229c)
-      \app \balt{8}{{\color{red}v229}}{v229} * ns/
+      \app\balt{8}{{\inred{v229}}}{v229} * ns/
     \ccblock k203()f: \mkclo[k204:f]
     \ccblock k204(f)xs: \goto map(f,xs)
     \ccblock k219()x: \goto toList(x)
@@ -669,22 +685,28 @@ obvious connectinos, such as between \lab cons/ and \lab map/, or between
   \end{onlyenv}
 
   \begin{onlyenv}<7>\begin{tikzpicture}[overlay, remember picture]
-    \node[fact, right=0.25in of nsc, anchor=west] (fvnsa6) {$\{\var ns/\,:\,\top\}$};
+    \node[fact, invis, right=0.25in of nsc, anchor=west] (fvnsa6) {\fct(ns:\top)};
     \draw [->] (fvnsa6) to (nsc);
-    \node[fact, right=0.25in of v227c, anchor=west] (fv227a6) {$\{\var v227/\,:\,\mkclo[k203:]\unskip\}$};
-    \node[fact, right=0.25in of v228c, anchor=west] (fv228a6) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
-    \node[fact, right=0.25in of v229c, anchor=west] (fv229a6) {$\{\var v229/\,:\,\mkclo[k204:v228]\unskip\}$};
+    \node[fact, invis, right=0.25in of v227c, anchor=west] (fv227a6) 
+         {\fct(v227:{\mkclo[k203:]})};
+    \node[fact, invis, right=0.25in of v228c, anchor=west] (fv228a6) 
+         {\fct(v228:{\mkclo[k219:]})};
+    \node[fact, invis, right=0.25in of v229c, anchor=west] (fv229a6) 
+         {\fct(v229:{\mkclo[k204:v228]})};
     \draw [->] (fv227a6) to (v227c);
     \draw [->] (fv228a6) to (v228c);
     \draw [->] (fv229a6) to (v229c);
   \end{tikzpicture}\end{onlyenv}
 
   \begin{onlyenv}<8>\begin{tikzpicture}[overlay, remember picture]
-    \node[fact, right=0.25in of nsc, anchor=west] (fvnsa7) {$\{\var ns/\,:\,\top\}$};
+    \node[fact, invis, right=0.25in of nsc, anchor=west] (fvnsa7) {\fct(ns:\top)};
     \draw [->] (fvnsa7) to (nsc);
-    \node[fact, right=0.25in of v227c, anchor=west] (fv227a7) {$\{\var v227/\,:\,\mkclo[k203:]\unskip\}$};
-    \node[fact, right=0.25in of v228c, anchor=west] (fv228a7) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
-    \node[fact, right=0.25in of v229c, anchor=west] (fv229a7) {$\{{\color{red}\var v229/}\,:\,\mkclo[k204:v228]\unskip\}$};
+    \node[fact, invis, right=0.25in of v227c, anchor=west] (fv227a7) 
+         {\fct(v227:{\mkclo[k203:]})};
+    \node[fact, invis, right=0.25in of v228c, anchor=west] (fv228a7) 
+         {\fct(v228:{\mkclo[k219:]})};
+    \node[fact, invis, right=0.25in of v229c, anchor=west] (fv229a7) 
+         {\fct(\inred v229:{\mkclo[k204:v228]})};
     \draw [->] (fv227a7) to (v227c);
     \draw [->] (fv228a7) to (v228c);
     \draw [->] (fv229a7) to (v229c);
@@ -695,19 +717,22 @@ obvious connectinos, such as between \lab cons/ and \lab map/, or between
       \vbinds v227<-\mkclo[k203:];\anchorF(v227d)
       \vbinds v228<-\mkclo[k219:];\anchorF(v228d)
       \vbinds v229<-\mkclo[k204:v228];\anchorF(v229d)
-      \app {\color{red}\mkclo[k204:v228]} * ns/
+      \app {\inred\mkclo[k204:v228]} * ns/
     \ccblock k203()f: \mkclo[k204:f]
-    \balt{10}{{\color{red}\ccblock k204(f)xs: \goto map(f,xs)}}{\ccblock k204(f)xs: \goto map(f,xs)}
+    \balt{10}{{\inred\ccblock k204(f)xs: \goto map(f,xs)}}{\ccblock k204(f)xs: \goto map(f,xs)}
     \ccblock k219()x: \goto toList(x)
   \end{AVerb}
   \end{onlyenv}
 
   \begin{onlyenv}<9,10>\begin{tikzpicture}[overlay, remember picture]
-    \node[fact, right=0.25in of nsd, anchor=west] (fvnsa11) {$\{\var ns/\,:\,\top\}$};
+    \node[fact, invis, right=0.25in of nsd, anchor=west] (fvnsa11) {\fct(ns:\top)};
     \draw [->] (fvnsa11) to (nsd);
-    \node[fact, right=0.25in of v227d, anchor=west] (fv227a11) {$\{\var v227/\,:\,\mkclo[k203:]\unskip\}$};
-    \node[fact, right=0.25in of v228d, anchor=west] (fv228a11) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
-    \node[fact, right=0.25in of v229d, anchor=west] (fv229a11) {$\{\var v229/\,:\,\mkclo[k204:v228]\unskip\}$};
+    \node[fact, invis, right=0.25in of v227d, anchor=west] (fv227a11) 
+         {\fct(v227:{\mkclo[k203:]})};
+    \node[fact, invis, right=0.25in of v228d, anchor=west] (fv228a11) 
+         {\fct(v228:{\mkclo[k219:]})};
+    \node[fact, invis, right=0.25in of v229d, anchor=west] (fv229a11) 
+         {\fct(v229:{\mkclo[k204:v228]})};
     \draw [->] (fv227a11) to (v227d);
     \draw [->] (fv228a11) to (v228d);
     \draw [->] (fv229a11) to (v229d);
@@ -726,19 +751,22 @@ obvious connectinos, such as between \lab cons/ and \lab map/, or between
       \balt{13}{\xout{\vbinds v227<-\mkclo[k203:];}}{\vbinds v227<-\mkclo[k203:];}\anchorF(v227e)
       \vbinds v228<-\mkclo[k219:];\anchorF(v228e)
       \balt{13}{\xout{\vbinds v229<-\mkclo[k204:v228];}}{\vbinds v229<-\mkclo[k204:v228];}\anchorF(v229e)
-      \balt{11}{\color{red}\goto map(v228, ns)}{\goto map(v228, ns)}
+      \balt{11}{\inred\goto map(v228, ns)}{\goto map(v228, ns)}
     \ccblock k203()f: \mkclo[k204:f]
-    \ccblock k204(f)xs: \balt{11}{\color{red}\goto map(f,xs)}{\goto map(f,xs)}
+    \ccblock k204(f)xs: \balt{11}{\inred\goto map(f,xs)}{\goto map(f,xs)}
     \ccblock k219()x: \goto toList(x)
   \end{AVerb}
   \end{onlyenv}
 
   \begin{onlyenv}<11,12>\begin{tikzpicture}[overlay, remember picture]
-    \node[fact, right=0.25in of nse, anchor=west] (fvnsa8) {$\{\var ns/\,:\,\top\}$};
+    \node[fact, invis, right=0.25in of nse, anchor=west] (fvnsa8) {\fct(ns:\top)};
     \draw [->] (fvnsa8) to (nse);
-    \node[fact, right=0.25in of v227e, anchor=west] (fv227a8) {$\{\var v227/\,:\,\mkclo[k203:]\unskip\}$};
-    \node[fact, right=0.25in of v228e, anchor=west] (fv228a8) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
-    \node[fact, right=0.25in of v229e, anchor=west] (fv229a8) {$\{\var v229/\,:\,\mkclo[k204:v228]\unskip\}$};
+    \node[fact, invis, right=0.25in of v227e, anchor=west] (fv227a8) 
+         {\fct(v227:{\mkclo[k203:]})};
+    \node[fact, invis, right=0.25in of v228e, anchor=west] (fv228a8) 
+         {\fct(v228:{\mkclo[k219:]})};
+    \node[fact, invis, right=0.25in of v229e, anchor=west] (fv229a8) 
+         {\fct(v229:{\mkclo[k204:v228]})};
     \draw [->] (fv227a8) to (v227e);
     \draw [->] (fv228a8) to (v228e);
     \draw [->] (fv229a8) to (v229e);
@@ -749,9 +777,9 @@ obvious connectinos, such as between \lab cons/ and \lab map/, or between
   \end{tikzpicture}\end{onlyenv}
 
   \begin{onlyenv}<13>\begin{tikzpicture}[overlay, remember picture]
-    \node[fact, right=0.25in of nse, anchor=west] (fvnsa9) {$\{\var ns/\,:\,\top\}$};
+    \node[fact, invis, right=0.25in of nse, anchor=west] (fvnsa9) {\fct(ns:\top)};
     \draw [->] (fvnsa9) to (nse);
-    \node[fact, right=0.25in of v228e, anchor=west] (fv228a9) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
+    \node[fact, invis, right=0.25in of v228e, anchor=west] (fv228a9) {\fct(v228:{\mkclo[k219:]})};
     \draw [->] (fv228a9) to (v228e);
     \draw [->] (main3) to (map3);
   \end{tikzpicture}\end{onlyenv}
@@ -768,34 +796,35 @@ obvious connectinos, such as between \lab cons/ and \lab map/, or between
   \end{onlyenv}
 
   \begin{onlyenv}<14>\begin{tikzpicture}[overlay,remember picture]
-    \node[fact, right=0.25in of nsf, anchor=west] (fvnsa10) {$\{\var ns/\,:\,\top\}$};
+    \node[fact, invis, right=0.25in of nsf, anchor=west] (fvnsa10) {\fct(ns:\top)};
     \draw [->] (fvnsa10) to (nsf);
-    \node[fact, right=0.25in of v228f, anchor=west] (fv228a10) {$\{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
+    \node[fact, invis, right=0.25in of v228f, anchor=west] (fv228a10) {\fct(v228:{\mkclo[k219:]})};
     \draw [->] (fv228a10) to (v228f);
     \draw [->] (main3) to (map3);
   \end{tikzpicture}
   \end{onlyenv}
 \end{frame}
-\end{comment}
 
 \note{I return to the \cfg, keeping \lab main/ on the screen, and show
   updated facts.}
 
 \begin{frame}[fragile]{Uncurrying |map|}
+  \begin{onlyenv}<1,2>
   \begin{tikzpicture}[remember picture]
     \node[stmt] (main4) {\block main(ns):};
     \node[stmt,below=.3in of main4] (map4) {\block map(f,xs):};
     \node[stmt,right=.3in of map4] (cons4) {\block cons(f, x, xs):};
     \node[stmt,left=.3in of map4] (nil4) {\block nil():};
-    \node[stmt,above=.3in of cons4] (toList3) {\block toList(x):};
+    \node[stmt,above=.3in of cons4] (toList4) {\block toList(x):};
 
-    \node[overlay,invis,below right=.07in and -.2in of main4] () {\mfun{in}(\lab map/): $\{\var f/\,:\,\mkclo[k219:]\unskip\}, \{\var xs/\,:\,\top\}$};
+    \node[overlay,invis,below right=.07in and -.2in of main4] () 
+         {\inL(map): \fct(f:{\mkclo[k219:]}), \fct(xs:\top)};
 
     \draw [->] (map4) to (nil4);
     \draw [->] (map4) to (cons4);
     \draw [->] (main4) to (map4);
   \end{tikzpicture}
-
+  \end{onlyenv}
   \begin{onlyenv}<1>
     \begin{AVerb}[gobble=6,numbers=left,xleftmargin=1.5em]
       \block main(ns): \anchorF(nsb1)
@@ -807,37 +836,129 @@ obvious connectinos, such as between \lab cons/ and \lab map/, or between
     \end{AVerb}
   \end{onlyenv}
 
-  \note<2>{Now I show \lab map/. I annotate the two locations that
+  \note<1>{Now I show \lab map/. I annotate the two locations that
     generate facts --- the arguments to the block, and the 
     case statement.}
-  \begin{onlyenv}<2->
+  \begin{onlyenv}<2>
     \begin{AVerb}[gobble=6,numbers=left,xleftmargin=1.5em]
       \block map(f,xs): \anchorF(mapb1)
         \case xs;
           \valt Nil()->\goto nil(); 
           \valt Cons(\uline{x \anchorF(xb1)xs})->\goto cons(f, x, xs); 
     \end{AVerb}
-  \end{onlyenv}
 
-  \begin{onlyenv}<2>
     \begin{tikzpicture}[remember picture,overlay]
-      \node[fact, right=0.25in of mapb1, anchor=west] (fvmapb1) {$\{\var f/\,:\,\mkclo[k219:]\unskip\}, \{\var xs/\,:\,\top\}$};
-      \node[fact, below=0.4in of xb1] (fvxb1) {$\{\var x/\,:\,\top\}, \{\var xs/\,:\,\top\}$};
-      \draw [->] (fvmapb1) to (mapb1);
-      \draw [->] (fvxb1) to ($(xb1) -(0in,0.1in)$);
+      \node[fact, invis, anchor=west] (fvmapb1) at ($(mapb1) + (0.25in,-0.1in)$) 
+           {\fct(f:{\mkclo[k219:]}), \fct(xs:\top)};
+      \node[fact, invis, anchor=west] (fvxb1) at ($(xb1) + (.25in,-.2in)$) 
+           {\fct(x:\top), \fct(xs:\top)};
+      \draw [->] (fvmapb1.west) to (mapb1);
+      \draw [->] (fvxb1.west) to ($(xb1) -(0in,0.1in)$);
     \end{tikzpicture}
   \end{onlyenv}
 
-  \begin{onlyenv}<3->\begin{tikzpicture}{remember picture}
-      \node[below=0.1in of cons4] (fvcons4b2) {\mfun{in}(\lab cons/):$\begin{array}{@@{}l}
-        \{\var f/\,:\,\top\}, \{\var x/\,:\,\top\},\\
-        \{\var xs/\,:\,\top\}\end{array}$};
-  \end{tikzpicture}\end{onlyenv}
+  \note<2>{Now I show how in(cons) and in(nil) are generated from the facts
+    passed through \lab map/. I emphasize that \var xs/ is actually new, and not
+  the same \var xs/ passed in from \lab map/. I also talk about why \lab nil/
+  gets no facts, because it takes no arguments.}
+
+  \begin{onlyenv}<3>
+    \begin{tikzpicture}
+      \node[stmt] (main5) {\block main(ns):};
+      \node[stmt,below=.3in of main5] (map5) {\block map(f,xs):};
+      \node[stmt,right=.3in of map5] (cons5) {\block cons(f, x, xs):};
+      \node[stmt,left=.3in of map5] (nil5) {\block nil():};
+      \node[stmt,above=.3in of cons5] (toList5) {\block toList(x):};
+
+      \node[overlay,invis,below right=.07in and -.2in of main5] () 
+           {\inL(map): \fct(f:{\,\mkclo[k219:]}), \fct(x:\top)};
+
+      \node[invis,below left=0.07in and -0.25in of cons5, anchor=north] () 
+           {\inL(cons): \fct(\inred f:{\mkclo[k219:]}),
+             \fct(\inred x:\top),
+             \fct(\inred xs:\top)};
+      
+      \node[fact, invis, below left=0.07in and -.2in of main5] () {$\inL(nil)\text{:\ }\emptyset$};
+
+      \draw [->] (map5) to (nil5);
+      \draw [->] (map5) to (cons5);
+      \draw [->] (main5) to (map5);
+    \end{tikzpicture}
+    \begin{AVerb}[gobble=6,numbers=left,xleftmargin=1.5em]
+      \block map(f,xs): \anchorF(mapb2)
+        \case xs;
+          \valt Nil()->\goto nil(); 
+          \valt Cons(\uline{x \anchorF(xb2)xs})->\goto cons(f, x, xs); 
+    \end{AVerb}
+    \begin{tikzpicture}[remember picture,overlay]
+      \node[fact, invis, anchor=west] (fvmapb2) at ($(mapb2) + (0.25in,-0.1in)$) 
+           {\fct(\inred f:{\mkclo[k219:]}), \fct(xs:\top)};
+      \node[fact, invis, anchor=west] (fvxb2) at ($(xb2) + (.25in,-.2in)$) 
+           {\fct(\inred x:\top), \fct(\inred xs:\top)};
+      \draw [->] (fvmapb2.west) to (mapb2);
+      \draw [->] (fvxb2.west) to ($(xb2) -(0in,0.1in)$);
+    \end{tikzpicture}
+  \end{onlyenv}
+\end{frame}
+
+\note{Now I can finally show how to rewrite \lab cons/. I leave the facts
+  as is on screen and bring up \lab cons/.}
+
+\begin{frame}[fragile]{Uncurrying |map|}
+    \begin{tikzpicture}
+      \node[stmt] (main6) {\block main(ns):};
+      \node[stmt,below=.3in of main6] (map6) {\block map(f,xs):};
+      \node[stmt,right=.3in of map6] (cons6) {\block cons(f, x, xs):};
+      \node[stmt,left=.3in of map6] (nil6) {\block nil():};
+      \node[stmt,above=.3in of cons6] (toList6) {\block toList(x):};
+
+      \node[fact,invis,below right=.07in and -.2in of main6] () 
+           {\inL(map): \fct(f:{\mkclo[k219:]}), 
+             \fct(xs:\top\})};
+
+      \node[invis,below left=0.07in and -0.25in of cons6, anchor=north] () 
+           {\inL(cons): \fct(f:{\mkclo[k219:]}),
+             \fct(x:\top),
+             \fct(xs:\top)};
+      
+      \node[fact, invis, below left=0.07in and -.2in of main6] () {$\inL(nil): \emptyset$};
+      \draw [->] (map6) to (nil6);
+      \draw [->] (map6) to (cons6);
+      \draw [->] (main6) to (map6);
+    \end{tikzpicture}
+    \begin{AVerb}[gobble=6,numbers=left,xleftmargin=1.5em]
+      \block cons(f, x, xs): \anchorF(consc1)
+        v209 <- \mkclo[Consclo2:] \anchorF(v209c1)
+        \vbinds v210<-\app f*x/; \anchorF(v210c1)
+        \vbinds v211<-\app v209*v210/; \anchorF(v211c1)
+        \vbinds v212<-\mkclo[k203:];  \anchorF(v212c1)
+        \vbinds v213<-\app v212*f/; \anchorF(v213c1)
+        \vbinds v214<-\app v213*xs/; \anchorF(v214c1)
+        \app v211 * v214/ 
+    \end{AVerb}
+
+    \begin{tikzpicture}[remember picture,overlay]
+      \node[fact, invis, right=0.25in of consc1, anchor=west] (fvconsc1) {\fct(f:{\mkclo[k219:]}), \fct(x:\top), \fct(xs:\top)};
+      \node[fact, invis, right=0.25in of v209c1, anchor=west] (fvv209c1) {\fct(v209:\top)};
+      \node[fact, invis, right=0.25in of v210c1, anchor=west] (fvv210c1) {\fct(v210:\top)};
+      \node[fact, invis, right=0.25in of v211c1, anchor=west] (fvv211c1) {\fct(v211:\top)};
+      \node[fact, invis, right=0.25in of v212c1, anchor=west] (fvv212c1) {\fct(v212:\top)};
+      \node[fact, invis, right=0.25in of v213c1, anchor=west] (fvv213c1) {\fct(v213:\top)};
+      \node[fact, invis, right=0.25in of v214c1, anchor=west] (fvv214c1) {\fct(v214:\top)};
+
+      \draw [->] (fvconsc1) to (consc1);
+      \draw [->] (fvv209c1) to (v209c1);
+      \draw [->] (fvv210c1) to (v210c1);
+      \draw [->] (fvv211c1) to (v211c1);
+      \draw [->] (fvv212c1) to (v212c1);
+      \draw [->] (fvv213c1) to (v213c1);
+      \draw [->] (fvv214c1) to (v214c1);
+    \end{tikzpicture}
   
 \end{frame}
 
 \begin{comment}
-    %% \node[overlay,invis,below=.05in of cons4] () {\mfun{in}(\lab cons/):$\begin{array}{@@{}l}
+    %% \node[overlay,invis,below=.05in of cons4] () {\inL(cons):$\begin{array}{@@{}l}
     %%     \{\var f/\,:\,\top\}, \{\var x/\,:\,\top\},\\
     %%     \{\var xs/\,:\,\top\}\end{array}$};
 
