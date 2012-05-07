@@ -1268,7 +1268,7 @@ appel2 = [("f", lam "x" $ \x ->
 
 -- An example from Tarditi.
 {-
-g x y z = x + y + z
+g = \x. \y. \z -> x + y + z
 main = g (s  t) (t + u)  (t + t)
 -}
 tarditi1 = [("g", lam "x" $ \x ->
@@ -1288,6 +1288,18 @@ tarditi2 = [("f", lam "a" $ \a ->
                lam "c" $ \c -> lit 1),
             ("main", var "f" `app` var "s" `app`
                    var "t" `app` var "u")]
+
+{-
+g = \x. \y. \z.  x + y + z
+f = \x. \y. g x y
+main = f (s  t) (t + u)  (t + t)
+-}
+tarditi3 = [("g", lam "x" $ \x ->
+               lam "y" $ \y ->
+               lam "z" $ \z -> x `plus` y `plus` z),
+            ("h", lam "x" $ \x ->
+               lam "y" $ \y -> var "g" `app` x `app` y),
+            ("main", var "h" `app` var "s" `app` var "t" `app` var "u")]
 
 _case :: Expr -> ([LC.Alt] -> [LC.Alt]) -> Expr
 _case c f = ECase c (f [])
