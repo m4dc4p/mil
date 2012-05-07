@@ -426,8 +426,8 @@ to the respective closures shown.}
 \subsection{Related Work}
 \begin{frame}{Other Intermediate Forms}
   \begin{itemize}
-  \item Continuation-Passing Style\footnote{See Appel's ``Compiling with Continuations,'' 1992.}
-  \item Administrative-Normal Form: Flanagan, Sabry, Duba, and Felleisen\footnote{``The Essence of Compiling with Continuations,'' 1993.}
+  \item Continuation-Passing Style\footnote{See Appel's ``Compiling with Continuations'' (1992).}
+  \item Administrative-Normal Form: Flanagan, Sabry, Duba, and Felleisen\footnote{``The Essence of Compiling with Continuations'' (1993).}
   \item \Mlj: Benton, Kennedy, \& Russell\footnote{``Compiling Standard ML to Java Bytecodes'' (1998).}
   \end{itemize}
 \end{frame}
@@ -553,8 +553,11 @@ about \var g/ conflicts, so we set \inL(b2)'s fact about \var g/ to $\top$.}
 \subsection{\Hoopl}
 \begin{frame}{\Hoopl: A Haskell Library for Dataflow Analysis}
   \begin{itemize}
+  \item See ``Hoopl: A Modular, Reusable Library for Dataflow Analysis and Transformation'' by Ramsey, Dias, and Peyton Jones
+    (2010)
   \item Used in the Glasgow Haskell Compiler
   \item Based on ``Composing Dataflow Analyses and Transformations'' by Lerner, Grove, and Chambers (2002)
+  \item 
   \end{itemize}
 \end{frame}
 
@@ -1464,9 +1467,9 @@ obvious connections, such as between \lab cons/ and \lab map/, or between
 \subsection{Related Work}
 \begin{frame}{Related Work}
 \begin{itemize}
-\item Appel: Uncurrying by pattern matching (in ``Compiling with Continuations,'' 1992)
-\item Tarditi: Uncurrying in four passes (in ``Design and Implementation of Code Optimizations for a Type-Directed Compiler for Standard ML,'' 1996)
-\item Tolmach \& Oliva: Automatic uncurrying (in ``From ML to Ada: Strongly-typed Language Interoperability via Source Translation,'' 1998)
+\item Appel: Uncurrying by pattern matching; ``Compiling with Continuations'' (1992)
+\item Tarditi: Uncurrying in four passes; ``Design and Implementation of Code Optimizations for a Type-Directed Compiler for Standard ML'' (1996)
+\item Tolmach \& Oliva: Automatic uncurrying; ``From ML to Ada: Strongly-typed Language Interoperability via Source Translation'' (1998)
 \end{itemize}
 \end{frame}
 \end{comment}
