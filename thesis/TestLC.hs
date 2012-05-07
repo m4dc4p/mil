@@ -951,23 +951,57 @@ uncurry1 = [("uncurry1",
 
 {-
 
-main ns = map double ns
-double = times 2
+main ns = map toList ns
+toList x = Cons x Nil
 
 -}
-double1 = [("main",
+toList1 = [("main",
             lam "ns" $ \ns ->
             var "map" `app` var "toList" `app` ns),
            ("toList",
             lam "x" $ \x ->
               mkCons `app` x `app` mkNil)] ++ myMap
+{-
+main ns ms = 
+  let xs = map toList ns
+      ys = map toList ms
+  in [ms, xs]
+-}
+toList2 = [("main",
+            lam "ns" $ \ns ->
+            lam "ms" $ \ms ->
+              _let "xs" (var "map" `app` var "toList" `app` ns) $ \xs ->
+              _let "ys" (var "map" `app` var "toList" `app` ms) $ \ys -> 
+                mkCons `app` xs `app` (mkCons `app` ys `app` mkNil)),
+          ("toList",
+           lam "x" $ \x ->
+             mkCons `app` x `app` mkNil)] ++ myMap
+
+{-
+main ns ms = 
+  let xs = map toList1 ns
+      ys = map toList2 ms
+  in [ms, xs]
+-}
+toList3 = [("main",
+            lam "ns" $ \ns ->
+            lam "ms" $ \ms ->
+              _let "xs" (var "map" `app` var "toList1" `app` ns) $ \xs ->
+              _let "ys" (var "map" `app` var "toList2" `app` ms) $ \ys -> 
+                mkCons `app` xs `app` (mkCons `app` ys `app` mkNil)),
+          ("toList1",
+           lam "x" $ \x ->
+             mkCons `app` x `app` mkNil),
+          ("toList2",
+           lam "x" $ \x ->
+             mkCons `app` x `app` mkNil)] ++ myMap
 
 {-
 
 main ns = map (times 2) ns
 
 -}
-double2 = [("double",
+double1 = [("double",
             lam "ns" $ \ns ->
             var "map" `app` (var "mult" `app` lit 2) `app` ns),
            ("mult",
