@@ -37,4 +37,22 @@
 \makeatletter\input{common}\makeatother
 \input{lhs2tex}
 %% Indicates the preamble has been loadd.
+\def\balt#1#2#3{\alt<#1>{#2}{#3}}
+\def\bonly#1{\only<#1>}
+\def\buncover#1{\uncover<#1>}
+\def\labF#1;{\lab #1/}
+\usepackage{verbatim}
+\AtBeginEnvironment{hscode}{\abovedisplayshortskip=0in%
+  \abovedisplayskip=0in%
+  \belowdisplayshortskip=0in%
+  \belowdisplayskip=0in%
+  \parskip=0pt}
+\renewcommand{\hsnewpar}[1]{\parskip=0pt\parindent=0pt\par\noindent}
+\def\hsline#1{\uline{\smash{#1}}}
+\def\altline<#1>#2{\alt<#1>{\hsline{#2}}{#2}}
+\def\inred{\color{red}}
+\def\inL(#1){\ensuremath{\mfun{in}(\lab #1/)}}
+\def\outL(#1){\ensuremath{\mfun{out}(\lab #1/)}}
+\def\fct(#1:#2){\ensuremath{\{\var #1/\text{\,:\,}#2\unskip\}}}
+\let\elimdisplayskip\relax
 \def\preambleloaded{}
