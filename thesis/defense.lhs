@@ -14,7 +14,7 @@
 \vfill\hbox{\kern-.5\beamer@@leftsidebar\vbox{\titlepage}}\vfill
 \end{frame}\makeatother
 
-%%\begin{comment}
+\begin{comment}
 \section{Introduction}
 \begin{frame}{Optimizing Imperative Programs}
   \begin{itemize}
@@ -55,9 +55,9 @@
   \item Thorough exposition of the \hoopl library.
   \end{itemize}
 \end{frame}
-%%\end{comment}
+\end{comment}
 
-%%\begin{comment}
+\begin{comment}
 \section{\Mil}
 \subsection{Goals of \Mil}
 \note{Now I want to talk about \Mil's purpose. Why a ``monadic''
@@ -74,7 +74,7 @@
   to represent a simple fraction in TLA.}
 \begin{frame}[fragile]{Simplicity}
   \note<1>{Then I show how to represent the same expression using \Mil,
-    showing how simliar the two forms are.}
+    showing how similar the two forms are.}
   \begin{centering}\begin{equation*}
     \frac{(b * c + d)}{2}
   \end{equation*}
@@ -121,6 +121,7 @@
   \item Data Values
   \end{itemize}
 \end{frame}
+\end{comment}
 
 \begin{comment}
 \subsection{Basics}
@@ -317,7 +318,7 @@ to the respective closures shown.}
     k204/ and that captures the argument, \var f/. The statement on
     line 4 binds \var v229/ to the closure value returned. Notice that
     the closure holds a reference to \var v228/ -- we use the local
-    name of th value rather then the parameter name from the block.}
+    name of the value rather then the parameter name from the block.}
   \begin{onlyenv}<3>\begin{tikzpicture}[overlay, remember picture]
     \node[fact,right=.25in of v229g4,anchor=west] (fvv229g4) {$\left[\var v229/: \mkclo[k204:v228]\right]$};
     \draw [->] (fvv229g4) to (v229g4);
@@ -363,7 +364,7 @@ to the respective closures shown.}
 \end{minipage}\end{tabular*}
 \note<1>{In the following sequence I show how each line of \lab main/
   relates to an expression in the original program. At the end
-  of the block, we've evaluted |map toList ns|!}
+  of the block, we've evaluated |map toList ns|!}
 \begin{onlyenv}<2->\begin{tikzpicture}[remember picture, overlay]
   \node[fact,right=.25in of v227g5] (fv227g5) {|map|};
   \draw [->] (fv227g5) to (v227g5);
@@ -383,7 +384,7 @@ to the respective closures shown.}
 
 \note{Returning to the full example, I want to talk about the |map|
   function now; in particular, its use of the \milres case/
-  statement. The case staement implements conditional branching
+  statement. The case statement implements conditional branching
   in \mil.}
 \begin{frame}[fragile]{Conditionals}
   \begin{tabular*}{\hsize}{l}\begin{minipage}[t]{\hsize}
@@ -421,6 +422,7 @@ to the respective closures shown.}
 \end{frame}
 \end{comment}
 
+\begin{comment}
 \subsection{Related Work}
 \begin{frame}{Other Intermediate Forms}
   \begin{itemize}
@@ -429,13 +431,12 @@ to the respective closures shown.}
   \item \Mlj: Benton, Kennedy, \& Russell\footnote{``Compiling Standard ML to Java Bytecodes'' (1998).}
   \end{itemize}
 \end{frame}
-%%\end{comment}
 
 \section{Dataflow Analysis}
 \begin{frame}{The Dataflow Algorithm}
   \begin{itemize}
   \item Due to Kildall's ``A Unified Approach to Global Program Optimization'' (1973)
-  \item Widely applied to imperative programing languages
+  \item Widely applied to imperative programming languages
   \end{itemize}
 \end{frame}
 \subsection{Dataflow Basics}
@@ -503,7 +504,7 @@ how the in facts from \lab b1/ propagate to \lab b2/.}
     \draw [->] (b3.south) to ($(b3.south) + (0mm, -.25in)$) -|| ($(b2.west) + (-.25in, 0mm)$) to (b2.west);
   \end{tikzpicture}
 \end{frame}
-\note{I point out that things are mor complicated when a block has more than
+\note{I point out that things are more complicated when a block has more than
   one predecessor, as in \lab b2/s case. I state that the facts are resolved 
 using an analysis-specific ``meet'' operator. In this case, I show that the fact
 about \var g/ conflicts, so we set \inL(b2)'s fact about \var g/ to $\top$.}
@@ -580,7 +581,7 @@ specialized functions.}
 > toList x = Cons x Nil
 \end{frame}
 \note{However, partial application can have a cost. A naive
-  compiler might generate ineffecient code. For example, |main1| 
+  compiler might generate inefficient code. For example, |main1| 
   and |main2| produce the same result, but |main2| might 
   execute slower (or allocate more memory).}
 \begin{frame}{Partial Application}
@@ -607,8 +608,9 @@ easy, but in other cases its not so simple.}
   the benefits of my rewrite.
 
   The next slide begins the example by showing the example program.}
+\end{comment}
 
-%%\begin{comment}
+\begin{comment}
 \begin{frame}[fragile]{Uncurrying |map|}
 \begin{uncoverenv}<3>\begin{tikzpicture}
   \node[stmt] (main1) {\block main(ns):};
@@ -1456,12 +1458,9 @@ obvious connections, such as between \lab cons/ and \lab map/, or between
     \end{itemize}
   \end{onlyenv}
 \end{frame}
+\end{comment}
 
-
-%% \subsection{Example: Uncurrying with Loops}
-%% \begin{frame}{Original Program}
-%% \end{frame}
-
+\begin{comment}
 \subsection{Related Work}
 \begin{frame}{Related Work}
 \begin{itemize}
@@ -1470,7 +1469,7 @@ obvious connections, such as between \lab cons/ and \lab map/, or between
 \item Tolmach \& Oliva: Automatic uncurrying (in ``From ML to Ada: Strongly-typed Language Interoperability via Source Translation,'' 1998)
 \end{itemize}
 \end{frame}
-%%\end{comment}
+\end{comment}
 
 \section{Conclusion}
 \subsection{Monadic Optimizations}
@@ -2089,5 +2088,158 @@ email me at \texttt{jgbailey@@gmail.com}.
   \item Eliminating Thunks
   \item ``Push Through Cases''
   \end{itemize}
+\end{frame}
+\subsection{Example: Uncurrying with Loops}
+\begin{frame}[fragile]{Original Program}
+  \hfil\begin{tikzpicture}
+  \node[stmt] (b1) {\begin{minipage}{1in}
+    \begin{AVerb}[gobble=6]
+      \block b1():
+        \vbinds f<-\mkclo[k1:];
+        \vbinds g<-\mkclo[k3:];
+        \goto b2(f, g)
+    \end{AVerb}
+  \end{minipage}};
+  \node[stmt, below=.2in of b1] (b2) {\begin{minipage}{1in}
+    \begin{AVerb}[gobble=6]
+      \block b2 (f, g):
+        \vbinds t<-\app f*g/; 
+        \vbinds u<-\app g*t/;
+        \goto b3(t, u, f)
+    \end{AVerb}
+    \end{minipage}};
+  \node[stmt, below=.2in of b2] (b3) {\begin{minipage}{1in}
+    \begin{AVerb}[gobble=6]
+      \block b3 (t, u, f):
+        \vbinds v<-\app f*t/; 
+        \vbinds w<-\mkclo[k4:v]; 
+        \goto b2(f, w)
+    \end{AVerb}
+    \end{minipage}};
+    \draw [->] (b1) to (b2);
+    \draw [->] (b2) to (b3);
+    \draw [->] (b3.south) to ($(b3.south) + (0mm, -.25in)$) -|| ($(b2.west) + (-.25in, 0mm)$) to (b2.west);
+  \end{tikzpicture}
+\end{frame}
+\begin{frame}[fragile]{Initial Facts}
+  \hfil\begin{tikzpicture}
+  \node[stmt] (b1) {\begin{minipage}{1in}
+    \begin{AVerb}[gobble=6]
+      \block b1():
+        \vbinds f<-\mkclo[k1:];
+        \vbinds g<-\mkclo[k3:];
+        \goto b2(f, g)
+    \end{AVerb}
+  \end{minipage}};
+  \node[stmt, below=.2in of b1] (b2) {\begin{minipage}{1in}
+    \begin{AVerb}[gobble=6]
+      \block b2 (f, g):
+        \vbinds t<-\app f*g/; 
+        \vbinds u<-\app g*t/;
+        \goto b3(t, u, f)
+    \end{AVerb}
+    \end{minipage}};
+  \node[stmt, below=.2in of b2] (b3) {\begin{minipage}{1in}
+    \begin{AVerb}[gobble=6]
+      \block b3 (t, u, f):
+        \vbinds v<-\app f*t/; 
+        \vbinds w<-\mkclo[k4:v]; 
+        \goto b2(f, w)
+    \end{AVerb}
+    \end{minipage}};
+    \draw [->] (b1) to (b2);
+    \draw [->] (b2) to (b3);
+    \draw [->] (b3.south) to ($(b3.south) + (0mm, -.25in)$) -|| ($(b2.west) + (-.25in, 0mm)$) to (b2.west);
+
+    \node[fact,invis,right=.1in of b1,text width=1.5in] () 
+         {\outL(b1): \fct(f:\mkclo[k1:]), \fct(g:\mkclo[k3:])};
+    \node[fact,invis,right=.1in of b2,text width=1.5in] () 
+         {\inL(b2): \fct(f:\mkclo[k1:]), 
+           \fct(g:\top)};
+    \node[fact,invis,left=.3in of b3.west,text width=.75in,anchor=east] () 
+         {\outL(b3): \fct(g:\mkclo[k4:v])};
+  \end{tikzpicture}
+\end{frame}
+\begin{frame}[fragile]{Facts After Iteration}
+  \hfil\begin{tikzpicture}
+  \node[stmt] (b1) {\begin{minipage}{1in}
+    \begin{AVerb}[gobble=6]
+      \block b1():
+        \vbinds f<-\mkclo[k1:];
+        \vbinds g<-\mkclo[k3:];
+        \goto b2(f, g)
+    \end{AVerb}
+  \end{minipage}};
+  \node[stmt, below=.2in of b1] (b2) {\begin{minipage}{1in}
+    \begin{AVerb}[gobble=6]
+      \block b2 (f, g):
+        \vbinds t<-\app f*g/; 
+        \vbinds u<-\app g*t/;
+        \goto b3(t, u, f)
+    \end{AVerb}
+    \end{minipage}};
+  \node[stmt, below=.2in of b2] (b3) {\begin{minipage}{1in}
+    \begin{AVerb}[gobble=6]
+      \block b3 (t, u, f):
+        \vbinds v<-\app f*t/; 
+        \vbinds w<-\mkclo[k4:v]; 
+        \goto b2(f, w)
+    \end{AVerb}
+    \end{minipage}};
+    \draw [->] (b1) to (b2);
+    \draw [->] (b2) to (b3);
+    \draw [->] (b3.south) to ($(b3.south) + (0mm, -.25in)$) -|| ($(b2.west) + (-.25in, 0mm)$) to (b2.west);
+
+    \node[fact,invis,right=.1in of b1,text width=1.5in] () 
+         {\outL(b1): \fct(f:\mkclo[k1:]), \fct(g:\mkclo[k3:])};
+    \node[fact,invis,right=.1in of b2,text width=1.5in] () 
+         {\inL(b2): \fct(f:\mkclo[k1:]), 
+           \fct(g:\top)};
+    \node[invis,fact,right=.1in of b3,text width=1.5in] () 
+         {\inL(b3): \fct(t:\mkclo[k2:g]), \fct(u:\top), \fct(f:\mkclo[k1:])};
+    \node[fact,invis,left=.3in of b3.west,text width=.75in,anchor=east] () 
+         {\outL(b3): \fct(f:\mkclo[k1:]), \fct(g:\mkclo[k4:v])};
+  \end{tikzpicture}
+\end{frame}
+\begin{frame}[fragile]{Rewrite}
+  \hfil\begin{tikzpicture}
+  \node[stmt] (b1) {\begin{minipage}{1in}
+    \begin{AVerb}[gobble=6]
+      \block b1():
+        \vbinds f<-\mkclo[k1:];
+        \vbinds g<-\mkclo[k3:];
+        \goto b2(f, g)
+    \end{AVerb}
+  \end{minipage}};
+  \node[stmt, below=.2in of b1] (b2) {\begin{minipage}{1in}
+    \begin{AVerb}[gobble=6]
+      \block b2 (f, g):
+        \vbinds t<-\mkclo[k2:g];
+        \vbinds u<-\app g*t/;
+        \goto b3(t, u, f)
+    \end{AVerb}
+    \end{minipage}};
+  \node[stmt, below=.2in of b2] (b3) {\begin{minipage}{1in}
+    \begin{AVerb}[gobble=6]
+      \block b3 (t, u, f):
+        \vbinds v<-\mkclo[k2:t];
+        \vbinds w<-\mkclo[k4:v]; 
+        \goto b2(f, w)
+    \end{AVerb}
+    \end{minipage}};
+    \draw [->] (b1) to (b2);
+    \draw [->] (b2) to (b3);
+    \draw [->] (b3.south) to ($(b3.south) + (0mm, -.25in)$) -|| ($(b2.west) + (-.25in, 0mm)$) to (b2.west);
+
+    \node[fact,invis,right=.1in of b1,text width=1.5in] () 
+         {\outL(b1): \fct(f:\mkclo[k1:]), \fct(g:\mkclo[k3:])};
+    \node[fact,invis,right=.1in of b2,text width=1.5in] () 
+         {\inL(b2): \fct(f:\mkclo[k1:]), 
+           \fct(g:\top)};
+    \node[invis,fact,right=.1in of b3,text width=1.5in] () 
+         {\inL(b3): \fct(t:\mkclo[k2:g]), \fct(u:\top), \fct(f:\mkclo[k1:])};
+    \node[fact,invis,left=.3in of b3.west,text width=.75in,anchor=east] () 
+         {\outL(b3): \fct(f:\mkclo[k1:]), \fct(g:\mkclo[k4:v])};
+  \end{tikzpicture}
 \end{frame}
 \end{document}
