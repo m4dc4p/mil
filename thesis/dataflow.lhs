@@ -744,8 +744,7 @@ else
 \end{singlespace}
 
 Our algorithm, however, does not take such conditions into
-account. The ideal solution is called the \emph{meet over paths}
-solution because it takes into account only the paths that will taken
+account. The ideal solution considers only the paths that will taken
 by the program. Determining the actual paths taken is an undecidable
 problem --- thus we settle for the maximum fixed point. Fortunately,
 the algorithm is conservative --- it never ignores (or adds) paths ---
