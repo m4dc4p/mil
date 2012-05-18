@@ -1285,16 +1285,16 @@ analysis stops. Applications of \var f/ are correctly replaced with
 direct closure allocations, but applications of \var g/ remain as it
 does not always hold the same closure.
 
-\subsection{Complications}
+\subsection{Soundness}
 
-Our implementation of uncurrying replaces \enter expression with
-closure allocations if possible. When |collapseTransfer| sees
+Our implementation of uncurrying can produce incorrect results
+under certain circumstances. When |collapseTransfer| sees
 a binding to a closure value, it records not only the label that
 the closure refers to, but also all of the variables captured in the
 closure. These facts are propagated to successor blocks. If those
-blocks are subsequently rewritten allocate the closure directly,
+blocks are subsequently rewritten to allocate the closure directly,
 then the variables in the closure may be ``unpacked'' into the block,
-introducing free variables that are not properly bound.
+introducing free variables that are not properly bound. 
 
 For example, consider the \mil program in Figure~\ref{unc_fv}. In
 Part~\subref{unc_fv_a}, the statement \binds v<-\mkclo[k1:x]; in \lab
@@ -1353,12 +1353,11 @@ of where each variable in a given closure was declared.  We could use
 that information to propagate free variables from the block in which
 they are first bound to the blocks where they are used.
 
-A second challenge is that our approach does not account for calls to
-blocks on the \rhs of a bind statement, such as \binds v <- \goto
-b(\dots);; it only considers calls at the end of blocks. If
-the values passed to the block \lab b/ on the \rhs of a \mbind differ
-from those passed at the end of a block, then our analysis will
-propagate incorrect facts.
+Calls to blocks on the \rhs of a bind statement, such as \binds v <-
+\goto b(\dots);; can also produce incorrect results in our current
+implementation. If the values passed to the block \lab b/ on the \rhs
+of a \mbind differ from those passed at the end of a block, then our
+analysis will propagate incorrect facts.
 
 \begin{myfig}
   \begin{tabular}{cc}

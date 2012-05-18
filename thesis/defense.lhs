@@ -1,4 +1,4 @@
-%&pre_defense
+%&Pre_defense
 \makeatletter\@@ifundefined{preambleloaded}{\input{pre_defense}}{}\makeatother
 %include polycode.fmt
 %include lineno.fmt
@@ -14,12 +14,13 @@
 \vfill\hbox{\kern-.5\beamer@@leftsidebar\vbox{\titlepage}}\vfill
 \end{frame}\makeatother
 
-\begin{comment}
+%%\begin{comment}
 \section{Introduction}
-\begin{frame}{Optimizing Imperative Programs}
+\begin{frame}{Introduction}
   \begin{itemize}
+  \item Compiling Functional Programming Languages
   \item Dataflow Analysis
-  \item Intermediate Representations: Three-Address Code
+  \item Three-Address Code
   \end{itemize}
 \end{frame}
 \begin{frame}{Dataflow Analysis for Functional Languages?}
@@ -55,9 +56,9 @@
   \item Thorough exposition of the \hoopl library.
   \end{itemize}
 \end{frame}
-\end{comment}
+%%\end{comment}
 
-\begin{comment}
+%%\begin{comment}
 \section{\Mil}
 \subsection{Goals of \Mil}
 \note{Now I want to talk about \Mil's purpose. Why a ``monadic''
@@ -90,9 +91,9 @@
   \begin{onlyenv}<3>\begin{itemize}
   \item \Mil
     \begin{AVerb}[gobble=6,numbers=left,xleftmargin=1em]
-      \vbinds t1<-mul b c;
-      \vbinds t2<-add t1 d;
-      \vbinds t3<-div t2 2;
+      \vbinds t1<-\prim mul(b, c);
+      \vbinds t2<-\prim add(t1, d);
+      \vbinds t3<-\prim div(t2, 2);
     \end{AVerb}
   \end{itemize}\end{onlyenv}
 \end{frame}
@@ -100,14 +101,16 @@
   pure values by placing all side-effecting operations
   in monadic \emph{tail} expressions.}
 \begin{frame}[fragile]{Side-Effects}
-  \begin{itemize}
-  \item Closures\par
+\begin{onlyenv}<2->
+    \begin{itemize}
+    \item Closures\par
   \only<2->{\qquad\binds t1 <- \mkclo[k:x];}
-  \only<3->{\item Data values\par}
-  \only<4->{\qquad\binds t3<- Cons\ x\ xs;}
-  \only<5->{\item Primitives\par}
-  \only<6->{\qquad\binds t2<-\prim add(t1, d);}
-  \end{itemize}
+  \only<4->{\item Data values\par}
+  \only<4->{\qquad\binds t2<- Cons\ x\ xs;}
+  \only<6->{\item Primitives\par}
+  \only<6->{\qquad\binds t3<-\prim add(x, y);}
+    \end{itemize}
+\end{onlyenv}
 \end{frame}
 
 \note{\Mil is an \emph{intermediate} language, so it better be
@@ -121,7 +124,7 @@
   \item Data Values
   \end{itemize}
 \end{frame}
-\end{comment}
+%%\end{comment}
 
 \begin{comment}
 \subsection{Basics}
@@ -422,27 +425,35 @@ to the respective closures shown.}
 \end{frame}
 \end{comment}
 
-\begin{comment}
+%%\begin{comment}
 \subsection{Related Work}
-\begin{frame}{Other Intermediate Forms}
+\begin{frame}{Related Work}
   \begin{itemize}
+  \item \Mlj: Benton, Kennedy, \& Russell\footnote{``Compiling Standard ML to Java Bytecodes'' (1998).}
   \item Continuation-Passing Style\footnote{See Appel's ``Compiling with Continuations'' (1992).}
   \item Administrative-Normal Form: Flanagan, Sabry, Duba, and Felleisen\footnote{``The Essence of Compiling with Continuations'' (1993).}
-  \item \Mlj: Benton, Kennedy, \& Russell\footnote{``Compiling Standard ML to Java Bytecodes'' (1998).}
   \end{itemize}
 \end{frame}
 
 \section{Dataflow Analysis}
-\begin{frame}{The Dataflow Algorithm}
+\begin{frame}{Dataflow Analysis}
   \begin{itemize}
   \item Due to Kildall's ``A Unified Approach to Global Program Optimization'' (1973)
   \item Widely applied to imperative programming languages
   \end{itemize}
 \end{frame}
-\subsection{Dataflow Basics}
+\begin{frame}{Typical Dataflow Optimizations}
+  \begin{itemize}
+  \item Dead-code Elimination
+  \item Constant Folding
+  \item Lazy Code Motion
+  \item For more, see Muchnick's ``Advanced compiler design and implementation'' (1997)
+  \end{itemize}
+\end{frame}
+\subsection{Fundamentals}
 \note{I give an abbreviated \mil program and its associated \cfg. I give
 the definition of a ``basic block,'' as well.}
-\begin{frame}[fragile]{Control-Flow Graphs \& Basic Blocks}
+\begin{frame}[fragile]{Fundamentals: \Cfg{}s \& Basic Blocks}
   \hfil\begin{tikzpicture}
   \node[stmt] (b1) {\begin{minipage}{1in}
     \begin{AVerb}[gobble=6]
@@ -459,7 +470,7 @@ the definition of a ``basic block,'' as well.}
         \goto b3(t, u, f)
     \end{AVerb}
     \end{minipage}};
-  \node[stmt, below=.1in of b2] (b3) {\begin{minipage}{1in}
+  \node[stmt, below=.2in of b2] (b3) {\begin{minipage}{1in}
     \begin{AVerb}[gobble=6]
       \block b3 (t, u, f):
         \dots
@@ -490,7 +501,7 @@ how the in facts from \lab b1/ propagate to \lab b2/.}
         \goto b3(t, u, f)
     \end{AVerb}
     \end{minipage}};
-  \node[stmt, below=.1in of b2] (b3) {\begin{minipage}{1in}
+  \node[stmt, below=.2in of b2] (b3) {\begin{minipage}{1in}
     \begin{AVerb}[gobble=6]
       \block b3 (t, u, f):
         \dots
@@ -508,7 +519,7 @@ how the in facts from \lab b1/ propagate to \lab b2/.}
   one predecessor, as in \lab b2/s case. I state that the facts are resolved 
 using an analysis-specific ``meet'' operator. In this case, I show that the fact
 about \var g/ conflicts, so we set \inL(b2)'s fact about \var g/ to $\top$.}
-\begin{frame}[fragile]{Facts}
+\begin{frame}[fragile]{Iteration}
   \hfil\begin{tikzpicture}
   \node[stmt] (b1) {\begin{minipage}{1in}
     \begin{AVerb}[gobble=6]
@@ -525,7 +536,7 @@ about \var g/ conflicts, so we set \inL(b2)'s fact about \var g/ to $\top$.}
         \goto b3(t, u, f)
     \end{AVerb}
     \end{minipage}};
-  \node[stmt, below=.1in of b2] (b3) {\begin{minipage}{1in}
+  \node[stmt, below=.2in of b2] (b3) {\begin{minipage}{1in}
     \begin{AVerb}[gobble=6]
       \block b3 (t, u, f):
         \dots
@@ -534,7 +545,10 @@ about \var g/ conflicts, so we set \inL(b2)'s fact about \var g/ to $\top$.}
     \end{minipage}};
     \node[invis,overlay,right=.1in of b1,text width=1.5in] () {\outL(b1): \fct(f:\mkclo[k1:]), \fct(g:\mkclo[k3:])};
     \node[invis,overlay,right=.1in of b2,text width=1.5in] () {\inL(b2): \fct(f:\mkclo[k1:]), \fct(g:\balt{2}{\top}{\mkclo[k3:]})};
-    \node[invis,overlay,right=.1in of b3] () {\outL(b3): \fct(g:\mkclo[k4:v])};
+    \node[fact,invis,left=.3in of b3.west,text width=.75in,anchor=east] () 
+         {\outL(b3): \fct(f:\mkclo[k1:]), \fct(g:\mkclo[k4:v])};
+
+%%    \node[invis,overlay,right=.1in of b3] () {\outL(b3): \fct(g:\mkclo[k4:v])};
 
     \draw [->] (b1) to (b2);
     \draw [->] (b2) to (b3);
@@ -542,14 +556,6 @@ about \var g/ conflicts, so we set \inL(b2)'s fact about \var g/ to $\top$.}
   \end{tikzpicture}
 \end{frame}
 
-\begin{frame}{Typical Dataflow Optimizations}
-  \begin{itemize}
-  \item Dead-code Elimination
-  \item Constant Folding
-  \item Lazy Code Motion
-  \item For more, see Muchnick's ``Advanced compiler design and implementation'' (1997)
-  \end{itemize}
-\end{frame}
 \subsection{\Hoopl}
 \begin{frame}{\Hoopl: A Haskell Library for Dataflow Analysis}
   \begin{itemize}
@@ -562,6 +568,12 @@ about \var g/ conflicts, so we set \inL(b2)'s fact about \var g/ to $\top$.}
 \end{frame}
 
 \section{Uncurrying}
+\begin{frame}{Uncurrying}
+  \begin{itemize}
+  \item Partial Application
+  \item Uncurrying |map|
+  \end{itemize}
+\end{frame}
 \note{I explain the |map| and |toList| functions in brief, then 
 reveal the |mkLists| function.}
 \begin{frame}{Partial Application}
@@ -578,6 +590,7 @@ Partial application is powerful, because I can easily define
 specialized functions.}
 \begin{frame}{Partial Application}
 > mkLists = map toList 
+
 > map f xs = case xs of
 >   Cons x xs' -> Cons (f x) (map f xs')
 >   Nil -> Nil
@@ -589,8 +602,10 @@ specialized functions.}
   execute slower (or allocate more memory).}
 \begin{frame}{Partial Application}
 > mkLists = map toList 
-> main1 ns = map toList 
+
+> main1 ns = map toList ns
 > main2 ns = mkLists ns
+
 > map f xs = case xs of
 >   Cons x xs' -> Cons (f x) (map f xs')
 >   Nil -> Nil
@@ -601,7 +616,7 @@ specialized functions.}
 want to transform |main2| into |main1|. In this case, its
 easy, but in other cases its not so simple.}
 
-\subsection{Example: Uncurrying |map|}
+\subsection{Uncurrying |map|}
 \note{The following example illustrates how I can turn a recursive
   call into a loop. I start by showing the definition of the example,
   then I talk through the translation of each block, building up
@@ -611,9 +626,9 @@ easy, but in other cases its not so simple.}
   the benefits of my rewrite.
 
   The next slide begins the example by showing the example program.}
-\end{comment}
+%%\end{comment}
 
-\begin{comment}
+%%\begin{comment}
 \begin{frame}[fragile]{Uncurrying |map|}
 \begin{uncoverenv}<3>\begin{tikzpicture}
   \node[stmt] (main1) {\block main(ns):};
@@ -627,7 +642,7 @@ easy, but in other cases its not so simple.}
 >   Cons x xs' -> 
 >     Cons (f x) (map f xs')
 >   Nil -> Nil 
-> toList n = Cons n Nil
+> toList x = Cons x Nil
 \end{minipage} & \begin{uncoverenv}<2-3>\begin{minipage}[t]{.4\hsize}
     \begin{AVerb}[gobble=6,numbers=left]
       \block main(ns): 
@@ -655,7 +670,7 @@ easy, but in other cases its not so simple.}
 >   Cons x xs' -> 
 >     Cons (f x) (map f xs')
 >   Nil -> Nil 
-> {-"\hsline{"-}toList n{-"}"-} = Cons n Nil
+> {-"\hsline{"-}toList x{-"}"-} = Cons x Nil
 \end{minipage}& \begin{minipage}[t]{.4\hsize}
     \begin{AVerb}[gobble=6,numbers=left]
       \block toList(x):
@@ -698,7 +713,7 @@ obvious connections, such as between \lab cons/ and \lab map/, or between
 >   Cons x xs' -> 
 >     {-"\altline<3>{"-}Cons (f x) (map f xs'){-"}"-}
 >   Nil -> {-"\altline<4>{"-}Nil{-"}"-}
-> toList n = Cons n Nil
+> toList x = Cons x Nil
 \end{minipage} & \begin{onlyenv}<1,2>\begin{minipage}[t]{.4\hsize}
   \begin{AVerb}[gobble=6,numbers=left]
       \block map(f,xs): 
@@ -742,7 +757,7 @@ obvious connections, such as between \lab cons/ and \lab map/, or between
 > map f xs = case xs of
 >   Cons x xs' -> Cons (f x) (map f xs')
 >   Nil -> Nil 
-> toList n = Cons n Nil
+> toList x = Cons x Nil
 \end{frame}
 
 \note{To proceed, I need to connect \lab main/ to \lab map/. I will go through
@@ -916,7 +931,7 @@ obvious connections, such as between \lab cons/ and \lab map/, or between
     \node[fact, invis, right=0.25in of v228d, anchor=west] (fv228a11) 
          {\fct(v228:{\mkclo[k219:]})};
     \node[fact, invis, right=0.25in of v229d, anchor=west] (fv229a11) 
-         {\fct(v229:{\mkclo[k204:v228]})};
+         {\fct(v229:{{\inred \mkclo[k204:v228]}})};
     \draw [->] (fv227a11) to (v227d);
     \draw [->] (fv228a11) to (v228d);
     \draw [->] (fv229a11) to (v229d);
@@ -1461,9 +1476,9 @@ obvious connections, such as between \lab cons/ and \lab map/, or between
     \end{itemize}
   \end{onlyenv}
 \end{frame}
-\end{comment}
+%%\end{comment}
 
-\begin{comment}
+%%\begin{comment}
 \subsection{Related Work}
 \begin{frame}{Related Work}
 \begin{itemize}
@@ -1472,9 +1487,15 @@ obvious connections, such as between \lab cons/ and \lab map/, or between
 \item Tolmach \& Oliva: Automatic uncurrying; ``From ML to Ada: Strongly-typed Language Interoperability via Source Translation'' (1998)
 \end{itemize}
 \end{frame}
-\end{comment}
+%%\end{comment}
 
 \section{Conclusion}
+\begin{frame}{Conclusion}
+  \begin{itemize}
+  \item Monadic Optimizations
+  \item Contributions
+  \end{itemize}
+\end{frame}
 \subsection{Monadic Optimizations}
 \begin{frame}{Optimizing using the Monad Laws}
   \begin{itemize}
@@ -1490,13 +1511,14 @@ $$
 $$
 |do { x <- do {y <- m; n}; o }| \equiv\ |do { y <- m; x <- n; o}|
 $$
+\item From Wadler's ``Monads for Functional Programming'' (1995)
   \end{itemize}
 \end{frame}
 \subsection{Contributions}
 \begin{frame}{Dataflow Analysis \& \Mil}
   \begin{itemize}
     \item High-level functional programming; low-level details.
-    \item Structured for dataflow analysis
+    \item Structured for dataflow analysis.
     \item Implemented other optimizations; for example, dead-code elimination.
   \end{itemize}
 \end{frame}
@@ -1514,7 +1536,7 @@ $$
   \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]{Thank You!}
+\begin{frame}[fragile]{Questions?}
 Source code and paper available at \url{http://mil.codeslower.com}, or 
 email me at \texttt{jgbailey@@gmail.com}.
 \end{frame}
@@ -2038,7 +2060,7 @@ email me at \texttt{jgbailey@@gmail.com}.
 %%     \end{AVerb}
 %% \end{comment}
 \section{Appendix}
-\subsection{Uncurrying}
+\subsection{Uncurrying Comparisons}
 \begin{frame}[fragile]{Related Work: Appel}
 \begin{minipage}{\hsize}
 > f x = g x
@@ -2084,13 +2106,6 @@ email me at \texttt{jgbailey@@gmail.com}.
     \ccblock k215(x, y)z: \goto b216(x, y, z)
   \end{AVerb}
 \end{minipage} 
-\end{frame}
-\subsection{Future Work}
-\begin{frame}{Future Work}
-  \begin{itemize}
-  \item Eliminating Thunks
-  \item ``Push Through Cases''
-  \end{itemize}
 \end{frame}
 \subsection{Example: Uncurrying with Loops}
 \begin{frame}[fragile]{Original Program}
@@ -2244,5 +2259,12 @@ email me at \texttt{jgbailey@@gmail.com}.
     \node[fact,invis,left=.3in of b3.west,text width=.75in,anchor=east] () 
          {\outL(b3): \fct(f:\mkclo[k1:]), \fct(g:\mkclo[k4:v])};
   \end{tikzpicture}
+\end{frame}
+\subsection{Future Work}
+\begin{frame}{Future Work}
+  \begin{itemize}
+  \item Eliminating Thunks
+  \item ``Push Through Cases''
+  \end{itemize}
 \end{frame}
 \end{document}

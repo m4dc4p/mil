@@ -407,7 +407,7 @@ For our example analysis, we only consider two kinds of statements:
 constant and non-constant updates. A constant update is one of the
 form $a !+=+! C$, where $C$ is a known integer value. A non-constant
 update is any other type of assignment; in our example, something like
-$i!++++!$.
+$i$!++++!.
 
 We define a transfer function, $t$, for our analysis in terms over
 these two types of statements. Our function takes a set of input facts
@@ -416,25 +416,20 @@ these two types of statements. Our function takes a set of input facts
 \begin{singlespace}\correctspaceskip
   \begin{equation}\allowdisplaybreaks[0]
     \begin{array}{rl}
-      t (F, a\ \text{\tt =}\ C) &= \{(a, x \lub C), \text{when\ } (a, x) \in F\ \text{or} \\
-      & \phantom{= \{}(a, C), \text{when\ } a \not\in \dom(F)\}\ \cup \\
-      & \phantom{=} F\ \backslash\ \mfun{uses}(F, a).\\
+      t (F, a\ \text{\tt =}\ C) &= \{(a, C) \} \cup (F\ \backslash\ \mfun{uses}(F, a)) \\
       t (F, a\text{\tt ++}) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)). \\
       t (F, a\ \text{\tt +=\ } b) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)). \\\\
-      \mfun{uses}(F, a) &= \{(a, x)\ ||\ a \in \dom(F)\}. 
+      \mfun{uses}(F, a) &= \{(a', x)\ ||\ (a', x) \in F\ \text{and } a = a' \}. 
     \end{array}\label{eqn_back4}
   \end{equation}
 \end{singlespace}
 
-When a node contains a constant update ($a !+=+! C$) and the input
-facts do not contain a fact for $a$, then
-Equation~\eqref{eqn_back4} combines the fact \factC{a}{C} with the
-input set. Otherwise, the \lub operator is used to combine the
-existing fact \factC{a}{x} with the new fact. For a non--constant
-update, a new fact \factC{a}{\top} is always added to the output
-set. In both cases, all mentions of $a$ in the input set are removed
-before being combined with the new fact --- this ensures that no more
-than one fact per variable exists in our fact set.
+When a node contains a constant update ($a !+=+! C$), then
+Equation~\eqref{eqn_back4} adds that fact to the input set. For a
+non--constant update, a new fact \factC{a}{\top} is always added to
+the output set. In both cases, all mentions of $a$ in the input set
+are removed before being combined with the new fact --- this ensures
+that no more than one fact per variable exists in our fact set.
 
 The definition in Equation~\eqref{eqn_back4} matches our intuition for
 constant propagation. When we know a variable is assigned a constant,
@@ -630,18 +625,6 @@ many'' assignments (or some other update).  This means our transfer
 function always increases (or does not change) the information we
 have. 
 
-To show that our transfer function (Equation~\eqref{eqn_back4}) is
-monotone, consider some fact $(v,x)$ and some block $B$. $v$ is a
-variable in the program; $x$ is a value in \setLC; and $B$ contains
-some number of statements.  We analyze the fact, $(v,x')$ produced
-applying our transfer function $f$ to $B$. If $B$ does not contain an
-assignment affecting $v$, then $x = x'$, and we already know that $x \sqlte
-x'$. If $B$ makes a non-constant update to $v$, then $x' = \top$ and we
-know $x \sqlte \top$ for all $x$ by the definition of \lub. Finally,
-if $B$ assigns some constant $C$ to $x$, then $x' = x \lub C$, which
-again satisfies our relation. Therefore our transfer function is
-monotone.
-
 \section{Dataflow Equations}
 \label{back_subsec_eq}
 
@@ -761,8 +744,7 @@ else
 \end{singlespace}
 
 Our algorithm, however, does not take such conditions into
-account. The ideal solution is called the \emph{meet over paths}
-solution because it takes into account only the paths that will taken
+account. The ideal solution considers only the paths that will taken
 by the program. Determining the actual paths taken is an undecidable
 problem --- thus we settle for the maximum fixed point. Fortunately,
 the algorithm is conservative --- it never ignores (or adds) paths ---
