@@ -30,7 +30,7 @@ the program.
 
 Though Kildall named his algorithm ``global,'' he also applied it to
 smaller pieces of programs such as subroutines or function
-definitions. He showed that some analysis' required reversing the
+definitions. He showed that some analyses required reversing the
 input and output pools; in other words, running the algorithm
 backwards.
 
@@ -42,11 +42,11 @@ Section~\ref{sec_back3} introduces ``basic blocks,'' not something
 originally defined by Kildall but now a fundamental way of
 representing nodes in \cfgs. We show the modern representation
 of the dataflow algorithm in Section~\ref{back_sec_df}, introducing
-terms and definitions that have been defined since Kildall's original
+terms and definitions that have been used since Kildall's original
 work. In Section~\ref{back_subsec_eq} we show the general form of
 \emph{dataflow equations} that can be used to describe any dataflow
 analysis; we will use these equations later in the thesis to describe
-our own analysis'. Section~\ref{back_sec_quality} discusses the
+our own analyses. Section~\ref{back_sec_quality} discusses the
 trustworthiness of the dataflow algorithm --- that is, it shows how we
 can know a particular analysis has given the best possible
 solution. Transforming programs based on a dataflow analysis is
@@ -378,10 +378,10 @@ computes different facts, but those facts are always represented by a
 lattice.
 
 We have established that our analysis computes \emph{facts} at each
-node in our programs control-flow graph. The facts assign a value from
+node in our program's control-flow graph. The facts assign a value from
 the set $\{\bot, \top\} \cup \ZZ$ to each variable in the program,
 at each node in the graph. We defined a \emph{meet operator}, \lub,
-which is used to combing conflicting values when computing \inBa.  The
+which is used to combine conflicting values when computing \inBa.  The
 facts and meet operator together define a \emph{lattice}. We next
 explore how \out facts are computed for each node.
 
@@ -390,8 +390,8 @@ explore how \out facts are computed for each node.
 
 The dataflow algorithm calculates new facts using a \emph{transfer
   function}. The transfer function is specific to both the analysis
-performed and the semantics of the programming language used to write
-the program analyzed. Theoretically, each node in the graph can
+performed and the semantics of the source language for 
+the programs that are analyzed. In principle, each node in the graph can
 have its own transfer function, but in practice the function is 
 defined by cases for each statement or expression in the language. 
 
@@ -409,22 +409,22 @@ form $a !+=+! C$, where $C$ is a known integer value. A non-constant
 update is any other type of assignment; in our example, something like
 $i$!++++!.
 
-We define a transfer function, $t$, for our analysis in terms over
+We define a transfer function, $t$, for our analysis in terms of
 these two types of statements. Our function takes a set of input facts
 ($F$), and a statement; it produces a set of output facts:
 
 \begin{singlespace}\correctspaceskip
   \begin{equation}\allowdisplaybreaks[0]
     \begin{array}{rl}
-      t (F, a\ \text{\tt =}\ C) &= \{(a, C) \} \cup (F\ \backslash\ \mfun{uses}(F, a)) \\
-      t (F, a\text{\tt ++}) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)). \\
+      t (F, a\ \text{\tt =}\ C) &= \{(a, C) \} \cup (F\ \backslash\ \mfun{uses}(F, a)), \\
+      t (F, a\text{\tt ++}) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)), \\
       t (F, a\ \text{\tt +=\ } b) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)). \\\\
       \mfun{uses}(F, a) &= \{(a', x)\ ||\ (a', x) \in F\ \text{and } a = a' \}. 
     \end{array}\label{eqn_back4}
   \end{equation}
 \end{singlespace}
 
-When a node contains a constant update ($a !+=+! C$), then
+\noindent When a node contains a constant update ($a !+=+! C$), then
 Equation~\eqref{eqn_back4} adds that fact to the input set. For a
 non--constant update, a new fact \factC{a}{\top} is always added to
 the output set. In both cases, all mentions of $a$ in the input set
@@ -464,8 +464,8 @@ analysis performed and the semantics of the underlying
 program. Equation~\eqref{eqn_back4}, the transfer function for our
 constant propagation example, defines how we derive information about
 a variable's value after the statements in the given node execute.  In
-the next section, we iteratively apply our transfer function and
-lattice to the control-flow graph.
+the next section, we iteratively apply our transfer function to the
+control-flow graph.
 
 \subsection{Iteration \& Fixed Points}
 \label{back_subsec_iter}
@@ -481,7 +481,7 @@ analysis) or \inE (in the case of a backwards analysis) sets reach a
 Figure~\ref{fig_back13}, Part~\subref{fig_back13_tbl} shows how the
 \inE and \out sets for each node change during our
 analysis. The ``zeroth'' iteration corresponds to the initial value
-for all facts: everything is $\bot$, i.e., unknown. Reading from
+for all facts: everything is $\bot$ (i.e., unknown). Reading from
 left-to-right gives the \inE and \out facts for a given node at each
 iteration of the analysis. The control-flow graph is reproduced in
 Part~\subref{fig_back13_cfg}. Following the control-flow between nodes
@@ -546,10 +546,11 @@ Notice how the conflicting values for $i$ are resolved with the \lub
 operator. The value of $i$ in \outB{lst_back15_test} has reached a fixed point
 with this iteration; it will no longer change.
 
-The above example raises an important question: how do we know we have
-reached a fixed point? How do we know we have gotten the best possible
-answer?  Both of these questions can be answered if our lattice has
-\emph{finite height} and the transfer function is \emph{monotone}.
+The above example raises an important question: how do we know that
+our analysis will terminate? Will the algorithm iterate endlessly over
+the \cfg, updating facts and never stopping? The answer is that the
+dataflow algorithm will terminate if our lattice has \emph{finite
+  height} and a \emph{monotone} transfer function.
 
 Let us begin with the lattice. Consider again the meet operator, \lub,
 defined in Figure~\ref{tbl_back4} and our set of values, \setLC:
@@ -594,15 +595,16 @@ And now we can redefine height as the largest $n$ such that:
 \end{equation}
 
 We can show by contradiction that the height of our lattice is
-$3$. Suppose there exists $x_1 \sqlt x_2 \sqlt \dots \sqlt x_n$, such that $n = 4$. If
-$x_4$ is $\top$, then $x_3$ must be an integer or $\bot$. If $x_3$ is
+$3$. Suppose there exists $x_1 \sqlt x_2 \sqlt x_3\sqlt x_4$. If $x_4$
+is $\top$, then $x_3$ must be an integer or $\bot$. If $x_3$ is
 $\bot$, by Equation~\eqref{eqn_back17}, there is no such $x_2$ such
 that $x_2 \sqlt \bot$. Therefore, $x_3$ cannot be $\bot$. If $x_3$ is
 an integer, again by Equation~\eqref{eqn_back17}, $x_2$ must be
 $\bot$. In turn, there is no such $x_1$ such that $x_1 \sqlt
 \bot$. Therefore, $x_4$ cannot be $\top$ and in fact, by similar
-arguments, it cannot exist. Using similar logic, we can show by cases
-that $n$ (and the height of our lattice) must be $3$.
+arguments, it cannot exist. But we know already that $\bot \sqlt C
+\sqlt \top$, for all $C \in \ZZ$, which is a path of length $3$, so it
+follows that the height of our lattice must be $3$.
 
 Now let us address the transfer function. A \emph{monotone} function 
 has the following property:
@@ -610,20 +612,35 @@ has the following property:
   f(x) \sqlte f(y)\ \text{whenever}\ x \sqlte y.
   \label{eqn_back11}
 \end{equation}
-That is, a monotone function does not change the ordering between its
-inputs. If $x$ is ``less than or equal to'' $y$, $f(x)$ will also be
-``less than or equal to'' $f(y)$. 
+That is, if $x$ is ``less than or equal to'' $y$, $f(x)$ will also be
+``less than or equal to'' $f(y)$.
 
-The transfer function moves our facts along the lattice. A monotone
-transfer function will never ``decrease'' its argument --- $f$ will
-always produce a value that is at the same ``height'' or ``higher'' in
-the lattice. The lattice represents the information we have gathered
-during our analysis. In turn, the ordering of values represents ``how
-much'' we know. That is, when a variable is assigned $\bot$, we do not
-know anything about it. If it is assigned $\top$, we have seen ``too
-many'' assignments (or some other update).  This means our transfer
-function always increases (or does not change) the information we
-have. 
+The transfer function moves our facts along the lattice. The lattice
+represents the information we have gathered during our analysis. In
+turn, the ordering of values represents ``how much'' we know. That is,
+when a variable is assigned $\bot$, we do not know anything about
+it. If it is assigned $\top$, we have seen ``too many'' assignments
+(or some other update).  A monotone transfer function always increases
+(or does not change) the information we have.
+
+We can show that our transfer function (Equation~\eqref{eqn_back4}) is
+monotone by cases. Assume we are analyzing some statement $s$ and that
+we have some set of facts so far, named $F$. If $s$ is $a\ !+=+!\ C$,
+then $t(F, s)$ adds $(a, C)$ to $F$. Any other facts in $F$ are unaffeted
+by $t(s)$; therefore, $t(F, a\ !+=+!\ C) \sqlt $
+
+consider some fact $(v,x)$ and some block $B$. $v$ is a
+variable in the program; $x$ is a value in \setLC; and $B$ contains
+some number of statements.  We analyze the fact, $(v,x')$ produced
+applying our transfer function $f$ to $B$. If $B$ does not contain an
+assignment affecting $v$, then $x = x'$, and we already know that $x \sqlte
+x'$. If $B$ makes a non-constant update to $v$, then $x' = \top$ and we
+know $x \sqlte \top$ for all $x$ by the definition of \lub. Finally,
+if $B$ assigns some constant $C$ to $x$, then $x' = x \lub C$, which
+again satisfies our relation. Therefore our transfer function is
+monotone.
+That is, if $x$ is ``less than or equal to'' $y$, $f(x)$ will also be
+``less than or equal to'' $f(y)$.
 
 \section{Dataflow Equations}
 \label{back_subsec_eq}
@@ -720,7 +737,7 @@ Aho \citep{Aho2006} shows that for a dataflow analysis defined with a
 finite lattice and monotone transfer function, Figure~\ref{fig_back14}
 will compute a \emph{maximum fixed point}. A maximum fixed point means
 that for any $F = \outBa$ computed by the algorithm, no other $F'$ can
-be computed such that $F \sqlt F'$. In other words,
+be computed such that $F \sqlt F'$. In other words, the process described in 
 Figure~\ref{fig_back14} will compute \out facts with the best
 possible information that our algorithm is capable of.
 
