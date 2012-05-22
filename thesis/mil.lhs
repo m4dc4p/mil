@@ -586,7 +586,8 @@ implementation follows the style used by Kennedy
 \citeyearpar{Kennedy2007} and in most cases it does not differ much
 from numerous other compilers that translate the \lamA to a given
 intermediate form. However, we will highlight some nuances of our
-translation.
+translation.\footnote{Those interested in the full compiler can 
+download the source from the \textsc{url} given in the Appendix.} 
 
 \intent{Show how $\lambda$-abstractions are translated.}  Consider
 again the definition of |compose| in Figure~\ref{mil_fig1a} on
@@ -677,7 +678,7 @@ function) illustrates this principle. Though |kleisli| ends with a
 monadic expression (|f v|), it does not return a suspended computation
 representing |f v|; instead, it returns the result of executing |f v|. The
 statement on Line~\ref{mil_fig_kleisli_f_app} evaluate \app f * v1/
-and assigns the result to \var v206/. Crucially, the next line invokes
+and assigns the result to \var v206/. The next line invokes
 the thunk, immediately executing the program returned by \app f *
 v1/. This is a case where the compiler generates code to execute a
 sequence of monadic values, rather than code that returns a suspended
@@ -902,19 +903,13 @@ no successors for all other |Tail| values.
 
 Crucially, we do \emph{not} consider any \mil blocks mentioned in
 |Goto| expressions on the \rhs of a |Bind| statement as
-successors. This choice makes our use of \hoopl less effective,
-because certain control-flow facts are not apparent to the
-framework. However, we choose this representation for practical
-reasons. 
-
-\Hoopl only allows |successors| to be defined for ``|e C|'' types
-(such as |Done| and |Case|). We would need to make |Goto| a |Stmt
-O C| type to define a |successors| instance for it, which would require
-that |Goto| only appears at the end of a block. Requiring |Goto| to
-appear at the end of a block would break the \emph{Right-Unit} monad
-law (discussed in Section~\ref{conc_inline_monadic} on
-Page~\pageref{conc_inline_monadic}), which would limit our ability
-to inline \mil blocks. 
+successors. This choice can make certain transformations unsound if we
+are not careful, because some control-flow facts will not be apparent
+to \hoopl. However, we choose this representation in order to allow
+support for the monadic transformations described in
+Section~\ref{conc_other} on Page~\pageref{conc_other}. We describe the
+scenarios that can lead to unsound transformations in
+Section~\ref{uncurry_soundness} on Page~\pageref{uncurry_soundness}.
 
 \section{Related Work}
 \label{mil_sec_rel}

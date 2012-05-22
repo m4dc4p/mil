@@ -264,7 +264,7 @@ value represents a function entry point; we give it type |C O| because
 control-flow can only explicitly enter a function through a call. The
 |Return| constructor creates a value with the type |CStmt O C|, meaning
 control-flow will not implicitly pass from the statement but rather
-explicitly transfers to another block (i.e., the caller of the
+explicitly transfer to another block (i.e., the caller of the
 function). The |Assign| constructor's type, |CStmt O O|, indicates
 that control-flow \emph{will} fall-through, reflecting the behavior of
 the assignment statement.
@@ -373,7 +373,7 @@ The (<*>) operator defines control-flow within a basic block, and the
 graph. \Hoopl defines the |NonLocal| class to bridge the gap between
 these two operators:\footnote{The |(||*><*||)| and |(<*>)| operators
   in Figure~\ref{hoopl_fig4} specify a |NonLocal| constraint on |n|,
-  which we hid to simplify the presentation.}
+  which we have hidden to simplify the presentation.}
 
 \begin{singlespace}
 > class NonLocal n where 
@@ -582,10 +582,12 @@ function for our example. The subsidiary definition, |transfer|,
 computes facts for each constructor in |CStmt|:
 
 \begin{description}
-\item[|transfer (Entry _) f|] This statement represents the
-  entry point of the function. No variables are live before the
-  procedures executes, so |transfer| returns the empty set.\footnote{If our \ast 
-    represented global variables, this would not be true.}
+\item[|transfer (Entry _) f|] This statement indicates the entry point
+  of the function. Our \ast does not represent parameters or globals;
+  therefore, any variables live at this point were used but never
+  assigned. Another analysis could use this fact to warn the
+  programmer that an uninitialized variable was used. For our
+  purposes, |transfer| just returns |f|, the set of facts so far.
   
 \item[|transfer (Assign var expr) f|] In this case, |f| represents the
   set of live variables found so far. We first remove |var| from |f|,
@@ -850,7 +852,7 @@ The first argument to |analyzedAndRewriteBwd|, |pass|, packages up the
 lattice definition, transfer function, and rewrite function previously
 discussed. The second argument, |(JustC entryPoints)|, gives all entry
 points for the program. The third argument is the program we are
-optimizing. Finally, the inputs facts (an empty set) are given in the
+optimizing. Finally, the input facts (an empty set) are given in the
 fourth argument.
 
 |analyzeAndRewriteBwd| returns a transformed program, the final facts
@@ -885,7 +887,7 @@ originally described by Lerner and colleagues
 facts to analyze, a transfer function, a rewriting function, and a
 meet operator (which, in turn, defines a lattice for the facts given).
 The complete source code for the dead-code elimination optimization 
-shown in this chapter can be found in the Appendix, starting on Page~\pageref{ref_appendix_deadcode}.
+shown in this chapter can be downloaded from the \textsc{url} given in the Appendix.
 
 \standaloneBib 
 %% Some interaction with standalone makes the thesis break unless we

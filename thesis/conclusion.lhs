@@ -243,9 +243,11 @@ f/ even further.
 \subsection{Dead-Code Elimination}
 \label{conc_deadcode}
 
-\Mil treats allocation as a monadic operation, but we cannot really
-observe any side-effect of allocation. Therefore we can eliminate any
-closure, thunk or constructor allocation that binds to a
+\Mil treats allocation as a monadic operation, and allocation can
+definitely cause observable effects. However, most of the time we do
+not mind eliminating those effects, as they only cause our program to
+behave badly. Therefore it is usually reasonable to remove any
+allocation (be it a closure, thunk or constructor) that binds to a
 dead variable.
 
 For example, consider |compose1|, which captures the first

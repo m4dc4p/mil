@@ -68,7 +68,7 @@
 > liveness = mkBTransfer transfer
 >   where 
 >     transfer :: forall e x. CStmt e x -> Fact x Vars -> Vars 
->     transfer (Entry _) _ = Set.empty 
+>     transfer (Entry _) f = f
 >     transfer (Assign var expr) facts = (var `delete` facts) `union` (uses expr) 
 >     transfer (Call _ exprs) facts = facts `union` unions (map uses exprs) 
 >     transfer Return _ = Set.empty 

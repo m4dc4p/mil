@@ -1286,15 +1286,23 @@ direct closure allocations, but applications of \var g/ remain as it
 does not always hold the same closure.
 
 \subsection{Soundness}
+\label{uncurry_soundness}
 
 Our implementation of uncurrying can produce incorrect results
-under certain circumstances. When |collapseTransfer| sees
-a binding to a closure value, it records not only the label that
-the closure refers to, but also all of the variables captured in the
-closure. These facts are propagated to successor blocks. If those
-blocks are subsequently rewritten to allocate the closure directly,
-then the variables in the closure may be ``unpacked'' into the block,
-introducing free variables that are not properly bound. 
+under two circumstances. In the first case, we can introduce
+free variables into a block. In the second case, our analysis
+does not see facts that should be propagated to a block, leading to
+unsound rewrites. We describe both cases, and possible solutions, below.
+
+The first case occurs when a function application is replaced with a
+closure that introduces variables not declared in the containing
+block. When |collapseTransfer| sees a binding to a closure value, it
+records not only the label that the closure refers to, but also all of
+the variables captured in the closure. These facts are propagated to
+successor blocks. If those blocks are subsequently rewritten to
+allocate the closure directly, then the variables in the closure may
+be ``unpacked'' into the block, introducing free variables that are
+not properly bound.
 
 For example, consider the \mil program in Figure~\ref{unc_fv}. In
 Part~\subref{unc_fv_a}, the statement \binds v<-\mkclo[k1:x]; in \lab
@@ -1346,18 +1354,19 @@ k1/ immediately jumps to \lab p1/, producing the program shown in
 Part~\ref{unc_fv_b}. But this introduces a free variable, \var x/, in
 \lab b2/.
 
-This problem could be solved with another dataflow analysis. After
+This problem might be solved with another dataflow analysis. After
 uncurrying, we would determine the free variables in each block (a
 backwards dataflow analysis). Our uncurrying analysis could keep track
 of where each variable in a given closure was declared.  We could use
 that information to propagate free variables from the block in which
 they are first bound to the blocks where they are used.
 
-Calls to blocks on the \rhs of a bind statement, such as \binds v <-
-\goto b(\dots);; can also produce incorrect results in our current
-implementation. If the values passed to the block \lab b/ on the \rhs
-of a \mbind differ from those passed at the end of a block, then our
-analysis will propagate incorrect facts.
+The second case occurs when a block is called on the \rhs of a bind
+statement, such as \binds v <- \goto b(\dots);. Our analysis will not
+propagate any facts to \lab b/ in such situations. If the values
+passed to the block \lab b/ on the \rhs of a \mbind differ from those
+passed at the end of a block, then our analysis may rewrite using
+partial facts.
 
 \begin{myfig}
   \begin{tabular}{cc}
@@ -1408,12 +1417,11 @@ b2/. Figure~\ref{unc_goto_b} shows the rewritten program. In \lab b2/,
 \binds t<- \app v*y/; has been incorrectly rewritten to \binds t<- \mkclo[k1:];,
 which is incorrect.
 
-A simple solution to this problem would assign $\top$ to all
-parameters of blocks called on the \rhs of a bind; then we would never
-propagate anything but $\top$ into those blocks, and no rewriting
-would occur. A better solution would make blocks called this way
-proper successors of the calling block; then our dataflow analysis
-would make sure the correct facts were propagated into each block.
+A simple solution to this problem would first scan the entire program,
+finding all blocks called on the \rhs of a bind; then those blocks
+would be eliminated from further analysis. Our intuition is that
+while this solution is not ideal, many programs can still be uncurried
+even with this restriction.
 
 \section{Related Work}
 \label{uncurry_sec_related}

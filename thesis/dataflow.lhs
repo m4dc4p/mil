@@ -403,22 +403,24 @@ facts that were true \emph{before} a node executed.  In both cases,
 the transfer function also considers known facts (i.e., \inE facts for
 forwards, \out for backwards) as well as the statements in the node.
 
-For our example analysis, we only consider two kinds of statements:
-constant and non-constant updates. A constant update is one of the
-form $a !+=+! C$, where $C$ is a known integer value. A non-constant
-update is any other type of assignment; in our example, something like
-$i$!++++!.
+For our example analysis, only two kinds of statements can affect the
+facts we calculate: constant and non-constant updates. A constant
+update is one of the form $a !+=+! C$, where $C$ is a known integer
+value. A non-constant update is any other type of assignment; in our
+example, something like $i$!++++!. Any other type of statement will
+have no effect on our facts.
 
 We define a transfer function, $t$, for our analysis in terms of
-these two types of statements. Our function takes a set of input facts
-($F$), and a statement; it produces a set of output facts:
+statements in our source language. Our function takes a set of input
+facts ($F$), and a statement; it produces a set of output facts:
 
-\begin{singlespace}\correctspaceskip
-  \begin{equation}\allowdisplaybreaks[0]
+\begin{singlespace}
+  \begin{equation}
     \begin{array}{rl}
       t (F, a\ \text{\tt =}\ C) &= \{(a, C) \} \cup (F\ \backslash\ \mfun{uses}(F, a)), \\
       t (F, a\text{\tt ++}) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)), \\
-      t (F, a\ \text{\tt +=\ } b) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)). \\\\
+      t (F, a\ \text{\tt +=\ } b) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)),\\
+      t (F, s) &= F, \\\\
       \mfun{uses}(F, a) &= \{(a', x)\ ||\ (a', x) \in F\ \text{and } a = a' \}. 
     \end{array}\label{eqn_back4}
   \end{equation}
@@ -435,7 +437,8 @@ The definition in Equation~\eqref{eqn_back4} matches our intuition for
 constant propagation. When we know a variable is assigned a constant,
 we add that fact to our knowledge. When we know it is changed in a
 non-constant way, we update our knowledge to show we no longer know
-the value of the variable.
+the value of the variable. If the statement is not an assignment, we
+leave the facts unchanged.
 
 Figure~\ref{fig_back9}, Part~\subref{fig_back9_initial}, shows our
 program, annotated with initial \inE and \out
@@ -602,8 +605,8 @@ that $x_2 \sqlt \bot$. Therefore, $x_3$ cannot be $\bot$. If $x_3$ is
 an integer, again by Equation~\eqref{eqn_back17}, $x_2$ must be
 $\bot$. In turn, there is no such $x_1$ such that $x_1 \sqlt
 \bot$. Therefore, $x_4$ cannot be $\top$ and in fact, by similar
-arguments, it cannot exist. But we know already that $\bot \sqlt C
-\sqlt \top$, for all $C \in \ZZ$, which is a path of length $3$, so it
+arguments, it cannot exist. But we know that, for all $C \in
+\ZZ$, $\bot \sqlt C \sqlt \top$, which is a path of length $3$, so it
 follows that the height of our lattice must be $3$.
 
 Now let us address the transfer function. A \emph{monotone} function 
@@ -621,26 +624,11 @@ turn, the ordering of values represents ``how much'' we know. That is,
 when a variable is assigned $\bot$, we do not know anything about
 it. If it is assigned $\top$, we have seen ``too many'' assignments
 (or some other update).  A monotone transfer function always increases
-(or does not change) the information we have.
-
-We can show that our transfer function (Equation~\eqref{eqn_back4}) is
-monotone by cases. Assume we are analyzing some statement $s$ and that
-we have some set of facts so far, named $F$. If $s$ is $a\ !+=+!\ C$,
-then $t(F, s)$ adds $(a, C)$ to $F$. Any other facts in $F$ are unaffeted
-by $t(s)$; therefore, $t(F, a\ !+=+!\ C) \sqlt $
-
-consider some fact $(v,x)$ and some block $B$. $v$ is a
-variable in the program; $x$ is a value in \setLC; and $B$ contains
-some number of statements.  We analyze the fact, $(v,x')$ produced
-applying our transfer function $f$ to $B$. If $B$ does not contain an
-assignment affecting $v$, then $x = x'$, and we already know that $x \sqlte
-x'$. If $B$ makes a non-constant update to $v$, then $x' = \top$ and we
-know $x \sqlte \top$ for all $x$ by the definition of \lub. Finally,
-if $B$ assigns some constant $C$ to $x$, then $x' = x \lub C$, which
-again satisfies our relation. Therefore our transfer function is
+(or does not change) the information we have.  For all statements, our
+transfer function either does not change the set of facts or it
+updates them so a given variable is either associated with some $C \in
+\ZZ$ or the $\top$ value. Therefore, our transfer function must be
 monotone.
-That is, if $x$ is ``less than or equal to'' $y$, $f(x)$ will also be
-``less than or equal to'' $f(y)$.
 
 \section{Dataflow Equations}
 \label{back_subsec_eq}
@@ -761,20 +749,20 @@ else
 \end{singlespace}
 
 Our algorithm, however, does not take such conditions into
-account. The ideal solution considers only the paths that will taken
+account. The ideal solution considers only the paths that will be taken
 by the program. Determining the actual paths taken is an undecidable
 problem --- thus we settle for the maximum fixed point. Fortunately,
 the algorithm is conservative --- it never ignores (or adds) paths ---
 so we can be sure that its analysis will never be wrong, just that it
-probably will not be as good as the ideal.
+may not be as good as the ideal.
 
 \section{Applying Results}
 \label{back_sec_apply}
 
 Figure~\ref{fig_back7}, Part~\subref{fig_back7_initial} gave a sample
-program which we wished to optimize using a \emph{constant propagation}
+program that we wished to optimize using a \emph{constant propagation}
 dataflow analysis. Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt} gave
-the result, replacing all occurrences of $m$ with $10$. Now knowing
+the result, replacing all occurrences of $m$ with $10$. Now, knowing
 the dataflow algorithm and the equations for constant propagation, we
 can derive how that transformation is made.
 
@@ -826,14 +814,15 @@ dataflow \emph{algorithm} gives a general technique for applying an
 representing a given program. The optimizing function computes
 \emph{facts} about each node in the graph, using a \emph{transfer}
 function. A given analysis can proceed \emph{forwards} (where \inBa
-facts produce \outBa facts) or \emph{backwards} (where \outBa facts
-produce \inBa facts). Each optimization defines a specific \emph{meet
-  operator} that combines facts for nodes with multiple predecessors
-(for forwards analysis) or successors (for backwards). We compute
-facts \emph{iteratively}, stopping when they reach a \emph{fixed
-  point}. Finally, we \emph{rewrite} the \cfg using the facts computed. The 
-meaning of our program does not change, but its behavior will be ``better,'' 
-whatever that means for the particular optimization applied.
+facts are used to produce \outBa facts) or \emph{backwards} (where
+\outBa facts are used to produce \inBa facts). Each optimization
+defines a specific \emph{meet operator} that combines facts for nodes
+with multiple predecessors (for forwards analysis) or successors (for
+backwards). We compute facts \emph{iteratively}, stopping when they
+reach a \emph{fixed point}. Finally, we \emph{rewrite} the \cfg using
+the facts computed as a guide. The meaning of our program does not
+change, but its behavior may be ``better,'' whatever that means for
+the particular optimization applied.
 
 \standaloneBib
 \end{document}
