@@ -185,8 +185,7 @@ Consider Figure~\ref{fig_back7}, Part~\subref{fig_back7_initial}, which
 shows a C function containing a loop that multiplies the argument by 10
 some number of times. Line~\ref{fig_back7_m} declares !+m+! and assigns
 it the value 10. The function uses !+m+! in the loop body on
-Line~\ref{fig_back7_loop} to multiply the value passed in
-repeatedly. 
+Line~\ref{fig_back7_loop} to repeatedly multiply the value passed in. 
 
 \begin{myfig}[tbh]\disableoverfull
   \begin{tabular}{cc}
@@ -234,7 +233,7 @@ that does not change. \emph{Indeterminate}, indicated by $\top$
 for the variable. Together, $\{\bot, \top\} \cup \ZZ$ forms a set
 which we will denote as \setLC.
 
-\begin{myfig}
+\begin{myfig}[t]
   \input{lst_back17}
   \caption{Our program, annotated with facts partway through the
     analysis. Notice that \outB{lst_back17_assign} and
@@ -254,7 +253,7 @@ statement in the node executes; the \out sets give the value of the
 variables afterwards. Together these sets represent our knowledge
 about each variable's value at each point in the program.
 
-Constant propagation is a \emph{forwards} analysis, meaning the values
+Constant propagation is a \emph{forwards} analysis, so the values
 for each \inE set are calculated based on the \out values of its
 predecessors. Figure~\ref{fig_back11} shows the facts computed partway
 through this analysis, concentrating on the nodes that reference $i$:
@@ -285,7 +284,7 @@ $C_2$, result in $\top$, while equal constants give the same constant.
   \end{math}
   \caption{Definition of the \emph{meet operator}, \lub, for the
     lattice used in our constant propagation analysis. $v_1$ and $v_2$
-    are values in \setLC. The table shows how lub combines any two
+    are values in \setLC. The table shows how \lub combines any two
     values.}
   \label{tbl_back4}
 \end{myfig}
@@ -377,14 +376,6 @@ knowledge about a variable's value. Each specific dataflow analysis
 computes different facts, but those facts are always represented by a
 lattice.
 
-We have established that our analysis computes \emph{facts} at each
-node in our program's control-flow graph. The facts assign a value from
-the set $\{\bot, \top\} \cup \ZZ$ to each variable in the program,
-at each node in the graph. We defined a \emph{meet operator}, \lub,
-which is used to combine conflicting values when computing \inBa.  The
-facts and meet operator together define a \emph{lattice}. We next
-explore how \out facts are computed for each node.
-
 \subsection{Transfer Functions}
 \label{back_subsec_transfer}
 
@@ -417,10 +408,10 @@ facts ($F$), and a statement; it produces a set of output facts:
 \begin{singlespace}
   \begin{equation}
     \begin{array}{rl}
-      t (F, a\ \text{\tt =}\ C) &= \{(a, C) \} \cup (F\ \backslash\ \mfun{uses}(F, a)), \\
-      t (F, a\text{\tt ++}) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)), \\
-      t (F, a\ \text{\tt +=\ } b) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)),\\
-      t (F, s) &= F, \\\\
+      t (F, a\ \text{\tt =}\ C) &= \{(a, C) \} \cup (F\ \backslash\ \mfun{uses}(F, a)) \\
+      t (F, a\text{\tt ++}) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a)) \\
+      t (F, a\ \text{\tt +=\ } b) &= \{(a, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, a))\\
+      t (F, s) &= F \\\\
       \mfun{uses}(F, a) &= \{(a', x)\ ||\ (a', x) \in F\ \text{and } a = a' \}. 
     \end{array}\label{eqn_back4}
   \end{equation}
@@ -460,15 +451,6 @@ facts \factC{i}{\top} or \factC{i}{0} from either
 iteration will discuss how we update \inE sets as \out sets change.
 
 \input{fig_back9}
-
-Every dataflow analysis defines a \emph{transfer function} for
-creating (or updating) facts. The function is specific to both the
-analysis performed and the semantics of the underlying
-program. Equation~\eqref{eqn_back4}, the transfer function for our
-constant propagation example, defines how we derive information about
-a variable's value after the statements in the given node execute.  In
-the next section, we iteratively apply our transfer function to the
-control-flow graph.
 
 \subsection{Iteration \& Fixed Points}
 \label{back_subsec_iter}
@@ -732,7 +714,7 @@ possible information that our algorithm is capable of.
 The maximum fixed point solution differs from the \emph{ideal}
 solution in that the maximum fixed point solution may make more
 conservative estimates than necessary. In particular,
-the algorithm does not consider branches that will never be taken. For
+the algorithm does not consider knowledge about branches that will never be taken. For
 example, the C program from Figure~\ref{fig_back1_a} will never
 execute Line~$\ref{lst_back19_test_true}$, because the test !+if(a > b)+!
 is always false:
@@ -759,12 +741,13 @@ may not be as good as the ideal.
 \section{Applying Results}
 \label{back_sec_apply}
 
-Figure~\ref{fig_back7}, Part~\subref{fig_back7_initial} gave a sample
-program that we wished to optimize using a \emph{constant propagation}
-dataflow analysis. Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt} gave
-the result, replacing all occurrences of $m$ with $10$. Now, knowing
-the dataflow algorithm and the equations for constant propagation, we
-can derive how that transformation is made.
+Figure~\ref{fig_back7}, Part~\subref{fig_back7_initial} on
+Page~\pageref{fig_back7} gave a sample program that we wished to
+optimize using a \emph{constant propagation} dataflow
+analysis. Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt} gave the
+result, replacing all occurrences of $m$ with $10$. Now, knowing the
+dataflow algorithm and the equations for constant propagation, we can
+derive how that transformation is made.
 
 Figure~\ref{fig_back12} gives the facts calculated for all nodes in our
 program, during each iteration of the analysis. The first iteration

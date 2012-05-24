@@ -329,14 +329,16 @@ statement given. We define $t$ by cases over \mil statements.
 
 \item[\emph{Equation~\eqref{uncurry_df_transfer_closure} --- Bind To
     Closure}] When the \rhs of a \mbind statement creates a closure,
-  as in \binds v <- \mkclo[l: v_1, \dots, v_n];, we create a new fact
-  $(\var v/, \mkclo[l: v_1, \dots, v_n])$.  Because \var v/ has been
+  as in \binds v <- \mkclo[b: v_1, \dots, v_n];, we may or may not
+  create a new fact. If \var v/ appears in $\{\var v_1/, \dots,
+  \var v_n/\}$ (as in ``\binds v <- \mkclo[k1:];!+;+! \binds v <-
+  \mkclo[k2: v];''), then we simply delete any facts mentioning \var v/
+  and we do not create a new fact. Otherwise we create the fact $(\var
+  v/, \mkclo[b: v_1, \dots, v_n])$.  Because \var v/ has been
   redefined, we must invalidate any previous facts that refer to \var
-  v/, as they do not refer to the new value of \var v/. Additionally,
-  \var v/ may appear in $\{\var v_1/, \dots, \var v_n/\}$ (as in
-  \binds v <- \mkclo[k1:];!+;+! \binds v <- \mkclo[k2: v];). To ensure
-  we remove all references to \var v/, we apply \mfun{uses} to the
-  combined set $F \cup \{(\var v/, \mkclo[l:v_1, \dots, v_n])\}$. We
+  v/, as they do not refer to the new value of \var v/. To ensure we
+  remove all references to \var v/, we apply \mfun{uses} to the
+  combined set $F \cup \{(\var v/, \mkclo[b:v_1, \dots, v_n])\}$. We
   subtract the result from $F$, thereby removing any facts that refer
   to $\var v/$.
 
@@ -424,7 +426,7 @@ function filters all facts from $F$ except those about \var v/.
 \section{Rewriting}
 \label{uncurry_sec_rewriting}
 \intent{Explain how we rewrite |Enter| expressions.}  The facts
-gathered by $t$ allow us to replace \enter expressions with closure
+gathered by our dataflow analysis allow us to replace \enter expressions with closure
 allocations if we know the value that the expression results in. For
 example, let $F$ be the facts computed so far and \binds v <- \app f *
 y/; the statement we are considering. If $(\var f/, \mkclo[k0: x]) \in
@@ -611,7 +613,7 @@ list of parameters for every ordinary block in the program, which we
 use during renaming operations. The first argument to |transfer| is
 the statement we are analyzing, and the second is our facts so
 far. |transfer| depends on a number of auxiliary functions: |kill|,
-|using|, etc. We will describe each function as they are first
+|using|, etc. We will describe each function as it is first
 encountered when describing |transfer|. The |Map| prefix on some of
 the functions used by |transfer| and related definitions indicates
 they are imported from Haskell's standard |Data.Map| library. We
@@ -916,7 +918,7 @@ If the destination returns a closure
 (Line~\ref{uncurry_fig_rewrite_impl_collapse_capt}), then we rewrite
 \app f * x/ to allocate the closure directly. The Boolean value
 |usesArg| indicates if the closure returned should capture the
-argument |x| or not..
+argument |x| or not.
 
 \subsection{Optimization Pass}
 

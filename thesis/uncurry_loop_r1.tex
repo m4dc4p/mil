@@ -19,7 +19,7 @@
       \ccblock k4(x)y: Right y
     \end{AVerb}
   \end{minipage} &
-  \begin{tikzpicture}[baseline=(b1.north)]
+  \begin{minipage}[t]{2.1in}\begin{tikzpicture}[baseline=(b1.north)]
     \node[stmt] (b1) {\block b1():};
     \node[stmt, below=.5in of b1] (b2) {\block b2 (f, g):};
     \node[stmt, below=.5in of b2] (b3) {\block b3 (t, u, f):};
@@ -35,6 +35,6 @@
     \draw [->] (b1) to (b2);
     \draw [->] (b2) to (b3);
     \pausemd{\draw [->] (b3.south) to ($(b3.south) + (0mm, -.25in)$) -| ($(b2.west) + (-.25in, 0mm)$) to (b2.west);}
-  \end{tikzpicture} \\\\
+  \end{tikzpicture}\end{minipage}\\\\
   \hfil\scap{uncurry_loop_r1_a} & \scap{uncurry_loop_r1_b}\hfil
 \end{tabular}

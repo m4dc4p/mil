@@ -309,7 +309,7 @@ t1/ and assigns the result to \var t2/. The last line returns \var
 t2/. Thus, the \lab compose/ block returns the value of \lcapp f * (g
 * x)/, just as in our original \lamC expression.
 
-\begin{myfig}
+\begin{myfig}[t]
   \begin{tabular}{c@@{\hspace{2em}}c}
     \lcdef compose()=\lcapp \lcabs f. \lcabs g. \lcabs x. f * (g * x)/; & 
     \begin{minipage}[t]{\widthof{\block compose(f, g, x):}}
@@ -528,7 +528,7 @@ result.
 \lamC functions in Figure~\ref{mil_fig_hello_a}.\footnote{Again, some
   syntactic liberties are taken.} The |echo| function prints its
 argument to the screen. The \hsdo keyword shows that |echo| is a monadic
-program. The |main| function uses a \hslet statement to assign |m| the value
+function. The |main| function uses a \hslet statement to assign |m| the value
 |echo a|. Notice this does \emph{not} evaluate |echo a|; instead, |m| is a thunk
 that points to the |echo| function and that captures the value of |x|. 
 

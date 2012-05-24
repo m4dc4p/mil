@@ -368,7 +368,7 @@ appropriate. We concatenate the graphs using the |(<*>)| operator,
 forming one large graph with type |CStmt C C|. This construction
 exactly represents the \cfg in Figure~\ref{hoopl_fig2_b}.
 
-The (<*>) operator defines control-flow within a basic block, and the
+The |(<*>)| operator defines control-flow within a basic block, and the
 |(||*><*||)| operator combines unconnected blocks into a larger
 graph. \Hoopl defines the |NonLocal| class to bridge the gap between
 these two operators:\footnote{The |(||*><*||)| and |(<*>)| operators
@@ -453,7 +453,7 @@ the analysis' meet operator.\footnote{The \hoopl authors choose to
   \label{hoopl_fig7}
 \end{myfig}
 
-The meet operator, |fact_join|, takes two arguments and returns a pair
+The meet operator, |fact_join|, takes three arguments and returns a pair
 consisting of a value and a |ChangeFlag|. The arguments represent
 possibly differing output facts; the result represents the meet of
 those facts. \Hoopl determines that a fixed point has been reached when
