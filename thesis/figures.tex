@@ -4,12 +4,13 @@
 \begin{document}
 \numbersoff
 \input{document.preamble}
-\pagestyle{empty}
 \begin{singlespace}
-  \input{uncurry_loop}
-
-  \input{uncurry_loop_r1}
-
-  \input{uncurry_loop_opt}
+\begin{myfig}
+  \begin{minipage}{\hsize}
+    \input{uncurrying_df}
+  \end{minipage}
+  \caption{Dataflow facts and equations for our uncurrying transformation.}
+  \label{uncurry_fig_df}
+\end{myfig}
 \end{singlespace}
 \end{document}

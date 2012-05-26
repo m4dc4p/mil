@@ -3,7 +3,7 @@
     \multicolumn{3}{c}{\textit{Facts}} \\
     \setL{Labels} &= \text{Set of all program labels.} \\
     \setL{Vars} &= \text{Set of all variables.} \\
-    \setL{Clo} &= \{\mkclo[b:v_1, \dots, v_n]\ |\ \lab b/ \in \setL{Labels}, \var v_i/ \in \setL{Var}, n \geq 0\}.\\
+    \setL{Clo} &= \mathrlap{\{\mkclo[b:v_1, \dots, v_n]\ |\ \lab b/ \in \setL{Labels}, \var v_i/ \in \setL{Var}, n \geq 0\}}.\\
     \setL{Fact} &= \setL{Vars} \times (\{\top\} \cup \setL{Clo}). \\\\
 
     \multicolumn{3}{c}{\textit{Meet}} \\
@@ -25,42 +25,38 @@
     \mathllap{t (F, \block b(\dots):)} &= F;\quad t(F, \ccblock k(\dots)x:) = F  \labeleq{uncurry_df_transfer_block} \labeleq{uncurry_df_transfer_ccblock} & \mathllap{\eqref{uncurry_df_transfer_block},~\eqref{uncurry_df_transfer_ccblock}}\\
     \mathllap{t (F, \binds v\ <-\ \mkclo[b:v_1];)} &= 
     \begin{cases}
-      (F \cup \{(\var v/, \mkclo[b:v_1])\})\ \backslash\ \mfun{uses}(F, \var v/)& \text{when}\ \var v/ \neq \var v_1/ \\
-      \mfun{delete}(F, \var v/) & \text{when}\ \var v/ = \var v_1/ 
+      (F \cup \{(\var v/, \mkclo[b:v_1])\})\ \backslash\ \mfun{uses}(F, \var v/)& \hskip-0.5em\mathrlap{\text{when}\ \var v/ \neq \var v_1/} \\
+      \mfun{delete}(F, \var v/) & \hskip-0.5em\mathrlap{\text{when}\ \var v/ = \var v_1/}
     \end{cases}
-    \labeleq{uncurry_df_transfer_closure} & \eqref{uncurry_df_transfer_closure} \\
+    \labeleq{uncurry_df_transfer_closure} & \ \eqref{uncurry_df_transfer_closure} \\
 
     t (F, \binds v\ <-\ \ldots;) &= \{(\var v/, \top)\} \cup (F\ \backslash\ \mfun{uses}(F, \var v/)) \labeleq{uncurry_df_transfer_other} & \eqref{uncurry_df_transfer_other} \\
 
     t (F, \goto b(v)) &= \left\{\lab b/\ :\ \mfun{rename}(\mfun{args}(\lab b/), \var v/, \mfun{restrict}(F, \var v/))\right\}
     \labeleq{uncurry_df_transfer_goto} & \eqref{uncurry_df_transfer_goto} \\
 
-    \mathllap{t \left(F, \parbox{\widthof{\quad \alt C_m(v_1)->\goto b$!+_q+!$(v_2);}}{\baselineskip=12pt\disableparspacing;%%
+    t \left(F, \parbox{\widthof{\quad \alt C_m(v_1)->\goto b$!+_q+!$(v_2);}}{\baselineskip=12pt\disableparspacing;%%
         \case v;\endgraf%%
         \quad \alt C_1(v_1)->\goto b$!+_1+!$(w_1);\endgraf%%
-        \quad \dots\endgraf%%
-        \quad \alt C_n(v_n)->\goto b$!+_q+!$(w_n);\endgraf%%
-      }\right)} &= 
+        \quad \vdots\endgraf%%
+      }\right) &= 
     \left\{\begin{array}{@{}r@{\;}c@{\;}l@{}}
-    \lab b$!+_1+!$/ &:& \mfun{rename}(\mfun{args}(\lab b$!+_1+!$/), \var w_1/, 
-      \mfun{trim}(\mfun{restrict}(F, \var w_1/), \var v_1/)) \\
+    \lab b$!+_1+!$/ &:& \mfun{rename}(\mfun{args}(\lab b$!+_1+!$/), \var w_1/, \\
+      &&\phantom{\mfun{rename}(}\mfun{trim}(\mfun{restrict}(F, \var w_1/), \var v_1/)) \\
     \multicolumn{3}{c}{\vdots} \\
-    \lab b$!+_n+!$/ &:& \mfun{rename}(\mfun{args}(\lab b$!+_n+!$/), \var w_n/, 
-      \mfun{trim}(\mfun{restrict}(F, \var w_n/), \var v_1/)) 
     \end{array}\right\}
     \labeleq{uncurry_df_transfer_case} & 
     \eqref{uncurry_df_transfer_case} \\
 
     t (F, \_) &= \emptyset, \labeleq{uncurry_df_transfer_rest} & \eqref{uncurry_df_transfer_rest} \\
-    & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \in \setL{Fact}.} \\\\
+    & \multicolumn{2}{l}{\phantom{=} \text{where\ } F \in \setL{Fact}.} \\[6pt]
 
     \mfun{uses}(F, \var v/) &= \begin{array}{l}
       \{(\var u/, \mkclo[l:v_1, \dots, v_n])\ |\\
       \quad  (\var u/, \mkclo[l:v_1, \dots, v_n]) \in F, \var v/ \in \{\var v_1/, \dots, \var v_n/\} \}
     \end{array} \labeleq{uncurry_df_uses} & \eqref{uncurry_df_uses} \\
-
     \mfun{rename}(\var u/, \var v/, F) &= \begin{array}{l}
-      \{(\var u/, p)\ |\ (\var v'/, p) \in F, \var v/ = \var v'/\}\ \cup \{(\var v'/, p)\ |\ (\var v'/, p) \in F, \var v/ \neq \var v'/\}
+      \{(\var u/, p)\ |\ (\var v'/, p) \in F, \var v/ = \var v'/\}\ \\ \phantom{\{(\var u/, p)\ |\ }\cup \{(\var v'/, p)\ |\ (\var v'/, p) \in F, \var v/ \neq \var v'/\}
     \end{array} \labeleq{uncurry_df_rename} & \eqref{uncurry_df_rename} \\
     \mfun{delete}(F, \var v/) &= \begin{array}{l}
       \{(\var u/, p)\ |\ (\var u/, p) \in F, \var u/ \neq \var v/\}
