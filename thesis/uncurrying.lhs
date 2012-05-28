@@ -939,7 +939,7 @@ infinite optimization fuel.
 %include Uncurry.lhs
 %let includeCollapse = False
   \end{withHsLabeled}\end{minipage}
-  \caption{The function which puts together all definitions for our
+  \caption{The function that puts together all definitions for our
     implementation of the uncurrying optimization.}
   \label{uncurry_fig_collapse}
 \end{myfig}
@@ -999,15 +999,15 @@ represents the output of our \lamC to \mil compiler.
 > toList n = Cons n Nil
     \end{centering}\end{minipage} \\
     \scap{uncurry_global_a} \\
-    \begin{tabular}{lr}\begin{minipage}[t]{.55\hsize}
+    \begin{tabular}{lr}\begin{minipage}[t]{.45\hsize}
     \begin{AVerb}[gobble=6,numbers=left]
       \block main(ns): 
         \vbinds v227<-\mkclo[k203:];
         \vbinds v228<-\mkclo[k219:];
         \vbinds v229<-\app v227*v228/;
         \app v229 * ns/ 
-      \ccblock k219()x: \goto b220(x)
-      \block b220(x):\label{uncurry_global_toList_body}
+      \ccblock k219()x: \goto toList(x)
+      \block toList(x):\label{uncurry_global_toList_body}
         \vbinds v221<-\mkclo[Consclo2:];
         \vbinds v222<-\app v221*x/;
         \vbinds v223<-Nil;
@@ -1019,13 +1019,13 @@ represents the output of our \lamC to \mil compiler.
   \begin{minipage}[t]{.4\hsize}
     \begin{AVerb}[gobble=6,numbers=left,firstnumber=last]
       \ccblock k203()f: \mkclo[k204:f]
-      \ccblock k204(f)xs: \goto caseEval216(xs, f)
-      \block caseEval216(xs, f): \label{uncurry_global_map_body}
+      \ccblock k204(f)xs: \goto map(xs, f)
+      \block map(xs, f): \label{uncurry_global_map_body}
         \case xs;
-          \valt Nil()->\goto altNil206();
-          \valt Cons(x xs)->\goto altCons208(f, x, xs);
-      \block altNil206(): Nil \label{uncurry_global_map_nil}
-      \block altCons208(f, x, xs): \label{uncurry_global_map_cons}
+          \valt Nil()->\goto nil();
+          \valt Cons(x xs)->\goto cons(f, x, xs);
+      \block nil(): Nil \label{uncurry_global_map_nil}
+      \block cons(f, x, xs): \label{uncurry_global_map_cons}
         v209 <- \mkclo[Consclo2:]
         \vbinds v210<-\app f*x/; \label{uncurry_global_map_cons_fx}
         \vbinds v211<-\app v209*v210/;
@@ -1053,14 +1053,14 @@ x/. Lines~\ref{uncurry_global_map_cons_map_start}--\ref{uncurry_global_map_cons_
 recursively call |map| with the remainder of the
 list. Line~\ref{uncurry_global_map_cons_end} returns the updated list. 
 
-In the body of \lab altCons208/, there are two opportunities to
+In the body of \lab cons/, there are two opportunities to
 eliminate \enter expressions. \var f/ always represents the |toList|
-function, which is implemented by \lab b220/ on
+function, which is implemented by \lab toList/ on
 Lines~\ref{uncurry_global_toList_body}--\ref{uncurry_global_toList_body_end}. We
 should be able to replace \app f * x/ on
-Line~\ref{uncurry_global_map_cons_fx} with \goto b220(f,
+Line~\ref{uncurry_global_map_cons_fx} with \goto toList(f,
 x). Similarly, the recursive call to |map| can be replaced by a direct
-call to \lab caseEval216/, which implements the body of |map|. 
+call to \lab map/, which implements the body of |map|. 
 
 Though our analysis covers the entire program, we first concentrate on
 the \lab main/ block. Figure~\ref{uncurry_global_main} shows how we
@@ -1110,7 +1110,7 @@ rewritten lines with a $\rightarrow$ symbol.
         \xout{\vbinds v227<-\mkclo[k203:];}
         \vbinds v228<-\mkclo[k219:];
         \xout{\vbinds v229<-\mkclo[k204:v228];}
-        \llap{\ensuremath{\rightarrow} }\goto caseEval216(ns, v228) \anchorF(gotoCaseEval216a)
+        \llap{\ensuremath{\rightarrow} }\goto map(ns, v228) \anchorF(gotoCaseEval216a)
     \end{AVerb}
   \end{minipage} \\
   \begin{tikzpicture}[overlay,remember picture]
@@ -1131,7 +1131,7 @@ fact to rewrite the \enter expression on Line~\ref{main_v229a}.  In
 Part~\subref{uncurry_global_main_b}, the rewritten line allows us to
 create a new fact, associating \var v229/ with \mkclo[k204:v228]. The
 \cc block \lab k204/ immediately jumps to \lab
-caseEval216/. Therefore, on Line~\ref{main_app_b}, we can rewrite the
+map/. Therefore, on Line~\ref{main_app_b}, we can rewrite the
 expression \app v229 * ns/ to \goto caseEval(ns,
 v228). Part~\subref{uncurry_global_main_c} shows this rewrite and also
 crosses out lines with now-dead bindings.
@@ -1139,7 +1139,7 @@ crosses out lines with now-dead bindings.
 After the rewrite in Figure~\ref{uncurry_global_main_c}, the \cfg for
 the program changes. \lab main/ did not originally end in a \milres
 case/ statement or ``goto'' expression, so the block did not have any
-successors; after our rewrite, \lab caseEval216/ becomes the successor
+successors; after our rewrite, \lab map/ becomes the successor
 to \lab main/. Figure~\ref{uncurry_global_blocks_a} shows the \cfg for
 our program before our rewrite; Figure~\ref{uncurry_global_blocks_b}
 shows the \cfg afterwards. We also show the facts that flow between
@@ -1155,30 +1155,30 @@ each block (using the parameters for each block to name the facts).
 \label{uncurry_global_blocks}
 \end{myfig}
 
-As Figure~\ref{uncurry_global_blocks_b} shows, when \lab caseEval216/
+As Figure~\ref{uncurry_global_blocks_b} shows, when \lab map/
 becomes the successor of \lab main/, the fact $\{\var
 f/\,:\,\mkclo[k219:]\unskip\}$ becomes available to \lab
-altCons208/. Figure~\ref{uncurry_global_cons} shows how we iteratively
-analyze and rewrite \lab altCons208/ using our new
+cons/. Figure~\ref{uncurry_global_cons} shows how we iteratively
+analyze and rewrite \lab cons/ using our new
 fact. Part~\subref{uncurry_global_cons_a} shows the initial facts for
 each binding. In Part~\subref{uncurry_global_cons_b}, we replace the
-expression \app f * x/ on Line~\ref{ugb_v210b} with \goto b220(x),
+expression \app f * x/ on Line~\ref{ugb_v210b} with \goto toList(x),
 because we know the \cc block \lab k219/ immediately jumps to \lab
-b220/. On Line~\ref{ugb_v213b}, we rewrite \app v212 * f/ to
+toList/. On Line~\ref{ugb_v213b}, we rewrite \app v212 * f/ to
 \mkclo[k204:f], due to the fact $\{\var
 v212/\,:\,\mkclo[k203:]\unskip\}$ and that \lab k203/ returns
 \mkclo[k204:f]. Originally, this line gathered the first argument for
 |map|; now, we create the closure directly. This also generates a new
 fact, $\{\var v213/\,:\,\mkclo[k204:f]\unskip\}$. We know that \lab
-k204/ jumps to \lab caseEval216/ (i.e., the body of |map|). In
+k204/ jumps to \lab map/ (i.e., the body of |map|). In
 Part~\subref{uncurry_global_cons_c}, we use our knowledge of \var
 v213/ to rewrite Line~\ref{ugb_v214c} from \app v213 * xs/ to \goto
-caseEval216(xs, f). We also cross out dead bindings that could be
+map(xs, f). We also cross out dead bindings that could be
 eliminated, after our rewrites. 
 
 \begin{myfig}[tbp]
 \input{uncurry_global_cons}
-\caption{Development of facts and rewrites within \lab altCons208/, after 
+\caption{Development of facts and rewrites within \lab cons/, after 
   facts begin flowing from \lab main/.}
 \label{uncurry_global_cons}
 \end{myfig}
@@ -1186,13 +1186,13 @@ eliminated, after our rewrites.
 Figure~\ref{uncurry_global_opt} summarizes the result of applying our
 uncurrying optimization (and dead-code elimination) to the program in
 Figure~\ref{uncurry_global}. On Line~\ref{uncurry_global_opt_toList},
-we replaced the expression \app f * x/ with \goto b220(x); our program
+we replaced the expression \app f * x/ with \goto toList(x); our program
 now directly calls |toList|, rather than repeatedly entering the
 closure represented by \var f/. In Figure~\ref{uncurry_global},
 Lines~\ref{uncurry_global_map_cons_map_start}--\ref{uncurry_global_map_cons_map_end}
 implemented the recursive call to |map|. In Figure~\ref{uncurry_global_opt},
 Line~\ref{uncurry_global_opt_map} replaces those three lines
-with \goto caseEval216(xs, f), a direct recursive call. The first
+with \goto map(xs, f), a direct recursive call. The first
 change does not save a closure allocation (because \var f/ is still
 passed in),\footnote{We could eliminate \var f/ through an analysis
   that finds unused parameters.} but the second change saves two
@@ -1200,13 +1200,13 @@ closure allocations and two \enter expressions.
 
 \begin{myfig}[tbp]
   \begin{tabular}{lr}
-  \begin{minipage}[t]{.55\hsize}
+  \begin{minipage}[t]{.45\hsize}
     \begin{AVerb}[gobble=6,numbers=left]
       \block main(ns):
         \vbinds v228<-\mkclo[k219:];
-        \goto caseEval216(ns, v228)
-      \ccblock k219()x: b220(x)
-      \block b220(x):
+        \goto map(ns, v228)
+      \ccblock k219()x: toList(x)
+      \block toList(x):
         \vbinds v222<-\mkclo[Consclo1:x];
         \vbinds v223<-Nil;
         \app v222 * v223/
@@ -1216,17 +1216,16 @@ closure allocations and two \enter expressions.
   \begin{minipage}[t]{.45\hsize}
     \begin{AVerb}[gobble=6,numbers=left]
       \ccblock k203()f: \mkclo[k204:f]
-      \ccblock k204(f)xs: \goto caseEval216(xs, f)
-      \block b205(xs, f): \goto caseEval216(xs, f)
-      \block caseEval216(xs, f):
+      \ccblock k204(f)xs: \goto map(xs, f)
+      \block map(xs, f):
         \case xs;
-          \valt Nil ()->\goto altNil206();
-          \valt Cons(x xs)->\goto altCons208(f, x, xs);
-      \block altNil206(): Nil
-      \block altCons208(f, x, xs):
-        \vbinds v210<-\goto b220(x); \label{uncurry_global_opt_toList}
+          \valt Nil()->\goto nil();
+          \valt Cons(x xs)->\goto cons(f, x, xs);
+      \block nil(): Nil
+      \block cons(f, x, xs):
+        \vbinds v210<-\goto toList(x); \label{uncurry_global_opt_toList}
         \vbinds v211<-\mkclo[Consclo1:v210];
-        \vbinds v214<-\goto caseEval216(xs, f); \label{uncurry_global_opt_map}
+        \vbinds v214<-\goto map(xs, f); \label{uncurry_global_opt_map}
         \app v211 * v214/
     \end{AVerb}
   \end{minipage}

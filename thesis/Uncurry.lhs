@@ -98,8 +98,9 @@ closure or jump to the block.
 >                   , fp_transfer = collapseTransfer blockArgs
 >                   , fp_rewrite = collapseRewrite (destinations labels) }
 >     
->     blockArgs :: Map Hoopl.Label [Var]
->     blockArgs = Map.fromList [(l, args) | (_, BlockEntry _ l args) <- entryPoints program]
+>     blockArgs  :: Map Hoopl.Label [Var]
+>     blockArgs  = Map.fromList [(l, args) | 
+>                (_, BlockEntry _ l args) <- entryPoints program]
 >
 >     destinations :: [Hoopl.Label] -> Map Hoopl.Label DestOf
 >     destinations = Map.fromList . catMaybes . {-"\hslabel{destinations}"-}
