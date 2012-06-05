@@ -103,12 +103,12 @@
 >   where
 >     opt :: CheckingFuelMonad SimpleUniqueMonad (Graph CStmt C C)
 >     opt = do
->       (program', _, _) <- analyzeAndRewriteBwd pass (JustC entryPoints) program facts
+>       (program', _, _) <-  analyzeAndRewriteBwd pass (JustC entryPoints) program 
+>                            facts
 >       return program' 
 >
->     pass = BwdPass { bp_lattice = lattice
->                   , bp_transfer = liveness 
->                   , bp_rewrite = eliminate }
+>     pass = BwdPass {  bp_lattice = lattice, bp_transfer = liveness
+>                       , bp_rewrite = eliminate }
 >
 >     entryPoints = case program of 
 >       (GMany _ blocks _) -> map (entry . blockToNodeList') (mapElems blocks)

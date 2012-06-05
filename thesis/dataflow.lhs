@@ -664,13 +664,13 @@ other \out sets.
 
 \begin{myfig}
   \begin{minipage}{\hsize}
-    \begin{AVerb}[numbers=left,gobble=6]
+    \begin{NVerb}[gobble=6]
       in($B$)$^0$ = $u$, out($B$)$^0$ = $f$, $\forall$\ nodes $B$; $f, u \in$\ \setL{Fact} \label{fig_back14_init}
       \textbf{do} \{
         in($B$)$^{i+1}$ = $\bigwedge\limits_{\mathclap{P \in pred(B)}} \text{out}^{i}$($P$) \label{fig_back14_in}
         out($B$)$^{i+1}$ = $t$(in($B$)$^i$, $B$)  \label{fig_back14_out}
       \} \textbf{until} out($B$)$^{i+1}$ = out($B$)$^{i}$, $\forall B$ \label{fig_back14_loop}
-    \end{AVerb}
+    \end{NVerb}
   \end{minipage}
   \caption{The dataflow algorithm, using parameters for facts, the meet operator,
     direction, and the transfer function.}
@@ -720,14 +720,14 @@ execute Line~$\ref{lst_back19_test_true}$, because the test !+if(a > b)+!
 is always false:
 
 \begin{singlespace}\correctspaceskip
-\begin{AVerb}[numbers=left]
+\begin{NVerb}
 int a = 1, b = 2, c; \label{lst_back19_assign}
 if(a > b) \label{lst_back19_test}
   c = 4; \label{lst_back19_test_true}
 else     
   c = 3; \label{lst_back19_test_false}
 \dots
-\end{AVerb}
+\end{NVerb}
 \end{singlespace}
 
 Our algorithm, however, does not take such conditions into
@@ -765,12 +765,10 @@ with $10$, resulting in the optimized program given in
 Figure~\ref{fig_back7}, Part~\subref{fig_back7_opt}.
 
 \begin{myfig}
-  \setlength{\tabcolsep}{2pt}
-  \hbox to \textwidth{\hss
-  \begin{tabular}{cc}
-    \input{fig_back12_tbl} & \def\prefix{fig_back12}\input{df_eg_cfg} \\
-    \scap{fig_back12_tbl} & \scap{df_eg_cfg}
-  \end{tabular}\hss}
+  \begin{tabular}{@@{}l@@{}r@@{}}
+    \hbox to 4.5in{\input{fig_back12_tbl}} & \hbox to 1.25in{\def\prefix{fig_back12}\input{df_eg_cfg}} \\
+    \hfil\scap{fig_back12_tbl} & \scap{df_eg_cfg}\hfil
+  \end{tabular}
   \caption{This figure shows the facts calculated for all nodes in our
     example program. Part~\subref{fig_back12_tbl} shows the \inE and
     \out facts associated with each node. Part~\subref{df_eg_cfg}

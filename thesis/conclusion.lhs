@@ -426,7 +426,7 @@ v215/. The \milres case/ statement on the next line immediately takes
 \begin{myfig}
   \begin{minipage}{\textwidth}
     \begin{singlespace}
-      \begin{AVerb}[gobble=8,numbers=left]
+      \begin{NNVerb}[gobble=8]
         \block loop(n, f):
            \vbinds v215<-\goto dec(n); \label{conc_fig_push1_goto_dec}
            \case v215;
@@ -450,7 +450,7 @@ v215/. The \milres case/ statement on the next line immediately takes
            \prim Just(v225)
       
         \block altFalse(): \prim Nothing()
-      \end{AVerb}
+      \end{NNVerb}
     \end{singlespace}
   \end{minipage}
   \caption{Initial form of our function.}

@@ -244,11 +244,28 @@
 % or the file will have two spaces.
 \newcommand{\rem}[1]{}
 
+\newcommand{\indentVerb}{\hskip12pt\relax}
 %% A verbatim environment with active charactesr
 %% so we can use math shortcuts and macros
 \DefineVerbatimEnvironment{AVerb}{Verbatim}{commandchars=\\\{\},%% 
   codes={\catcode`\_8\catcode`\$3\catcode`\^7},%%
   numberblanklines=false}
+
+%% This environment ensures line numbers do not extend into the right
+%% margin (for programs with less then 10 lines) .
+\setbox0=\hbox{\noindent\phantom{\scriptsize\ensuremath{9}\kern12pt}}%
+\newdimen\vrbLineMar\vrbLineMar=\wd0\relax%
+\DefineVerbatimEnvironment{NVerb}{Verbatim}{commandchars=\\\{\},%% 
+  codes={\catcode`\_8\catcode`\$3\catcode`\^7},%%
+  numberblanklines=false,numbers=left,xleftmargin=\the\vrbLineMar}
+
+%% This environment ensures line numbers do not extend into the right
+%% margin (for programs with up to 99 lines)
+\setbox0=\hbox{\noindent\phantom{\scriptsize\ensuremath{99}\kern12pt}}%
+\newdimen\vrbLineMarNN\vrbLineMarNN=\wd0\relax
+\DefineVerbatimEnvironment{NNVerb}{Verbatim}{commandchars=\\\{\},%% 
+  codes={\catcode`\_8\catcode`\$3\catcode`\^7},%%
+  numberblanklines=false,numbers=left,xleftmargin=\the\vrbLineMarNN}
 
 \DefineVerbatimEnvironment{Verb}{Verbatim}{commandchars=\\\[\],%% 
   numberblanklines=false}
@@ -257,6 +274,7 @@
 %% and reset the line number counter.
 \newcommand{\hsNumOn}{\numberson\numbersreset}
 \newcommand{\hsNumOff}{\numbersoff}
+
 %% Turn on line numbering in Haskell code within
 %% the environment, then turn it off. The optional
 %% argument specifies a prefix that \hslabel can

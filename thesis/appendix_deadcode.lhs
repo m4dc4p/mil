@@ -34,5 +34,5 @@ for headings and titles. Margins, line-spacing and font size conform
 to guidelines given by Portland State University's Office of Graduate
 Studies.
 
-This version of the thesis was created on \today.
+We created this version of the thesis on \today.
 \end{document}

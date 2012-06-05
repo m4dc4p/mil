@@ -20,7 +20,7 @@
   \node[stmt,
     below of=assigna1] (print) {|Call "printf" [String "%d", Var "c"]|\labelNode{hoopl_lst4_print}}; %%  :: CStmt O O
   \node[labelfor=print] () {\refNode{hoopl_lst4_print}};
-  \node[right=.1in of print.east, overlay] () {|:: CStmt O O|};
+  \node[right=.1in of print.east] () {|:: CStmt O O|};
 
   \node[stmt,
     below of=print] (assigna2) {|Assign "a" (Add (Var "c") (Const 2))|\labelNode{hoopl_lst4_assigna2}}; %%  :: CStmt O O

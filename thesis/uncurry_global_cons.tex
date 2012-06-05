@@ -1,5 +1,5 @@
 \begin{tabular*}{\textwidth}{l}\begin{minipage}[t]{\textwidth}
-  \begin{AVerb}[gobble=6,numbers=left]
+  \begin{NVerb}[gobble=6,numbers=left]
       \block cons(f, x, xs): \anchorF(altCons208a)
         v209 <- \mkclo[Consclo2:] \anchorF(v209a)
         \vbinds v210<-\app f*x/; \anchorF(v210a)
@@ -8,7 +8,7 @@
         \vbinds v213<-\app v212*f/; \anchorF(v213a)
         \vbinds v214<-\app v213*xs/; \anchorF(v214a)\label{ugb_map_end}
         \app v211 * v214/ 
-    \end{AVerb}
+    \end{NVerb}
 \end{minipage} \\\\
   \begin{tikzpicture}[overlay,remember picture]
     \node[fact, right=0.25in of altCons208a, anchor=west] (fvAltCons208a) {$\{\var f/\,:\,\mkclo[k219:]\unskip\}, \{\var x/\,:\,\top\}, \{\var xs/\,:\,\top\}$};
@@ -35,7 +35,7 @@
   \end{tikzpicture}%%
   \hfil\scap{uncurry_global_cons_a} \\
   \begin{minipage}[t]{\textwidth}
-  \begin{AVerb}[gobble=6,numbers=left]
+  \begin{NVerb}[gobble=6,numbers=left]
       \block cons(f, x, xs): 
         \vbinds v209 <- \mkclo[Consclo2:];
         \llap{$\rightarrow$}\vbinds v210<-\goto toList(x); \anchorF(v210b)\label{ugb_v210b}
@@ -44,7 +44,7 @@
         \llap{$\rightarrow$}\vbinds v213<-\mkclo[k204:f]; \anchorF(v213b)\label{ugb_v213b}
         \vbinds v214<-\app v213*xs/; 
         \app v211 * v214/ 
-    \end{AVerb}
+    \end{NVerb}
   \end{minipage} \\\\
   \begin{tikzpicture}[overlay,remember picture]
     \node[fact, right=0.25in of v210b, anchor=west] (fvv210b) {$\{\var v210/\,:\,\top\}$};
@@ -58,7 +58,7 @@
   \end{tikzpicture}%%
   \hfil\scap{uncurry_global_cons_b}\\
   \begin{minipage}[t]{\textwidth}
-  \begin{AVerb}[gobble=6,numbers=left]
+  \begin{NVerb}[gobble=6,numbers=left]
       \block cons(f, x, xs): 
         \xout{\vbinds v209 <- \mkclo[Consclo2:];}
         \vbinds v210<-\goto toList(x);
@@ -67,7 +67,7 @@
         \xout{\vbinds v213<-\mkclo[k204:f];}
         \llap{$\rightarrow$}\vbinds v214<-\goto map(xs, f); \anchorF(v214c)\label{ugb_v214c}
         \app v211 * v214/ 
-    \end{AVerb}
+    \end{NVerb}
   \end{minipage} \\\\
   \begin{tikzpicture}[overlay,remember picture]
     \node[fact, right=0.25in of v214c, anchor=west] (fvv214c) {$\{\var v214/\,:\,\top\}$};

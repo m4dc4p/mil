@@ -159,14 +159,14 @@ executes when all of the arguments to |compose| are available.
     \end{minipage} \\
     \hss\scap{uncurry_fig_compose_a}\hss \\
     \begin{minipage}{\hsize}
-      \begin{AVerb}[numbers=left, gobble=8]
+      \begin{NVerb}[gobble=8]
         \block k0(): \mkclo[k1:] 
         \ccblock k1()f: \mkclo[k2:f] 
         \ccblock k2(f)g: \mkclo[k3:f, g] 
         \ccblock k3(f, g)x: \goto compose(f, g, x) 
         
         \block compose(f, g, x): {\rm\emph{\dots as in Figure \ref{mil_fig1b} on Page \pageref{mil_fig1b}}\dots} 
-      \end{AVerb}
+      \end{NVerb}
     \end{minipage} \\\\
     \hss\scap{uncurry_fig_compose_b}\hss
   \end{tabular}
@@ -1071,13 +1071,13 @@ rewritten lines with a $\rightarrow$ symbol.
 
 \begin{myfig}
   \begin{tabular*}{\textwidth}{l}\begin{minipage}[t]{\textwidth}
-    \begin{AVerb}[gobble=6,numbers=left]
+    \begin{NVerb}[gobble=6]
       \block main(ns):  \anchorF(nsa)
         \vbinds v227<-\mkclo[k203:];\anchorF(v227a) \label{main_v227a}
         \vbinds v228<-\mkclo[k219:];\anchorF(v228a)
         \vbinds v229<-\app v227*v228/;\anchorF(v229a) \label{main_v229a}
         \app v229 * ns/ 
-    \end{AVerb}
+    \end{NVerb}
   \end{minipage} \\\\
     \begin{tikzpicture}[overlay,remember picture]
       \node[fact, right=0.25in of nsa, anchor=west] (fvnsa) {$\{\var ns/\,:\,\top\}$};
@@ -1091,13 +1091,13 @@ rewritten lines with a $\rightarrow$ symbol.
     \end{tikzpicture}%%
   \hfil\scap{uncurry_global_main_a} \\
   \begin{minipage}[t]{\textwidth}
-    \begin{AVerb}[gobble=6,numbers=left]
+    \begin{NVerb}[gobble=6]
       \block main(ns): 
         \vbinds v227<-\mkclo[k203:];
         \vbinds v228<-\mkclo[k219:];
         \llap{\ensuremath{\rightarrow} }\vbinds v229<-\mkclo[k204:v228];\anchorF(v229b) \label{main_v229b}
         \app v229 * ns/\label{main_app_b}
-    \end{AVerb}
+    \end{NVerb}
   \end{minipage} \\\\
   \begin{tikzpicture}[overlay,remember picture]
     \node[fact, right=0.25in of v229b, anchor=west] (fv229b) {$\{\var v229/\,:\,\{\mkclo[k204:v228]\unskip\}$};
@@ -1105,13 +1105,13 @@ rewritten lines with a $\rightarrow$ symbol.
   \end{tikzpicture}%%
   \hfil\scap{uncurry_global_main_b} \\
   \begin{minipage}[t]{\textwidth}
-    \begin{AVerb}[gobble=6,numbers=left]
+    \begin{NVerb}[gobble=6]
       \block main(ns): 
         \xout{\vbinds v227<-\mkclo[k203:];}
         \vbinds v228<-\mkclo[k219:];
         \xout{\vbinds v229<-\mkclo[k204:v228];}
         \llap{\ensuremath{\rightarrow} }\goto map(ns, v228) \anchorF(gotoCaseEval216a)
-    \end{AVerb}
+    \end{NVerb}
   \end{minipage} \\
   \begin{tikzpicture}[overlay,remember picture]
     \node[fact, right=0.25in of gotoCaseEval216a, anchor=west] (fvGotoCaseEval216a) {$\{\var ns/\,:\,\top\}, \{\var v228/\,:\,\mkclo[k219:]\unskip\}$};
