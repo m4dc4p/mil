@@ -17,7 +17,7 @@ optimization, the dead-code elimination example from Chapter~\ref{ref_chapter_ho
 the ``monadic'' optimizations mentioned in Section~\ref{conc_other}, and a number
 of other artifacts of this work (including the entire \TeX\ source of this document)
 can be downloaded from \texttt{http://mil.codeslower.com}. The author can also
-be contacted via e-mail at \texttt{jgbailey@@gmail.com}.
+be contacted via e-mail at \texttt{jgbailey@@codeslower.com}.
 
 \section*{Colophon}
 

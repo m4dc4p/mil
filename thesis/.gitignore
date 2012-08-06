@@ -32,3 +32,6 @@ preamble.fmt
 *@*
 appendix_deadcode.tex
 *.bundle
+pre_defense.fmt
+*.vrb
+defense.tex

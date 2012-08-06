@@ -3,7 +3,7 @@
 %include polycode.fmt
 %include lineno.fmt
 %include subst.fmt
-\author[Justin Bailey]{Justin Bailey \\ \texttt{jgbailey@@gmail.com}}
+\author[Justin Bailey]{Justin Bailey \\ \texttt{jgbailey@@codeslower.com}}
 \institute{Portland State University}
 \title{Using Dataflow Optimization Techniques with a Monadic Intermediate Language}
 \date{\today}%\setbeameroption{show notes}
@@ -1538,7 +1538,7 @@ $$
 
 \begin{frame}[fragile]{Questions?}
 Source code and paper available at \url{http://mil.codeslower.com}, or 
-email me at \texttt{jgbailey@@gmail.com}.
+email me at \texttt{jgbailey@@codeslower.com}.
 \end{frame}
 
 %% \subsection{Monadic Effects}
