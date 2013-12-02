@@ -6,12 +6,13 @@
 \author[Justin Bailey]{Justin Bailey \\ \texttt{jgbailey@@codeslower.com}}
 \institute{Portland State University}
 \title{Using Dataflow Optimization Techniques with a Monadic Intermediate Language}
-\date{\today}%\setbeameroption{show notes}
+\date{May 7, 2012}%\setbeameroption{show notes}
 \begin{document}\nomd\numbersoff
 
 \setbeamertemplate{navigation symbols}{}
 \makeatletter\begin{frame}[plain]
 \vfill\hbox{\kern-.5\beamer@@leftsidebar\vbox{\titlepage}}\vfill
+\hfill\tiny This document generated \today.
 \end{frame}\makeatother
 
 %%\begin{comment}
