@@ -563,7 +563,6 @@ about \var g/ conflicts, so we set \inL(b2)'s fact about \var g/ to $\top$.}
     (2010)
   \item Used in the Glasgow Haskell Compiler
   \item Based on ``Composing Dataflow Analyses and Transformations'' by Lerner, Grove, and Chambers (2002)
-  \item 
   \end{itemize}
 \end{frame}
 
